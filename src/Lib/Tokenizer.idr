@@ -13,10 +13,6 @@ specialOps = ["->", ":"]
 checkKW : String -> Token Kind
 checkKW s = if elem s keywords then Tok Keyword s else Tok Ident s
 
-opkind : String -> Kind
-opkind "->" = Arrow
-opkind _    = Oper
-
 isOpChar : Char -> Bool
 isOpChar c = c `elem` (unpack ":!#$%&*+./<=>?@\\^|-~")
 
@@ -28,7 +24,7 @@ opChar = pred isOpChar
 -- tmap = [
 --   (alpha <+> many alphaNum, checkKW),
 --   (some digit, Tok Number),
---   (some opChar, \s => Tok (opkind s) s),
+--   (some opChar, \s => Tok Oper s),
 --   (lineComment (exact "--"), Tok Space),
 --   (symbol, Tok Symbol),
 --   (spaces, Tok Space)
@@ -38,7 +34,7 @@ rawTokens : Tokenizer (Token Kind)
 rawTokens
    =  match (alpha <+> many alphaNum) checkKW
   <|> match (some digit) (Tok Number)
-  <|> match (some opChar) (\s => Tok (opkind s) s)
+  <|> match (some opChar) (\s => Tok Oper s)
   <|> match (lineComment (exact "--")) (Tok Space)
   <|> match symbol (Tok Symbol)
   <|> match spaces (Tok Space)

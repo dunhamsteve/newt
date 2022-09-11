@@ -33,9 +33,19 @@ Functor Result where
 export
 data Parser a = P (TokenList -> Bool -> (lc : (Int,Int)) -> Result a)
 
+export
 runP : Parser a -> TokenList -> Bool -> (Int,Int) -> Result a
 runP (P f) = f
 
+export
+parse : Parser a -> TokenList -> Either String a
+parse pa toks = case runP pa toks False (0,0) of
+  Fail (E msg) toks com => Left "error: \{msg} next at: \{show toks}"
+  OK a [] _ => Right a
+  OK a ts _ => Left "Extra toks \{show ts}"
+
+
+export
 fail : String -> Parser a
 fail msg = P $ \toks,com,col => Fail (E msg) toks com
 
@@ -58,23 +68,24 @@ export
 Alternative Parser where
   empty = fail "empty"
   (P pa) <|> (P pb) = P $ \toks,com,col =>
-    case pa toks com col of
-      f@(Fail _ _ com') => if com' then f else pb toks com col
-      t => t
+    case pa toks False col of
+      OK a toks' _ => OK a toks' com
+      Fail err toks' True  => Fail err toks' com
+      Fail err toks' False => pb toks com col
 
 export
 Monad Parser where
   P pa >>= pab = P $ \toks,com,col =>
     case pa toks com col of
       (OK a toks com) => runP (pab a) toks com col
-      (Fail err xs x) => ?rhs_1
+      (Fail err xs x) => Fail err xs x
 
 
 -- do we need this?
 pred : (BTok -> Bool) -> String -> Parser String
 pred f msg = P $ \toks,com,col =>
   case toks of
-    (t :: ts) => if f t then OK (value t) ts com else Fail (E msg) toks com
+    (t :: ts) => if f t then OK (value t) ts com else Fail (E "\{msg} vt:\{value t}") toks com
     [] => Fail (E "eof") toks com
 
 export
@@ -82,19 +93,17 @@ commit : Parser ()
 commit = P $ \toks,com,col => OK () toks True
 
 export
-token : Kind -> Parser String
-token k = pred (\t => t.val.kind == k) "Expected a \{show k}"
+defer : (() -> (Parser a)) -> Parser a
+defer f = P $ \toks,com,col => runP (f ()) toks com col
 
 
-export
-keyword : String -> Parser ()
-keyword kw = ignore $ pred (\t => t.val.text == kw) "Expected \{kw}"
-
-
-many : Parser a -> Parser (List a)
-some : Parser a -> Parser (List a)
-some p = (::) <$> p <*> many p
-many p = some p <|> pure []
+mutual
+  
+  export some : Parser a -> Parser (List a)
+  some p = defer $ \_ => [| p :: many p|] --(::) <$> p <*> many p)
+  
+  export many : Parser a -> Parser (List a)
+  many p = some p <|> pure []
 
 -- sixty let has some weird CPS stuff, but essentially:
 
@@ -108,7 +117,7 @@ export
 startBlock : Parser a -> Parser a
 startBlock (P p) = P $ \toks,com,(l,c) => case toks of
   [] => p toks com (l,c)
-  (t :: ts) =>
+  (t :: _) =>
     let (tl,tc) = start t
     in p toks com (tl,tc)
 
@@ -118,7 +127,7 @@ export
 sameLevel : Parser a -> Parser a
 sameLevel (P p) = P $ \toks,com,(l,c) => case toks of
   [] => p toks com (l,c)
-  (t :: ts) => 
+  (t :: _) => 
     let (tl,tc) = start t 
     in if tc == c then p toks com (tl, c)
     else if c < tc then Fail (E "unexpected indent") toks com
@@ -126,14 +135,38 @@ sameLevel (P p) = P $ \toks,com,(l,c) => case toks of
 
 export
 someSame : Parser a -> Parser (List a)
-someSame = some . sameLevel
+someSame pa = some $ sameLevel pa
 
 ||| requires a token to be indented?
+export
 indented : Parser a -> Parser a
 indented (P p) = P $ \toks,com,(l,c) => case toks of
   [] => p toks com (l,c)
-  (t::ts) =>
+  (t::_) =>
     let (tl,tc) = start t
     in if tc > c || tl == l then p toks com (l,c)
     else Fail (E "unexpected outdent") toks com
+
+
+
+export
+token' : Kind -> Parser String
+token' k = pred (\t => t.val.kind == k) "Expected a \{show k}"
+
+
+export
+keyword' : String -> Parser ()
+keyword' kw = ignore $ pred (\t => t.val.text == kw) "Expected \{kw}"
+
+export
+token : Kind -> Parser String
+token = indented . token'
+
+export
+keyword : String -> Parser ()
+keyword kw = indented $ keyword' kw
+
+export
+sym : String -> Parser ()
+sym = keyword
 

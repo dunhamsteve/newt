@@ -9,8 +9,8 @@ data Kind
   | Oper 
   | Number 
   | Symbol
-  | Arrow
   | Space
+  -- not doing Layout.idr
   | LBrace
   | Semi
   | RBrace
@@ -22,7 +22,6 @@ Show Kind where
   show Oper    = "Oper"
   show Number  = "Number"
   show Symbol  = "Symbol"
-  show Arrow   = "Arrow"
   show Space  = "Space"
   show LBrace  = "LBrace"
   show Semi    = "Semi"
@@ -35,7 +34,6 @@ Eq Kind where
   Oper    == Oper = True
   Number  == Number = True
   Symbol  == Symbol = True
-  Arrow   == Arrow = True
   Space   == Space = True
   LBrace  == LBrace = True
   Semi    == Semi   = True
