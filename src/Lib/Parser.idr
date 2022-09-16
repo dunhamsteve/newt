@@ -65,7 +65,7 @@ data Fixity = InfixL | InfixR | Infix
 operators : List (String, Int, Fixity)
 operators = [
   ("->", 1, InfixR),
-  ("=", 2, InfixL), -- REVIEW
+  ("=", 2, InfixL), -- REVIEW L R ?
   ("+",4,InfixL),
   ("-",4,InfixL),
   ("*",5,InfixL),
@@ -119,7 +119,7 @@ letExpr = do
 pPattern : Parser Pattern
 pPattern
    = PatWild <$ keyword "_"
-  <|> [| PatVar ident |]
+  <|> PatVar <$> ident
 
 export
 lamExpr : Parser Term
@@ -154,32 +154,29 @@ caseExpr = do
 term = defer $ \_ => 
         caseExpr
     <|> letExpr
+    <|> lamExpr
     <|> parseOp
 
-{-
-so lets say we wanted to do the indent, the hard way. 
 
-what does this look like
+-- And top level stuff
 
-We want to say:
-   kw 'let' $  indentedSome assignment
+parseSig : Parser Decl
+parseSig = TypeSig <$> ident <* keyword ":" <*> term
 
-now assignment is going to be whatever, but we need to make sure the initial token can/must be at
-current indentation level.
-
-Ok idris indent is not Col, it's AnyIndent | AtPos Int | AfterPos Int
-
-The col though is somehow sixty.
-
-sixten is sameCol, dropAnchor, with an "environment"
+parseDef : Parser Decl
+parseDef = Def <$> ident <* keyword "=" <*> term
 
 
-sixty is Position is line and col and either line matches or col < tokenCol.
+parseDecl : Parser Decl
+parseDecl = parseSig <|> parseDef
 
-that's maybe doable..
-
-
-
-
- -}
+export
+parseMod : Parser Module
+parseMod = do
+  keyword "module"
+  name <- ident
+  -- probably should be manySame, and we want to start with col -1
+  -- if we enforce blocks indent
+  decls <- startBlock $ someSame $ parseDecl
+  pure $ MkModule name [] decls
 

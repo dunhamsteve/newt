@@ -60,11 +60,13 @@ Telescope = List Decl -- pi-forall, always typeSig?
 
 data ConstrDef = MkCDef Name Telescope
 
+public export
 data Decl
-  = TypeSig Name RigCount TyTerm
+  = TypeSig Name TyTerm
   | Def Name Term
   | Data Name Telescope (List ConstrDef)
 
+public export
 record Module where
   constructor MkModule
   name : Name
@@ -75,6 +77,18 @@ foo : List String -> String
 foo ts = "(" ++ unwords ts ++ ")"
 
 mutual
+  Show ConstrDef where
+    show x = ?holex
+
+  covering
+  Show Decl where
+    show (TypeSig str x) = foo ["TypeSig", show str, show x]
+    show (Def str x) = foo ["Def", show str, show x]
+    show (Data str xs ys) = foo ["Data", show str, show xs, show ys]
+  
+  export covering
+  Show Module where
+    show (MkModule name imports decls) = foo ["MkModule", show name, show imports, show decls]
 
   Show RigCount where
     show Rig0 = "Rig0"
