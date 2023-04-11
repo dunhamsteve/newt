@@ -1,0 +1,9 @@
+module Ex
+
+data Bool : Type where
+  True : Bool
+  False : Bool
+
+id : a -> a
+id = \ a => a
+
