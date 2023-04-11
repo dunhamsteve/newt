@@ -20,7 +20,6 @@ import Data.List
 
 ident = token Ident
 
-
 parens : Parser a -> Parser a
 parens pa = do
   sym "("
@@ -33,11 +32,8 @@ lit = do
   t <- token Number
   pure $ Lit (LInt (cast t))
 
-
-
 export
 term : (Parser Term)
-
 
 -- ( t : ty ), (t , u) (t)
 -- Or do we want (x : ty)  I think we may need to annotate any term
@@ -77,7 +73,6 @@ parseApp = do
   rest <- many atom
   pure $ foldl App hd rest
   
-
 parseOp : Lazy (Parser Term)
 parseOp = parseApp >>= go 0
   where
@@ -95,7 +90,6 @@ parseOp = parseApp >>= go 0
         right <- go pr !(parseApp)
         go prec (App (App (Var op) left) right)
       <|> pure left
-
 
 export
 letExpr : Parser Term
@@ -174,8 +168,20 @@ parseDef : Parser Decl
 parseDef = Def <$> ident <* keyword "=" <*> term
 
 export
+parseData : Parser Decl
+parseData = do
+  keyword "data"
+  name <- ident
+  keyword ":"
+  ty <- term
+  keyword "where"
+  decls <- startBlock $ someSame $ parseSig
+  -- TODO - turn decls into something more useful
+  pure $ Data name ty decls
+
+export
 parseDecl : Parser Decl
-parseDecl = parseImport <|> parseSig <|> parseDef
+parseDecl = parseImport <|> parseSig <|> parseDef <|> parseData
 
 export
 parseMod : Parser Module

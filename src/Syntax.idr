@@ -55,7 +55,7 @@ data Decl
   = TypeSig Name TyTerm
   | Def Name Term
   | DImport Name
-  | Data Name Telescope (List ConstrDef)
+  | Data Name Term (List Decl)
 
 public export
 record Module where
