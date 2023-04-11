@@ -44,6 +44,7 @@ parse pa toks = case runP pa toks False (0,0) of
   OK a [] _ => Right a
   OK a ts _ => Left "Extra toks \{show ts}"
 
+-- I think I want to drop the typeclasses for v1
 
 export
 fail : String -> Parser a
@@ -147,11 +148,9 @@ indented (P p) = P $ \toks,com,(l,c) => case toks of
     in if tc > c || tl == l then p toks com (l,c)
     else Fail (E "unexpected outdent") toks com
 
-
-
 export
 token' : Kind -> Parser String
-token' k = pred (\t => t.val.kind == k) "Expected a \{show k}"
+token' k = pred (\t => t.val.kind == k) "Expected a \{show k} token"
 
 
 export

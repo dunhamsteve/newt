@@ -107,7 +107,6 @@ letExpr = do
   scope <- term
   pure $ Let alts scope
   -- Let <$ keyword "let" <*> ident <* keyword "=" <*> term <* keyword "in" <*> term
-
   where
     letAssign : Parser (Name,Term)
     letAssign = do
@@ -127,7 +126,7 @@ lamExpr = do
   keyword "\\"
   commit
   name <- pPattern
-  keyword "."
+  keyword "=>"
   scope <- term
   pure $ Lam name scope
 
@@ -150,25 +149,33 @@ caseExpr = do
   alts <- startBlock $ someSame $ caseAlt
   pure $ Case sc alts
 
-
 term = defer $ \_ => 
         caseExpr
     <|> letExpr
     <|> lamExpr
     <|> parseOp
 
-
 -- And top level stuff
 
+optional : Parser a -> Parser (Maybe a)
+optional pa = Just <$> pa <|> pure Nothing
+
+export
 parseSig : Parser Decl
 parseSig = TypeSig <$> ident <* keyword ":" <*> term
 
+parseImport : Parser Decl
+parseImport = DImport <$ keyword "import" <*> ident
+
+-- Do we do pattern stuff now? or just name = lambda?
+
+export
 parseDef : Parser Decl
 parseDef = Def <$> ident <* keyword "=" <*> term
 
-
+export
 parseDecl : Parser Decl
-parseDecl = parseSig <|> parseDef
+parseDecl = parseImport <|> parseSig <|> parseDef
 
 export
 parseMod : Parser Module
@@ -176,7 +183,7 @@ parseMod = do
   keyword "module"
   name <- ident
   -- probably should be manySame, and we want to start with col -1
-  -- if we enforce blocks indent
+  -- if we enforce blocks indent more than parent
   decls <- startBlock $ someSame $ parseDecl
   pure $ MkModule name [] decls
 

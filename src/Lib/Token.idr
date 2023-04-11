@@ -10,10 +10,12 @@ data Kind
   | Number 
   | Symbol
   | Space
+  | Comment
   -- not doing Layout.idr
   | LBrace
   | Semi
   | RBrace
+  | EOI
 
 export
 Show Kind where
@@ -26,6 +28,8 @@ Show Kind where
   show LBrace  = "LBrace"
   show Semi    = "Semi"
   show RBrace  = "RBrace"
+  show Comment = "Comment"
+  show EOI     = "EOI"
 
 export
 Eq Kind where
