@@ -1,15 +1,6 @@
 module Syntax
 
 import Data.String
-import Derive
-
--- Good enough start, lets parse
--- This is informed by pi-forall and others and is somewhat low level
--- %language ElabReflection
--- %logging "foo" 19
-
-%hide Name
-%hide Decl
 
 Name = String
 
@@ -127,9 +118,7 @@ Show Plicity where
 
 covering
 Show Term where
-  show (Ann t ty) = "Ann" ++ " " ++ show t ++ " " ++ show ty
   show Wildcard = "Wildcard"
-  
   show (Var name) = foo ["Var", show name]
   show (Ann t ty) = foo [ "Ann", show t, show ty]
   show (Lit x) = foo [ "Lit", show x]
@@ -138,6 +127,5 @@ Show Term where
   show (App x y) = foo [ "App", show x, show y]
   show (Lam x y) = foo [ "Lam", show x, show y]
   show (Case x xs) = foo [ "Case", show x, show xs]
-  
   show (ParseError str) = foo [ "ParseError", "str"]
-  show _ = "woo"
+
