@@ -1,12 +1,12 @@
 module Syntax
 
 import Data.String
+import Lib.Parser.Impl
+
 
 Name = String
 
-data Term : Type where
-
-TyTerm = Term
+data Raw : Type where
 
 public export
 data Literal = LString String | LInt Int | LBool Bool
@@ -26,20 +26,23 @@ data Pattern
 
 -- could be a pair, but I suspect stuff will be added?
 public export
-data CaseAlt = MkAlt Pattern Term
+data CaseAlt = MkAlt Pattern Raw
 
 public export
-data Term
-  = Var Name
-  | Ann Term TyTerm
-  | Lit Literal
-  | Let (List (Name, Term)) Term
-  | Pi Name Plicity Term Term
-  | App Term Term
-  | Lam Pattern Term
-  | Case Term (List CaseAlt)
-  | Wildcard
-  | ParseError String
+data Raw
+  = RVar Name  
+  | RLam Pattern Raw
+  | RApp Raw Raw
+  | RU
+  | RPi Name Plicity Raw Raw
+  | RLet (List (Name, Raw)) Raw
+  | RSrcPos SourcePos Raw
+
+  | RAnn Raw Raw
+  | RLit Literal
+  | RCase Raw (List CaseAlt)
+  | RWildcard
+  | RParseError String
 
 -- derive some stuff - I'd like json, eq, show, ...
 
@@ -52,10 +55,10 @@ data ConstrDef = MkCDef Name Telescope
 
 public export
 data Decl
-  = TypeSig Name TyTerm
-  | Def Name Term
+  = TypeSig Name Raw
+  | Def Name Raw
   | DImport Name
-  | Data Name Term (List Decl)
+  | Data Name Raw (List Decl)
 
 public export
 record Module where
@@ -76,7 +79,7 @@ Show Literal where
 
 export
 covering
-implementation Show Term
+implementation Show Raw
 
 export
 implementation Show Decl
@@ -117,15 +120,18 @@ Show Plicity where
   show Eq = "Eq"
 
 covering
-Show Term where
-  show Wildcard = "Wildcard"
-  show (Var name) = foo ["Var", show name]
-  show (Ann t ty) = foo [ "Ann", show t, show ty]
-  show (Lit x) = foo [ "Lit", show x]
-  show (Let alts y) = foo [ "Let", show alts, show y]
-  show (Pi str x y z) = foo [ "Pi", show str, show x, show y, show z]
-  show (App x y) = foo [ "App", show x, show y]
-  show (Lam x y) = foo [ "Lam", show x, show y]
-  show (Case x xs) = foo [ "Case", show x, show xs]
-  show (ParseError str) = foo [ "ParseError", "str"]
+Show Raw where
+  show RWildcard = "Wildcard"
+  show (RVar name) = foo ["RVar", show name]
+  show (RAnn t ty) = foo [ "RAnn", show t, show ty]
+  show (RLit x) = foo [ "RLit", show x]
+  show (RLet alts y) = foo [ "Let", show alts, show y]
+  show (RPi str x y z) = foo [ "Pi", show str, show x, show y, show z]
+  show (RApp x y) = foo [ "App", show x, show y]
+  show (RLam x y) = foo [ "Lam", show x, show y]
+  show (RCase x xs) = foo [ "Case", show x, show xs]
+  show (RParseError str) = foo [ "ParseError", "str"]
+  show RU = "U"
+  show (RSrcPos pos tm) = show tm
+
 

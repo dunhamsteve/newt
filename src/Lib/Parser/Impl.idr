@@ -6,6 +6,14 @@ public export
 TokenList : Type
 TokenList = List BTok
 
+-- I was going to use a record, but we're peeling this off of bounds at the moment.
+public export
+SourcePos : Type
+SourcePos = (Int,Int)
+
+emptyPos : SourcePos
+emptyPos = (0,0) 
+
 -- Error of a parse
 public export
 data Error = E String
@@ -31,15 +39,15 @@ Functor Result where
 
 -- dunno why I'm making that a pair..
 export
-data Parser a = P (TokenList -> Bool -> (lc : (Int,Int)) -> Result a)
+data Parser a = P (TokenList -> Bool -> (lc : SourcePos) -> Result a)
 
 export
-runP : Parser a -> TokenList -> Bool -> (Int,Int) -> Result a
+runP : Parser a -> TokenList -> Bool -> SourcePos -> Result a
 runP (P f) = f
 
 export
 parse : Parser a -> TokenList -> Either String a
-parse pa toks = case runP pa toks False (0,0) of
+parse pa toks = case runP pa toks False emptyPos of
   Fail (E msg) toks com => Left "error: \{msg} next at: \{show toks}"
   OK a [] _ => Right a
   OK a ts _ => Left "Extra toks \{show ts}"
@@ -65,6 +73,7 @@ Applicative Parser where
           (OK x toks com) => OK (f x) toks com
           (Fail err toks com) => Fail err toks com
 
+-- REVIEW it would be nice if the second argument was lazy...
 export
 Alternative Parser where
   empty = fail "empty"
@@ -112,6 +121,11 @@ mutual
 --   Lexer.LLet -> PLet <$> blockOfMany let_ <* token Lexer.In <*> term
 
 -- withIndentationBlock - sets the col
+export
+getPos : Parser SourcePos
+getPos = P $ \toks,com, (l,c) => case toks of
+  [] => Fail (E "End of file") toks com -- OK emptyPos toks com
+  (t :: ts) => OK (start t) toks com
 
 ||| Start an indented block and run parser in it
 export

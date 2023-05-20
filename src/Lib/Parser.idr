@@ -27,17 +27,20 @@ parens pa = do
   sym ")"
   pure t
 
-lit : Parser Term
+lit : Parser Raw
 lit = do
   t <- token Number
-  pure $ Lit (LInt (cast t))
+  pure $ RLit (LInt (cast t))
 
 export
-term : (Parser Term)
+term : (Parser Raw)
+
+withPos : Parser Raw -> Parser Raw
+withPos p = RSrcPos <$> getPos <*> p
 
 -- ( t : ty ), (t , u) (t)
--- Or do we want (x : ty)  I think we may need to annotate any term
-parenThinger : Parser Term
+-- Or do we want (x : ty)  I think we may need to annotate any Raw
+parenThinger : Parser Raw
 parenThinger = do
   keyword "("
   t <- term
@@ -45,12 +48,12 @@ parenThinger = do
   -- we could do this with backtracing, but it'd kinda suck?
   fail "todo"
 
--- the inside of term
-atom : Parser Term
-atom = lit 
-    <|> Var <$> ident
+-- the inside of Raw
+atom : Parser Raw
+atom = lit
+    <|> withPos (RVar <$> ident)
     <|> parens term
-    -- <|> sym "(" *> term <* sym ")"
+    -- <|> sym "(" *> Raw <* sym ")"
 
 --
 -- atom is lit or ident
@@ -67,16 +70,16 @@ operators = [
   ("*",5,InfixL),
   ("/",5,InfixL)
 ]
-parseApp : Parser Term
+parseApp : Parser Raw
 parseApp = do
   hd <- atom
   rest <- many atom
-  pure $ foldl App hd rest
+  pure $ foldl RApp hd rest
   
-parseOp : Lazy (Parser Term)
+parseOp : Lazy (Parser Raw)
 parseOp = parseApp >>= go 0
   where
-    go : Int -> Term -> Parser Term
+    go : Int -> Raw -> Parser Raw
     go prec left = 
       do
         op <- token Oper
@@ -88,21 +91,21 @@ parseOp = parseApp >>= go 0
         let pr = case fix of InfixR => p; _ => p + 1
         -- commit?
         right <- go pr !(parseApp)
-        go prec (App (App (Var op) left) right)
+        go prec (RApp (RApp (RVar op) left) right)
       <|> pure left
 
 export
-letExpr : Parser Term
+letExpr : Parser Raw
 letExpr = do
   keyword "let"
   commit
   alts <- startBlock $ someSame $ letAssign
   keyword' "in"
   scope <- term
-  pure $ Let alts scope
-  -- Let <$ keyword "let" <*> ident <* keyword "=" <*> term <* keyword "in" <*> term
+  pure $ RLet alts scope
+  -- Let <$ keyword "let" <*> ident <* keyword "=" <*> Raw <* keyword "in" <*> Raw
   where
-    letAssign : Parser (Name,Term)
+    letAssign : Parser (Name,Raw)
     letAssign = do
       name <- ident
       keyword "="
@@ -115,33 +118,33 @@ pPattern
   <|> PatVar <$> ident
 
 export
-lamExpr : Parser Term
+lamExpr : Parser Raw
 lamExpr = do
   keyword "\\"
   commit
   name <- pPattern
   keyword "=>"
   scope <- term
-  pure $ Lam name scope
+  pure $ RLam name scope
 
 
 caseAlt : Parser CaseAlt
 caseAlt = do
-  pat <- pPattern -- Term and sort it out later?
+  pat <- pPattern -- term and sort it out later?
   keyword "=>"
   commit
   t <- term
   pure $ MkAlt pat t
 
 export
-caseExpr : Parser Term
+caseExpr : Parser Raw
 caseExpr = do
   keyword "case"
   commit
   sc <- term
   keyword "of"
   alts <- startBlock $ someSame $ caseAlt
-  pure $ Case sc alts
+  pure $ RCase sc alts
 
 term = defer $ \_ => 
         caseExpr
