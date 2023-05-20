@@ -71,4 +71,4 @@ main = do
   Right files <- listDir "eg"
     | Left err => printLn err
   traverse_ testFile (filter (".newt" `isSuffixOf`) files)
-  
+

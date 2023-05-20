@@ -26,8 +26,8 @@ rawTokens : Tokenizer (Token Kind)
 rawTokens
    =  match (alpha <+> many identMore) checkKW
   <|> match (some digit) (Tok Number)
-  <|> match (some opChar) (\s => Tok Oper s)
   <|> match (lineComment (exact "--")) (Tok Space)
+  <|> match (some opChar) (\s => Tok Oper s)
   <|> match symbol (Tok Symbol)
   <|> match spaces (Tok Space)
 

@@ -12,6 +12,7 @@ public export
 data Literal = LString String | LInt Int | LBool Bool
 public export
 data RigCount = Rig0 | RigW
+-- I think I got Eq from pi-forall, it uses it for equality args (which are kinda like Prop/Rig0?)
 public export
 data Plicity = Implicit | Explicit | Eq
 
@@ -30,7 +31,7 @@ data CaseAlt = MkAlt Pattern Raw
 
 public export
 data Raw
-  = RVar Name  
+  = RVar Name
   | RLam Pattern Raw
   | RApp Raw Raw
   | RU
