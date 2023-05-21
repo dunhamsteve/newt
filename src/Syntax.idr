@@ -32,8 +32,8 @@ data CaseAlt = MkAlt Pattern Raw
 public export
 data Raw
   = RVar Name
-  | RLam Pattern Raw
-  | RApp Raw Raw
+  | RLam String Plicity Raw
+  | RApp Raw Raw Plicity
   | RU
   | RPi Name Plicity Raw Raw
   | RLet (List (Name, Raw)) Raw
@@ -42,7 +42,7 @@ data Raw
   | RAnn Raw Raw
   | RLit Literal
   | RCase Raw (List CaseAlt)
-  | RWildcard
+  | RHole
   | RParseError String
 
 -- derive some stuff - I'd like json, eq, show, ...
@@ -122,14 +122,14 @@ Show Plicity where
 
 covering
 Show Raw where
-  show RWildcard = "Wildcard"
+  show RHole = "_"
   show (RVar name) = foo ["RVar", show name]
   show (RAnn t ty) = foo [ "RAnn", show t, show ty]
   show (RLit x) = foo [ "RLit", show x]
   show (RLet alts y) = foo [ "Let", show alts, show y]
   show (RPi str x y z) = foo [ "Pi", show str, show x, show y, show z]
-  show (RApp x y) = foo [ "App", show x, show y]
-  show (RLam x y) = foo [ "Lam", show x, show y]
+  show (RApp x y z) = foo [ "App", show x, show y, show z]
+  show (RLam x i y) = foo [ "Lam", show x, show i, show y]
   show (RCase x xs) = foo [ "Case", show x, show xs]
   show (RParseError str) = foo [ "ParseError", "str"]
   show RU = "U"

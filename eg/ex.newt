@@ -12,10 +12,13 @@ id : a -> a
 -- declaration
 id = \ a => a * a + 2 * (3 + x)
 
--- this is complicated with patterns because we need to group stuff together.
--- I really should make a simple grammar
-
--- I want to put this on ice, there is so much to do before patterns..
-
 blah : Either a a -> a
 blah = \ x => let x = 1 in x * x
+
+bar = foo {x} 1
+blah = \ _ => 1
+
+
+next : (A : Type) -> (x : A) -> A
+
+next : {A : Type} -> (x : A) -> A

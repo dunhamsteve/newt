@@ -23,12 +23,12 @@ data Error = E String
 public export
 data Result : Type -> Type where
   OK : a -> (toks : TokenList) -> (com : Bool) -> Result a
-  Fail : Error -> (toks : TokenList) -> (com : Bool)  -> Result a  
+  Fail : Bool -> Error -> (toks : TokenList) -> (com : Bool)  -> Result a  
 
 export
 Functor Result where
   map f (OK a toks com ) = OK (f a) toks com
-  map _ (Fail err toks com) = Fail err toks com
+  map _ (Fail fatal err toks com) = Fail fatal err toks com
 
 -- So sixty just has a newtype function here now (probably for perf).
 -- A record might be more ergonomic, but would require a record impl before
@@ -48,7 +48,7 @@ runP (P f) = f
 export
 parse : Parser a -> TokenList -> Either String a
 parse pa toks = case runP pa toks False emptyPos of
-  Fail (E msg) toks com => Left "error: \{msg} next at: \{show toks}"
+  Fail fatal (E msg) toks com => Left "error: \{msg} next at: \{show toks}"
   OK a [] _ => Right a
   OK a ts _ => Left "Extra toks \{show ts}"
 
@@ -56,7 +56,18 @@ parse pa toks = case runP pa toks False emptyPos of
 
 export
 fail : String -> Parser a
-fail msg = P $ \toks,com,col => Fail (E msg) toks com
+fail msg = P $ \toks,com,col => Fail False (E msg) toks com
+
+export
+fatal : String -> Parser a
+fatal msg = P $ \toks,com,col => Fail False (E msg) toks com
+
+-- mustWork / commit copied from Idris, but I may switch to the parsec consumption thing.
+export
+mustWork : Parser a -> Parser a
+mustWork (P pa) = P $ \ toks, com, col => case (pa toks com col) of
+    Fail x err xs y => Fail True err xs y
+    res => res
 
 export
 Functor Parser where
@@ -67,36 +78,36 @@ Applicative Parser where
   pure pa = P (\ toks, com, col => OK pa toks com)
   P pab <*> P pa = P $ \toks,com,col =>
     case pab toks com col of
-      Fail err toks com => Fail err toks com
+      Fail fatal err toks com => Fail fatal err toks com
       OK f toks com => 
         case pa toks com col of 
           (OK x toks com) => OK (f x) toks com
-          (Fail err toks com) => Fail err toks com
+          (Fail fatal err toks com) => Fail fatal err toks com
 
 -- REVIEW it would be nice if the second argument was lazy...
 export
-Alternative Parser where
-  empty = fail "empty"
-  (P pa) <|> (P pb) = P $ \toks,com,col =>
-    case pa toks False col of
-      OK a toks' _ => OK a toks' com
-      Fail err toks' True  => Fail err toks' com
-      Fail err toks' False => pb toks com col
+(<|>) : Parser a -> Lazy (Parser a) -> Parser a
+(P pa) <|> (P pb) = P $ \toks,com,col =>
+  case pa toks False col of
+    OK a toks' _ => OK a toks' com
+    Fail True  err toks' com   => Fail True err toks' com
+    Fail fatal err toks' True  => Fail fatal err toks' com
+    Fail fatal err toks' False => pb toks com col
 
 export
 Monad Parser where
   P pa >>= pab = P $ \toks,com,col =>
     case pa toks com col of
       (OK a toks com) => runP (pab a) toks com col
-      (Fail err xs x) => Fail err xs x
+      (Fail fatal err xs x) => Fail fatal err xs x
 
 
 -- do we need this?
 pred : (BTok -> Bool) -> String -> Parser String
 pred f msg = P $ \toks,com,col =>
   case toks of
-    (t :: ts) => if f t then OK (value t) ts com else Fail (E "\{msg} vt:\{value t}") toks com
-    [] => Fail (E "eof") toks com
+    (t :: ts) => if f t then OK (value t) ts com else Fail False (E "\{msg} vt:\{value t}") toks com
+    [] => Fail False (E "eof") toks com
 
 export
 commit : Parser ()
@@ -106,9 +117,7 @@ export
 defer : (() -> (Parser a)) -> Parser a
 defer f = P $ \toks,com,col => runP (f ()) toks com col
 
-
 mutual
-  
   export some : Parser a -> Parser (List a)
   some p = defer $ \_ => [| p :: many p|] --(::) <$> p <*> many p)
   
@@ -124,7 +133,7 @@ mutual
 export
 getPos : Parser SourcePos
 getPos = P $ \toks,com, (l,c) => case toks of
-  [] => Fail (E "End of file") toks com -- OK emptyPos toks com
+  [] => Fail False (E "End of file") toks com -- OK emptyPos toks com
   (t :: ts) => OK (start t) toks com
 
 ||| Start an indented block and run parser in it
@@ -145,8 +154,8 @@ sameLevel (P p) = P $ \toks,com,(l,c) => case toks of
   (t :: _) => 
     let (tl,tc) = start t 
     in if tc == c then p toks com (tl, c)
-    else if c < tc then Fail (E "unexpected indent") toks com
-    else Fail (E "unexpected indent") toks com
+    else if c < tc then Fail False (E "unexpected indent") toks com
+    else Fail False (E "unexpected indent") toks com
 
 export
 someSame : Parser a -> Parser (List a)
@@ -160,12 +169,11 @@ indented (P p) = P $ \toks,com,(l,c) => case toks of
   (t::_) =>
     let (tl,tc) = start t
     in if tc > c || tl == l then p toks com (l,c)
-    else Fail (E "unexpected outdent") toks com
+    else Fail False (E "unexpected outdent") toks com
 
 export
 token' : Kind -> Parser String
 token' k = pred (\t => t.val.kind == k) "Expected a \{show k} token"
-
 
 export
 keyword' : String -> Parser ()
