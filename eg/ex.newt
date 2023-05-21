@@ -1,9 +1,21 @@
+-- comment with double hyphen, takes precedence over operators
 module Ex
--- comment
+-- imports not implemented yet
+import Foo
+-- inductive data type declaration (not supported in language yet)
 data Bool : Type where
   True : Bool
   False : Bool
 
+-- claim
 id : a -> a
-id = \ a => a
+-- declaration
+id = \ a => a * a + 2 * (3 + x)
 
+-- this is complicated with patterns because we need to group stuff together.
+-- I really should make a simple grammar
+
+-- I want to put this on ice, there is so much to do before patterns..
+
+blah : Either a a -> a
+blah = \ x => let x = 1 in x * x

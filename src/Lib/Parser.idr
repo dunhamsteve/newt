@@ -189,7 +189,7 @@ parseDecl = parseImport <|> parseSig <|> parseDef <|> parseData
 export
 parseMod : Parser Module
 parseMod = do
-  keyword "module"
+  sameLevel $ keyword "module"
   name <- ident
   -- probably should be manySame, and we want to start with col -1
   -- if we enforce blocks indent more than parent
