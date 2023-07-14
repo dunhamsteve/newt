@@ -11,6 +11,8 @@ import System
 import System.File
 import System.Directory
 import Control.App
+import Syntax
+import Lib.Prettier
 
 -- Put stuff in attic
 -- Error printing
@@ -30,8 +32,10 @@ test pa src = do
   putStrLn "- Toks"
   printLn $ toks
   putStrLn "- Parse"
-  let res = parse pa toks
-  printLn res
+  let Right res = parse pa toks
+    | Left y => putStrLn "Error: \{y}"
+  printLn $ res
+
   -- let toks2 = layout toks
   -- printLn $ map value toks2
 
@@ -40,9 +44,13 @@ test pa src = do
 testFile : String -> IO ()
 testFile fn = do
   putStrLn ("***" ++ fn)
-  Right text <- readFile $ "eg/" ++ fn
+  Right src <- readFile $ "eg/" ++ fn
     | Left err => printLn err
-  test parseMod text
+  let toks = tokenise src
+  let Right res = parse parseMod toks
+    | Left y => putStrLn "Error: \{y}"
+
+  putStrLn $ pretty 80 $ pretty res
 
 olderTests : IO ()
 olderTests = do

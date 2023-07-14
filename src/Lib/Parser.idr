@@ -112,7 +112,8 @@ letExpr = do
   alts <- startBlock $ someSame $ letAssign
   keyword' "in"
   scope <- term
-  pure $ RLet alts scope
+  
+  pure $ foldl (\ acc, (n,v) => RLet n RHole v acc) scope alts
   where
     letAssign : Parser (Name,Raw)
     letAssign = do
@@ -178,7 +179,7 @@ expBinder = do
   sym ")"
   sym "->"
   scope <- typeExpr
-  pure $ RPi name Explicit ty scope
+  pure $ RPi (Just name) Explicit ty scope
 
 impBinder : Parser Raw
 impBinder = do
@@ -189,7 +190,7 @@ impBinder = do
   sym "}"
   sym "->"
   scope <- typeExpr
-  pure $ RPi name Implicit ty scope
+  pure $ RPi (Just name) Implicit ty scope
 
 -- something binder looking
 -- todo sepby space or whatever
@@ -205,7 +206,7 @@ typeExpr = binder
         case scope of
           Nothing      => pure exp
           -- consider Maybe String to represent missing
-          (Just scope) => pure $ RPi "_" Explicit exp scope
+          (Just scope) => pure $ RPi Nothing Explicit exp scope
 
 
 -- And top level stuff

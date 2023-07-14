@@ -1,7 +1,9 @@
 module Syntax
 
 import Data.String
+import Data.Maybe
 import Lib.Parser.Impl
+import Lib.Prettier
 
 
 Name = String
@@ -14,7 +16,9 @@ public export
 data RigCount = Rig0 | RigW
 -- I think I got Eq from pi-forall, it uses it for equality args (which are kinda like Prop/Rig0?)
 public export
-data Plicity = Implicit | Explicit | Eq
+data Plicity = Implicit | Explicit -- | Eq
+
+%name Plicity icit
 
 public export
 data Pattern
@@ -29,14 +33,16 @@ data Pattern
 public export
 data CaseAlt = MkAlt Pattern Raw
 
+-- TODO redo this with names for documentation
+
 public export
 data Raw
   = RVar Name
   | RLam String Plicity Raw
   | RApp Raw Raw Plicity
   | RU
-  | RPi Name Plicity Raw Raw
-  | RLet (List (Name, Raw)) Raw
+  | RPi (Maybe Name) Plicity Raw Raw
+  | RLet Name Raw Raw Raw
   | RSrcPos SourcePos Raw
 
   | RAnn Raw Raw
@@ -44,6 +50,8 @@ data Raw
   | RCase Raw (List CaseAlt)
   | RHole
   | RParseError String
+
+%name Raw tm
 
 -- derive some stuff - I'd like json, eq, show, ...
 
@@ -118,7 +126,7 @@ Show CaseAlt where
 Show Plicity where
   show Implicit = "Implicit"
   show Explicit = "Explicit"
-  show Eq = "Eq"
+  -- show Eq = "Eq"
 
 covering
 Show Raw where
@@ -126,7 +134,7 @@ Show Raw where
   show (RVar name) = foo ["RVar", show name]
   show (RAnn t ty) = foo [ "RAnn", show t, show ty]
   show (RLit x) = foo [ "RLit", show x]
-  show (RLet alts y) = foo [ "Let", show alts, show y]
+  show (RLet x ty v scope) = foo [ "Let", show x, " : ", show ty, " = ", show v, " in ", show scope]
   show (RPi str x y z) = foo [ "Pi", show str, show x, show y, show z]
   show (RApp x y z) = foo [ "App", show x, show y, show z]
   show (RLam x i y) = foo [ "Lam", show x, show i, show y]
@@ -135,4 +143,52 @@ Show Raw where
   show RU = "U"
   show (RSrcPos pos tm) = show tm
 
+export
+interface Pretty a where
+  pretty : a -> Doc
 
+export
+Pretty Raw where
+  pretty = asDoc 0
+    where
+    wrap : Plicity -> Doc -> Doc
+    wrap Implicit x = x
+    wrap Explicit x = text "{" ++ x ++ text "}"
+
+    par : Nat -> Nat -> Doc -> Doc
+    par p p' d = if p' < p then text "(" ++ d ++ text ")" else d
+
+    asDoc : Nat -> Raw -> Doc
+    asDoc p (RVar str) = text str
+    asDoc p (RLam str icit x) = par p 0 $ text "\\" ++ wrap icit (text str) <+> text "=>" <+> asDoc 0 x
+    -- This needs precedence and operators...
+    asDoc p (RApp x y Explicit) = par p 2 $ asDoc 2 x <+> asDoc 3 y
+    asDoc p (RApp x y Implicit) = par p 2 $ asDoc 2 x <+> text "{" ++ asDoc 0 y ++ text "}"
+    asDoc p RU = text "U"
+    asDoc p (RPi Nothing Implicit ty scope) = par p 1 $ asDoc p ty <+> text "->" <+/> asDoc p scope
+    asDoc p (RPi (Just x) Implicit ty scope) = 
+      par p 1 $ text "(" <+> text x <+> text ":" <+> asDoc p ty <+> text ")" <+> text "->" <+/> asDoc p scope
+    asDoc p (RPi nm Explicit ty scope) =
+      par p 1 $ text "{" <+> text (fromMaybe "_" nm) <+> text ":" <+> asDoc p ty <+> text "}" <+> text "->" <+/> asDoc 1 scope
+    asDoc p (RLet x v ty scope) = 
+      par p 0 $ text "let" <+> text x <+> text ":" <+> asDoc p ty 
+          <+> text "=" <+> asDoc p v
+          <+/> text "in" <+> asDoc p scope
+    asDoc p (RSrcPos x y) = asDoc p y
+    -- does this exist?
+    asDoc p (RAnn x y) = text "TODO - RAnn"
+    asDoc p (RLit x) = text (show x)
+    asDoc p (RCase x xs) = text "TODO - RCase" --?asDoc p_rhs_9
+    asDoc p RHole = text "_"
+    asDoc p (RParseError str) = text "PraseError \{str}"
+    
+export 
+Pretty Module where
+  pretty (MkModule name imports decls) =
+    text "module" <+> text name </> stack (map doDecl decls)
+      where
+        doDecl : Decl -> Doc
+        doDecl (TypeSig nm ty) = text nm <+> text ":" <+> nest 2 (pretty ty)
+        doDecl (Def nm tm) = text nm <+> text "=" <+> nest 2 (pretty tm)
+        doDecl (DImport nm) = text "import" <+> text nm ++ line
+        doDecl (Data str x xs) = text "TODO data"

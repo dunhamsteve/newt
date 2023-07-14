@@ -1,111 +1,150 @@
 module Lib.TT
 -- For SourcePos
 import Lib.Parser.Impl
+import Data.Fin
+import Data.Vect
 
 public export
 Name : Type
 Name = String
 
+-- Trying to do well-scoped here, so the indices are proven.
+
 export
 data Icit = Implicit | Explicit
 
--- Sorta cribbed from Kovacs
-Ty : Type
-
--- Idris and Kovacs have Icit at this level.
-public export
-data Tm
-  = Local Nat -- IsVar
-  | Ref String
-  | Lam Name Icit Tm
-  | App Tm Tm
-  | U
-  | Pi Name Ty Ty
-  | Let Name Ty Tm Tm
-  
-Ty = Tm
+%name Icit icit
 
 public export
-data Closure : Type
-VTy : Type
+data Tm : Nat -> Nat -> Type where
+  Local : Fin k -> Tm k n
+  Bnd : Fin n -> Tm k n
+  Ref   : String -> Tm k n
+  Lam   : Name -> Icit -> Tm k (S n) -> Tm k n
+  App   : Tm k n -> Tm k n -> Tm k n
+  U     : Tm k n
+  Pi    : Name -> Icit -> Tm k n -> Tm k (S n) -> Tm k n
+  Let   : Name -> Icit -> Tm k n -> Tm k n -> Tm k (S n) -> Tm k n
 
- -- Closure unpacked in the original
+%name Tm t, u, v
+
+-- public export
+-- data Closure : Nat -> Type
+data Val : Nat -> Type
+0 Closure : Nat -> Type
+
+-- IS/TypeTheory.idr is calling this a Kripke function space
+-- Yaffle, IS/TypeTheory use a function here.
+-- Kovacs, Idris use Env and Tm
+Closure n = (l : Nat) -> Val (l + n) -> Val (l + n)
+
 public export
-data Val
-  = VVar Nat -- level
-  | VApp Val (Lazy Val)
-  | VLam Name Icit Closure
-  | VPi Name (Lazy VTy) Closure
-  | VU
+data Val : Nat -> Type where
+  -- This will be local / flex with spine.
+  VVar : Fin n -> Val n
+  VRef : String -> Val n
+  VApp : Val n ->  Lazy (Val n) -> Val n
+  VLam : Name -> Icit -> Closure n -> Val n
+  VPi : Name -> Icit -> Lazy (Val n) -> Closure n -> Val n
+  VU : Val n
 
-VTy = Val
-
+||| Env k n holds the evaluation environment.
+||| k is the number of levels and n is the size
+||| of the environment. 
 public export
-Env : Type
-Env = List Val
+Env : Nat -> Nat -> Type
+Env k n = Vect n (Val k)
 
--- 
+export
+eval : Env k n -> Tm k n -> Val k
 
-lvl2Ix : Nat -> Nat -> Nat
+vapp : Val k -> Val k -> Val k
+vapp (VLam _ icit t) u = t 0 u
+vapp t u = VApp t u
 
-data Closure : Type where
-  MkClosure :  Env -> Tm -> Closure
+-- weakenEnv : (l : Nat) -> Env k n -> Env (l + k) n
 
-infixl 8 $$
+weakenVal : {e : Nat} -> Val k -> Val (e + k)
+weakenVal (VVar x) = VVar (shift _ x)
+weakenVal (VRef str) = VRef str
+weakenVal (VApp x y) = VApp (weakenVal x) (weakenVal y)
+weakenVal (VLam str icit f) = VLam str icit 
+      (\g, v => rewrite plusAssociative g e k in f (g + e) (rewrite sym $ plusAssociative g e k in v))
+weakenVal (VPi str icit x f) = VPi str icit (weakenVal {e} x) 
+      (\g, v => rewrite plusAssociative g e k in f (g + e) (rewrite sym $ plusAssociative g e k in v))
+weakenVal VU = VU
 
-eval : Env -> Tm -> Val
+bind : (e : Nat) -> Val (plus e k) -> Env k n -> Env (e + k) (S n)
+bind e v env = v :: map weakenVal env
 
-($$) : Closure -> Lazy Val -> Val
-(MkClosure env t) $$ u = eval (u :: env) t
+-- is this weaken or thin?
+weaken : {e : Nat} -> Tm k (S n) -> Tm (plus e k) (S n)
+weaken (Local x) = Local (shift _ x)
+weaken (Bnd x) = Bnd x
+weaken (Ref str) = Ref str
+weaken (Lam str x t) = Lam str x (weaken t)
+weaken (App t u) = App (weaken t) (weaken u)
+weaken U = U
+weaken (Pi str x t u) = Pi str x (weaken t) (weaken u)
+weaken (Let str x t u v) = Let str x (weaken t) (weaken u) (weaken v)
 
-eval env (Local k) = ?hole
-eval env (Ref x) = ?hole_1
-eval env (Lam x _ t) = ?hole_2
-eval env (App t u) = case (eval env t, eval env u) of
-  (VLam _ icit t, u) => t $$ u
-  (t, u) => VApp t u
-
+eval env (Local x) = VVar x -- this is a hole in intrinsic, vfree x in the other 
+eval env (Ref x) = VRef x
+eval env (Bnd n) = index n env
+eval env (Lam x icit t) = VLam x icit (\e, u => eval (bind e u env) (weaken t))-- (MkClosure env t) 
+eval env (App t u) = vapp (eval env t) (eval env u)
 eval env U = VU
-eval env (Pi x a b) = VPi x (eval env a) (MkClosure env b)
-eval env (Let x _ t u) = eval (eval env t :: env) u
+eval env (Pi x icit a b) = VPi x icit (eval env a) (\e, u => eval (bind e u env) (weaken b))
+-- This one we need to make 
+eval env (Let x icit ty t u) = eval (eval env t :: env) u
 
-quote : Nat -> Val -> Tm
-quote l (VVar k) = Local (lvl2Ix l k)
+vfresh : (l : Nat) -> Val (S l)
+vfresh l = VVar last
+
+quote : (k : Nat) -> Val k -> Tm 0 k
+quote l (VVar k) = Bnd (complement k) -- level to index
 quote l (VApp t u) = App (quote l t) (quote l u)
-quote l (VLam x icit t) = Lam x icit (quote (l + 1) (t $$ VVar l))
-quote l (VPi x a b) = Pi x (quote l a) (quote (l+1) (b $$ VVar l))
-quote l VU = ?rhs_4
+-- so this one is calling the kripke on [x] and a fresh var
+quote l (VLam x icit t) = Lam x icit (quote (S l) (t 1 (vfresh l)))
+quote l (VPi x icit a b) = Pi x icit (quote l a) (quote (S l) (b 1 $ vfresh l))
+quote l VU = U
+quote _ (VRef n) = Ref n
 
-nf : Env -> Tm -> Tm
-nf env t = quote (length env) (eval env t)
-
----
-public export
-conv : (lvl : Nat) -> Val -> Val -> Bool
-
-
--- 
-public export
-Types : Type
-Types = List (Name, Lazy VTy)
+nf : {n : Nat} -> Env 0 n -> Tm 0 n -> Tm 0 0
+nf env t = quote 0 (eval env t)
 
 public export
-record Ctx where
+conv : (lvl : Nat) -> Val n -> Val n -> Bool
+
+data BD = Bound | Defined
+
+public export
+Types : Nat -> Type
+Types n = Vect n (Name, Lazy (Val n))
+
+public export
+record Ctx (n : Nat) where
   constructor MkCtx
-  env : Env
-  types : Types
-  lvl : Nat
-  -- For now, we're following Kovacs and using a node for
-  -- source position. Might switch to FC at some point?
+  env : Env k n     -- for eval
+  types : Types n   -- name lookup, pp
+  bds : Vect n BD  -- meta creation
+  lvl : Nat -- This is n, do we need it?
+  -- Kovacs and Weirich use a position node
   pos : SourcePos
 
-public export
-emptyCtx : Ctx
-emptyCtx = MkCtx [] [] 0 (0,0)
+%name Ctx ctx
 
 public export
-bind : Name -> Lazy VTy -> Ctx -> Ctx
-bind x a (MkCtx env types l pos) =
-  MkCtx (VVar l :: env) ((x,a) :: types) (l+1) pos
+emptyCtx : Ctx Z
+emptyCtx = MkCtx {k=0} [] [] [] 0 (0,0)
 
+-- public export
+-- bind : Name -> Lazy (Val (k + n))  -> Ctx n -> Ctx (S n)
+-- bind x a (MkCtx env types bds l pos) =
+--   MkCtx (VVar l :: env) ((x,a) :: types) (Bound :: bds) (l+1) pos
+
+-- public export
+-- define : Name -> Val n -> Lazy (Val n)  -> Ctx n -> Ctx (S n)
+-- define x v ty (MkCtx env types bds l pos) =
+--   MkCtx (v :: env) ((x,ty) :: types) (Defined :: bds) (l + 1) pos
 

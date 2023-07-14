@@ -1,14 +1,23 @@
 
+Parser is in place. 
 
-I think we almost have enough of a parser to take another step.
+Currently trying to make TT well-scoped, considering well-named..
 
+Need to update todos below.
+Should I use well-scoped indices or well-scoped names...
+
+Parser:
 - [x] import statement
 - [x] def
 - [x] simple decl
 - [ ] type definition
-- [ ] read files
-- [ ] write tests
+- [x] read files
+
+- [ ] type checking / elab
+- [ ] 
+- [ ] 
+- [ ] 
 - [ ] symbolic execution
 - [ ] compilation
 
-
+- [ ] write tests
