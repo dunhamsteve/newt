@@ -4,9 +4,7 @@ import Data.String
 import Data.Maybe
 import Lib.Parser.Impl
 import Lib.Prettier
-
-
-Name = String
+import Lib.TT
 
 data Raw : Type where
 
@@ -14,11 +12,6 @@ public export
 data Literal = LString String | LInt Int | LBool Bool
 public export
 data RigCount = Rig0 | RigW
--- I think I got Eq from pi-forall, it uses it for equality args (which are kinda like Prop/Rig0?)
-public export
-data Plicity = Implicit | Explicit -- | Eq
-
-%name Plicity icit
 
 public export
 data Pattern
@@ -38,10 +31,10 @@ data CaseAlt = MkAlt Pattern Raw
 public export
 data Raw
   = RVar Name
-  | RLam String Plicity Raw
-  | RApp Raw Raw Plicity
+  | RLam String Icit Raw
+  | RApp Raw Raw Icit
   | RU
-  | RPi (Maybe Name) Plicity Raw Raw
+  | RPi (Maybe Name) Icit Raw Raw
   | RLet Name Raw Raw Raw
   | RSrcPos SourcePos Raw
 
@@ -123,7 +116,7 @@ Show Pattern where
 Show CaseAlt where
   show (MkAlt x y)= foo ["MkAlt", show x, assert_total $ show y]
 
-Show Plicity where
+Show Icit where
   show Implicit = "Implicit"
   show Explicit = "Explicit"
   -- show Eq = "Eq"
@@ -151,7 +144,7 @@ export
 Pretty Raw where
   pretty = asDoc 0
     where
-    wrap : Plicity -> Doc -> Doc
+    wrap : Icit -> Doc -> Doc
     wrap Implicit x = x
     wrap Explicit x = text "{" ++ x ++ text "}"
 
