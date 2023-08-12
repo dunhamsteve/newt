@@ -21,9 +21,9 @@ extend ctx ty = { env := ty :: ctx.env } ctx
 -- cribbed this, it avoids MonadError String m => everywhere
 parameters {0 m : Type -> Type} {auto _ : MonadError String m}
 
-  infer : {f : Nat} -> Context n f -> Raw -> m (Tm f n, Val f)
+  infer : {f : Nat} -> Context n f -> Raw -> m (Tm n, Val f)
   -- I think I'm hand-waving n here, probably need it in Context
-  check : {f : Nat} -> Context n f -> Raw -> Val f -> m (Tm f n)
+  check : {f : Nat} -> Context n f -> Raw -> Val f -> m (Tm n)
 
   check ctx (RLam _ _ _) ty = ?ch_rhs
   check ctx tm ty = do
@@ -35,7 +35,7 @@ parameters {0 m : Type -> Type} {auto _ : MonadError String m}
 
   infer ctx (RVar nm) = go 0 ctx.types
     where
-      go : Nat -> List (String, Val f) -> m (Tm f n, Val f)
+      go : Nat -> List (String, Val f) -> m (Tm n, Val f)
       go i [] = throwError "\{show nm} not in scope"
       -- REVIEW Local or Bnd (ezoo does not have both)
       go i ((x, ty) :: xs) = if x == nm then pure $ (Bnd ?i_not_fin, ty) 

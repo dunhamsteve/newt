@@ -16,22 +16,21 @@ data Icit = Implicit | Explicit
 %name Icit icit
 
 public export
-data Tm : Nat -> Nat -> Type where
-  Local : Fin k -> Tm k n
-  Bnd : Fin n -> Tm k n
-  Ref   : String -> Tm k n
-  Lam   : Name -> Icit -> Tm k (S n) -> Tm k n
-  App   : Tm k n -> Tm k n -> Tm k n
-  U     : Tm k n
-  Pi    : Name -> Icit -> Tm k n -> Tm k (S n) -> Tm k n
-  Let   : Name -> Icit -> Tm k n -> Tm k n -> Tm k (S n) -> Tm k n
+data Tm : Nat -> Type where
+  Bnd : Fin n -> Tm n
+  Ref : String -> Tm n
+  Lam : Name -> Icit -> Tm (S n) -> Tm n
+  App : Tm n -> Tm n -> Tm n
+  U   : Tm n
+  Pi  : Name -> Icit -> Tm n -> Tm (S n) -> Tm n
+  Let : Name -> Icit -> Tm n -> Tm n -> Tm (S n) -> Tm n
 
 %name Tm t, u, v
 
 -- TODO derive
 export
-Eq (Tm k n) where
-  (Local x) == (Local y) = x == y
+Eq (Tm n) where
+  -- (Local x) == (Local y) = x == y
   (Bnd x) == (Bnd y) = x == y
   (Ref x) == (Ref y) = x == y
   (Lam str icit t) == y = ?rhs_3
@@ -71,7 +70,7 @@ Env : Nat -> Nat -> Type
 Env k n = Vect n (Val k)
 
 export
-eval : Env k n -> Tm k n -> Val k
+eval : Env k n -> Tm n -> Val k
 
 export
 vapp : Val k -> Val k -> Val k
@@ -93,24 +92,12 @@ thinVal VU = VU
 bind : (e : Nat) -> Val (plus e k) -> Env k n -> Env (e + k) (S n)
 bind e v env = v :: map thinVal env
 
--- is this thin or thin?
-thin : {e : Nat} -> Tm k (S n) -> Tm (plus e k) (S n)
-thin (Local x) = Local (shift _ x)
-thin (Bnd x) = Bnd x
-thin (Ref str) = Ref str
-thin (Lam str x t) = Lam str x (thin t)
-thin (App t u) = App (thin t) (thin u)
-thin U = U
-thin (Pi str x t u) = Pi str x (thin t) (thin u)
-thin (Let str x t u v) = Let str x (thin t) (thin u) (thin v)
-
-eval env (Local x) = VVar x -- this is a hole in intrinsic, vfree x in the other 
 eval env (Ref x) = VRef x
 eval env (Bnd n) = index n env
-eval env (Lam x icit t) = VLam x icit (\e, u => eval (bind e u env) (thin t))-- (MkClosure env t) 
+eval env (Lam x icit t) = VLam x icit (\e, u => eval (bind e u env) t)-- (MkClosure env t) 
 eval env (App t u) = vapp (eval env t) (eval env u)
 eval env U = VU
-eval env (Pi x icit a b) = VPi x icit (eval env a) (\e, u => eval (bind e u env) (thin b))
+eval env (Pi x icit a b) = VPi x icit (eval env a) (\e, u => eval (bind e u env) b)
 -- This one we need to make 
 eval env (Let x icit ty t u) = eval (eval env t :: env) u
 
@@ -118,7 +105,7 @@ vfresh : (l : Nat) -> Val (S l)
 vfresh l = VVar last
 
 export
-quote : (k : Nat) -> Val k -> Tm 0 k
+quote : (k : Nat) -> Val k -> Tm k
 quote l (VVar k) = Bnd (complement k) -- level to index
 quote l (VApp t u) = App (quote l t) (quote l u)
 -- so this one is calling the kripke on [x] and a fresh var
@@ -128,7 +115,7 @@ quote l VU = U
 quote _ (VRef n) = Ref n
 
 export
-nf : {n : Nat} -> Env 0 n -> Tm 0 n -> Tm 0 0
+nf : {n : Nat} -> Env 0 n -> Tm n -> Tm 0
 nf env t = quote 0 (eval env t)
 
 public export
