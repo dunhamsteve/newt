@@ -11,6 +11,7 @@ data Kind
   | Symbol
   | Space
   | Comment
+  | Pragma
   -- not doing Layout.idr
   | LBrace
   | Semi
@@ -30,7 +31,7 @@ Show Kind where
   show RBrace  = "RBrace"
   show Comment = "Comment"
   show EOI     = "EOI"
-
+  show Pragma  = "Pragma"
 export
 Eq Kind where
   Ident   == Ident = True

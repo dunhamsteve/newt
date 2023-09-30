@@ -28,16 +28,23 @@ data Tm : Nat -> Type where
 %name Tm t, u, v
 
 -- TODO derive
+export 
+Eq Icit where
+  Implicit == Implicit = True
+  Explicit == Explicit = True
+  _ == _ = False
+
+||| Eq on Tm. We've got deBruijn indices, so I'm not comparing names
 export
 Eq (Tm n) where
   -- (Local x) == (Local y) = x == y
   (Bnd x) == (Bnd y) = x == y
   (Ref x) == (Ref y) = x == y
-  (Lam str icit t) == y = ?rhs_3
-  (App t u) == y = ?rhs_4
-  U == y = ?rhs_5
-  (Pi str icit t u) == y = ?rhs_6
-  (Let str icit t u v) == y = ?rhs_7
+  (Lam n icit t) == (Lam n' icit' t') = icit == icit' && t == t'
+  (App t u) == App t' u' = t == t' && u == u'
+  U == U = True
+  (Pi n icit t u) == (Pi n' icit' t' u') = icit == icit' && t == t' && u == u'
+  (Let n icit t u v) == (Let n' icit' t' u' v') = t == t' && u == u' && v == v'
   _ == _ = False
 
 -- public export
@@ -127,11 +134,47 @@ public export
 Types : Nat -> Type
 Types n = Vect n (Name, Lazy (Val n))
 
--- public export
+
+
+-- REVIEW indices
+public export
+record Context (n : Nat)  where
+  constructor MkCtx
+  
+  -- These are values, they'll be the length of the environment
+  env : Env n n -- Vect n (Val f)
+
+  -- fine for now, consider a map later
+  types : Vect n (String, Val n)
+  pos : SourcePos
+
+
+
+||| add a binding to environment
+extend : Context n n -> String -> Val n -> Context (S n) (S n)
+extend (MkCtx env types pos) name ty with (length env)
+  _ | l = 
+    
+    let types' = (name,ty) :: (map $ mapSnd thinVal) types in
+    let l' : Fin (S n) := ?hole in
+    MkCtx (VVar l' :: map thinVal env) types' pos
+    -- ?hole_0 --  { env  := (Val (length env.(Context env types pos)) :: (Context env types pos).env), types := (n, ty) :: (Context env types pos).types  } (Context env types pos)
+
+
+-- weirich has 'hints' to store the claims before the def is seen/checked
+-- saying it is unsafe. afterwards they are mixed into the context.
+-- idris essentially leaves holes, filled in later, for undefined claims
+-- Is it ok to leaving them in there (if they pass checkType) as long as
+-- we don't register the def if it fails checking?
+
+-- shoot, I have another of these in Check.idr
+
+
+-- -- public export
 -- record Ctx (n : Nat) where
 --   constructor MkCtx
 --   env : Env k n     -- for eval
---   types : Types n   -- name lookup, pp
+--   types : Types n   -- name lookup, prettyprint
 --   bds : Vect n BD  -- meta creation
 --   lvl : Nat -- This is n, do we need it?
 --   -- Kovacs and Weirich use a position node
@@ -142,6 +185,22 @@ Types n = Vect n (Name, Lazy (Val n))
 -- public export
 -- emptyCtx : Ctx Z
 -- emptyCtx = MkCtx {k=0} [] [] [] 0 (0,0)
+
+-- find out how pi-forall treats binders
+-- Vars are unbound TName 
+
+-- ezoo
+-- Tm has Ix
+-- Val has Lvl
+
+-- by the time we hit ezoo 5/6, there is a Map string -> (Lvl, Type) for name lookup.
+
+-- smalltt
+
+
+-- idris
+
+
 
 -- public export
 -- bindCtx : Name -> Lazy (Val (zz + n))  -> Ctx n -> Ctx (S n)

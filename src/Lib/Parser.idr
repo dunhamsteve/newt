@@ -252,3 +252,17 @@ parseMod = do
   decls <- startBlock $ someSame $ parseDecl
   pure $ MkModule name [] decls
 
+
+public export
+data ReplCmd =
+    Def Decl
+  | Norm Raw -- or just name?
+  | Check Raw
+
+
+-- Eventually I'd like immediate actions in the file, like lean, but I
+-- also want to REPL to work and we can do that first.
+export parseRepl : Parser ReplCmd
+parseRepl = Def <$> parseDecl <|> Norm <$ keyword "#nf" <*> typeExpr
+  <|> Check <$ keyword "#check" <*> typeExpr
+  
