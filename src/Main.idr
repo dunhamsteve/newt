@@ -14,11 +14,11 @@ import Control.App
 import Syntax
 import Lib.Prettier
 
--- Put stuff in attic
--- Error printing
--- Review surface syntax
--- Prettier printer
--- First pass at typecheck
+-- [ ] Put stuff in attic
+-- [ ] Error printing
+-- [ ] Review surface syntax
+-- [x] Prettier printer
+-- [ ] First pass at typecheck
 -- Just do it in zoo order
 
 

@@ -1,4 +1,5 @@
 module Lib.Parser
+import Lib.TT
 
 -- NEXT - need to sort out parsing implicits
 --
@@ -66,7 +67,7 @@ atom = withPos ( RVar <$> ident
     <|> parens term
 
 -- Argument to a Spine
-pArg : Parser (Plicity,Raw)
+pArg : Parser (Icit,Raw)
 pArg = (Explicit,) <$> atom <|> (Implicit,) <$> braces term
 
 --
@@ -123,7 +124,7 @@ letExpr = do
       t <- term
       pure (name,t)
 
-pLetArg : Parser (Plicity, String, Maybe Raw)
+pLetArg : Parser (Icit, String, Maybe Raw)
 pLetArg = (Implicit,,) <$> braces ident <*> optional (sym ":" >> typeExpr)
        <|> (Explicit,,) <$> parens ident <*> optional (sym ":" >> typeExpr)
        <|> (Explicit,,Nothing) <$> ident
