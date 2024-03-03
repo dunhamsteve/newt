@@ -7,14 +7,11 @@ module Lib.TT
 -- For SourcePos
 import Lib.Parser.Impl
 import Data.Fin
-import Data.Vect
+import Data.List
 
 public export
 Name : Type
 Name = String
-
--- Trying to do well-scoped here, so the indices are proven.
--- RIP out the indices
 
 public export
 data Icit = Implicit | Explicit
@@ -22,14 +19,14 @@ data Icit = Implicit | Explicit
 %name Icit icit
 
 public export
-data Tm : Nat -> Type where
-  Bnd : Fin n -> Tm n
-  Ref : String -> Tm n
-  Lam : Name -> Icit -> Tm (S n) -> Tm n
-  App : Tm n -> Tm n -> Tm n
-  U   : Tm n
-  Pi  : Name -> Icit -> Tm n -> Tm (S n) -> Tm n
-  Let : Name -> Icit -> Tm n -> Tm n -> Tm (S n) -> Tm n
+data Tm : Type where
+  Bnd : Nat -> Tm
+  Ref : String -> Tm
+  Lam : Name -> Icit -> Tm -> Tm
+  App : Tm -> Tm -> Tm
+  U   : Tm
+  Pi  : Name -> Icit -> Tm -> Tm -> Tm
+  Let : Name -> Icit -> Tm -> Tm -> Tm -> Tm
 
 %name Tm t, u, v
 
@@ -42,7 +39,7 @@ Eq Icit where
 
 ||| Eq on Tm. We've got deBruijn indices, so I'm not comparing names
 export
-Eq (Tm n) where
+Eq (Tm) where
   -- (Local x) == (Local y) = x == y
   (Bnd x) == (Bnd y) = x == y
   (Ref x) == (Ref y) = x == y
@@ -55,74 +52,53 @@ Eq (Tm n) where
 
 -- public export
 -- data Closure : Nat -> Type
-data Val : Nat -> Type
+data Val : Type
 
-public export
-0 Closure : Nat -> Type
 
 -- IS/TypeTheory.idr is calling this a Kripke function space
 -- Yaffle, IS/TypeTheory use a function here.
 -- Kovacs, Idris use Env and Tm
 
--- in cctt kovacs refers to this as defunctionalization vs HOAS
+-- in cctt kovacs refers to this choice as defunctionalization vs HOAS
 -- https://github.com/AndrasKovacs/cctt/blob/main/README.md#defunctionalization
-
+-- the tradeoff is access to internals of the function
 
 -- Yaffle is vars -> vars here
 
 
-Closure n = Val (S n) -> Val n
+public export
+0 Closure : Type
+Closure = Val -> Val
 
 public export
-data Val : Nat -> Type where
+data Val : Type where
   -- This will be local / flex with spine.
-  VVar : Fin n -> Val n
-  VRef : String -> Val n
-  VApp : Val n ->  Lazy (Val n) -> Val n
-  VLam : Name -> Icit -> Closure n -> Val n
-  VPi : Name -> Icit -> Lazy (Val n) -> Closure n -> Val n
-  VU : Val n
+  VVar : Nat -> Val
+  VRef : String -> Val
+  VApp : Val ->  Lazy (Val) -> Val
+  VLam : Name -> Icit -> Closure -> Val
+  VPi : Name -> Icit -> Lazy Val -> Closure -> Val
+  VU : Val
 
 ||| LocalEnv free vars
 public export
-LocalEnv : Nat -> Nat -> Type 
-LocalEnv k n = Vect k (Val n)
+LocalEnv : Type 
+LocalEnv = List Val
 
 public export
-Env : Nat -> Type
-Env n = Vect n (Val n)
+Env : Type
+Env = List Val
 
 export
-eval : LocalEnv k n -> Env n -> Tm (n + k) -> Val n
-
-thinVal : Val k -> Val (S k)
-thinVal (VVar x) = VVar (shift 1 x)
-thinVal (VRef str) = VRef str
-thinVal (VApp x y) = VApp (thinVal x) (thinVal y)
-thinVal (VLam str icit f) = VLam str icit (believe_me f) -- FIXME
-thinVal (VPi str icit x f) = VPi str icit (thinVal x) (believe_me f)
-thinVal VU = VU
-
+eval : LocalEnv -> Env -> Tm -> Val
 
 export
-vapp : Val n -> Val n -> Val n
-vapp (VLam _ icit t) u = t (thinVal u)
+vapp : Val -> Val -> Val
+vapp (VLam _ icit t) u = t u
 vapp t u = VApp t u
 
--- thinVal : {e : Nat} -> Val k -> Val (e + k)
--- thinVal (VVar x) = VVar (shift _ x)
--- thinVal (VRef str) = VRef str
--- thinVal (VApp x y) = VApp (thinVal x) (thinVal y)
--- thinVal (VLam str icit f) = VLam str icit 
---       (\g, v => rewrite plusAssociative g e k in f (g + e) (rewrite sym $ plusAssociative g e k in v))
--- thinVal (VPi str icit x f) = VPi str icit (thinVal {e} x) 
---       (\g, v => rewrite plusAssociative g e k in f (g + e) (rewrite sym $ plusAssociative g e k in v))
--- thinVal VU = VU
-
-
-
-bind :  Val n -> Env n -> Env (S n)
-bind v env = thinVal v :: map thinVal env
+bind : Val -> Env -> Env
+bind v env = v :: env
 
 -- so here we have LocalEnv free vars in Yaffle
 
@@ -130,51 +106,45 @@ eval locs env (Ref x) = VRef x
 eval locs env (App t u) = vapp (eval locs env t) (eval locs env u)
 eval locs env U = VU
 -- yaffle breaks out binder
-eval locs env (Lam x icit t) = VLam x icit (\u => (u :: locs) env (rewrite sym $ plusSuccRightSucc n k in t))
-eval locs env (Pi x icit a b) = VPi x icit (eval locs env a) (\u => eval (u :: locs) env (rewrite sym $ plusSuccRightSucc n k in b))
+eval locs env (Lam x icit t) = VLam x icit (\u => eval (u :: locs) env t)
+eval locs env (Pi x icit a b) = VPi x icit (eval locs env a) (\u => eval (u :: locs) env b)
 -- This one we need to make 
-eval locs env (Let x icit ty t u) = eval (eval locs env t :: locs) env (rewrite sym $ plusSuccRightSucc n k in u)
-eval locs env (Bnd i) = index i ?hole -- env
+eval locs env (Let x icit ty t u) = eval (eval locs env t :: locs) env u
+eval locs env (Bnd i) = let Just rval = getAt i env | _ => ?out_of_index in rval
 
-vfresh : (l : Nat) -> Val (S l)
-vfresh l = VVar last
+vfresh : Nat -> Val
+vfresh l = VVar l
 
 export
-quote : (k : Nat) -> Val k -> Tm k
-quote l (VVar k) = Bnd (complement k) -- level to index
+quote : (k : Nat) -> Val -> Tm
+quote l (VVar k) = Bnd (S l `minus` k) -- level to index
 quote l (VApp t u) = App (quote l t) (quote l u)
 -- so this one is calling the kripke on [x] and a fresh var
-quote l (VLam x icit t) = Lam x icit (quote (S l) (believe_me $ t (vfresh l))) -- that one is too big
-quote l (VPi x icit a b) = Pi x icit (quote l a) (quote (S l) (believe_me $ b $ vfresh l))
+quote l (VLam x icit t) = Lam x icit (quote (S l) (t (vfresh l))) -- that one is too big
+quote l (VPi x icit a b) = Pi x icit (quote l a) (quote (S l) (b $ vfresh l))
 quote l VU = U
 quote _ (VRef n) = Ref n
 
 -- vars -> vars -> vars in yaffle
 export
-nf : {n : Nat} -> Env n -> Tm n -> Tm n
-nf env t = quote n (eval [] env (rewrite plusZeroRightNeutral n in t))
+nf : {n : Nat} -> Env -> Tm -> Tm
+nf env t = quote n (eval [] env t)
 
 public export
-conv : (lvl : Nat) -> Val n -> Val n -> Bool
+conv : (lvl : Nat) -> Val -> Val -> Bool
 
 data BD = Bound | Defined
 
 public export
-Types : Nat -> Type
-Types n = Vect n (Name, Lazy (Val n))
-
-
+Types : Type
+Types = List (Name, Lazy Val)
 
 -- REVIEW indices
 public export
-record Context (n : Nat)  where
+record Context where
   constructor MkCtx
-  
-  -- These are values, they'll be the length of the environment
-  env : Env n -- Vect n (Val f)
-
-  -- fine for now, consider a map later
-  types : Vect n (String, Val n)
+  env : Env
+  types : List (String, Val)
   pos : SourcePos
 
 -- data Env : (tm : SnocList Name -> Type) -> SnocList Name -> Type where
@@ -183,14 +153,9 @@ record Context (n : Nat)  where
 -- Still need to sort out the indices - one or two on env?
 
 ||| add a binding to environment
-extend : { n : Nat} -> Context n -> String -> Val n -> Context (S n)
-extend (MkCtx env types pos) name ty with (length env)
-  _ | l = 
-    
-    let types' = Data.Vect.(::) (name, thinVal ty)   (map (map thinVal) types) in
-    let l' : Fin (S n) := last in
-    MkCtx {n=S n} (VVar l' :: map thinVal env) types' pos
-    -- ?hole_0 --  { env  := (Val (length env.(Context env types pos)) :: (Context env types pos).env), types := (n, ty) :: (Context env types pos).types  } (Context env types pos)
+extend : { n : Nat} -> Context -> String -> Val -> Context
+extend (MkCtx env types pos) name ty =
+    MkCtx (VVar (length env) :: env) ((name, ty) :: types) pos
 
 
 -- weirich has 'hints' to store the claims before the def is seen/checked
@@ -240,7 +205,7 @@ extend (MkCtx env types pos) name ty with (length env)
 --   MkCtx (VVar l :: env) ((x,a) :: map (map thinVal) types) (Bound :: bds) (l+1) pos
 
 -- public export
--- define : Name -> Val n -> Lazy (Val n)  -> Ctx n -> Ctx (S n)
+-- define : Name -> Val -> Lazy (Val)  -> Ctx n -> Ctx (S n)
 -- define x v ty (MkCtx env types bds l pos) =
 --   MkCtx (v :: env) ((x,ty) :: map (map thinVal) types) (Defined :: bds) (l + 1) pos
 
