@@ -16,7 +16,15 @@ parameters {0 m : Type -> Type} {auto _ : MonadError String m}
   export
   check : Context -> Raw -> Val -> m Tm
 
-  check ctx (RLam _ _ _) ty = ?ch_rhs
+  check ctx (RLam nm icit tm) ty = case ty of                    
+                    (VPi pinm icit a b) => do
+                      -- TODO icit
+                      let var = VVar (length ctx.env)
+                      let ctx' = extend ctx nm a
+                      tm' <- check ctx' tm (b var)
+                      pure $ Lam nm icit tm'
+                      
+                    other => throwError "Expected pi type \{show $ quote 0 ty}"
   check ctx tm ty = do
     (tm', ty') <- infer ctx tm
     if quote 0 ty /= quote 0 ty' then

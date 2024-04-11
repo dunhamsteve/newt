@@ -26,26 +26,30 @@ Running check is awkward. I need a monad stack.
 Main2.idr has an older App attempt without the code below. Retrofit.
 -}
 
-M = MonadError (String) (StateT Context IO)
+M : Type -> Type
+M = (StateT Context (EitherT String IO))
 
-processDecl : Context -> Decl -> IO Context
+processDecl : Context -> Decl -> M Context
 processDecl ctx (TypeSig nm tm)= do
   putStrLn "TypeSig \{nm} \{show tm}"
-  Right ty <- pure $ the (Either String Tm) (check ctx tm VU)
-    | Left err => printLn err >> pure ctx
+  ty <- check ctx tm VU
+  putStrLn "got \{show ty}"
   let vty = eval ctx.env ty
+  putStrLn "-- \{show $ quote 0 vty}   XXXXXXXXXX"
   pure $ extend ctx nm vty
+
 processDecl ctx (Def nm raw) = do
   putStrLn "def \{show nm}"
   let Just ty = lookup nm ctx.types
     | Nothing => printLn "skip def \{nm} without Decl" >> pure ctx
-  putStrLn "check \{nm} \{show raw} at [no printer for Tm/Val]"
-  Right ty <- pure $ the (Either String Tm) (check ctx raw ty)
+  putStrLn "check \{nm} = \{show raw} at \{show $ quote 0 ty}"
+  Right tm <- pure $ the (Either String Tm) (check ctx raw ty)
     | Left err => printLn err >> pure ctx
+  putStrLn "got \{show tm}"
   pure ctx
 processDecl ctx decl = putStrLn "skip \{show decl}" >> pure ctx
 
-processFile : String -> IO ()
+processFile : String -> M ()
 processFile fn = do
   putStrLn "*** Process \{fn}"
   Right src <- readFile $ "eg/" ++ fn
@@ -58,13 +62,19 @@ processFile fn = do
   ctx <- foldlM processDecl empty res.decls
   putStrLn "done \{show ctx}"
 
-
-main : IO ()
-main = do
+main' : M ()
+main' = do
   args <- getArgs
   putStrLn "Args: \{show args}"
+
   Right files <- listDir "eg"
     | Left err => printLn err
   -- TODO use args
+  
   traverse_ processFile (filter (".newt" `isSuffixOf`) files)
 
+main : IO ()
+main = do
+  foo <- runEitherT $ runStateT TT.empty $ main'
+  putStrLn "done"
+    

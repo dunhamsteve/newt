@@ -32,6 +32,19 @@ data Tm : Type where
 
 %name Tm t, u, v
 
+public export
+Show Tm where
+  show (Bnd k) = "Bnd \{show k}"
+  show (Ref str) = "Ref \{show str}"
+  show (Lam nm Implicit t) = "(λ {\{nm}} => \{show  t})"
+  show (Lam nm Explicit t) = "(λ \{nm}  => \{show  t})"
+  show (App t u) = "(\{show t} \{show u})"
+  show U = "U"
+  show (Pi str icit t u) = "(∏ \{str} : \{show t} => \{show u})"
+  show (Let str icit t u v) = "let \{str} : \{show t} = \{show u} in \{show v}"
+
+-- I can't really show val because it's HOAS...
+
 -- TODO derive
 export 
 Eq Icit where
