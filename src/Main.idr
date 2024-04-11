@@ -14,11 +14,27 @@ import Control.App
 import Syntax
 import Lib.Prettier
 
+{-
+
+Ok, dropped indexes.
+
+- The "sample" file I wrote looks like nonsense to test the parser. I'll need something that typechecks to get this going.
+- I want end to end before adding implicits, so something explicit.
+- maybe some #check / #eval pragmas?
+
+But checking that claims and functions are correct is a very good start.  Maybe spent too much time on making a full parser
+rather than piecing together end to end. (And way too much time on those indices.)
+
+
+
+ -}
+
+
 -- [ ] Put stuff in attic
 -- [ ] Error printing
 -- [ ] Review surface syntax
 -- [x] Prettier printer
--- [ ] First pass at typecheck
+-- [ ] First pass at typecheck (test cases are just parsing)
 -- Just do it in zoo order
 
 

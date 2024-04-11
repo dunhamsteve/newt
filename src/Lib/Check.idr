@@ -8,22 +8,13 @@ import Data.String
 import Lib.TT
 import Syntax
 
-record Context (n : Nat) (f : Nat)  where
-  -- review this
-  env : Env f n -- Vect n (Val f)
-  types : List (String, Val f)
-  pos : SourcePos
 
-
-extend : Context n f -> Val f -> Context (S n) f
-extend ctx ty = { env := ty :: ctx.env } ctx
 
 -- cribbed this, it avoids MonadError String m => everywhere
 parameters {0 m : Type -> Type} {auto _ : MonadError String m}
 
-  infer : {f : Nat} -> Context n f -> Raw -> m (Tm n, Val f)
-  -- I think I'm hand-waving n here, probably need it in Context
-  check : {f : Nat} -> Context n f -> Raw -> Val f -> m (Tm n)
+  infer : {f : Nat} -> Context -> Raw -> m (Tm, Val)
+  check : {f : Nat} -> Context -> Raw -> Val -> m Tm
 
   check ctx (RLam _ _ _) ty = ?ch_rhs
   check ctx tm ty = do
@@ -35,10 +26,10 @@ parameters {0 m : Type -> Type} {auto _ : MonadError String m}
 
   infer ctx (RVar nm) = go 0 ctx.types
     where
-      go : Nat -> List (String, Val f) -> m (Tm n, Val f)
+      go : Nat -> List (String, Val) -> m (Tm, Val)
       go i [] = throwError "\{show nm} not in scope"
       -- REVIEW Local or Bnd (ezoo does not have both)
-      go i ((x, ty) :: xs) = if x == nm then pure $ (Bnd ?i_not_fin, ty) 
+      go i ((x, ty) :: xs) = if x == nm then pure $ (Bnd i, ty) 
         else go (i + 1) xs
 
       

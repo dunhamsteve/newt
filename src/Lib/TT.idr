@@ -1,3 +1,4 @@
+-- I'm not sure this is related, or just a note to self (Presheaves on Porpoise)
 -- maybe watch https://www.youtube.com/watch?v=3gef0_NFz8Q
 -- or drop the indices for now.
 
@@ -133,24 +134,23 @@ nf env t = quote n (eval [] env t)
 public export
 conv : (lvl : Nat) -> Val -> Val -> Bool
 
-data BD = Bound | Defined
+-- data BD = Bound | Defined
 
-public export
-Types : Type
-Types = List (Name, Lazy Val)
+-- public export
+-- Types : Type
+-- Types = List (Name, Lazy Val)
 
--- REVIEW indices
+
 public export
 record Context where
   constructor MkCtx
-  env : Env
-  types : List (String, Val)
-  pos : SourcePos
-
--- data Env : (tm : SnocList Name -> Type) -> SnocList Name -> Type where
+  env : Env                  -- Values in scope
+  types : List (String, Val) -- types and names in scope
+  -- bds  : List BD          -- bind or define
+  -- lvl = length types
+  pos : SourcePos            -- the last SourcePos that we saw
 
 -- Kovacs Small-TT has locals and globals, lets do that.  
--- Still need to sort out the indices - one or two on env?
 
 ||| add a binding to environment
 extend : { n : Nat} -> Context -> String -> Val -> Context
@@ -164,7 +164,7 @@ extend (MkCtx env types pos) name ty =
 -- Is it ok to leaving them in there (if they pass checkType) as long as
 -- we don't register the def if it fails checking?
 
--- shoot, I have another of these in Check.idr
+-- shoot, I have another context in Check.idr
 
 
 -- -- public export

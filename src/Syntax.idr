@@ -145,8 +145,8 @@ Pretty Raw where
   pretty = asDoc 0
     where
     wrap : Icit -> Doc -> Doc
-    wrap Implicit x = x
-    wrap Explicit x = text "{" ++ x ++ text "}"
+    wrap Explicit x = x
+    wrap Implicit x = text "{" ++ x ++ text "}"
 
     par : Nat -> Nat -> Doc -> Doc
     par p p' d = if p' < p then text "(" ++ d ++ text ")" else d
@@ -158,10 +158,10 @@ Pretty Raw where
     asDoc p (RApp x y Explicit) = par p 2 $ asDoc 2 x <+> asDoc 3 y
     asDoc p (RApp x y Implicit) = par p 2 $ asDoc 2 x <+> text "{" ++ asDoc 0 y ++ text "}"
     asDoc p RU = text "U"
-    asDoc p (RPi Nothing Implicit ty scope) = par p 1 $ asDoc p ty <+> text "->" <+/> asDoc p scope
-    asDoc p (RPi (Just x) Implicit ty scope) = 
+    asDoc p (RPi Nothing Explicit ty scope) = par p 1 $ asDoc p ty <+> text "->" <+/> asDoc p scope
+    asDoc p (RPi (Just x) Explicit ty scope) = 
       par p 1 $ text "(" <+> text x <+> text ":" <+> asDoc p ty <+> text ")" <+> text "->" <+/> asDoc p scope
-    asDoc p (RPi nm Explicit ty scope) =
+    asDoc p (RPi nm Implicit ty scope) =
       par p 1 $ text "{" <+> text (fromMaybe "_" nm) <+> text ":" <+> asDoc p ty <+> text "}" <+> text "->" <+/> asDoc 1 scope
     asDoc p (RLet x v ty scope) = 
       par p 0 $ text "let" <+> text x <+> text ":" <+> asDoc p ty 
@@ -170,8 +170,10 @@ Pretty Raw where
     asDoc p (RSrcPos x y) = asDoc p y
     -- does this exist?
     asDoc p (RAnn x y) = text "TODO - RAnn"
-    asDoc p (RLit x) = text (show x)
-    asDoc p (RCase x xs) = text "TODO - RCase" --?asDoc p_rhs_9
+    asDoc p (RLit (LString str)) = text $ interpolate str
+    asDoc p (RLit (LInt i)) = text $ show i
+    asDoc p (RLit (LBool x)) = text $ show x
+    asDoc p (RCase x xs) = text "TODO - RCase"
     asDoc p RHole = text "_"
     asDoc p (RParseError str) = text "PraseError \{str}"
     
@@ -184,4 +186,5 @@ Pretty Module where
         doDecl (TypeSig nm ty) = text nm <+> text ":" <+> nest 2 (pretty ty)
         doDecl (Def nm tm) = text nm <+> text "=" <+> nest 2 (pretty tm)
         doDecl (DImport nm) = text "import" <+> text nm ++ line
-        doDecl (Data str x xs) = text "TODO data"
+        -- the behavior of nest is kinda weird, I have to do the nest before/around the </>. 
+        doDecl (Data nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map doDecl xs))

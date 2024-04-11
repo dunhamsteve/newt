@@ -3,7 +3,8 @@ module Lib.Prettier
 import Data.String
 import Data.Nat
 
--- A prettier printer, Wadler
+-- A prettier printer, Philip Wadler
+-- https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf
 
 ||| `Doc` is a pretty printing document.  Constructors are private, use
 ||| methods below.  `Alt` in particular has some invariants on it, see paper
