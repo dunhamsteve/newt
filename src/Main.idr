@@ -1,98 +1,70 @@
 module Main
 
+import Control.App
 import Data.String
-import Lib.Tokenizer
--- import Lib.Layout
-import Lib.Token
-import Lib.Parser.Impl
+import Control.Monad.Error.Interface
+import Control.Monad.Error.Either
+import Control.Monad.State
+import Lib.Check
 import Lib.Parser
+import Lib.Parser.Impl
+import Lib.Prettier
+import Lib.Token
+import Lib.Tokenizer
+import Lib.TT
+import Syntax
 import Syntax
 import System
-import System.File
 import System.Directory
-import Control.App
-import Syntax
-import Lib.Prettier
+import System.File
 
 {-
 
-Ok, dropped indexes.
+Currently working through checking of decl / def
 
-- The "sample" file I wrote looks like nonsense to test the parser. I'll need something that typechecks to get this going.
-- I want end to end before adding implicits, so something explicit.
-- maybe some #check / #eval pragmas?
+Running check is awkward. I need a monad stack.
+Main2.idr has an older App attempt without the code below. Retrofit.
+-}
 
-But checking that claims and functions are correct is a very good start.  Maybe spent too much time on making a full parser
-rather than piecing together end to end. (And way too much time on those indices.)
+M = MonadError (String) (StateT Context IO)
 
+processDecl : Context -> Decl -> IO Context
+processDecl ctx (TypeSig nm tm)= do
+  putStrLn "TypeSig \{nm} \{show tm}"
+  Right ty <- pure $ the (Either String Tm) (check ctx tm VU)
+    | Left err => printLn err >> pure ctx
+  let vty = eval ctx.env ty
+  pure $ extend ctx nm vty
+processDecl ctx (Def nm raw) = do
+  putStrLn "def \{show nm}"
+  let Just ty = lookup nm ctx.types
+    | Nothing => printLn "skip def \{nm} without Decl" >> pure ctx
+  putStrLn "check \{nm} \{show raw} at [no printer for Tm/Val]"
+  Right ty <- pure $ the (Either String Tm) (check ctx raw ty)
+    | Left err => printLn err >> pure ctx
+  pure ctx
+processDecl ctx decl = putStrLn "skip \{show decl}" >> pure ctx
 
-
- -}
-
-
--- [ ] Put stuff in attic
--- [ ] Error printing
--- [ ] Review surface syntax
--- [x] Prettier printer
--- [ ] First pass at typecheck (test cases are just parsing)
--- Just do it in zoo order
-
-
--- showPError : String -> 
-
-test : Show a => Parser a -> String -> IO ()
-test pa src = do
-  _ <- putStrLn "--"
-  _ <- putStrLn $ src
-  let toks = tokenise src
-  putStrLn "- Toks"
-  printLn $ toks
-  putStrLn "- Parse"
-  let Right res = parse pa toks
-    | Left y => putStrLn "Error: \{y}"
-  printLn $ res
-
-  -- let toks2 = layout toks
-  -- printLn $ map value toks2
-
--- gotta fix up error messages. Show it with some source
-
-testFile : String -> IO ()
-testFile fn = do
-  putStrLn ("***" ++ fn)
+processFile : String -> IO ()
+processFile fn = do
+  putStrLn "*** Process \{fn}"
   Right src <- readFile $ "eg/" ++ fn
     | Left err => printLn err
   let toks = tokenise src
   let Right res = parse parseMod toks
-    | Left y => putStrLn "Error: \{y}"
-
+    | Left y => putStrLn (showError src y)
   putStrLn $ pretty 80 $ pretty res
-
-olderTests : IO ()
-olderTests = do
-  test letExpr "let x = 1\n    y = 2\n in x + y"
-  test term "let x = 1 in x + 2"
-  printLn "BREAK"
-  test term "case x of\n   True => something\n   False => let\n      x = 1\n      y = 2\n    in x + y"
-  test term "x + y * z + w"
-  test term "y * z + w"
-  test term "x -> y -> z"
-  test term "x y z"
-  test parseMod "module Foo\nfoo : Int -> Int\nfoo = \\ x . x"
-  test lamExpr "\\ x . x"
-  test parseMod "module Foo\nimport Foo.Bar\nfoo = 1\n"
-  test parseDef "foo = 1"
-  test parseSig "foo : Bar -> Int"
-  test parseMod "module Test\nid : a -> a\nid = \\ x => x\n"
-
-foo : Maybe Int -> Int
-foo Nothing = ?foo_rhs_0
-foo (Just x) = ?foo_rhs_1
+  printLn "process Decls"
+  ctx <- foldlM processDecl empty res.decls
+  putStrLn "done \{show ctx}"
 
 
 main : IO ()
 main = do
+  args <- getArgs
+  putStrLn "Args: \{show args}"
   Right files <- listDir "eg"
     | Left err => printLn err
-  traverse_ testFile (filter (".newt" `isSuffixOf`) files)
+  -- TODO use args
+  traverse_ processFile (filter (".newt" `isSuffixOf`) files)
 

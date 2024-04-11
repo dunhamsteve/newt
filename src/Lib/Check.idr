@@ -8,31 +8,27 @@ import Data.String
 import Lib.TT
 import Syntax
 
-
-
 -- cribbed this, it avoids MonadError String m => everywhere
 parameters {0 m : Type -> Type} {auto _ : MonadError String m}
+  export
+  infer : Context -> Raw -> m (Tm, Val)
 
-  infer : {f : Nat} -> Context -> Raw -> m (Tm, Val)
-  check : {f : Nat} -> Context -> Raw -> Val -> m Tm
+  export
+  check : Context -> Raw -> Val -> m Tm
 
   check ctx (RLam _ _ _) ty = ?ch_rhs
   check ctx tm ty = do
     (tm', ty') <- infer ctx tm
-    if quote _ ty /= quote _ ty' then
+    if quote 0 ty /= quote 0 ty' then
         throwError "type mismatch"
       else pure tm'
-
 
   infer ctx (RVar nm) = go 0 ctx.types
     where
       go : Nat -> List (String, Val) -> m (Tm, Val)
-      go i [] = throwError "\{show nm} not in scope"
-      -- REVIEW Local or Bnd (ezoo does not have both)
+      go i [] = throwError "\{show nm} not in scope \{show $ map fst ctx.types}"
       go i ((x, ty) :: xs) = if x == nm then pure $ (Bnd i, ty) 
         else go (i + 1) xs
-
-      
     -- need environment of name -> type..
   infer ctx (RApp t u icit) = do 
     -- icit will be used for insertion, lets get this working first...
@@ -40,31 +36,14 @@ parameters {0 m : Type -> Type} {auto _ : MonadError String m}
     case tty of
       (VPi str icit' a b) => do
         u <- check ctx u a
-        
-        -- is zero right here?
-        -- I have ctx.env here and TypeTheory has []
-        -- maybe because I'm not substing?
-        pure (App t u, b 0 (eval ctx.env t))
-      _ => throwError "Expected Pi type"
-      
-    -- FIXME ctx.env?
-    -- vtya <- nf ctx.env tma
-    
+        pure (App t u, b (eval ctx.env t))
+      _ => throwError "Expected Pi type"    
   infer ctx RU = pure (U, VU) -- YOLO
   infer ctx (RPi nm icit ty ty2) = do
     ty' <- check ctx ty VU
     let vty' := eval ctx.env ty'
-    -- gallais and the source paper have subst here.  They're using Tm rather
-    -- than raw. Lets look at the zoo.
-    -- maybe run through zoo2 well typed...
-    -- it just binds vty' into the environment and evaluates 
-    -- Kovacs is sticking the type vty' and the value Var l into the context
-    -- and letting the Ix pick up the Var l from the context
-    -- gallais/paper are subst the Var l into the Tm.
-    -- yaffle just pushes to the environment, but it's a list of binders
-    -- so types, names, no values
-    ty2' <- check (extend ctx vty') ty2 VU
     let nm := fromMaybe "_" nm
+    ty2' <- check (extend ctx nm vty') ty2 VU
     pure (Pi nm icit ty' ty2', VU)
   infer ctx (RLet str tm tm1 tm2) = ?rhs_5
   infer ctx (RSrcPos x tm) = infer ({pos := x} ctx) tm
@@ -76,11 +55,13 @@ parameters {0 m : Type -> Type} {auto _ : MonadError String m}
 
   infer ctx (RLam str icit tm) = throwError "can't infer lambda"
 
-  infer ctx _ = ?later
+  infer ctx _ = throwError "TODO"
+
   -- I don't have types for these yet...
   -- infer ctx (RLit (LString str)) = ?rhs_10
   -- infer ctx (RLit (LInt i)) = ?rhs_11
   -- infer ctx (RLit (LBool x)) = ?rhs_12
-  -- infer ctx RHole = ?todo_meta2
-  -- infer ctx (RParseError str) = ?todo_insert_meta
   -- infer ctx (RCase tm xs) = ?rhs_9
+  -- infer ctx RHole = ?todo_meta2
+  -- The idea here is to insert a hole for a parse error
+  -- infer ctx (RParseError str) = ?todo_insert_meta

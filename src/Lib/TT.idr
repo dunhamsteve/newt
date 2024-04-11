@@ -7,6 +7,7 @@
 module Lib.TT
 -- For SourcePos
 import Lib.Parser.Impl
+import Control.Monad.Error.Interface
 import Data.Fin
 import Data.List
 
@@ -81,17 +82,12 @@ data Val : Type where
   VPi : Name -> Icit -> Lazy Val -> Closure -> Val
   VU : Val
 
-||| LocalEnv free vars
-public export
-LocalEnv : Type 
-LocalEnv = List Val
-
 public export
 Env : Type
 Env = List Val
 
 export
-eval : LocalEnv -> Env -> Tm -> Val
+eval : Env -> Tm -> Val
 
 export
 vapp : Val -> Val -> Val
@@ -103,15 +99,16 @@ bind v env = v :: env
 
 -- so here we have LocalEnv free vars in Yaffle
 
-eval locs env (Ref x) = VRef x
-eval locs env (App t u) = vapp (eval locs env t) (eval locs env u)
-eval locs env U = VU
+eval env (Ref x) = VRef x
+eval env (App t u) = vapp (eval env t) (eval env u)
+eval env U = VU
 -- yaffle breaks out binder
-eval locs env (Lam x icit t) = VLam x icit (\u => eval (u :: locs) env t)
-eval locs env (Pi x icit a b) = VPi x icit (eval locs env a) (\u => eval (u :: locs) env b)
+eval env (Lam x icit t) = VLam x icit (\u => eval (u :: env) t)
+eval env (Pi x icit a b) = VPi x icit (eval env a) (\u => eval (u :: env) b)
 -- This one we need to make 
-eval locs env (Let x icit ty t u) = eval (eval locs env t :: locs) env u
-eval locs env (Bnd i) = let Just rval = getAt i env | _ => ?out_of_index in rval
+eval env (Let x icit ty t u) = eval (eval env t :: env) u
+eval env (Bnd i) = let Just rval = getAt i env | _ => ?out_of_index
+                   in rval
 
 vfresh : Nat -> Val
 vfresh l = VVar l
@@ -129,7 +126,7 @@ quote _ (VRef n) = Ref n
 -- vars -> vars -> vars in yaffle
 export
 nf : {n : Nat} -> Env -> Tm -> Tm
-nf env t = quote n (eval [] env t)
+nf env t = quote n (eval env t)
 
 public export
 conv : (lvl : Nat) -> Val -> Val -> Bool
@@ -150,62 +147,29 @@ record Context where
   -- lvl = length types
   pos : SourcePos            -- the last SourcePos that we saw
 
+
+
+export
+empty : Context
+empty = MkCtx [] [] (0,0)
+
+export partial
+Show Context where
+  show ctx = "Context \{show $ map fst $ ctx.types}"
+
 -- Kovacs Small-TT has locals and globals, lets do that.  
 
 ||| add a binding to environment
-extend : { n : Nat} -> Context -> String -> Val -> Context
+export
+extend : Context -> String -> Val -> Context
 extend (MkCtx env types pos) name ty =
     MkCtx (VVar (length env) :: env) ((name, ty) :: types) pos
 
-
--- weirich has 'hints' to store the claims before the def is seen/checked
--- saying it is unsafe. afterwards they are mixed into the context.
--- idris essentially leaves holes, filled in later, for undefined claims
--- Is it ok to leaving them in there (if they pass checkType) as long as
--- we don't register the def if it fails checking?
-
--- shoot, I have another context in Check.idr
-
-
--- -- public export
--- record Ctx (n : Nat) where
---   constructor MkCtx
---   env : Env k n     -- for eval
---   types : Types n   -- name lookup, prettyprint
---   bds : Vect n BD  -- meta creation
---   lvl : Nat -- This is n, do we need it?
---   -- Kovacs and Weirich use a position node, Idris has FC
---   pos : SourcePos
-
--- %name Ctx ctx
-
--- public export
--- emptyCtx : Ctx Z
--- emptyCtx = MkCtx {k=0} [] [] [] 0 (0,0)
-
--- find out how pi-forall treats binders
--- Vars are unbound TName 
-
--- ezoo
--- Tm has Ix
--- Val has Lvl
-
--- by the time we hit ezoo 5/6, there is a Map string -> (Lvl, Type) for name lookup.
-
--- smalltt
-
-
--- idris
-
-
-
--- public export
--- bindCtx : Name -> Lazy (Val (zz + n))  -> Ctx n -> Ctx (S n)
--- bindCtx x a (MkCtx env types bds l pos) =
---   MkCtx (VVar l :: env) ((x,a) :: map (map thinVal) types) (Bound :: bds) (l+1) pos
-
--- public export
--- define : Name -> Val -> Lazy (Val)  -> Ctx n -> Ctx (S n)
--- define x v ty (MkCtx env types bds l pos) =
---   MkCtx (v :: env) ((x,ty) :: map (map thinVal) types) (Defined :: bds) (l + 1) pos
+lookup : {0 m : Type -> Type} -> {auto _ : MonadError String m} ->
+      Context -> String -> m Val
+lookup ctx nm = go ctx.types
+  where
+    go : List (String,Val) -> m Val
+    go [] = throwError "Name \{nm} not in scope"
+    go ((n, ty) :: xs) = if n == nm then pure ty else go xs
 

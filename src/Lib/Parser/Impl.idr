@@ -1,6 +1,8 @@
 module Lib.Parser.Impl
 
 import Lib.Token
+import Data.String
+import Data.Nat
 
 public export
 TokenList : Type
@@ -16,8 +18,20 @@ emptyPos = (0,0)
 
 -- Error of a parse
 public export
-data Error = E String
+data Error = E SourcePos String
 %name Error err
+
+public export
+showError : String -> Error -> String
+showError src (E (line, col) msg) = "Err at \{show (line,col)} \{msg}\n" ++ go 0 (lines src)
+  where
+    go : Int -> List String -> String
+    go l [] = ""
+    go l (x :: xs) = 
+      if l == line then
+        "\{x}\n\{replicate (cast col) ' '}^\n"
+      else if line - 3 < l then x ++ "\n" ++ go (l + 1) xs 
+      else ""
 
 -- Result of a parse
 public export
@@ -45,22 +59,26 @@ export
 runP : Parser a -> TokenList -> Bool -> SourcePos -> Result a
 runP (P f) = f
 
+error : TokenList -> String -> Error
+error [] msg = E emptyPos msg
+error ((MkBounded val isIrrelevant (MkBounds line col _ _)) :: _) msg = E (line, col) msg
+
 export
-parse : Parser a -> TokenList -> Either String a
+parse : Parser a -> TokenList -> Either Error a
 parse pa toks = case runP pa toks False emptyPos of
-  Fail fatal (E msg) toks com => Left "error: \{msg} next at: \{show toks}"
+  Fail fatal err toks com => Left err
   OK a [] _ => Right a
-  OK a ts _ => Left "Extra toks \{show ts}"
+  OK a ts _ => Left (error toks "Extra toks")
 
 -- I think I want to drop the typeclasses for v1
 
 export
 fail : String -> Parser a
-fail msg = P $ \toks,com,col => Fail False (E msg) toks com
+fail msg = P $ \toks,com,col => Fail False (error toks msg) toks com
 
 export
 fatal : String -> Parser a
-fatal msg = P $ \toks,com,col => Fail False (E msg) toks com
+fatal msg = P $ \toks,com,col => Fail False (error toks msg) toks com
 
 -- mustWork / commit copied from Idris, but I may switch to the parsec consumption thing.
 export
@@ -106,8 +124,8 @@ Monad Parser where
 pred : (BTok -> Bool) -> String -> Parser String
 pred f msg = P $ \toks,com,col =>
   case toks of
-    (t :: ts) => if f t then OK (value t) ts com else Fail False (E "\{msg} vt:\{value t}") toks com
-    [] => Fail False (E "eof") toks com
+    (t :: ts) => if f t then OK (value t) ts com else Fail False (error toks "\{msg} vt:\{value t}") toks com
+    [] => Fail False (error toks "eof") toks com
 
 export
 commit : Parser ()
@@ -133,7 +151,7 @@ mutual
 export
 getPos : Parser SourcePos
 getPos = P $ \toks,com, (l,c) => case toks of
-  [] => Fail False (E "End of file") toks com -- OK emptyPos toks com
+  [] => Fail False (error toks "End of file") toks com -- OK emptyPos toks com
   (t :: ts) => OK (start t) toks com
 
 ||| Start an indented block and run parser in it
@@ -154,8 +172,8 @@ sameLevel (P p) = P $ \toks,com,(l,c) => case toks of
   (t :: _) => 
     let (tl,tc) = start t 
     in if tc == c then p toks com (tl, c)
-    else if c < tc then Fail False (E "unexpected indent") toks com
-    else Fail False (E "unexpected indent") toks com
+    else if c < tc then Fail False (error toks "unexpected indent") toks com
+    else Fail False (error toks "unexpected indent") toks com
 
 export
 someSame : Parser a -> Parser (List a)
@@ -169,7 +187,7 @@ indented (P p) = P $ \toks,com,(l,c) => case toks of
   (t::_) =>
     let (tl,tc) = start t
     in if tc > c || tl == l then p toks com (l,c)
-    else Fail False (E "unexpected outdent") toks com
+    else Fail False (error toks "unexpected outdent") toks com
 
 export
 token' : Kind -> Parser String

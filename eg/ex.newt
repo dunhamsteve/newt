@@ -1,24 +1,7 @@
--- comment with double hyphen, takes precedence over operators
-module Ex
--- imports not implemented yet
-import Foo
--- inductive data type declaration (not supported in language yet)
-data Bool : Type where
-  True : Bool
-  False : Bool
+-- foo
+module Foo
 
--- claim
-id : a -> a
--- declaration
-id = \ a => a * a + 2 * (3 + x)
-
-blah : Either a a -> a
-blah = \ x => let x = 1 in x * x
-
-bar = foo {x} 1
-blah = \ _ => 1
-
-
-next : (A : Type) -> (x : A) -> A
-
-next : {A : Type} -> (x : A) -> A
+id : (a : U) -> a -> a
+id = \ a => \ x => x
+-- if I put foo here, it fails with 'extra toks'
+-- errors aren't cutting to the top

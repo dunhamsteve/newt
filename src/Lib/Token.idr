@@ -1,5 +1,7 @@
 module Lib.Token
 
+-- TODO replace this with own lexer
+
 import public Text.Lexer
 
 public export

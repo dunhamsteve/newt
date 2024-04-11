@@ -6,6 +6,7 @@ import Lib.Parser.Impl
 import Lib.Prettier
 import Lib.TT
 
+public export
 data Raw : Type where
 
 public export
@@ -28,7 +29,6 @@ data CaseAlt = MkAlt Pattern Raw
 
 -- TODO redo this with names for documentation
 
-public export
 data Raw
   = RVar Name
   | RLam String Icit Raw
@@ -48,6 +48,7 @@ data Raw
 
 -- derive some stuff - I'd like json, eq, show, ...
 
+public export
 data Decl : Type where
 
 Telescope: Type
@@ -55,7 +56,6 @@ Telescope = List Decl -- pi-forall, always typeSig?
 
 data ConstrDef = MkCDef Name Telescope
 
-public export
 data Decl
   = TypeSig Name Raw
   | Def Name Raw

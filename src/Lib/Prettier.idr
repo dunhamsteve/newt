@@ -1,10 +1,9 @@
+||| A prettier printer, Philip Wadler
+||| https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf
 module Lib.Prettier
 
 import Data.String
 import Data.Nat
-
--- A prettier printer, Philip Wadler
--- https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf
 
 ||| `Doc` is a pretty printing document.  Constructors are private, use
 ||| methods below.  `Alt` in particular has some invariants on it, see paper
@@ -13,8 +12,8 @@ import Data.Nat
 export
 data Doc = Empty | Line | Text String | Nest Nat Doc | Seq Doc Doc | Alt Doc Doc
 
+||| `DOC` is an intermediate form used during layout/rendering
 data DOC = EMPTY | TEXT String DOC | LINE Nat DOC
-
 
 flatten : Doc -> Doc
 flatten Empty = Empty
@@ -60,7 +59,7 @@ best w k x = be w k [(0,x)]
 -- Public interface
 
 export
-pretty : Nat -> Doc-> String
+pretty : Nat -> Doc -> String
 pretty w x = layout (best w 0 x)
 
 public export

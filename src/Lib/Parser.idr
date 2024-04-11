@@ -60,9 +60,9 @@ withPos p = RSrcPos <$> getPos <*> p
 
 -- the inside of Raw
 atom : Parser Raw
-atom = withPos ( RVar <$> ident 
+atom = withPos (RU <$ keyword "U"
+              <|> RVar <$> ident 
               <|> lit
-              <|> RU <$ keyword "U"
               <|> RHole <$ keyword "_")
     <|> parens term
 
