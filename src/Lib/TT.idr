@@ -82,8 +82,7 @@ data Val : Type
 
 
 public export
-0 Closure : Type
-Closure = Val -> Val
+data Closure : Type
 
 public export
 data Val : Type where
@@ -102,44 +101,46 @@ Env = List Val
 export
 eval : Env -> Tm -> Val
 
+data Closure = MkClosure Env Tm
+
+public export
+($$) : Closure -> Val -> Val
+($$) (MkClosure env tm) u = eval (u :: env) tm
+
+infixl 8 $$ 
+
 export
 vapp : Val -> Val -> Val
-vapp (VLam _ icit t) u = t u
+vapp (VLam _ icit t) u = t $$ u
 vapp t u = VApp t u
 
 bind : Val -> Env -> Env
 bind v env = v :: env
 
--- so here we have LocalEnv free vars in Yaffle
-
 eval env (Ref x) = VRef x
 eval env (App t u) = vapp (eval env t) (eval env u)
 eval env U = VU
--- yaffle breaks out binder
-eval env (Lam x icit t) = VLam x icit (\u => eval (u :: env) t)
-eval env (Pi x icit a b) = VPi x icit (eval env a) (\u => eval (u :: env) b)
--- This one we need to make 
+eval env (Lam x icit t) = VLam x icit (MkClosure env t)
+eval env (Pi x icit a b) = VPi x icit (eval env a) (MkClosure env b)
 eval env (Let x icit ty t u) = eval (eval env t :: env) u
 eval env (Bnd i) = let Just rval = getAt i env | _ => ?out_of_index
                    in rval
 
-vfresh : Nat -> Val
-vfresh l = VVar l
-
 export
-quote : (k : Nat) -> Val -> Tm
-quote l (VVar k) = Bnd (S l `minus` k) -- level to index
+quote : (lvl : Nat) -> Val -> Tm
+quote l (VVar k) = Bnd ((l `minus` k) `minus` 1) -- level to index
 quote l (VApp t u) = App (quote l t) (quote l u)
 -- so this one is calling the kripke on [x] and a fresh var
-quote l (VLam x icit t) = Lam x icit (quote (S l) (t (vfresh l))) -- that one is too big
-quote l (VPi x icit a b) = Pi x icit (quote l a) (quote (S l) (b $ vfresh l))
+quote l (VLam x icit t) = Lam x icit (quote (S l) (t $$ VVar l)) -- that one is too big
+quote l (VPi x icit a b) = Pi x icit (quote l a) (quote (S l) (b $$ VVar l))
 quote l VU = U
 quote _ (VRef n) = Ref n
 
--- vars -> vars -> vars in yaffle
+-- how are we using this?  Can we assume completely closed?
+-- ezoo only seems to use it at [], but essentially does this:
 export
-nf : {n : Nat} -> Env -> Tm -> Tm
-nf env t = quote n (eval env t)
+nf : Env -> Tm -> Tm
+nf env t = quote (length env) (eval env t)
 
 public export
 conv : (lvl : Nat) -> Val -> Val -> Bool
@@ -160,8 +161,6 @@ record Context where
   -- lvl = length types
   pos : SourcePos            -- the last SourcePos that we saw
 
-
-
 export
 empty : Context
 empty = MkCtx [] [] (0,0)
@@ -177,6 +176,9 @@ export
 extend : Context -> String -> Val -> Context
 extend (MkCtx env types pos) name ty =
     MkCtx (VVar (length env) :: env) ((name, ty) :: types) pos
+
+update : Context -> String -> Tm -> Context
+-- oof
 
 lookup : {0 m : Type -> Type} -> {auto _ : MonadError String m} ->
       Context -> String -> m Val

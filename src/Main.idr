@@ -29,25 +29,31 @@ Main2.idr has an older App attempt without the code below. Retrofit.
 M : Type -> Type
 M = (StateT Context (EitherT String IO))
 
-processDecl : Context -> Decl -> M Context
-processDecl ctx (TypeSig nm tm)= do
+processDecl : Decl -> M ()
+processDecl (TypeSig nm tm) = do
+  ctx <- get
   putStrLn "TypeSig \{nm} \{show tm}"
   ty <- check ctx tm VU
   putStrLn "got \{show ty}"
   let vty = eval ctx.env ty
-  putStrLn "-- \{show $ quote 0 vty}   XXXXXXXXXX"
-  pure $ extend ctx nm vty
+  putStrLn "--- \{show $ quote 0 vty}" 
+  put $ extend ctx nm vty
 
-processDecl ctx (Def nm raw) = do
+processDecl (Def nm raw) = do
   putStrLn "def \{show nm}"
+  ctx <- get
   let Just ty = lookup nm ctx.types
-    | Nothing => printLn "skip def \{nm} without Decl" >> pure ctx
+    | Nothing => printLn "skip def \{nm} without Decl"
   putStrLn "check \{nm} = \{show raw} at \{show $ quote 0 ty}"
   Right tm <- pure $ the (Either String Tm) (check ctx raw ty)
-    | Left err => printLn err >> pure ctx
+    | Left err => printLn err
   putStrLn "got \{show tm}"
-  pure ctx
-processDecl ctx decl = putStrLn "skip \{show decl}" >> pure ctx
+  -- XXXXX here I need to update the environment
+  -- I may want to rework things to have a top environment with names,
+  -- then levels / indices for local stuff.
+  
+  
+processDecl decl = putStrLn "skip \{show decl}"
 
 processFile : String -> M ()
 processFile fn = do
@@ -59,8 +65,8 @@ processFile fn = do
     | Left y => putStrLn (showError src y)
   putStrLn $ pretty 80 $ pretty res
   printLn "process Decls"
-  ctx <- foldlM processDecl empty res.decls
-  putStrLn "done \{show ctx}"
+  traverse_ processDecl res.decls
+  putStrLn "done \{show !get}"
 
 main' : M ()
 main' = do

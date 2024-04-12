@@ -21,7 +21,7 @@ parameters {0 m : Type -> Type} {auto _ : MonadError String m}
                       -- TODO icit
                       let var = VVar (length ctx.env)
                       let ctx' = extend ctx nm a
-                      tm' <- check ctx' tm (b var)
+                      tm' <- check ctx' tm (b $$ var)
                       pure $ Lam nm icit tm'
                       
                     other => throwError "Expected pi type \{show $ quote 0 ty}"
@@ -44,7 +44,7 @@ parameters {0 m : Type -> Type} {auto _ : MonadError String m}
     case tty of
       (VPi str icit' a b) => do
         u <- check ctx u a
-        pure (App t u, b (eval ctx.env t))
+        pure (App t u, b $$ eval ctx.env t)
       _ => throwError "Expected Pi type"    
   infer ctx RU = pure (U, VU) -- YOLO
   infer ctx (RPi nm icit ty ty2) = do

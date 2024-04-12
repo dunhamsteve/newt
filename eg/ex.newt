@@ -3,5 +3,9 @@ module Foo
 
 id : (a : U) -> a -> a
 id = \ a => \ x => x
--- if I put foo here, it fails with 'extra toks'
+
+-- if I put foo here, it fails with 'extra toks' at "module"
 -- errors aren't cutting to the top
+-- I think we need the errors to be fatal if anything is consumed (since the nearest alt)
+
+foo

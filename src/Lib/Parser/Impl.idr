@@ -31,7 +31,7 @@ showError src (E (line, col) msg) = "Err at \{show (line,col)} \{msg}\n" ++ go 0
       if l == line then
         "\{x}\n\{replicate (cast col) ' '}^\n"
       else if line - 3 < l then x ++ "\n" ++ go (l + 1) xs 
-      else ""
+      else go (l + 1) xs
 
 -- Result of a parse
 public export
@@ -68,7 +68,7 @@ parse : Parser a -> TokenList -> Either Error a
 parse pa toks = case runP pa toks False emptyPos of
   Fail fatal err toks com => Left err
   OK a [] _ => Right a
-  OK a ts _ => Left (error toks "Extra toks")
+  OK a ts _ => Left (error ts "Extra toks")
 
 -- I think I want to drop the typeclasses for v1
 
