@@ -6,10 +6,11 @@ import Lib.Parser.Impl
 import Data.Vect
 import Data.String
 import Lib.TT
+import Lib.TopContext
 import Syntax
 
 -- cribbed this, it avoids MonadError String m => everywhere
-parameters {0 m : Type -> Type} {auto _ : MonadError String m}
+parameters {0 m : Type -> Type} {auto _ : MonadError String m} (top : TopContext)
   export
   infer : Context -> Raw -> m (Tm, Val)
 
@@ -33,7 +34,7 @@ parameters {0 m : Type -> Type} {auto _ : MonadError String m}
 
   infer ctx (RVar nm) = go 0 ctx.types
     where
-      go : Nat -> List (String, Val) -> m (Tm, Val)
+      go : Nat -> Vect n (String, Val) -> m (Tm, Val)
       go i [] = throwError "\{show nm} not in scope \{show $ map fst ctx.types}"
       go i ((x, ty) :: xs) = if x == nm then pure $ (Bnd i, ty) 
         else go (i + 1) xs

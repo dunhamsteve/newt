@@ -26,6 +26,11 @@ import Data.List
 -- exercises.  There is some fill in the parser stuff that may show 
 -- the future.
 
+-- kovacs desugars the (a b c : Foo) during parsing (foldr)
+
+-- We need to allow A -> B -> C in functions
+-- We need to handle A -> (A -> B) -> C
+
 ident = token Ident
 
 parens : Parser a -> Parser a
@@ -51,7 +56,7 @@ lit = do
   t <- token Number
   pure $ RLit (LInt (cast t))
 
--- I can haz arrows
+-- typeExpr is term with arrows. 
 export typeExpr : Parser Raw
 export term : (Parser Raw)
 
@@ -64,7 +69,7 @@ atom = withPos (RU <$ keyword "U"
               <|> RVar <$> ident 
               <|> lit
               <|> RHole <$ keyword "_")
-    <|> parens term
+    <|> parens typeExpr
 
 -- Argument to a Spine
 pArg : Parser (Icit,Raw)
@@ -112,7 +117,7 @@ letExpr = do
   commit
   alts <- startBlock $ someSame $ letAssign
   keyword' "in"
-  scope <- term
+  scope <- typeExpr
   
   pure $ foldl (\ acc, (n,v) => RLet n RHole v acc) scope alts
   where
@@ -121,7 +126,7 @@ letExpr = do
       name <- ident
       -- TODO type assertion
       keyword "="
-      t <- term
+      t <- typeExpr
       pure (name,t)
 
 pLetArg : Parser (Icit, String, Maybe Raw)
@@ -138,7 +143,7 @@ lamExpr = do
   commit
   (icit, name, ty) <- pLetArg
   keyword "=>"
-  scope <- term
+  scope <- typeExpr
   -- TODO optional type
   pure $ RLam name icit scope
 

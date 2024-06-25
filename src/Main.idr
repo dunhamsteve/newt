@@ -2,6 +2,8 @@ module Main
 
 import Control.App
 import Data.String
+import Data.Vect
+import Data.List
 import Control.Monad.Error.Interface
 import Control.Monad.Error.Either
 import Control.Monad.State
@@ -12,6 +14,7 @@ import Lib.Prettier
 import Lib.Token
 import Lib.Tokenizer
 import Lib.TT
+import Lib.TopContext
 import Syntax
 import Syntax
 import System
@@ -20,38 +23,46 @@ import System.File
 
 {-
 
+- [ ] Replace on define
+- [ ] more sugar on lambdas
+
+
 Currently working through checking of decl / def
 
 Running check is awkward. I need a monad stack.
 Main2.idr has an older App attempt without the code below. Retrofit.
+
+App isn't compatible with javascript (without a way to short circuit 
+the fork foreign function.)
+
 -}
 
 M : Type -> Type
-M = (StateT Context (EitherT String IO))
+M = (StateT TopContext (EitherT String IO))
 
 processDecl : Decl -> M ()
 processDecl (TypeSig nm tm) = do
   ctx <- get
   putStrLn "TypeSig \{nm} \{show tm}"
-  ty <- check ctx tm VU
+  ty <- check ctx empty tm VU
   putStrLn "got \{show ty}"
-  let vty = eval ctx.env ty
-  putStrLn "--- \{show $ quote 0 vty}" 
-  put $ extend ctx nm vty
+  
+  put $ claim ctx nm ty
 
 processDecl (Def nm raw) = do
   putStrLn "def \{show nm}"
   ctx <- get
-  let Just ty = lookup nm ctx.types
+  let Just entry = lookup nm ctx
     | Nothing => printLn "skip def \{nm} without Decl"
-  putStrLn "check \{nm} = \{show raw} at \{show $ quote 0 ty}"
-  Right tm <- pure $ the (Either String Tm) (check ctx raw ty)
+  let (MkEntry name ty Axiom) := entry
+    -- FIXME error
+    | _ => printLn "\{nm} already defined"
+  putStrLn "check \{nm} = \{show raw} at \{show $ ty}"
+  let vty = eval empty ty
+  Right tm <- pure $ the (Either String Tm) (check ctx empty raw vty)
     | Left err => printLn err
   putStrLn "got \{show tm}"
-  -- XXXXX here I need to update the environment
-  -- I may want to rework things to have a top environment with names,
-  -- then levels / indices for local stuff.
-  
+  put (addDef ctx nm tm ty)
   
 processDecl decl = putStrLn "skip \{show decl}"
 
@@ -81,6 +92,6 @@ main' = do
 
 main : IO ()
 main = do
-  foo <- runEitherT $ runStateT TT.empty $ main'
+  foo <- runEitherT $ runStateT empty $ main'
   putStrLn "done"
     

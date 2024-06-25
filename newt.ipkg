@@ -13,7 +13,7 @@ authors = "Steve Dunham"
 -- langversion
 
 -- packages to add to search path
-depends = contrib, base
+depends = contrib, base, elab-util
 
 -- modules to install
 -- modules =

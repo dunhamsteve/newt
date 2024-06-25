@@ -66,6 +66,7 @@ public export
 Semigroup Doc where x <+> y = Seq x (Seq (Text " ") y)
 
 -- Match System.File so we don't get warnings
+public export
 infixl 5 </>
 
 export

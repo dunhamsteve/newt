@@ -1,4 +1,5 @@
 -- I'm not sure this is related, or just a note to self (Presheaves on Porpoise)
+
 -- maybe watch https://www.youtube.com/watch?v=3gef0_NFz8Q
 -- or drop the indices for now.
 
@@ -7,9 +8,12 @@
 module Lib.TT
 -- For SourcePos
 import Lib.Parser.Impl
+
 import Control.Monad.Error.Interface
 import Data.Fin
 import Data.List
+import Data.Vect
+import Data.SortedMap
 
 public export
 Name : Type
@@ -107,7 +111,8 @@ public export
 ($$) : Closure -> Val -> Val
 ($$) (MkClosure env tm) u = eval (u :: env) tm
 
-infixl 8 $$ 
+public export
+infixl 8 $$
 
 export
 vapp : Val -> Val -> Val
@@ -152,30 +157,69 @@ conv : (lvl : Nat) -> Val -> Val -> Bool
 -- Types = List (Name, Lazy Val)
 
 
+{-
+smalltt
+
+smalltt gets into weird haskell weeds in eval - shifting top level to the left
+and tagging meta vs top with a bit.
+
+I think something subtle is going on with laziness on Elaboration.hs:300
+yeah, and define is even inlined.
+
+So it has a top context, and clears out almost everything for processing a def in
+a different kind of context.
+
+we very much need an idea of local context for metas. I don't want to abstract over
+the entire program.
+
+So I guess we have top and local then?
+
+With haskell syntax. I think we can have Axiom for claims and rewrite to def later.
+
+Hmm, so given ezoo, if I'm going simple, I could keep BDs short, and use the normal
+context. (Zoo4.lean:222) I'd probably still need an undefined/axiom marker as a value? 
+
+ok, so with just one context, Env is List Val and we're getting Tm back from type checking.
+
+Can I get val back? Do we need to quote? What happens if we don't?
+
+-}
+
+data BD = Bound | Defined
+
+-- we'll use this for typechecking, but need to keep a TopContext around too.
 public export
 record Context where
   constructor MkCtx
+  lvl : Nat
+  -- shall we use lvl as an index?
   env : Env                  -- Values in scope
-  types : List (String, Val) -- types and names in scope
-  -- bds  : List BD          -- bind or define
-  -- lvl = length types
+  types : Vect lvl (String, Val) -- types and names in scope
+  -- so we'll try "bds" determines length of local context
+  bds  : List BD          -- bound or defined
+  
   pos : SourcePos            -- the last SourcePos that we saw
 
 export
 empty : Context
-empty = MkCtx [] [] (0,0)
+empty = MkCtx 0 [] [] [] (0,0)
 
 export partial
 Show Context where
   show ctx = "Context \{show $ map fst $ ctx.types}"
 
--- Kovacs Small-TT has locals and globals, lets do that.  
-
 ||| add a binding to environment
 export
 extend : Context -> String -> Val -> Context
-extend (MkCtx env types pos) name ty =
-    MkCtx (VVar (length env) :: env) ((name, ty) :: types) pos
+extend (MkCtx lvl env types bds pos) name ty =
+    MkCtx (S lvl) (VVar lvl :: env) ((name, ty) :: types) (Bound :: bds) pos
+
+-- I guess we define things as values?
+export
+define : Context -> String -> Val -> Val -> Context
+define (MkCtx lvl env types bds pos) name val ty =
+  MkCtx (S lvl) (val :: env) ((name, ty) :: types) (Defined :: bds) pos
+
 
 update : Context -> String -> Tm -> Context
 -- oof
@@ -184,7 +228,7 @@ lookup : {0 m : Type -> Type} -> {auto _ : MonadError String m} ->
       Context -> String -> m Val
 lookup ctx nm = go ctx.types
   where
-    go : List (String,Val) -> m Val
+    go : Vect n (String,Val) -> m Val
     go [] = throwError "Name \{nm} not in scope"
     go ((n, ty) :: xs) = if n == nm then pure ty else go xs
 
