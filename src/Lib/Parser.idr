@@ -141,11 +141,10 @@ lamExpr : Parser Raw
 lamExpr = do
   keyword "\\"
   commit
-  (icit, name, ty) <- pLetArg
+  args <- some pLetArg
   keyword "=>"
   scope <- typeExpr
-  -- TODO optional type
-  pure $ RLam name icit scope
+  pure $ foldr (\(icit, name, ty), sc => RLam name icit sc) scope args
 
 pPattern : Parser Pattern
 pPattern

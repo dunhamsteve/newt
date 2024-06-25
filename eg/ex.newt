@@ -11,9 +11,8 @@ id = \ a => \ x => x
 List : U -> U
 List = \ A => (L : U) -> L -> (A -> L -> L) -> L
 
--- need more sugar for lambdas
 nil : (A L : U) -> L -> (A -> L -> L) -> L
-nil = \ A => \ L => \ n => \ f => n
+nil = \ A L n f => n
 
 Bool : U
 
