@@ -176,36 +176,37 @@ term =  caseExpr
     <|> lamExpr
     <|> parseOp
 
-expBinder : Parser Raw
-expBinder = do
+
+ebind : Parser (List (String, Icit, Raw))
+ebind = do
   sym "("
-  name <- ident
+  names <- some ident
   sym ":"
   ty <- typeExpr
   sym ")"
-  sym "->"
-  scope <- typeExpr
-  pure $ RPi (Just name) Explicit ty scope
+  pure $ map (\name => (name, Explicit, ty)) names
 
-impBinder : Parser Raw
-impBinder = do
+ibind : Parser (List (String, Icit, Raw))
+ibind = do
   sym "{"
-  name <- ident
+  names <- some ident
   sym ":"
   ty <- typeExpr
   sym "}"
+  pure $ map (\name => (name, Explicit, ty)) names
+
+-- Collect a bunch of binders (A : U) {y : A} -> ...
+binders : Parser Raw
+binders = do  
+  binds <- many (ibind <|> ebind)
   sym "->"
   scope <- typeExpr
-  pure $ RPi (Just name) Implicit ty scope
+  pure $ foldr mkBind scope (join binds)
+  where
+    mkBind : (String, Icit, Raw) -> Raw -> Raw
+    mkBind (name, icit, ty) scope = RPi (Just name) icit ty scope
 
--- something binder looking
--- todo sepby space or whatever
-export
-binder : Parser Raw
-binder = expBinder <|> impBinder
-
-
-typeExpr = binder
+typeExpr = binders
   <|> do
         exp <- term
         scope <- optional (sym "->" *> mustWork typeExpr)

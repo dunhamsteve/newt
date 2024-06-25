@@ -12,7 +12,7 @@ List : U -> U
 List = \ A => (L : U) -> L -> (A -> L -> L) -> L
 
 -- need more sugar for lambdas
-nil : (A : U) -> (L : U) -> L -> (A -> L -> L) -> L
+nil : (A L : U) -> L -> (A -> L -> L) -> L
 nil = \ A => \ L => \ n => \ f => n
 
 Bool : U
