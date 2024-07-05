@@ -1,0 +1,62 @@
+{
+  "name": "newt-vscode",
+  "displayName": "newt-vscode",
+  "description": "newt language support",
+  "version": "0.0.1",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [{
+      "id": "newt",
+      "aliases": ["newt", "newt"],
+      "extensions": ["newt"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "newt",
+      "scopeName": "source.newt",
+      "path": "./syntaxes/newt.tmLanguage.json"
+    }],
+    "commands": [
+      {
+        "command": "newt-vscode.check",
+        "title": "Check newt file"
+      }
+    ]
+
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src --ext ts",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.7",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.90.0",
+    "@typescript-eslint/eslint-plugin": "^7.14.1",
+    "@typescript-eslint/parser": "^7.11.0",
+    "@vscode/test-cli": "^0.0.9",
+    "@vscode/test-electron": "^2.4.0",
+    "esbuild": "^0.21.5",
+    "eslint": "^8.57.0",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,13 +1,11 @@
 module Lib.Parser
 import Lib.TT
 
--- NEXT - need to sort out parsing implicits
---
--- app:   foo {a} a b 
--- lam: λ {A} {b : A} (c : Blah) d e f. something
+-- app: foo {a} a b 
+-- lam: λ {A} {b : A} (c : Blah) d e f => something
+-- lam: \ {A} {b : A} (c : Blah) d e f => something
 -- pi: (A : Set) -> {b : A} -> (c : Foo b) -> c -> bar d
-
-
+-- pi: (A B : Set) {b : A} -> (c : Foo b) -> c -> bar d
 
 import Lib.Token
 import Lib.Parser.Impl
@@ -139,7 +137,7 @@ pLetArg = (Implicit,,) <$> braces ident <*> optional (sym ":" >> typeExpr)
 export
 lamExpr : Parser Raw
 lamExpr = do
-  keyword "\\"
+  keyword "\\" <|> keyword "λ"
   commit
   args <- some pLetArg
   keyword "=>"
@@ -170,7 +168,7 @@ caseExpr = do
   alts <- startBlock $ someSame $ caseAlt
   pure $ RCase sc alts
 
-term =  caseExpr
+term =  withPos $ caseExpr
     <|> letExpr
     <|> lamExpr
     <|> parseOp

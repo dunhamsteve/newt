@@ -23,14 +23,14 @@ data Error = E SourcePos String
 
 public export
 showError : String -> Error -> String
-showError src (E (line, col) msg) = "Err at \{show (line,col)} \{msg}\n" ++ go 0 (lines src)
+showError src (E (line, col) msg) = "ERROR at \{show (line,col)}: \{msg}\n" ++ go 0 (lines src)
   where
     go : Int -> List String -> String
     go l [] = ""
     go l (x :: xs) = 
       if l == line then
-        "\{x}\n\{replicate (cast col) ' '}^\n"
-      else if line - 3 < l then x ++ "\n" ++ go (l + 1) xs 
+        "  \{x}\n  \{replicate (cast col) ' '}^\n"
+      else if line - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs 
       else go (l + 1) xs
 
 -- Result of a parse

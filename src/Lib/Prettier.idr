@@ -57,10 +57,13 @@ best : Nat -> Nat -> Doc -> DOC
 best w k x = be w k [(0,x)]
 
 -- Public interface
+public export
+interface Pretty a where
+  pretty : a -> Doc
 
 export
-pretty : Nat -> Doc -> String
-pretty w x = layout (best w 0 x)
+render : Nat -> Doc -> String
+render w x = layout (best w 0 x)
 
 public export
 Semigroup Doc where x <+> y = Seq x (Seq (Text " ") y)
@@ -124,3 +127,7 @@ fill : List Doc -> Doc
 fill [] = Empty
 fill [x] = x
 fill (x :: y :: xs) = (flatten x <+> fill (flatten y :: xs)) `Alt` (x </> fill (y :: xs))
+
+public export
+FromString Doc where
+  fromString = text

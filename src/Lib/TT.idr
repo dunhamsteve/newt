@@ -3,11 +3,10 @@
 -- maybe watch https://www.youtube.com/watch?v=3gef0_NFz8Q
 -- or drop the indices for now.
 
--- The Control.App requires a patched idris. :(
-
 module Lib.TT
 -- For SourcePos
 import Lib.Parser.Impl
+import Lib.Prettier
 
 import Control.Monad.Error.Interface
 import Data.Fin
@@ -27,7 +26,8 @@ data Icit = Implicit | Explicit
 public export
 data Tm : Type where
   Bnd : Nat -> Tm
-  Ref : String -> Tm
+  -- Maybe Def here instead of Maybe Tm, we'll have DCon, TCon, etc.
+  Ref : String -> Maybe Tm -> Tm
   Lam : Name -> Icit -> Tm -> Tm
   App : Tm -> Tm -> Tm
   U   : Tm
@@ -38,8 +38,8 @@ data Tm : Type where
 
 public export
 Show Tm where
-  show (Bnd k) = "Bnd \{show k}"
-  show (Ref str) = "Ref \{show str}"
+  show (Bnd k) = "(Bnd \{show k})"
+  show (Ref str _) = "(Ref \{show str})"
   show (Lam nm Implicit t) = "(λ {\{nm}} => \{show  t})"
   show (Lam nm Explicit t) = "(λ \{nm}  => \{show  t})"
   show (App t u) = "(\{show t} \{show u})"
@@ -61,7 +61,7 @@ export
 Eq (Tm) where
   -- (Local x) == (Local y) = x == y
   (Bnd x) == (Bnd y) = x == y
-  (Ref x) == (Ref y) = x == y
+  (Ref x _) == (Ref y _) = x == y
   (Lam n icit t) == (Lam n' icit' t') = icit == icit' && t == t'
   (App t u) == App t' u' = t == t' && u == u'
   U == U = True
@@ -92,7 +92,7 @@ public export
 data Val : Type where
   -- This will be local / flex with spine.
   VVar : Nat -> Val
-  VRef : String -> Val
+  VRef : String -> Maybe Tm -> Val
   VApp : Val ->  Lazy (Val) -> Val
   VLam : Name -> Icit -> Closure -> Val
   VPi : Name -> Icit -> Lazy Val -> Closure -> Val
@@ -102,14 +102,17 @@ public export
 Env : Type
 Env = List Val
 
+public export
+data Mode = CBN | CBV
+
 export
-eval : Env -> Tm -> Val
+eval : Env -> Mode -> Tm -> Val
 
 data Closure = MkClosure Env Tm
 
 public export
-($$) : Closure -> Val -> Val
-($$) (MkClosure env tm) u = eval (u :: env) tm
+($$) : {auto mode : Mode} -> Closure -> Val -> Val
+($$) (MkClosure env tm) u = eval (u :: env) mode tm
 
 public export
 infixl 8 $$
@@ -122,39 +125,37 @@ vapp t u = VApp t u
 bind : Val -> Env -> Env
 bind v env = v :: env
 
-eval env (Ref x) = VRef x
-eval env (App t u) = vapp (eval env t) (eval env u)
-eval env U = VU
-eval env (Lam x icit t) = VLam x icit (MkClosure env t)
-eval env (Pi x icit a b) = VPi x icit (eval env a) (MkClosure env b)
-eval env (Let x icit ty t u) = eval (eval env t :: env) u
-eval env (Bnd i) = let Just rval = getAt i env | _ => ?out_of_index
+-- Do we want a def in here instead?  We'll need DCon/TCon eventually
+-- I need to be aggressive about reduction, I guess. I'll figure it out
+-- later, maybe need lazy glued values.
+eval env mode (Ref x (Just tm)) = eval env mode tm
+eval env mode (Ref x Nothing) = VRef x Nothing
+eval env mode (App (Ref x (Just tm)) u) = vapp (eval env mode tm) (eval env mode u)
+eval env mode (App t u) = vapp (eval env mode t) (eval env mode u)
+eval env mode U = VU
+eval env mode (Lam x icit t) = VLam x icit (MkClosure env t)
+eval env mode (Pi x icit a b) = VPi x icit (eval env mode a) (MkClosure env b)
+eval env mode (Let x icit ty t u) = eval (eval env mode t :: env) mode u
+eval env mode (Bnd i) = let Just rval = getAt i env | _ => ?out_of_index
                    in rval
 
 export
 quote : (lvl : Nat) -> Val -> Tm
 quote l (VVar k) = Bnd ((l `minus` k) `minus` 1) -- level to index
 quote l (VApp t u) = App (quote l t) (quote l u)
--- so this one is calling the kripke on [x] and a fresh var
-quote l (VLam x icit t) = Lam x icit (quote (S l) (t $$ VVar l)) -- that one is too big
+quote l (VLam x icit t) = Lam x icit (quote (S l) (t $$ VVar l))
 quote l (VPi x icit a b) = Pi x icit (quote l a) (quote (S l) (b $$ VVar l))
 quote l VU = U
-quote _ (VRef n) = Ref n
+quote l (VRef n tm) = Ref n tm
 
 -- how are we using this?  Can we assume completely closed?
 -- ezoo only seems to use it at [], but essentially does this:
 export
 nf : Env -> Tm -> Tm
-nf env t = quote (length env) (eval env t)
+nf env t = quote (length env) (eval env CBN t)
 
 public export
 conv : (lvl : Nat) -> Val -> Val -> Bool
-
--- data BD = Bound | Defined
-
--- public export
--- Types : Type
--- Types = List (Name, Lazy Val)
 
 
 {-
@@ -208,6 +209,25 @@ export partial
 Show Context where
   show ctx = "Context \{show $ map fst $ ctx.types}"
 
+-- TODO Pretty Context
+
+
+
+-- idea cribbed from pi-forall
+public export
+data ErrorSeg : Type where
+  DD : Pretty a => a -> ErrorSeg
+  DS : String -> ErrorSeg
+
+toDoc : ErrorSeg -> Doc
+toDoc (DD x) = pretty x
+toDoc (DS str) = text str
+
+export
+error : {0 m : Type -> Type} -> {auto _ : MonadError Error m} ->
+    {auto ctx : Context} -> List ErrorSeg -> m a
+error xs = throwError $ E ctx.pos (render 80 $ spread $ map toDoc xs)
+
 ||| add a binding to environment
 export
 extend : Context -> String -> Val -> Context
@@ -220,10 +240,7 @@ define : Context -> String -> Val -> Val -> Context
 define (MkCtx lvl env types bds pos) name val ty =
   MkCtx (S lvl) (val :: env) ((name, ty) :: types) (Defined :: bds) pos
 
-
-update : Context -> String -> Tm -> Context
--- oof
-
+-- not used
 lookup : {0 m : Type -> Type} -> {auto _ : MonadError String m} ->
       Context -> String -> m Val
 lookup ctx nm = go ctx.types
@@ -231,4 +248,5 @@ lookup ctx nm = go ctx.types
     go : Vect n (String,Val) -> m Val
     go [] = throwError "Name \{nm} not in scope"
     go ((n, ty) :: xs) = if n == nm then pure ty else go xs
+
 

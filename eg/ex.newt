@@ -11,7 +11,7 @@ id = \ a => \ x => x
 List : U -> U
 List = \ A => (L : U) -> L -> (A -> L -> L) -> L
 
-nil : (A L : U) -> L -> (A -> L -> L) -> L
+nil : (A : U) -> List A
 nil = \ A L n f => n
 
 Bool : U

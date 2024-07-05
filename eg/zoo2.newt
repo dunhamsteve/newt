@@ -1,0 +1,31 @@
+module Zoo2
+
+id : (A : U) -> A -> A
+id = \ A x => x
+
+const : (A B : U) -> A -> B -> A
+const = \A B x y => x
+
+Nat : U
+Nat = (N : U) -> (N -> N) -> N -> N
+
+-- need Nat to reduce (and syntax highlighting)
+five : Nat
+five = \ N s z => s (s (s (s (s z))))
+
+add : Nat -> Nat -> Nat
+add = \a b N s z => a N s (b N s z)
+
+mul : Nat -> Nat -> Nat
+mul = \a b N s z => a N (b N s) z
+
+ten : Nat
+ten = add five five
+
+hundred : Nat
+hundred = mul ten ten
+
+thousand : Nat
+thousand = mul ten hundred
+
+-- and then nf / eval of hundred

@@ -1,0 +1,15 @@
+module Equality
+
+-- we don't have implicits yet, so this won't typecheck
+
+Eq : {A : U} -> A -> A -> U
+Eq = \ {A} => \ x => \ y => (P : A -> U) -> P x -> P y
+
+refl : {A : U} {x : A} -> Eq x x
+refl = \ {A} => \ {x} => x
+
+-- can I write J without pattern matching?
+J : {A : U} {x y : A} (eq : Eq x y) ->
+(mot : (x : A) (P : Eq x y) -> U)
+(b : mot y refl) -> 
+mot x eq

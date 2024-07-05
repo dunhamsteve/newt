@@ -10,13 +10,13 @@ import Lib.TopContext
 import Syntax
 
 -- cribbed this, it avoids MonadError String m => everywhere
-parameters {0 m : Type -> Type} {auto _ : MonadError String m} (top : TopContext)
+parameters {0 m : Type -> Type} {auto _ : MonadError Error m} (top : TopContext)
   export
   infer : Context -> Raw -> m (Tm, Val)
 
   export
   check : Context -> Raw -> Val -> m Tm
-
+  check ctx (RSrcPos x tm) ty = check ({pos := x} ctx) tm ty
   check ctx (RLam nm icit tm) ty = case ty of                    
                     (VPi pinm icit a b) => do
                       -- TODO icit
@@ -24,18 +24,25 @@ parameters {0 m : Type -> Type} {auto _ : MonadError String m} (top : TopContext
                       let ctx' = extend ctx nm a
                       tm' <- check ctx' tm (b $$ var)
                       pure $ Lam nm icit tm'
-                      
-                    other => throwError "Expected pi type \{show $ quote 0 ty}"
+                    
+                    -- So it gets stuck for `List a`, not a pi type, and we want the
+                    -- (This is not a data constructor, but a church encoding)
+                    -- List reduces now and we're stuck for `Nat`.
+
+                    other => error [(DS "Expected pi type, got \{show $ quote 0 ty}")]
   check ctx tm ty = do
     (tm', ty') <- infer ctx tm
     if quote 0 ty /= quote 0 ty' then
-        throwError "type mismatch"
+        error [DS "type mismatch"]
       else pure tm'
 
   infer ctx (RVar nm) = go 0 ctx.types
     where
       go : Nat -> Vect n (String, Val) -> m (Tm, Val)
-      go i [] = throwError "\{show nm} not in scope \{show $ map fst ctx.types}"
+      go i [] = case lookup nm top of
+        Just (MkEntry name ty (Fn t)) => pure (Ref nm (Just t), eval [] CBN ty)
+        Just (MkEntry name ty _) => pure (Ref nm Nothing, eval [] CBN ty)
+        Nothing => error [DS "\{show nm} not in scope"]
       go i ((x, ty) :: xs) = if x == nm then pure $ (Bnd i, ty) 
         else go (i + 1) xs
     -- need environment of name -> type..
@@ -45,12 +52,12 @@ parameters {0 m : Type -> Type} {auto _ : MonadError String m} (top : TopContext
     case tty of
       (VPi str icit' a b) => do
         u <- check ctx u a
-        pure (App t u, b $$ eval ctx.env t)
-      _ => throwError "Expected Pi type"    
+        pure (App t u, b $$ eval ctx.env CBN t)
+      _ => error [DS "Expected Pi type"]
   infer ctx RU = pure (U, VU) -- YOLO
   infer ctx (RPi nm icit ty ty2) = do
     ty' <- check ctx ty VU
-    let vty' := eval ctx.env ty'
+    let vty' := eval ctx.env CBN ty'
     let nm := fromMaybe "_" nm
     ty2' <- check (extend ctx nm vty') ty2 VU
     pure (Pi nm icit ty' ty2', VU)
@@ -58,13 +65,13 @@ parameters {0 m : Type -> Type} {auto _ : MonadError String m} (top : TopContext
   infer ctx (RSrcPos x tm) = infer ({pos := x} ctx) tm
   infer ctx (RAnn tm rty) = do
     ty <- check ctx rty VU
-    let vty = eval ctx.env ty 
+    let vty = eval ctx.env CBN ty 
     tm <- check ctx tm vty
     pure (tm, vty)
 
-  infer ctx (RLam str icit tm) = throwError "can't infer lambda"
+  infer ctx (RLam str icit tm) = error [DS "can't infer lambda"]
 
-  infer ctx _ = throwError "TODO"
+  infer ctx _ = error [DS "TODO"]
 
   -- I don't have types for these yet...
   -- infer ctx (RLit (LString str)) = ?rhs_10

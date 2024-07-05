@@ -25,7 +25,7 @@ record TopEntry where
 
 export
 Show TopEntry where
-  show (MkEntry name type def) = "\{show name} : \{show type} := \{show def}"
+  show (MkEntry name type def) = "\{name} : \{show type} := \{show def}"
 
 ||| Top level context.
 ||| Most of the reason this is separate is to have a different type
@@ -65,5 +65,10 @@ claim tc name ty = { defs $= (MkEntry name ty Axiom ::) } tc
 
 public export
 addDef : TopContext -> String -> Tm -> Tm -> TopContext
-addDef tc name tm ty = { defs $= (MkEntry name ty (Fn tm) ::) } tc
+addDef tc name tm ty = { defs $= go } tc
+  where
+    go : List TopEntry -> List TopEntry
+    -- FIXME throw if we hit [] or is not an axiom
+    go [] = []
+    go ((MkEntry nm _ _) :: xs) = MkEntry nm ty (Fn tm) :: xs
 

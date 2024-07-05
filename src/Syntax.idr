@@ -136,9 +136,6 @@ Show Raw where
   show RU = "U"
   show (RSrcPos pos tm) = show tm
 
-export
-interface Pretty a where
-  pretty : a -> Doc
 
 export
 Pretty Raw where
