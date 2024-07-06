@@ -27,22 +27,20 @@ data Pattern
 public export
 data CaseAlt = MkAlt Pattern Raw
 
--- TODO redo this with names for documentation
-
-data Raw
-  = RVar Name
-  | RLam String Icit Raw
-  | RApp Raw Raw Icit
-  | RU
-  | RPi (Maybe Name) Icit Raw Raw
-  | RLet Name Raw Raw Raw
-  | RSrcPos SourcePos Raw
-
-  | RAnn Raw Raw
-  | RLit Literal
-  | RCase Raw (List CaseAlt)
-  | RHole
-  | RParseError String
+data Raw : Type where
+  RVar : (nm : Name) -> Raw
+  RLam : (nm : String) -> (icit : Icit) -> (ty : Raw) -> Raw
+  RApp : (t : Raw) -> (u : Raw) -> (icit : Icit) -> Raw
+  RU   : Raw
+  RPi  : (nm : Maybe Name) -> (icit : Icit) -> (ty : Raw) -> (sc : Raw) -> Raw
+  RLet : (nm : Name) -> (ty : Raw) -> (v : Raw) -> (sc : Raw) -> Raw
+  -- REVIEW do we want positions on terms?
+  RSrcPos : SourcePos -> Raw -> Raw
+  RAnn  : (tm : Raw) -> (ty : Raw) -> Raw
+  RLit : Literal -> Raw
+  RCase : (scrut : Raw) -> (alts : List CaseAlt) -> Raw
+  RHole : Raw
+  RParseError : String -> Raw
 
 %name Raw tm
 
@@ -66,7 +64,6 @@ public export
 record Module where
   constructor MkModule
   name : Name
-  imports : List Name
   decls : List Decl
 
 foo : List String -> String
@@ -98,10 +95,9 @@ Show Decl where
   show (Data str xs ys) = foo ["Data", show str, show xs, show ys]
   show (DImport str) = foo ["DImport", show str]
 
-
 export covering
 Show Module where
-  show (MkModule name imports decls) = foo ["MkModule", show name, show imports, show decls]
+  show (MkModule name decls) = foo ["MkModule", show name, show decls]
 
 Show RigCount where
   show Rig0 = "Rig0"
@@ -172,11 +168,11 @@ Pretty Raw where
     asDoc p (RLit (LBool x)) = text $ show x
     asDoc p (RCase x xs) = text "TODO - RCase"
     asDoc p RHole = text "_"
-    asDoc p (RParseError str) = text "PraseError \{str}"
+    asDoc p (RParseError str) = text "ParseError \{str}"
     
 export 
 Pretty Module where
-  pretty (MkModule name imports decls) =
+  pretty (MkModule name decls) =
     text "module" <+> text name </> stack (map doDecl decls)
       where
         doDecl : Decl -> Doc

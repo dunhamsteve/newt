@@ -1,0 +1,7 @@
+module Zoo3
+
+id : (A : _) -> A -> A
+id = \ A x => x
+
+List : U -> U
+List = \ A => (L : _) -> (A -> L -> L) -> L -> L

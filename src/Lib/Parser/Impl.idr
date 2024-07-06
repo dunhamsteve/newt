@@ -179,6 +179,10 @@ export
 someSame : Parser a -> Parser (List a)
 someSame pa = some $ sameLevel pa
 
+export
+manySame : Parser a -> Parser (List a)
+manySame pa = many $ sameLevel pa
+
 ||| requires a token to be indented?
 export
 indented : Parser a -> Parser a

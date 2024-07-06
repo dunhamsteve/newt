@@ -3,46 +3,20 @@
   "name": "newt",
   "scopeName": "source.newt",
   "patterns": [
-	{
-		"name": "comment.block.newt",
-		"begin": "/-",
-		"end": "`-/",
-		"contentName": "comment.block.newt"
-	},
-	{
+    {
+      "name": "comment.block.newt",
+      "begin": "/-",
+      "end": "-/",
+      "contentName": "comment.block.newt"
+    },
+    {
       "name": "comment.line.newt",
       "begin": "--",
       "end": "\\n"
-  },
-	{
-      "name": "variable.other.constant",
-      "match": "([\\w]+)\\."
-    },
-    {
-      "name": "entity.name.variable",
-      "match": "\\.([\\w]+)"
-    },
-	{
-		"name": "punctuation",
-		"match": ":|=>|\\"
-	},
-    {
-      "name": "keyword.other.operator.newt",
-      "match": "[\\p{Math}:!#$%&*+.,/<=>?@\\^|-]+"
-    },
-
-    {
-      "name": "keyword.command.newt",
-      "match": "\\b(module)\\b"
     },
     {
       "name": "keyword.newt",
-      "match": "\\b(data)\\b"
-    },
-    // {
-    //   "name": "variable.other.constant.newt",
-    //   "match": "\\b(Type|Id|refl|sym|Gel|ungel)\\b",
-	  // "comment": "These are in the emacs mode, but some are user defined"
-    // }
+      "match": "\\b(data|where|case|of|let|in|U|module)\\b"
+    }
   ]
 }

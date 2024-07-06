@@ -1,9 +1,14 @@
 {
   "name": "newt-vscode",
+  "publisher": "dunhamsteve",
   "displayName": "newt-vscode",
   "description": "newt language support",
   "version": "0.0.1",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dunhamsteve/newt"
+  },
   "engines": {
     "vscode": "^1.91.0"
   },
@@ -11,27 +16,35 @@
     "Programming Languages"
   ],
   "activationEvents": [
+    "onLanguage:newt"
   ],
   "main": "./dist/extension.js",
   "contributes": {
-    "languages": [{
-      "id": "newt",
-      "aliases": ["newt", "newt"],
-      "extensions": ["newt"],
-      "configuration": "./language-configuration.json"
-    }],
-    "grammars": [{
-      "language": "newt",
-      "scopeName": "source.newt",
-      "path": "./syntaxes/newt.tmLanguage.json"
-    }],
+    "languages": [
+      {
+        "id": "newt",
+        "aliases": [
+          "newt"
+        ],
+        "extensions": [
+          "newt"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "newt",
+        "scopeName": "source.newt",
+        "path": "./syntaxes/newt.tmLanguage.json"
+      }
+    ],
     "commands": [
       {
         "command": "newt-vscode.check",
         "title": "Check newt file"
       }
     ]
-
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

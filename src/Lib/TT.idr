@@ -7,8 +7,11 @@ module Lib.TT
 -- For SourcePos
 import Lib.Parser.Impl
 import Lib.Prettier
+import Lib.Metas
 
 import Control.Monad.Error.Interface
+
+import Data.IORef
 import Data.Fin
 import Data.List
 import Data.Vect
@@ -24,10 +27,17 @@ data Icit = Implicit | Explicit
 %name Icit icit
 
 public export
+data BD = Bound | Defined
+
+
+public export
 data Tm : Type where
   Bnd : Nat -> Tm
   -- Maybe Def here instead of Maybe Tm, we'll have DCon, TCon, etc.
   Ref : String -> Maybe Tm -> Tm
+  Meta : Nat -> Tm
+  -- kovacs optimization, I think we can App out meta instead
+  -- InsMeta : Nat -> List BD -> Tm
   Lam : Name -> Icit -> Tm -> Tm
   App : Tm -> Tm -> Tm
   U   : Tm
@@ -43,6 +53,7 @@ Show Tm where
   show (Lam nm Implicit t) = "(λ {\{nm}} => \{show  t})"
   show (Lam nm Explicit t) = "(λ \{nm}  => \{show  t})"
   show (App t u) = "(\{show t} \{show u})"
+  show (Meta i) = "(Meta \{show i})"
   show U = "U"
   show (Pi str icit t u) = "(∏ \{str} : \{show t} => \{show u})"
   show (Let str icit t u v) = "let \{str} : \{show t} = \{show u} in \{show v}"
@@ -69,6 +80,18 @@ Eq (Tm) where
   (Let n icit t u v) == (Let n' icit' t' u' v') = t == t' && u == u' && v == v'
   _ == _ = False
 
+public export
+Pretty Tm where
+  pretty (Bnd k) = ?rhs_0
+  pretty (Ref str mt) = text str
+  pretty (Meta k) = text "?m\{show k}"
+  pretty (Lam str Implicit t) = text "(\\ {\{str}} => " <+> pretty t <+> ")"
+  pretty (Lam str Explicit t) = text "(\\ \{str} => " <+> pretty t <+> ")"
+  pretty (App t u) = text "(" <+> pretty t <+> pretty u <+> ")"
+  pretty U = "U"
+  pretty (Pi str icit t u) = text "(" <+> text str <+> ":" <+> pretty t <+> "=>" <+> pretty u <+> ")"
+  pretty (Let str icit t u v) = text "let" <+> text str <+> ":" <+> pretty t <+> "=" <+> pretty u
+
 -- public export
 -- data Closure : Nat -> Type
 data Val : Type
@@ -91,9 +114,12 @@ data Closure : Type
 public export
 data Val : Type where
   -- This will be local / flex with spine.
-  VVar : Nat -> Val
-  VRef : String -> Maybe Tm -> Val
-  VApp : Val ->  Lazy (Val) -> Val
+  VVar : (k : Nat) -> (sp : List Val) -> Val
+  -- I wanted the Maybe Tm in here, but for now we're always expanding.
+  -- Maybe this is where I glue
+  VRef : (nm : String) -> (sp : List Val) -> Val
+  -- we'll need to look this up in ctx with IO
+  VMeta : (ix : Nat) -> (sp : List Val) -> Val
   VLam : Name -> Icit -> Closure -> Val
   VPi : Name -> Icit -> Lazy Val -> Closure -> Val
   VU : Val
@@ -120,7 +146,10 @@ infixl 8 $$
 export
 vapp : Val -> Val -> Val
 vapp (VLam _ icit t) u = t $$ u
-vapp t u = VApp t u
+vapp (VVar k sp) u = VVar k (u :: sp)
+vapp (VRef nm sp) u = VRef nm (u :: sp)
+vapp (VMeta k sp) u = VMeta k (u :: sp)
+vapp _ _ = ?throw_impossible
 
 bind : Val -> Env -> Env
 bind v env = v :: env
@@ -129,10 +158,11 @@ bind v env = v :: env
 -- I need to be aggressive about reduction, I guess. I'll figure it out
 -- later, maybe need lazy glued values.
 eval env mode (Ref x (Just tm)) = eval env mode tm
-eval env mode (Ref x Nothing) = VRef x Nothing
+eval env mode (Ref x Nothing) = VRef x []
 eval env mode (App (Ref x (Just tm)) u) = vapp (eval env mode tm) (eval env mode u)
 eval env mode (App t u) = vapp (eval env mode t) (eval env mode u)
 eval env mode U = VU
+eval env mode (Meta i) = VMeta i []
 eval env mode (Lam x icit t) = VLam x icit (MkClosure env t)
 eval env mode (Pi x icit a b) = VPi x icit (eval env mode a) (MkClosure env b)
 eval env mode (Let x icit ty t u) = eval (eval env mode t :: env) mode u
@@ -141,14 +171,19 @@ eval env mode (Bnd i) = let Just rval = getAt i env | _ => ?out_of_index
 
 export
 quote : (lvl : Nat) -> Val -> Tm
-quote l (VVar k) = Bnd ((l `minus` k) `minus` 1) -- level to index
-quote l (VApp t u) = App (quote l t) (quote l u)
-quote l (VLam x icit t) = Lam x icit (quote (S l) (t $$ VVar l))
-quote l (VPi x icit a b) = Pi x icit (quote l a) (quote (S l) (b $$ VVar l))
-quote l VU = U
-quote l (VRef n tm) = Ref n tm
 
--- how are we using this?  Can we assume completely closed?
+quoteSp : (lvl : Nat) -> Tm -> List Val -> Tm
+quoteSp lvl t [] = t
+quoteSp lvl t (x :: xs) = quoteSp lvl (App t (quote lvl x)) xs
+
+quote l (VVar k sp) = quoteSp l (Bnd ((l `minus` k) `minus` 1)) sp -- level to index
+quote l (VMeta i sp) = quoteSp l (Meta i) sp
+quote l (VLam x icit t) = Lam x icit (quote (S l) (t $$ VVar l []))
+quote l (VPi x icit a b) = Pi x icit (quote l a) (quote (S l) (b $$ VVar l []))
+quote l VU = U
+quote l (VRef n sp) = quoteSp l (Ref n Nothing) sp
+
+-- Can we assume closed terms?
 -- ezoo only seems to use it at [], but essentially does this:
 export
 nf : Env -> Tm -> Tm
@@ -186,7 +221,53 @@ Can I get val back? Do we need to quote? What happens if we don't?
 
 -}
 
-data BD = Bound | Defined
+
+public export
+data MetaEntry = Unsolved Nat (List BD) | Solved Nat Tm (List BD)
+
+public export
+record MetaContext where
+  constructor MC
+  metas : List MetaEntry
+  next : Nat
+
+
+public export
+data Def = Axiom | TCon (List String) | DCon Nat | Fn Tm
+
+Show Def where
+  show Axiom = "axiom"
+  show (TCon strs) = "TCon \{show strs}"
+  show (DCon k) = "DCon \{show k}"
+  show (Fn t) = "Fn \{show t}"
+
+||| entry in the top level context
+public export
+record TopEntry where
+  constructor MkEntry
+  name : String
+  type : Tm
+  def : Def
+
+-- FIXME snoc
+
+export
+Show TopEntry where
+  show (MkEntry name type def) = "\{name} : \{show type} := \{show def}"
+
+||| Top level context.
+||| Most of the reason this is separate is to have a different type
+||| `Def` for the entries.
+|||
+||| The price is that we have names in addition to levels. Do we want to
+||| expand these during conversion?
+public export
+record TopContext where
+  constructor MkTop
+  -- We'll add a map later?
+  defs : List TopEntry
+  metas : IORef MetaContext
+  -- metas : TODO
 
 -- we'll use this for typechecking, but need to keep a TopContext around too.
 public export
@@ -198,20 +279,36 @@ record Context where
   types : Vect lvl (String, Val) -- types and names in scope
   -- so we'll try "bds" determines length of local context
   bds  : List BD          -- bound or defined
-  
   pos : SourcePos            -- the last SourcePos that we saw
+  
+  -- We only need this here if we don't pass TopContext
+  -- top : TopContext
+  metas : IORef MetaContext
 
 export
-empty : Context
-empty = MkCtx 0 [] [] [] (0,0)
+freshMeta : HasIO m => Context -> m Tm
+freshMeta ctx = do
+  mc <- readIORef ctx.metas
+  writeIORef ctx.metas $ { next $= S, metas $= (Unsolved mc.next ctx.bds ::) } mc
+  pure $ applyBDs 0 (Meta mc.next) ctx.bds 
+  where
+  -- hope I got the right order here :)
+  applyBDs : Nat -> Tm -> List BD -> Tm
+  applyBDs k t [] = t
+  applyBDs k t (Bound :: xs) = applyBDs (S k) (App t (Bnd k)) xs
+  applyBDs k t (Defined :: xs) = applyBDs (S k) t xs
+
+-- we need more of topcontext later - Maybe switch it up so we're not passing
+-- around top
+export
+mkCtx : IORef MetaContext -> Context
+mkCtx metas = MkCtx 0 [] [] [] (0,0) metas
 
 export partial
 Show Context where
   show ctx = "Context \{show $ map fst $ ctx.types}"
 
 -- TODO Pretty Context
-
-
 
 -- idea cribbed from pi-forall
 public export
@@ -231,14 +328,15 @@ error xs = throwError $ E ctx.pos (render 80 $ spread $ map toDoc xs)
 ||| add a binding to environment
 export
 extend : Context -> String -> Val -> Context
-extend (MkCtx lvl env types bds pos) name ty =
-    MkCtx (S lvl) (VVar lvl :: env) ((name, ty) :: types) (Bound :: bds) pos
-
+extend ctx name ty =
+    { lvl $= S, env $= (VVar ctx.lvl [] ::), types $= ((name, ty) ::), bds $= (Bound ::) } ctx
+    
 -- I guess we define things as values?
 export
 define : Context -> String -> Val -> Val -> Context
-define (MkCtx lvl env types bds pos) name val ty =
-  MkCtx (S lvl) (val :: env) ((name, ty) :: types) (Defined :: bds) pos
+define ctx name val ty =
+  { lvl $= S, env $= (val ::), types $= ((name,ty) ::), bds $= (Defined ::) } ctx
+
 
 -- not used
 lookup : {0 m : Type -> Type} -> {auto _ : MonadError String m} ->

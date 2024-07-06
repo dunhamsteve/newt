@@ -1,20 +1,20 @@
 module Main
 
 -- import Control.App
+import Control.Monad.Error.Either
+import Control.Monad.Error.Interface
+import Control.Monad.State
+import Data.List
 import Data.String
 import Data.Vect
-import Data.List
-import Control.Monad.Error.Interface
-import Control.Monad.Error.Either
-import Control.Monad.State
 import Lib.Check
 import Lib.Parser
 import Lib.Parser.Impl
 import Lib.Prettier
 import Lib.Token
 import Lib.Tokenizer
-import Lib.TT
 import Lib.TopContext
+import Lib.TT
 import Syntax
 import Syntax
 import System
@@ -25,12 +25,13 @@ import System.File
 
 Main2.idr has an older App attempt without the code below.
 
-App was not compatible with javascript, but I have a remedy for
-that now. 
+It has a repl, so we might want to re-integrate that code. And it uses
+App, but we have a way to make that work on javascript.
+
+I still want to stay in MonadError outside this file though.
+
 
 -}
-
--- TODO We're shadowing Control.App.Error do we want that?
 
 M : Type -> Type
 M = (StateT TopContext (EitherT Impl.Error IO))
@@ -48,29 +49,58 @@ dumpContext top = do
 
 processDecl : Decl -> M ()
 processDecl (TypeSig nm tm) = do
-  ctx <- get
+  top <- get
   putStrLn "TypeSig \{nm} \{show tm}"
-  ty <- check ctx empty tm VU
+  ty <- check top (mkCtx top.metas) tm VU
   putStrLn "got \{show ty}"
-  
-  put $ claim ctx nm ty
+  modify $ claim nm ty
 
+-- FIXME - this should be in another file
 processDecl (Def nm raw) = do
+  let m : MonadError Error M := %search
   putStrLn "def \{show nm}"
   ctx <- get
+  let pos = case raw of
+        RSrcPos pos _ => pos
+        _ => (0,0)
+
   let Just entry = lookup nm ctx
-    | Nothing => throwError $ E (0,0) "skip def \{nm} without Decl"
+    | Nothing => throwError $ E pos "skip def \{nm} without Decl"
   let (MkEntry name ty Axiom) := entry
-    -- FIXME error
-    | _ => throwError $ E (0,0) "\{nm} already defined"
+    | _ => throwError $ E pos "\{nm} already defined"
   putStrLn "check \{nm} = \{show raw} at \{show $ ty}"
   let vty = eval empty CBN ty
-  Right tm <- pure $ the (Either Impl.Error Tm) (check ctx empty raw vty)
-    | Left err => throwError err
+  tm <- check ctx (mkCtx ctx.metas) raw vty
   putStrLn "Ok \{show tm}"
   put (addDef ctx nm tm ty)
+
+processDecl (DImport str) = throwError $ E (0,0) "import not implemented"
+
+processDecl (Data nm ty cons) = do
+  -- It seems like the FC for the errors are not here?
+  ctx <- get
+  tyty <- check ctx (mkCtx ctx.metas) ty VU
+  -- TODO check tm is VU or Pi ending in VU
+  -- Maybe a pi -> binders function
+  -- TODO we're putting in axioms, we need constructors
+  -- for each constructor, check and add
+  modify $ claim nm tyty
+  ctx <- get
+  for_ cons $ \x => case x of
+      -- expecting tm to be a Pi type
+      (TypeSig nm' tm) => do
+          ctx <- get
+          -- TODO check pi type ending in full tyty application
+          dty <- check ctx (mkCtx ctx.metas) tm VU
+          modify $ claim nm' dty
+      _ => throwError $ E (0,0) "expected TypeSig"
   
-processDecl decl = putStrLn "skip \{show decl}"
+  pure ()
+  where
+    checkDeclType : Tm -> M ()
+    checkDeclType U = pure ()
+    checkDeclType (Pi str icit t u) = checkDeclType u
+    checkDeclType _ = throwError $ E (0,0) "data type doesn't return U"
 
 processFile : String -> M ()
 processFile fn = do
@@ -100,6 +130,8 @@ main' = do
 
 main : IO ()
 main = do
-  Right _  <- runEitherT $ runStateT empty $ main'
+  -- we'll need to reset for each file, etc.
+  ctx <- empty
+  Right _  <- runEitherT $ runStateT ctx $ main'
     | Left (E (c, r) str) => putStrLn "Error: \{show c} \{show r} \{show str}"
   putStrLn "done"

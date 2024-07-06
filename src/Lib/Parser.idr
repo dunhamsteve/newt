@@ -237,7 +237,8 @@ parseData = do
   keyword ":"
   ty <- typeExpr
   keyword "where"
-  decls <- startBlock $ someSame $ parseSig
+  commit
+  decls <- startBlock $ manySame $ parseSig
   -- TODO - turn decls into something more useful
   pure $ Data name ty decls
 
@@ -252,9 +253,8 @@ parseMod = do
   name <- ident
   -- probably should be manySame, and we want to start with col -1
   -- if we enforce blocks indent more than parent
-  decls <- startBlock $ someSame $ parseDecl
-  pure $ MkModule name [] decls
-
+  decls <- startBlock $ manySame $ parseDecl
+  pure $ MkModule name decls
 
 public export
 data ReplCmd =

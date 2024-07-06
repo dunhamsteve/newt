@@ -29,3 +29,4 @@ thousand : Nat
 thousand = mul ten hundred
 
 -- and then nf / eval of hundred
+-- #nf hundred
