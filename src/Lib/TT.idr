@@ -7,7 +7,6 @@ module Lib.TT
 -- For SourcePos
 import Lib.Parser.Impl
 import Lib.Prettier
-import Lib.Metas
 
 import Control.Monad.Error.Interface
 
@@ -189,9 +188,6 @@ export
 nf : Env -> Tm -> Tm
 nf env t = quote (length env) (eval env CBN t)
 
-public export
-conv : (lvl : Nat) -> Val -> Val -> Bool
-
 
 {-
 smalltt
@@ -221,9 +217,9 @@ Can I get val back? Do we need to quote? What happens if we don't?
 
 -}
 
-
+-- FIXME remove List BD
 public export
-data MetaEntry = Unsolved Nat (List BD) | Solved Nat Tm (List BD)
+data MetaEntry = Unsolved Nat (List BD) | Solved Nat Val
 
 public export
 record MetaContext where
@@ -297,6 +293,11 @@ freshMeta ctx = do
   applyBDs k t [] = t
   applyBDs k t (Bound :: xs) = applyBDs (S k) (App t (Bnd k)) xs
   applyBDs k t (Defined :: xs) = applyBDs (S k) t xs
+
+-- solveMeta : HasIO m => Context -> m Tm
+-- solveMeta ctx = do
+--   mc <- readIORef ctx.metas
+  
 
 -- we need more of topcontext later - Maybe switch it up so we're not passing
 -- around top
