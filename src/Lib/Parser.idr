@@ -1,6 +1,9 @@
 module Lib.Parser
 import Lib.TT
 
+-- The SourcePos stuff is awkward later on. We might want bounds on productions
+-- But we might want to consider something more generic and closer to lean?
+
 -- app: foo {a} a b 
 -- lam: λ {A} {b : A} (c : Blah) d e f => something
 -- lam: \ {A} {b : A} (c : Blah) d e f => something
@@ -23,11 +26,6 @@ import Data.List
 -- After the parser runs, see below, take a break and finish pi-forall
 -- exercises.  There is some fill in the parser stuff that may show 
 -- the future.
-
--- kovacs desugars the (a b c : Foo) during parsing (foldr)
-
--- We need to allow A -> B -> C in functions
--- We need to handle A -> (A -> B) -> C
 
 ident = token Ident
 
@@ -93,7 +91,7 @@ parseApp = do
   rest <- many pArg
   pure $ foldl (\a, (c,b) => RApp a b c) hd rest
   
-parseOp : Lazy (Parser Raw)
+parseOp : Parser Raw
 parseOp = parseApp >>= go 0
   where
     go : Int -> Raw -> Parser Raw
@@ -168,6 +166,7 @@ caseExpr = do
   alts <- startBlock $ someSame $ caseAlt
   pure $ RCase sc alts
 
+-- This hits an idris codegen bug if parseOp is last and Lazy
 term =  withPos $ caseExpr
     <|> letExpr
     <|> lamExpr
