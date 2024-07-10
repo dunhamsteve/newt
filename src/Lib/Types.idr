@@ -1,0 +1,258 @@
+module Lib.Types
+-- I'm not sure this is related, or just a note to self (Presheaves on Porpoise)
+
+-- maybe watch https://www.youtube.com/watch?v=3gef0_NFz8Q
+-- or drop the indices for now.
+
+-- For SourcePos
+import Lib.Parser.Impl
+import Lib.Prettier
+
+import public Control.Monad.Error.Either
+import public Control.Monad.Error.Interface
+import public Control.Monad.State
+
+import Data.IORef
+import Data.Fin
+import Data.List
+import Data.SnocList
+import Data.Vect
+import Data.SortedMap
+
+public export
+Name : Type
+Name = String
+
+public export
+data Icit = Implicit | Explicit
+
+%name Icit icit
+
+public export
+data BD = Bound | Defined
+
+
+public export
+data Tm : Type where
+  Bnd : Nat -> Tm
+  -- Maybe Def here instead of Maybe Tm, we'll have DCon, TCon, etc.
+  Ref : String -> Maybe Tm -> Tm
+  Meta : Nat -> Tm
+  -- kovacs optimization, I think we can App out meta instead
+  -- InsMeta : Nat -> List BD -> Tm
+  Lam : Name -> Icit -> Tm -> Tm
+  App : Tm -> Tm -> Tm
+  U   : Tm
+  Pi  : Name -> Icit -> Tm -> Tm -> Tm
+  Let : Name -> Icit -> Tm -> Tm -> Tm -> Tm
+
+%name Tm t, u, v
+
+public export
+Show Tm where
+  show (Bnd k) = "(Bnd \{show k})"
+  show (Ref str _) = "(Ref \{show str})"
+  show (Lam nm Implicit t) = "(\\ {\{nm}} => \{show  t})"
+  show (Lam nm Explicit t) = "(\\ \{nm}  => \{show  t})"
+  show (App t u) = "(\{show t} \{show u})"
+  show (Meta i) = "(Meta \{show i})"
+  show U = "U"
+  show (Pi str icit t u) = "(∏ \{str} : \{show t} => \{show u})"
+  show (Let str icit t u v) = "let \{str} : \{show t} = \{show u} in \{show v}"
+
+-- I can't really show val because it's HOAS...
+
+-- TODO derive
+export 
+Eq Icit where
+  Implicit == Implicit = True
+  Explicit == Explicit = True
+  _ == _ = False
+
+||| Eq on Tm. We've got deBruijn indices, so I'm not comparing names
+export
+Eq (Tm) where
+  -- (Local x) == (Local y) = x == y
+  (Bnd x) == (Bnd y) = x == y
+  (Ref x _) == (Ref y _) = x == y
+  (Lam n icit t) == (Lam n' icit' t') = icit == icit' && t == t'
+  (App t u) == App t' u' = t == t' && u == u'
+  U == U = True
+  (Pi n icit t u) == (Pi n' icit' t' u') = icit == icit' && t == t' && u == u'
+  (Let n icit t u v) == (Let n' icit' t' u' v') = t == t' && u == u' && v == v'
+  _ == _ = False
+
+public export
+Pretty Tm where
+  pretty (Bnd k) = ?rhs_0
+  pretty (Ref str mt) = text str
+  pretty (Meta k) = text "?m\{show k}"
+  pretty (Lam str Implicit t) = text "(\\ {\{str}} => " <+> pretty t <+> ")"
+  pretty (Lam str Explicit t) = text "(\\ \{str} => " <+> pretty t <+> ")"
+  pretty (App t u) = text "(" <+> pretty t <+> pretty u <+> ")"
+  pretty U = "U"
+  pretty (Pi str icit t u) = text "(" <+> text str <+> ":" <+> pretty t <+> "=>" <+> pretty u <+> ")"
+  pretty (Let str icit t u v) = text "let" <+> text str <+> ":" <+> pretty t <+> "=" <+> pretty u
+
+-- public export
+-- data Closure : Nat -> Type
+data Val : Type
+
+
+-- IS/TypeTheory.idr is calling this a Kripke function space
+-- Yaffle, IS/TypeTheory use a function here.
+-- Kovacs, Idris use Env and Tm
+
+-- in cctt kovacs refers to this choice as defunctionalization vs HOAS
+-- https://github.com/AndrasKovacs/cctt/blob/main/README.md#defunctionalization
+-- the tradeoff is access to internals of the function
+
+-- Yaffle is vars -> vars here
+
+
+public export
+data Closure : Type
+
+public export
+data Val : Type where
+  -- This will be local / flex with spine.
+  VVar : (k : Nat) -> (sp : SnocList Val) -> Val
+  -- I wanted the Maybe Tm in here, but for now we're always expanding.
+  -- Maybe this is where I glue
+  VRef : (nm : String) -> (sp : SnocList Val) -> Val
+  -- we'll need to look this up in ctx with IO
+  VMeta : (ix : Nat) -> (sp : SnocList Val) -> Val
+  VLam : Name -> Icit -> Closure -> Val
+  VPi : Name -> Icit -> Lazy Val -> Closure -> Val
+  VU : Val
+
+Show Icit where
+  show Implicit = "I"
+  show Explicit = "E"
+
+Show Closure
+
+covering export
+Show Val where
+  show (VVar k sp) = "(%var \{show k} \{show sp})"
+  show (VRef nm sp) = "(%ref \{nm} \{show sp})"
+  show (VMeta ix sp) = "(%meta \{show ix} \{show sp})"
+  show (VLam str icit x) = "(%lam \{str} \{show icit} \{show x})"
+  show (VPi str icit x y) = "(%pi \{str} \{show icit} \{show x} \{show y})"
+  show VU = "U"
+
+public export
+Env : Type
+Env = List Val
+
+public export
+data Mode = CBN | CBV
+
+public export
+data Closure = MkClosure Env Tm
+
+covering
+Show Closure where
+  show (MkClosure xs t) = "(%cl \{show xs} \{show t})"
+{-
+smalltt
+
+smalltt gets into weird haskell weeds in eval - shifting top level to the left
+and tagging meta vs top with a bit.
+
+I think something subtle is going on with laziness on Elaboration.hs:300
+yeah, and define is even inlined.
+
+So it has a top context, and clears out almost everything for processing a def in
+a different kind of context.
+
+we very much need an idea of local context for metas. I don't want to abstract over
+the entire program.
+
+So I guess we have top and local then?
+
+With haskell syntax. I think we can have Axiom for claims and rewrite to def later.
+
+Hmm, so given ezoo, if I'm going simple, I could keep BDs short, and use the normal
+context. (Zoo4.lean:222) I'd probably still need an undefined/axiom marker as a value? 
+
+ok, so with just one context, Env is List Val and we're getting Tm back from type checking.
+
+Can I get val back? Do we need to quote? What happens if we don't?
+
+-}
+
+-- FIXME remove List BD
+public export
+data MetaEntry = Unsolved Nat (List BD) | Solved Nat Val
+
+public export
+record MetaContext where
+  constructor MC
+  metas : List MetaEntry
+  next : Nat
+
+
+public export
+data Def = Axiom | TCon (List String) | DCon Nat | Fn Tm
+
+Show Def where
+  show Axiom = "axiom"
+  show (TCon strs) = "TCon \{show strs}"
+  show (DCon k) = "DCon \{show k}"
+  show (Fn t) = "Fn \{show t}"
+
+||| entry in the top level context
+public export
+record TopEntry where
+  constructor MkEntry
+  name : String
+  type : Tm
+  def : Def
+
+-- FIXME snoc
+
+export
+Show TopEntry where
+  show (MkEntry name type def) = "\{name} : \{show type} := \{show def}"
+
+||| Top level context.
+||| Most of the reason this is separate is to have a different type
+||| `Def` for the entries.
+|||
+||| The price is that we have names in addition to levels. Do we want to
+||| expand these during normalization?
+public export
+record TopContext where
+  constructor MkTop
+  -- We'll add a map later?
+  defs : List TopEntry
+  metas : IORef MetaContext
+  -- metas : TODO
+
+-- we'll use this for typechecking, but need to keep a TopContext around too.
+public export
+record Context where
+  constructor MkCtx
+  lvl : Nat
+  -- shall we use lvl as an index?
+  env : Env                  -- Values in scope
+  types : Vect lvl (String, Val) -- types and names in scope
+  -- so we'll try "bds" determines length of local context
+  bds  : List BD          -- bound or defined
+  pos : SourcePos            -- the last SourcePos that we saw
+  
+  -- We only need this here if we don't pass TopContext
+  -- top : TopContext
+  metas : IORef MetaContext
+
+
+public export
+M : Type -> Type
+M = (StateT TopContext (EitherT Impl.Error IO))
+
+-- we need more of topcontext later - Maybe switch it up so we're not passing
+-- around top
+export
+mkCtx : IORef MetaContext -> Context
+mkCtx metas = MkCtx 0 [] [] [] (0,0) metas

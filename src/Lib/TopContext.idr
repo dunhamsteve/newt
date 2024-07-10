@@ -1,7 +1,7 @@
 module Lib.TopContext
 
 import Data.String
-import Lib.TT
+import Lib.Types
 import Data.IORef
 
 -- I want unique ids, to be able to lookup, update, and a Ref so

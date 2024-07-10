@@ -1,5 +1,5 @@
 module Lib.Parser
-import Lib.TT
+import Lib.Types
 
 -- The SourcePos stuff is awkward later on. We might want bounds on productions
 -- But we might want to consider something more generic and closer to lean?
@@ -241,9 +241,14 @@ parseData = do
   -- TODO - turn decls into something more useful
   pure $ Data name ty decls
 
+-- Not sure what I want here.
+-- I can't get a Tm without a type, and then we're covered by the other stuff
+parseNorm : Parser Decl
+parseNorm = DCheck <$ keyword "#check" <*> typeExpr <* keyword ":" <*> typeExpr
+
 export
 parseDecl : Parser Decl
-parseDecl = parseImport <|> parseSig <|> parseDef <|> parseData
+parseDecl = parseImport <|> parseSig <|> parseDef <|> parseNorm <|> parseData
 
 export
 parseMod : Parser Module

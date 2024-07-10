@@ -4,7 +4,7 @@ import Data.String
 import Data.Maybe
 import Lib.Parser.Impl
 import Lib.Prettier
-import Lib.TT
+import Lib.Types
 
 public export
 data Raw : Type where
@@ -58,6 +58,7 @@ data Decl
   = TypeSig Name Raw
   | Def Name Raw
   | DImport Name
+  | DCheck Raw Raw
   | Data Name Raw (List Decl)
 
 public export
@@ -94,6 +95,7 @@ Show Decl where
   show (Def str x) = foo ["Def", show str, show x]
   show (Data str xs ys) = foo ["Data", show str, show xs, show ys]
   show (DImport str) = foo ["DImport", show str]
+  show (DCheck x y) = foo ["DCheck", show x, show y]
 
 export covering
 Show Module where
@@ -181,3 +183,4 @@ Pretty Module where
         doDecl (DImport nm) = text "import" <+> text nm ++ line
         -- the behavior of nest is kinda weird, I have to do the nest before/around the </>. 
         doDecl (Data nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map doDecl xs))
+        doDecl (DCheck x y) = text "#check" <+> pretty x <+> ":" <+> pretty y

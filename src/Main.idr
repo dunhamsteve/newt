@@ -14,6 +14,7 @@ import Lib.Prettier
 import Lib.Token
 import Lib.Tokenizer
 import Lib.TopContext
+import Lib.Types
 import Lib.TT
 import Syntax
 import Syntax
@@ -33,9 +34,6 @@ I still want to stay in MonadError outside this file though.
 
 -}
 
-M : Type -> Type
-M = (StateT TopContext (EitherT Impl.Error IO))
-
 
 dumpContext : TopContext -> M ()
 dumpContext top = do
@@ -51,7 +49,7 @@ processDecl : Decl -> M ()
 processDecl (TypeSig nm tm) = do
   top <- get
   putStrLn "TypeSig \{nm} \{show tm}"
-  ty <- check top (mkCtx top.metas) tm VU
+  ty <- check (mkCtx top.metas) tm VU
   putStrLn "got \{show ty}"
   modify $ claim nm ty
 
@@ -69,17 +67,34 @@ processDecl (Def nm raw) = do
   let (MkEntry name ty Axiom) := entry
     | _ => throwError $ E pos "\{nm} already defined"
   putStrLn "check \{nm} = \{show raw} at \{show $ ty}"
-  let vty = eval empty CBN ty
-  tm <- check ctx (mkCtx ctx.metas) raw vty
+  vty <- eval empty CBN ty
+  tm <- check (mkCtx ctx.metas) raw vty
   putStrLn "Ok \{show tm}"
   put (addDef ctx nm tm ty)
+
+processDecl (DCheck tm ty) = do
+  
+  top <- get
+  putStrLn "check \{show tm} at \{show ty}"
+  ty' <- check (mkCtx top.metas) tm VU
+  putStrLn "got type \{show ty'}"
+  vty <- eval [] CBN ty'
+  res <- check (mkCtx top.metas) ty vty
+  putStrLn "got \{show res}"
+  norm <- nf [] res
+  putStrLn "norm \{show norm}"
+  -- top <- get
+  -- ctx <- mkCtx top.metas
+  -- I need a type to check against 
+  -- norm <- nf [] x
+  putStrLn "NF "
 
 processDecl (DImport str) = throwError $ E (0,0) "import not implemented"
 
 processDecl (Data nm ty cons) = do
   -- It seems like the FC for the errors are not here?
   ctx <- get
-  tyty <- check ctx (mkCtx ctx.metas) ty VU
+  tyty <- check (mkCtx ctx.metas) ty VU
   -- TODO check tm is VU or Pi ending in VU
   -- Maybe a pi -> binders function
   -- TODO we're putting in axioms, we need constructors
@@ -91,7 +106,7 @@ processDecl (Data nm ty cons) = do
       (TypeSig nm' tm) => do
           ctx <- get
           -- TODO check pi type ending in full tyty application
-          dty <- check ctx (mkCtx ctx.metas) tm VU
+          dty <- check (mkCtx ctx.metas) tm VU
           modify $ claim nm' dty
       _ => throwError $ E (0,0) "expected TypeSig"
   

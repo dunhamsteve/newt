@@ -24,7 +24,12 @@ Idris does a common array for metas and defs.
 
 
 
+Something exponential is going on with zoo3.newt.  Adding code makes it quickly worse. 
+
+
 Parser:
+- [x] unify broken for zoo3 `cons`
+- [ ] parser for block comments
 - [x] import statement
 - [x] def
 - [x] simple decl
