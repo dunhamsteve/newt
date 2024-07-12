@@ -22,10 +22,9 @@ I'd kinda like to see array run in js...
 
 Idris does a common array for metas and defs. 
 
+Prettier was missing a Lazy.
 
-
-Something exponential is going on with zoo3.newt.  Adding code makes it quickly worse. 
-
+Zoo3, mostly runs aside from eqTest. 
 
 Parser:
 - [x] unify broken for zoo3 `cons`

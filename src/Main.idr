@@ -55,7 +55,6 @@ processDecl (TypeSig nm tm) = do
 
 -- FIXME - this should be in another file
 processDecl (Def nm raw) = do
-  let m : MonadError Error M := %search
   putStrLn "def \{show nm}"
   ctx <- get
   let pos = case raw of

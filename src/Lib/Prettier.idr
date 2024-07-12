@@ -35,12 +35,13 @@ layout (TEXT str x) = str ++ layout x
 
 ||| Whether a documents first line fits.
 fits : Nat -> DOC -> Bool
-fits w x = if w < 0 then False else case x of
+fits w x = if w == 0 then False else case x of
             EMPTY => True
             (LINE k x) => True
             (TEXT s x) => fits (w `minus` length s) x
 
-better : Nat -> Nat -> DOC -> DOC -> DOC
+-- The lazy is important
+better : Nat -> Nat -> DOC -> Lazy DOC -> DOC
 better w k x y = if fits (w `minus` k) x then x else y
 
 be : Nat -> Nat -> List (Nat, Doc) -> DOC

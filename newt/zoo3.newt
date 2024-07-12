@@ -33,19 +33,39 @@ refl = \ A x p px => px
 list1 : List Bool
 list1 = cons _ true (cons _ false (nil _))
 
--- 9 sec
-
-
 Nat : U
 Nat = (N : U) -> (N -> N) -> N -> N
 
--- 30 sec
+five : Nat
+five = \ N s z => s (s (s (s (s z))))
 
--- five : Nat
--- five = \ N s z => s (s (s (s (s z))))
+add : Nat -> Nat -> Nat
+add = \ a b N s z => a N s (b N s z)
 
--- add : Nat -> Nat -> Nat
--- add = \ a b N s z => a N s (b N s z)
+mul : Nat -> Nat -> Nat
+mul = \a b N s z => a N (b N s) z
+
+ten : Nat
+ten = add five five
+
+hundred : Nat
+hundred = mul ten ten
+
+thousand : Nat
+thousand = mul ten hundred
+
+-- All of these fail, but are they funext?
+-- works for zoo3, but maybe I'm expanding stuff too eagerly
+
+-- eq : Eq _ true true
+-- eq = refl
+
+-- eqTest2 : Eq _ five five
+-- eqTest2 = refl
+
+-- -- This one breaks
+-- eqTest : Eq _ hundred hundred
+-- -- eqTest = refl _ _
 
 -- Add the rest
 
