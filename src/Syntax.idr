@@ -114,11 +114,6 @@ Show Pattern where
 Show CaseAlt where
   show (MkAlt x y)= foo ["MkAlt", show x, assert_total $ show y]
 
-Show Icit where
-  show Implicit = "Implicit"
-  show Explicit = "Explicit"
-  -- show Eq = "Eq"
-
 covering
 Show Raw where
   show RHole = "_"

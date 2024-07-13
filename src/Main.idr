@@ -48,6 +48,7 @@ dumpContext top = do
 processDecl : Decl -> M ()
 processDecl (TypeSig nm tm) = do
   top <- get
+  putStrLn "-----"
   putStrLn "TypeSig \{nm} \{show tm}"
   ty <- check (mkCtx top.metas) tm VU
   putStrLn "got \{show ty}"
@@ -55,6 +56,7 @@ processDecl (TypeSig nm tm) = do
 
 -- FIXME - this should be in another file
 processDecl (Def nm raw) = do
+  putStrLn "-----"
   putStrLn "def \{show nm}"
   ctx <- get
   let pos = case raw of
@@ -67,12 +69,13 @@ processDecl (Def nm raw) = do
     | _ => throwError $ E pos "\{nm} already defined"
   putStrLn "check \{nm} = \{show raw} at \{show $ ty}"
   vty <- eval empty CBN ty
+  putStrLn "vty is \{show vty}"
   tm <- check (mkCtx ctx.metas) raw vty
   putStrLn "Ok \{show tm}"
   put (addDef ctx nm tm ty)
 
 processDecl (DCheck tm ty) = do
-  
+
   top <- get
   putStrLn "check \{show tm} at \{show ty}"
   ty' <- check (mkCtx top.metas) tm VU
@@ -84,7 +87,7 @@ processDecl (DCheck tm ty) = do
   putStrLn "norm \{show norm}"
   -- top <- get
   -- ctx <- mkCtx top.metas
-  -- I need a type to check against 
+  -- I need a type to check against
   -- norm <- nf [] x
   putStrLn "NF "
 
@@ -108,7 +111,7 @@ processDecl (Data nm ty cons) = do
           dty <- check (mkCtx ctx.metas) tm VU
           modify $ claim nm' dty
       _ => throwError $ E (0,0) "expected TypeSig"
-  
+
   pure ()
   where
     checkDeclType : Tm -> M ()
@@ -128,9 +131,9 @@ processFile fn = do
   printLn "process Decls"
   Right _ <- tryError $ traverse_ processDecl res.decls
     | Left y => putStrLn (showError src y)
-  
+
   dumpContext !get
-  
+
 main' : M ()
 main' = do
   args <- getArgs
@@ -139,7 +142,7 @@ main' = do
     | _ => putStrLn "Usage: newt foo.newt"
   -- Right files <- listDir "eg"
   --   | Left err => printLn err
-  
+
   traverse_ processFile (filter (".newt" `isSuffixOf`) files)
 
 main : IO ()

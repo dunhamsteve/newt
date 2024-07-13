@@ -54,23 +54,5 @@ hundred = mul ten ten
 thousand : Nat
 thousand = mul ten hundred
 
--- All of these fail, but are they funext?
--- works for zoo3, but maybe I'm expanding stuff too eagerly
-
--- eq : Eq _ true true
--- eq = refl
-
--- eqTest2 : Eq _ five five
--- eqTest2 = refl
-
--- -- This one breaks
--- eqTest : Eq _ hundred hundred
--- -- eqTest = refl _ _
-
--- Add the rest
-
-
--- unify (%pi _ E (%var 3 []) (%cl [(%var 6 []), (%var 3 []), (%var 0 []), (%var 2 []), (%var 1 []), (%var 0 [])] (Bnd 2))) with 
---       (%pi _ E (%var 2 []) (%cl [(%var 6 []), (%var 2 []), (%var 0 []), (%var 1 []), (%var 0 [])] (Bnd 2)))
--- ->    (%pi _ E (%var 3 []) (%cl [(%var 6 []), (%var 3 []), (%var 0 []), (%var 2 []), (%var 1 []), (%var 0 [])] (Bnd 2))) with 
---       (%pi _ E (%var 2 []) (%cl [(%var 6 []), (%var 2 []), (%var 0 []), (%var 1 []), (%var 0 [])] (Bnd 2)))
+eqTest : Eq _ hundred hundred
+eqTest = refl _ _

@@ -28,6 +28,11 @@ data Icit = Implicit | Explicit
 
 %name Icit icit
 
+export
+Show Icit where
+  show Implicit = "Implicit"
+  show Explicit = "Explicit"
+
 public export
 data BD = Bound | Defined
 
@@ -41,6 +46,7 @@ data Tm : Type where
   -- kovacs optimization, I think we can App out meta instead
   -- InsMeta : Nat -> List BD -> Tm
   Lam : Name -> Icit -> Tm -> Tm
+  -- Do we need to remember Icit here?
   App : Tm -> Tm -> Tm
   U   : Tm
   Pi  : Name -> Icit -> Tm -> Tm -> Tm
@@ -57,13 +63,14 @@ Show Tm where
   show (App t u) = "(\{show t} \{show u})"
   show (Meta i) = "(Meta \{show i})"
   show U = "U"
-  show (Pi str icit t u) = "(∏ \{str} : \{show t} => \{show u})"
+  show (Pi str Implicit t u) = "(Pi (\{str} : \{show t}) => \{show u})"
+  show (Pi str Explicit t u) = "(Pi {\{str} : \{show t}} => \{show u})"
   show (Let str icit t u v) = "let \{str} : \{show t} = \{show u} in \{show v}"
 
 -- I can't really show val because it's HOAS...
 
 -- TODO derive
-export 
+export
 Eq Icit where
   Implicit == Implicit = True
   Explicit == Explicit = True
@@ -126,9 +133,6 @@ data Val : Type where
   VPi : Name -> Icit -> Lazy Val -> Closure -> Val
   VU : Val
 
-Show Icit where
-  show Implicit = "I"
-  show Explicit = "E"
 
 Show Closure
 
@@ -138,7 +142,8 @@ Show Val where
   show (VRef nm sp) = "(%ref \{nm} \{show sp})"
   show (VMeta ix sp) = "(%meta \{show ix} \{show sp})"
   show (VLam str icit x) = "(%lam \{str} \{show icit} \{show x})"
-  show (VPi str icit x y) = "(%pi \{str} \{show icit} \{show x} \{show y})"
+  show (VPi str Implicit x y) = "(%pi {\{str} : \{show  x}}. \{show  y})"
+  show (VPi str Explicit x y) = "(%pi (\{str} : \{show  x}). \{show  y})"
   show VU = "U"
 
 public export
@@ -174,7 +179,7 @@ So I guess we have top and local then?
 With haskell syntax. I think we can have Axiom for claims and rewrite to def later.
 
 Hmm, so given ezoo, if I'm going simple, I could keep BDs short, and use the normal
-context. (Zoo4.lean:222) I'd probably still need an undefined/axiom marker as a value? 
+context. (Zoo4.lean:222) I'd probably still need an undefined/axiom marker as a value?
 
 ok, so with just one context, Env is List Val and we're getting Tm back from type checking.
 
@@ -182,9 +187,14 @@ Can I get val back? Do we need to quote? What happens if we don't?
 
 -}
 
--- FIXME remove List BD
 public export
-data MetaEntry = Unsolved Nat (List BD) | Solved Nat Val
+data MetaEntry = Unsolved SourcePos Nat (List BD) | Solved Nat Val
+
+export
+covering
+Show MetaEntry where
+  show (Unsolved pos k xs) = "Unsolved \{show pos} \{show k}"
+  show (Solved k x) = "Solved \{show k} \{show x}"
 
 public export
 record MetaContext where
@@ -241,7 +251,7 @@ record Context where
   -- so we'll try "bds" determines length of local context
   bds  : List BD          -- bound or defined
   pos : SourcePos            -- the last SourcePos that we saw
-  
+
   -- We only need this here if we don't pass TopContext
   -- top : TopContext
   metas : IORef MetaContext

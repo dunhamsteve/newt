@@ -27,9 +27,9 @@ export function activate(context: vscode.ExtensionContext) {
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        const match = line.match(/ERROR at \((\d+), (\d+)\): (.*)/);
+        const match = line.match(/(INFO|ERROR) at \((\d+), (\d+)\): (.*)/);
         if (match) {
-          let [_full, line, column, message] = match;
+          let [_full, kind, line, column, message] = match;
           let lnum = Number(line);
           let cnum = Number(column);
           let start = new vscode.Position(lnum, cnum);
@@ -47,7 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
           ) {
             message += "\n" + lines[++i];
           }
-          const severity = vscode.DiagnosticSeverity.Error;
+          const severity = kind === 'ERROR' ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Information
           const diag = new vscode.Diagnostic(range, message, severity);
           diagnostics.push(diag);
         }

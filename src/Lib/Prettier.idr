@@ -13,6 +13,7 @@ export
 data Doc = Empty | Line | Text String | Nest Nat Doc | Seq Doc Doc | Alt Doc Doc
 
 ||| `DOC` is an intermediate form used during layout/rendering
+||| The capitalization is the opposite of the paper.
 data DOC = EMPTY | TEXT String DOC | LINE Nat DOC
 
 flatten : Doc -> Doc

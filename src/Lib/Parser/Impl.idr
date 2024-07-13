@@ -14,7 +14,7 @@ SourcePos : Type
 SourcePos = (Int,Int)
 
 emptyPos : SourcePos
-emptyPos = (0,0) 
+emptyPos = (0,0)
 
 -- Error of a parse
 public export
@@ -27,17 +27,17 @@ showError src (E (line, col) msg) = "ERROR at \{show (line,col)}: \{msg}\n" ++ g
   where
     go : Int -> List String -> String
     go l [] = ""
-    go l (x :: xs) = 
+    go l (x :: xs) =
       if l == line then
         "  \{x}\n  \{replicate (cast col) ' '}^\n"
-      else if line - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs 
+      else if line - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
       else go (l + 1) xs
 
 -- Result of a parse
 public export
 data Result : Type -> Type where
   OK : a -> (toks : TokenList) -> (com : Bool) -> Result a
-  Fail : Bool -> Error -> (toks : TokenList) -> (com : Bool)  -> Result a  
+  Fail : Bool -> Error -> (toks : TokenList) -> (com : Bool)  -> Result a
 
 export
 Functor Result where
@@ -92,13 +92,13 @@ Functor Parser where
   map f (P pa) = P $ \ toks, com, col => map f (pa toks com col)
 
 export
-Applicative Parser where 
+Applicative Parser where
   pure pa = P (\ toks, com, col => OK pa toks com)
   P pab <*> P pa = P $ \toks,com,col =>
     case pab toks com col of
       Fail fatal err toks com => Fail fatal err toks com
-      OK f toks com => 
-        case pa toks com col of 
+      OK f toks com =>
+        case pa toks com col of
           (OK x toks com) => OK (f x) toks com
           (Fail fatal err toks com) => Fail fatal err toks com
 
@@ -125,7 +125,7 @@ pred : (BTok -> Bool) -> String -> Parser String
 pred f msg = P $ \toks,com,col =>
   case toks of
     (t :: ts) => if f t then OK (value t) ts com else Fail False (error toks "\{msg} vt:\{value t}") toks com
-    [] => Fail False (error toks "eof") toks com
+    [] => Fail False (error toks "\{msg} at EOF") toks com
 
 export
 commit : Parser ()
@@ -138,7 +138,7 @@ defer f = P $ \toks,com,col => runP (f ()) toks com col
 mutual
   export some : Parser a -> Parser (List a)
   some p = defer $ \_ => [| p :: many p|] --(::) <$> p <*> many p)
-  
+
   export many : Parser a -> Parser (List a)
   many p = some p <|> pure []
 
@@ -169,8 +169,8 @@ export
 sameLevel : Parser a -> Parser a
 sameLevel (P p) = P $ \toks,com,(l,c) => case toks of
   [] => p toks com (l,c)
-  (t :: _) => 
-    let (tl,tc) = start t 
+  (t :: _) =>
+    let (tl,tc) = start t
     in if tc == c then p toks com (tl, c)
     else if c < tc then Fail False (error toks "unexpected indent") toks com
     else Fail False (error toks "unexpected indent") toks com

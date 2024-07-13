@@ -3,6 +3,9 @@
 -- maybe watch https://www.youtube.com/watch?v=3gef0_NFz8Q
 -- or drop the indices for now.
 
+-- ***
+-- Kovacs has icity on App, and passes it around, but I'm not sure where it is needed since the insertion happens based on Raw.
+
 module Lib.TT
 -- For SourcePos
 import Lib.Parser.Impl
@@ -34,17 +37,21 @@ export
 error' : String -> M a
 error' msg = throwError $ E (0,0) msg
 
+-- order does indeed matter on the meta arguments
+-- because of dependent types (if we want something well-typed back out)
 
 export
 freshMeta : Context -> M Tm
 freshMeta ctx = do
   mc <- readIORef ctx.metas
-  writeIORef ctx.metas $ { next $= S, metas $= (Unsolved mc.next ctx.bds ::) } mc
-  pure $ applyBDs 0 (Meta mc.next) ctx.bds 
+  putStrLn "INFO at \{show ctx.pos}: fresh meta \{show mc.next}"
+  writeIORef ctx.metas $ { next $= S, metas $= (Unsolved ctx.pos mc.next ctx.bds ::) } mc
+  pure $ applyBDs 0 (Meta mc.next) ctx.bds
   where
   -- hope I got the right order here :)
   applyBDs : Nat -> Tm -> List BD -> Tm
   applyBDs k t [] = t
+  -- review the order here
   applyBDs k t (Bound :: xs) = App (applyBDs (S k) t xs) (Bnd k)
   applyBDs k t (Defined :: xs) = applyBDs (S k) t xs
 
@@ -57,7 +64,7 @@ lookupMeta ix = do
   where
     go : List MetaEntry -> M MetaEntry
     go [] = error' "Meta \{show ix} not found"
-    go (meta@(Unsolved k ys) :: xs) = if k == ix then pure meta else go xs
+    go (meta@(Unsolved _ k ys) :: xs) = if k == ix then pure meta else go xs
     go (meta@(Solved k x) :: xs) = if k == ix then pure meta else go xs
 
 export
@@ -69,10 +76,12 @@ solveMeta ctx ix tm = do
   where
     go : List MetaEntry -> SnocList MetaEntry -> M (List MetaEntry)
     go [] _ = error' "Meta \{show ix} not found"
-    go (meta@(Unsolved k _) :: xs) lhs = if k == ix 
-      then pure $ lhs <>> (Solved k tm :: xs)
+    go (meta@(Unsolved pos k _) :: xs) lhs = if k == ix
+      then do
+        putStrLn "INFO at \{show pos}: solve \{show k} as \{show tm}"
+        pure $ lhs <>> (Solved k tm :: xs)
       else go xs (lhs :< meta)
-    go (meta@(Solved k _) :: xs) lhs = if k == ix 
+    go (meta@(Solved k _) :: xs) lhs = if k == ix
       then error' "Meta \{show ix} already solved!"
       else go xs (lhs :< meta)
 
@@ -88,7 +97,7 @@ export
 extend : Context -> String -> Val -> Context
 extend ctx name ty =
     { lvl $= S, env $= (VVar ctx.lvl [<] ::), types $= ((name, ty) ::), bds $= (Bound ::) } ctx
-    
+
 -- I guess we define things as values?
 export
 define : Context -> String -> Val -> Val -> Context
@@ -146,7 +155,7 @@ eval env mode (App t u) = vapp !(eval env mode t) !(eval env mode u)
 eval env mode U = pure VU
 eval env mode (Meta i) =
   case !(lookupMeta i) of
-        (Unsolved k xs) => pure $ VMeta i [<]
+        (Unsolved _ k xs) => pure $ VMeta i [<]
         (Solved k t) => pure $ t
 eval env mode (Lam x icit t) = pure $ VLam x icit (MkClosure env t)
 eval env mode (Pi x icit a b) = pure $ VPi x icit !(eval env mode a) (MkClosure env b)
@@ -154,13 +163,13 @@ eval env mode (Let x icit ty t u) = eval (!(eval env mode t) :: env) mode u
 eval env mode (Bnd i) = case getAt i env of
   Just rval => pure rval
   Nothing => error' "Bad deBruin index \{show i}"
-  
+
 export
 quote : (lvl : Nat) -> Val -> M Tm
 
 quoteSp : (lvl : Nat) -> Tm -> SnocList Val -> M Tm
 quoteSp lvl t [<] = pure t
-quoteSp lvl t (xs :< x) = 
+quoteSp lvl t (xs :< x) =
   pure $ App !(quoteSp lvl t xs) !(quote lvl x)
   -- quoteSp lvl (App t !(quote lvl x)) xs  -- snoc says previous is right
 

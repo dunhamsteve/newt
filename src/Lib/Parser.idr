@@ -14,6 +14,7 @@ import Lib.Token
 import Lib.Parser.Impl
 import Syntax
 import Data.List
+import Data.Maybe
 
 -- There is the whole core vs surface thing here.
 -- might be best to do core first/ Technically don't
@@ -186,10 +187,11 @@ ibind : Parser (List (String, Icit, Raw))
 ibind = do
   sym "{"
   names <- some ident
-  sym ":"
-  ty <- typeExpr
+  ty <- optional (sym ":" >> typeExpr)
+  pos <- getPos
   sym "}"
-  pure $ map (\name => (name, Explicit, ty)) names
+  -- getPos is a hack here, I would like to position at the name... 
+  pure $ map (\name => (name, Implicit, fromMaybe (RSrcPos pos RHole) ty)) names
 
 -- Collect a bunch of binders (A : U) {y : A} -> ...
 binders : Parser Raw
