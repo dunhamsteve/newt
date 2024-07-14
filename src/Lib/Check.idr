@@ -19,7 +19,6 @@ data PRen = PR Nat Nat (List Nat)
 -- IORef for metas needs IO
 
 forceMeta : Val -> M Val
--- TODO - need to look up metas
 forceMeta (VMeta ix sp) = case !(lookupMeta ix) of
   (Unsolved pos k xs) => pure (VMeta ix sp)
   (Solved k t) => vappSpine t sp

@@ -159,7 +159,6 @@ eval env mode (Meta i) =
         (Solved k t) => pure $ t
 eval env mode (Lam x t) = pure $ VLam x (MkClosure env t)
 eval env mode (Pi x icit a b) = pure $ VPi x icit !(eval env mode a) (MkClosure env b)
-eval env mode (Let x ty t u) = eval (!(eval env mode t) :: env) mode u
 eval env mode (Bnd i) = case getAt i env of
   Just rval => pure rval
   Nothing => error' "Bad deBruin index \{show i}"

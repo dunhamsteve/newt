@@ -49,7 +49,6 @@ data Tm : Type where
   App : Tm -> Tm -> Tm
   U   : Tm
   Pi  : Name -> Icit -> Tm -> Tm -> Tm
-  Let : Name -> Tm -> Tm -> Tm -> Tm
 
 %name Tm t, u, v
 
@@ -63,7 +62,6 @@ Show Tm where
   show U = "U"
   show (Pi str Implicit t u) = "(Pi (\{str} : \{show t}) => \{show u})"
   show (Pi str Explicit t u) = "(Pi {\{str} : \{show t}} => \{show u})"
-  show (Let str t u v) = "let \{str} : \{show t} = \{show u} in \{show v}"
 
 -- I can't really show val because it's HOAS...
 
@@ -84,7 +82,6 @@ Eq (Tm) where
   (App t u) == App t' u' = t == t' && u == u'
   U == U = True
   (Pi n icit t u) == (Pi n' icit' t' u') = icit == icit' && t == t' && u == u'
-  (Let n t u v) == (Let n' t' u' v') = t == t' && u == u' && v == v'
   _ == _ = False
 
 public export
@@ -96,7 +93,6 @@ Pretty Tm where
   pretty (App t u) = text "(" <+> pretty t <+> pretty u <+> ")"
   pretty U = "U"
   pretty (Pi str icit t u) = text "(" <+> text str <+> ":" <+> pretty t <+> "=>" <+> pretty u <+> ")"
-  pretty (Let str t u v) = text "let" <+> text str <+> ":" <+> pretty t <+> "=" <+> pretty u
 
 -- public export
 -- data Closure : Nat -> Type
