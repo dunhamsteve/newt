@@ -132,7 +132,7 @@ infixl 8 $$
 
 export
 vapp : Val -> Val -> M Val
-vapp (VLam _ icit t) u = t $$ u
+vapp (VLam _ t) u = t $$ u
 vapp (VVar k sp) u = pure $ VVar k (sp :< u)
 vapp (VRef nm sp) u = pure $ VRef nm (sp :< u)
 vapp (VMeta k sp) u = pure $ VMeta k (sp :< u)
@@ -157,9 +157,9 @@ eval env mode (Meta i) =
   case !(lookupMeta i) of
         (Unsolved _ k xs) => pure $ VMeta i [<]
         (Solved k t) => pure $ t
-eval env mode (Lam x icit t) = pure $ VLam x icit (MkClosure env t)
+eval env mode (Lam x t) = pure $ VLam x (MkClosure env t)
 eval env mode (Pi x icit a b) = pure $ VPi x icit !(eval env mode a) (MkClosure env b)
-eval env mode (Let x icit ty t u) = eval (!(eval env mode t) :: env) mode u
+eval env mode (Let x ty t u) = eval (!(eval env mode t) :: env) mode u
 eval env mode (Bnd i) = case getAt i env of
   Just rval => pure rval
   Nothing => error' "Bad deBruin index \{show i}"
@@ -177,7 +177,7 @@ quote l (VVar k sp) = if k < l
   then quoteSp l (Bnd ((l `minus` k) `minus` 1)) sp -- level to index
   else ?borken
 quote l (VMeta i sp) = quoteSp l (Meta i) sp
-quote l (VLam x icit t) = pure $ Lam x icit !(quote (S l) !(t $$ VVar l [<]))
+quote l (VLam x t) = pure $ Lam x !(quote (S l) !(t $$ VVar l [<]))
 quote l (VPi x icit a b) = pure $ Pi x icit !(quote l a) !(quote (S l) !(b $$ VVar l [<]))
 quote l VU = pure U
 quote l (VRef n sp) = quoteSp l (Ref n Nothing) sp

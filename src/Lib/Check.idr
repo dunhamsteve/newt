@@ -57,13 +57,13 @@ rename meta ren lvl v = go ren lvl v
     go ren lvl (VMeta ix sp) = if ix == meta
       then throwError $ E (0,0) "meta occurs check"
       else goSpine ren lvl (Meta ix) sp
-    go ren lvl (VLam n icit t) = pure (Lam n icit !(go (lvl :: ren) (S lvl) !(t $$ VVar lvl [<])))
+    go ren lvl (VLam n t) = pure (Lam n !(go (lvl :: ren) (S lvl) !(t $$ VVar lvl [<])))
     go ren lvl (VPi n icit ty tm) = pure (Pi n icit !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar lvl [<])))
     go ren lvl VU = pure U
 
 lams : Nat -> Tm -> Tm
 lams 0 tm = tm
-lams (S k) tm = Lam "arg:\{show k}" Explicit (lams k tm)
+lams (S k) tm = Lam "arg:\{show k}" (lams k tm)
 
 solve : Nat -> Nat -> SnocList Val -> Val  -> M  ()
 solve l m sp t = do
@@ -91,9 +91,9 @@ parameters (ctx: Context)
     t' <- forceMeta t
     u' <- forceMeta u
     case (t',u') of
-      (VLam _ _ t,  VLam _ _ t'  ) => unify (l + 1) !(t $$ VVar l [<]) !(t' $$ VVar l [<])
-      (t,           VLam _ _ t'  ) => unify (l + 1) !(t `vapp` VVar l [<]) !(t' $$ VVar l [<])
-      (VLam _ _ t,  t'           ) => unify (l + 1) !(t $$ VVar l [<]) !(t' `vapp` VVar l [<])
+      (VLam _ t,  VLam _ t') => unify (l + 1) !(t $$ VVar l [<]) !(t' $$ VVar l [<])
+      (t,         VLam _ t') => unify (l + 1) !(t `vapp` VVar l [<]) !(t' $$ VVar l [<])
+      (VLam _ t,  t'       ) => unify (l + 1) !(t $$ VVar l [<]) !(t' `vapp` VVar l [<])
       (VPi _ _ a b, VPi _ _ a' b') => unify l a a' >> unify (S l) !(b $$ VVar l [<]) !(b' $$ VVar l [<])
       (VVar k sp,   VVar k' sp'  ) =>
         if k == k' then unifySpine l (k == k') sp sp'
@@ -133,12 +133,12 @@ check ctx tm ty with (force ty)
                 let var = VVar (length ctx.env) [<]
                 let ctx' = extend ctx nm a
                 tm' <- check ctx' tm !(b $$ var)
-                pure $ Lam nm icit tm'
+                pure $ Lam nm tm'
               else if icit' == Implicit then do
                 let var = VVar (length ctx.env) [<]
                 ty' <- b $$ var
                 sc <- check (extend ctx nm' a) t ty'
-                pure $ Lam nm' icit' sc
+                pure $ Lam nm' sc
               else
                 error [(DS "Icity issue checking \{show t} at \{show ty}")]
           other => error [(DS "Expected pi type, got \{show !(quote 0 ty)}")]
@@ -147,7 +147,7 @@ check ctx tm ty with (force ty)
     let var = VVar (length ctx.env) [<]
     ty' <- b $$ var
     sc <- check (extend ctx nm' a) tm ty'
-    pure $ Lam nm' Implicit sc
+    pure $ Lam nm' sc
   check ctx tm _ | ty = do
     -- We need to insert if it's not a Lam
     -- TODO figure out why the exception is here (cribbed from kovacs)
@@ -216,7 +216,7 @@ infer ctx (RLam nm icit tm) = do
   let ctx' = extend ctx nm a
   (tm', b) <- infer ctx' tm
   putStrLn "make lam for \{show nm} scope \{show tm'} : \{show b}"
-  pure $ (Lam nm icit tm', VPi nm icit a $ MkClosure ctx.env !(quote (S ctx.lvl) b))
+  pure $ (Lam nm tm', VPi nm icit a $ MkClosure ctx.env !(quote (S ctx.lvl) b))
   -- error {ctx} [DS "can't infer lambda"]
 
 infer ctx RHole = do

@@ -45,12 +45,11 @@ data Tm : Type where
   Meta : Nat -> Tm
   -- kovacs optimization, I think we can App out meta instead
   -- InsMeta : Nat -> List BD -> Tm
-  Lam : Name -> Icit -> Tm -> Tm
-  -- Do we need to remember Icit here?
+  Lam : Name -> Tm -> Tm
   App : Tm -> Tm -> Tm
   U   : Tm
   Pi  : Name -> Icit -> Tm -> Tm -> Tm
-  Let : Name -> Icit -> Tm -> Tm -> Tm -> Tm
+  Let : Name -> Tm -> Tm -> Tm -> Tm
 
 %name Tm t, u, v
 
@@ -58,14 +57,13 @@ public export
 Show Tm where
   show (Bnd k) = "(Bnd \{show k})"
   show (Ref str _) = "(Ref \{show str})"
-  show (Lam nm Implicit t) = "(\\ {\{nm}} => \{show  t})"
-  show (Lam nm Explicit t) = "(\\ \{nm}  => \{show  t})"
+  show (Lam nm t) = "(\\ \{nm}  => \{show  t})"
   show (App t u) = "(\{show t} \{show u})"
   show (Meta i) = "(Meta \{show i})"
   show U = "U"
   show (Pi str Implicit t u) = "(Pi (\{str} : \{show t}) => \{show u})"
   show (Pi str Explicit t u) = "(Pi {\{str} : \{show t}} => \{show u})"
-  show (Let str icit t u v) = "let \{str} : \{show t} = \{show u} in \{show v}"
+  show (Let str t u v) = "let \{str} : \{show t} = \{show u} in \{show v}"
 
 -- I can't really show val because it's HOAS...
 
@@ -82,11 +80,11 @@ Eq (Tm) where
   -- (Local x) == (Local y) = x == y
   (Bnd x) == (Bnd y) = x == y
   (Ref x _) == (Ref y _) = x == y
-  (Lam n icit t) == (Lam n' icit' t') = icit == icit' && t == t'
+  (Lam n t) == (Lam n' t') = t == t'
   (App t u) == App t' u' = t == t' && u == u'
   U == U = True
   (Pi n icit t u) == (Pi n' icit' t' u') = icit == icit' && t == t' && u == u'
-  (Let n icit t u v) == (Let n' icit' t' u' v') = t == t' && u == u' && v == v'
+  (Let n t u v) == (Let n' t' u' v') = t == t' && u == u' && v == v'
   _ == _ = False
 
 public export
@@ -94,12 +92,11 @@ Pretty Tm where
   pretty (Bnd k) = ?rhs_0
   pretty (Ref str mt) = text str
   pretty (Meta k) = text "?m\{show k}"
-  pretty (Lam str Implicit t) = text "(\\ {\{str}} => " <+> pretty t <+> ")"
-  pretty (Lam str Explicit t) = text "(\\ \{str} => " <+> pretty t <+> ")"
+  pretty (Lam str t) = text "(\\ \{str} => " <+> pretty t <+> ")"
   pretty (App t u) = text "(" <+> pretty t <+> pretty u <+> ")"
   pretty U = "U"
   pretty (Pi str icit t u) = text "(" <+> text str <+> ":" <+> pretty t <+> "=>" <+> pretty u <+> ")"
-  pretty (Let str icit t u v) = text "let" <+> text str <+> ":" <+> pretty t <+> "=" <+> pretty u
+  pretty (Let str t u v) = text "let" <+> text str <+> ":" <+> pretty t <+> "=" <+> pretty u
 
 -- public export
 -- data Closure : Nat -> Type
@@ -129,7 +126,7 @@ data Val : Type where
   VRef : (nm : String) -> (sp : SnocList Val) -> Val
   -- we'll need to look this up in ctx with IO
   VMeta : (ix : Nat) -> (sp : SnocList Val) -> Val
-  VLam : Name -> Icit -> Closure -> Val
+  VLam : Name -> Closure -> Val
   VPi : Name -> Icit -> Lazy Val -> Closure -> Val
   VU : Val
 
@@ -141,7 +138,7 @@ Show Val where
   show (VVar k sp) = "(%var \{show k} \{show sp})"
   show (VRef nm sp) = "(%ref \{nm} \{show sp})"
   show (VMeta ix sp) = "(%meta \{show ix} \{show sp})"
-  show (VLam str icit x) = "(%lam \{str} \{show icit} \{show x})"
+  show (VLam str x) = "(%lam \{str} \{show x})"
   show (VPi str Implicit x y) = "(%pi {\{str} : \{show  x}}. \{show  y})"
   show (VPi str Explicit x y) = "(%pi (\{str} : \{show  x}). \{show  y})"
   show VU = "U"
