@@ -23,4 +23,4 @@ compile l (App t u) = compile l t <+> "(" <+> compile l u <+> ")"
 
 compile l U = "undefined"
 compile l (Pi str icit t u) = "undefined"
-compile l (Meta k) = ?fixme_zonk
+compile l (Meta k) = text "ZONKME \{show k}"

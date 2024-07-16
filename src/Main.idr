@@ -51,8 +51,9 @@ processDecl (TypeSig nm tm) = do
   putStrLn "-----"
   putStrLn "TypeSig \{nm} \{show tm}"
   ty <- check (mkCtx top.metas) tm VU
-  putStrLn "got \{show ty}"
-  modify $ claim nm ty
+  ty' <- nf [] ty
+  putStrLn "got \{show ty'}"
+  modify $ claim nm ty'
 
 -- FIXME - this should be in another file
 processDecl (Def nm raw) = do

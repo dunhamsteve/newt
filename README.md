@@ -42,10 +42,12 @@ Questions:
 - [ ] Should I write this up properly?
 
 Parser:
-- [ ] parser for block comments
+- [x] parser for block comments
 - [x] import statement
 - [x] def
 - [x] simple decl
+- [ ] check (either check at _ or infer and let it throw)
+- [ ] nf (ditto, but print value. WHNF for now    )
 
 Misc:
 - [x] vscode support for .newt
@@ -65,10 +67,10 @@ Misc:
 - [x] figure out context representation - Global context?
 - [x] type checking / elab
   - What does this represent? The basics, implicits? pattern unification?
-- [ ] symbolic execution
-  - why did I put this here? Is it just for `eval`?  We do have CBN in place, we could eval inferrable
+- [ ] check for unsolved metas (after each def or at end?)
 - [ ] compilation
   - I'm thinking I get data working first
+- [ ] repl
 - [ ] write tests
 - [ ] Split up code better
 
@@ -77,6 +79,7 @@ Forward:
 - [ ] Switch to query-based?
 - [ ] LSP?
 - [ ] white box testing
+- [ ] switches on logging
 
 ----
 

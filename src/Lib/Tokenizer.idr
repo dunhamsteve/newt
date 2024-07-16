@@ -28,6 +28,7 @@ rawTokens
   <|> match (some digit) (Tok Number)
   <|> match (is '#' <+> many alpha) (Tok Pragma)
   <|> match (lineComment (exact "--")) (Tok Space)
+  <|> match (blockComment (exact "/-") (exact "-/")) (Tok Space)
   <|> match (some opChar) (\s => Tok Oper s)
   <|> match symbol (Tok Symbol)
   <|> match spaces (Tok Space)
@@ -38,4 +39,4 @@ notSpace _ = True
 
 export
 tokenise : String -> List BTok
-tokenise = filter notSpace . fst . lex rawTokens 
+tokenise = filter notSpace . fst . lex rawTokens
