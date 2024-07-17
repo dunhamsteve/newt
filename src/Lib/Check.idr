@@ -24,57 +24,58 @@ forceMeta (VMeta ix sp) = case !(lookupMeta ix) of
   (Solved k t) => vappSpine t sp
 forceMeta x = pure x
 
--- return renaming, the position is the new VVar
-invert : Nat -> SnocList Val -> M (List Nat)
-invert lvl sp = go sp []
-  where
-    go : SnocList Val -> List Nat -> M (List Nat)
-    go [<] acc = pure $ reverse acc
-    go (xs :< VVar k [<]) acc = do
-      if elem k acc
-        then throwError $ E (0,0) "non-linear pattern"
-        else go xs (k :: acc)
-    go _ _ = throwError $ E (0,0) "non-variable in pattern"
-
--- we have to "lift" the renaming when we go under a lambda
--- I think that essentially means our domain ix are one bigger, since we're looking at lvl
--- in the codomain, so maybe we can just keep that value
-rename : Nat -> List Nat -> Nat -> Val  -> M  Tm
-rename meta ren lvl v = go ren lvl v
-  where
-    go : List Nat -> Nat -> Val  -> M  Tm
-    goSpine : List Nat -> Nat -> Tm -> SnocList Val  -> M  Tm
-    goSpine ren lvl tm [<] = pure tm
-    goSpine ren lvl tm (xs :< x) = do
-      xtm <- go ren lvl x
-      goSpine ren lvl (App tm xtm) xs
-
-    go ren lvl (VVar k sp) = case findIndex (== k) ren of
-      Nothing => throwError $ E (0,0) "scope/skolem thinger"
-      Just x => goSpine ren lvl (Bnd $ cast x) sp
-    go ren lvl (VRef nm sp) = goSpine ren lvl (Ref nm Nothing) sp
-    go ren lvl (VMeta ix sp) = if ix == meta
-      then throwError $ E (0,0) "meta occurs check"
-      else goSpine ren lvl (Meta ix) sp
-    go ren lvl (VLam n t) = pure (Lam n !(go (lvl :: ren) (S lvl) !(t $$ VVar lvl [<])))
-    go ren lvl (VPi n icit ty tm) = pure (Pi n icit !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar lvl [<])))
-    go ren lvl VU = pure U
-
-lams : Nat -> Tm -> Tm
-lams 0 tm = tm
-lams (S k) tm = Lam "arg:\{show k}" (lams k tm)
-
-solve : Nat -> Nat -> SnocList Val -> Val  -> M  ()
-solve l m sp t = do
-  ren <- invert l sp
-  tm <- rename m ren l t
-  let tm = lams (length sp) tm
-  top <- get
-  soln <- eval [] CBN tm
-  solveMeta top m soln
-  pure ()
-
 parameters (ctx: Context)
+  -- return renaming, the position is the new VVar
+  invert : Nat -> SnocList Val -> M (List Nat)
+  invert lvl sp = go sp []
+    where
+      go : SnocList Val -> List Nat -> M (List Nat)
+      go [<] acc = pure $ reverse acc
+      go (xs :< VVar k [<]) acc = do
+        if elem k acc
+          then error [DS "non-linear pattern"]
+          else go xs (k :: acc)
+      go _ _ = error [DS "non-variable in pattern"]
+
+  -- we have to "lift" the renaming when we go under a lambda
+  -- I think that essentially means our domain ix are one bigger, since we're looking at lvl
+  -- in the codomain, so maybe we can just keep that value
+  rename : Nat -> List Nat -> Nat -> Val  -> M  Tm
+  rename meta ren lvl v = go ren lvl v
+    where
+      go : List Nat -> Nat -> Val  -> M  Tm
+      goSpine : List Nat -> Nat -> Tm -> SnocList Val  -> M  Tm
+      goSpine ren lvl tm [<] = pure tm
+      goSpine ren lvl tm (xs :< x) = do
+        xtm <- go ren lvl x
+        goSpine ren lvl (App tm xtm) xs
+
+      go ren lvl (VVar k sp) = case findIndex (== k) ren of
+        Nothing => error [DS "scope/skolem thinger"]
+        Just x => goSpine ren lvl (Bnd $ cast x) sp
+      go ren lvl (VRef nm sp) = goSpine ren lvl (Ref nm Nothing) sp
+      go ren lvl (VMeta ix sp) = if ix == meta
+        then error [DS "meta occurs check"]
+        else goSpine ren lvl (Meta ix) sp
+      go ren lvl (VLam n t) = pure (Lam n !(go (lvl :: ren) (S lvl) !(t $$ VVar lvl [<])))
+      go ren lvl (VPi n icit ty tm) = pure (Pi n icit !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar lvl [<])))
+      go ren lvl VU = pure U
+
+  lams : Nat -> Tm -> Tm
+  lams 0 tm = tm
+  lams (S k) tm = Lam "arg:\{show k}" (lams k tm)
+
+
+  solve : Nat -> Nat -> SnocList Val -> Val  -> M  ()
+  solve l m sp t = do
+    ren <- invert l sp
+    tm <- rename m ren l t
+    let tm = lams (length sp) tm
+    top <- get
+    soln <- eval [] CBN tm
+    solveMeta top m soln
+    pure ()
+
   unify : (l : Nat) -> Val -> Val  -> M  ()
 
   unifySpine : Nat -> Bool -> SnocList Val -> SnocList Val  -> M  ()
@@ -147,6 +148,10 @@ check ctx tm ty with (force ty)
     ty' <- b $$ var
     sc <- check (extend ctx nm' a) tm ty'
     pure $ Lam nm' sc
+  -- TODO Work in progress
+  -- I'd like to continue and also this is useless without some var names
+  check ctx RHole _ | ty = do
+    error [DS "hole has type \{show ty}"]
   check ctx tm _ | ty = do
     -- We need to insert if it's not a Lam
     -- TODO figure out why the exception is here (cribbed from kovacs)
@@ -157,6 +162,7 @@ check ctx tm ty with (force ty)
     when( ctx.lvl /= length ctx.env) $ error [DS "level mismatch \{show ctx.lvl} \{show ctx.env}"]
     unify ctx ctx.lvl ty' ty
     pure tm'
+
 
 infer ctx (RVar nm) = go 0 ctx.types
   where
@@ -218,7 +224,7 @@ infer ctx (RLam nm icit tm) = do
   pure $ (Lam nm tm', VPi nm icit a $ MkClosure ctx.env !(quote (S ctx.lvl) b))
   -- error {ctx} [DS "can't infer lambda"]
 
-infer ctx RHole = do
+infer ctx RImplicit = do
   ty <- freshMeta ctx
   vty <- eval ctx.env CBN ty
   tm <- freshMeta ctx
@@ -231,6 +237,6 @@ infer ctx tm = error [DS "Implement infer \{show tm}"]
 -- infer ctx (RLit (LInt i)) = ?rhs_11
 -- infer ctx (RLit (LBool x)) = ?rhs_12
 -- infer ctx (RCase tm xs) = ?rhs_9
--- infer ctx RHole = ?todo_meta2
+-- infer ctx RImplicit = ?todo_meta2
 -- The idea here is to insert a hole for a parse error
 -- infer ctx (RParseError str) = ?todo_insert_meta

@@ -1,4 +1,6 @@
 
+- [ ] Add PRINTME / ?
+
 Parser is in place.
 Ditched well-scoped for now.
 
@@ -36,10 +38,13 @@ When I self host, I'll have to drop or implement typeclasses. I do understand au
 
 Ok, for code gen, I think I'll need something like primitive values and definitely primitive functions. For v0, I could leave the holes as undefined and if there is a function with that name, it's magically FFI.
 
-
 Questions:
 - [ ] Code gen or data next?
 - [ ] Should I write this up properly?
+- [ ] Erased values?
+  - pi-forall handles this, so it's probably not too crazy. She won't go near implicits and I think I understand why.
+  - I don't think I Want to go full QTT at the moment
+  - Is erased different from 0/many?
 
 Parser:
 - [x] parser for block comments

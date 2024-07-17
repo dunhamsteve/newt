@@ -4,7 +4,7 @@ import Lib.Types
 -- The SourcePos stuff is awkward later on. We might want bounds on productions
 -- But we might want to consider something more generic and closer to lean?
 
--- app: foo {a} a b 
+-- app: foo {a} a b
 -- lam: λ {A} {b : A} (c : Blah) d e f => something
 -- lam: \ {A} {b : A} (c : Blah) d e f => something
 -- pi: (A : Set) -> {b : A} -> (c : Foo b) -> c -> bar d
@@ -25,7 +25,7 @@ import Data.Maybe
 -- so holes and all that
 
 -- After the parser runs, see below, take a break and finish pi-forall
--- exercises.  There is some fill in the parser stuff that may show 
+-- exercises.  There is some fill in the parser stuff that may show
 -- the future.
 
 ident = token Ident
@@ -53,7 +53,7 @@ lit = do
   t <- token Number
   pure $ RLit (LInt (cast t))
 
--- typeExpr is term with arrows. 
+-- typeExpr is term with arrows.
 export typeExpr : Parser Raw
 export term : (Parser Raw)
 
@@ -63,9 +63,10 @@ withPos p = RSrcPos <$> getPos <*> p
 -- the inside of Raw
 atom : Parser Raw
 atom = withPos (RU <$ keyword "U"
-              <|> RVar <$> ident 
+              <|> RVar <$> ident
               <|> lit
-              <|> RHole <$ keyword "_")
+              <|> RImplicit <$ keyword "_"
+              <|> RHole <$ keyword "?")
     <|> parens typeExpr
 
 -- Argument to a Spine
@@ -91,12 +92,12 @@ parseApp = do
   hd <- atom
   rest <- many pArg
   pure $ foldl (\a, (c,b) => RApp a b c) hd rest
-  
+
 parseOp : Parser Raw
 parseOp = parseApp >>= go 0
   where
     go : Int -> Raw -> Parser Raw
-    go prec left = 
+    go prec left =
       do
         op <- token Oper
         let Just (p,fix) = lookup op operators
@@ -115,8 +116,8 @@ letExpr = do
   alts <- startBlock $ someSame $ letAssign
   keyword' "in"
   scope <- typeExpr
-  
-  pure $ foldl (\ acc, (n,v) => RLet n RHole v acc) scope alts
+
+  pure $ foldl (\ acc, (n,v) => RLet n RImplicit v acc) scope alts
   where
     letAssign : Parser (Name,Raw)
     letAssign = do
@@ -186,18 +187,20 @@ ebind = do
 ibind : Parser (List (String, Icit, Raw))
 ibind = do
   sym "{"
-  names <- some ident
-  ty <- optional (sym ":" >> typeExpr)
-  pos <- getPos
-  sym "}"
-  -- getPos is a hack here, I would like to position at the name... 
-  pure $ map (\name => (name, Implicit, fromMaybe (RSrcPos pos RHole) ty)) names
+  mustWork $ do
+    names <- some ident
+    ty <- optional (sym ":" >> typeExpr)
+    pos <- getPos
+    sym "}"
+    -- getPos is a hack here, I would like to position at the name...
+    pure $ map (\name => (name, Implicit, fromMaybe (RSrcPos pos RImplicit) ty)) names
 
 -- Collect a bunch of binders (A : U) {y : A} -> ...
 binders : Parser Raw
-binders = do  
+binders = do
   binds <- many (ibind <|> ebind)
   sym "->"
+  commit
   scope <- typeExpr
   pure $ foldr mkBind scope (join binds)
   where
@@ -274,4 +277,3 @@ data ReplCmd =
 export parseRepl : Parser ReplCmd
 parseRepl = Def <$> parseDecl <|> Norm <$ keyword "#nf" <*> typeExpr
   <|> Check <$ keyword "#check" <*> typeExpr
-  

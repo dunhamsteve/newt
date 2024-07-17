@@ -7,6 +7,7 @@ import Control.Monad.State
 import Data.List
 import Data.String
 import Data.Vect
+import Data.IORef
 import Lib.Check
 import Lib.Parser
 import Lib.Parser.Impl
@@ -30,7 +31,6 @@ It has a repl, so we might want to re-integrate that code. And it uses
 App, but we have a way to make that work on javascript.
 
 I still want to stay in MonadError outside this file though.
-
 
 -}
 
@@ -73,6 +73,14 @@ processDecl (Def nm raw) = do
   putStrLn "vty is \{show vty}"
   tm <- check (mkCtx ctx.metas) raw vty
   putStrLn "Ok \{show tm}"
+
+  mc <- readIORef ctx.metas
+  for_ mc.metas $ \case
+    (Solved k x) => pure ()
+    (Unsolved (l,c) k xs) => do
+      -- putStrLn "ERROR at (\{show l}, \{show c}): Unsolved meta \{show k}"
+      throwError $ E (l,c) "Unsolved meta \{show k}"
+
   put (addDef ctx nm tm ty)
 
 processDecl (DCheck tm ty) = do

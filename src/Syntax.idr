@@ -39,7 +39,9 @@ data Raw : Type where
   RAnn  : (tm : Raw) -> (ty : Raw) -> Raw
   RLit : Literal -> Raw
   RCase : (scrut : Raw) -> (alts : List CaseAlt) -> Raw
+  RImplicit : Raw
   RHole : Raw
+  -- not used, but intended to allow error recovery
   RParseError : String -> Raw
 
 %name Raw tm
@@ -50,7 +52,7 @@ public export
 data Decl : Type where
 
 Telescope: Type
-Telescope = List Decl -- pi-forall, always typeSig? 
+Telescope = List Decl -- pi-forall, always typeSig?
 
 data ConstrDef = MkCDef Name Telescope
 
@@ -116,7 +118,8 @@ Show CaseAlt where
 
 covering
 Show Raw where
-  show RHole = "_"
+  show RImplicit = "_"
+  show RHole = "?"
   show (RVar name) = foo ["RVar", show name]
   show (RAnn t ty) = foo [ "RAnn", show t, show ty]
   show (RLit x) = foo [ "RLit", show x]
@@ -149,12 +152,12 @@ Pretty Raw where
     asDoc p (RApp x y Implicit) = par p 2 $ asDoc 2 x <+> text "{" ++ asDoc 0 y ++ text "}"
     asDoc p RU = text "U"
     asDoc p (RPi Nothing Explicit ty scope) = par p 1 $ asDoc p ty <+> text "->" <+/> asDoc p scope
-    asDoc p (RPi (Just x) Explicit ty scope) = 
+    asDoc p (RPi (Just x) Explicit ty scope) =
       par p 1 $ text "(" <+> text x <+> text ":" <+> asDoc p ty <+> text ")" <+> text "->" <+/> asDoc p scope
     asDoc p (RPi nm Implicit ty scope) =
       par p 1 $ text "{" <+> text (fromMaybe "_" nm) <+> text ":" <+> asDoc p ty <+> text "}" <+> text "->" <+/> asDoc 1 scope
-    asDoc p (RLet x v ty scope) = 
-      par p 0 $ text "let" <+> text x <+> text ":" <+> asDoc p ty 
+    asDoc p (RLet x v ty scope) =
+      par p 0 $ text "let" <+> text x <+> text ":" <+> asDoc p ty
           <+> text "=" <+> asDoc p v
           <+/> text "in" <+> asDoc p scope
     asDoc p (RSrcPos x y) = asDoc p y
@@ -164,10 +167,11 @@ Pretty Raw where
     asDoc p (RLit (LInt i)) = text $ show i
     asDoc p (RLit (LBool x)) = text $ show x
     asDoc p (RCase x xs) = text "TODO - RCase"
-    asDoc p RHole = text "_"
+    asDoc p RImplicit = text "_"
+    asDoc p RHole = text "?"
     asDoc p (RParseError str) = text "ParseError \{str}"
-    
-export 
+
+export
 Pretty Module where
   pretty (MkModule name decls) =
     text "module" <+> text name </> stack (map doDecl decls)
@@ -176,6 +180,6 @@ Pretty Module where
         doDecl (TypeSig nm ty) = text nm <+> text ":" <+> nest 2 (pretty ty)
         doDecl (Def nm tm) = text nm <+> text "=" <+> nest 2 (pretty tm)
         doDecl (DImport nm) = text "import" <+> text nm ++ line
-        -- the behavior of nest is kinda weird, I have to do the nest before/around the </>. 
+        -- the behavior of nest is kinda weird, I have to do the nest before/around the </>.
         doDecl (Data nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map doDecl xs))
         doDecl (DCheck x y) = text "#check" <+> pretty x <+> ":" <+> pretty y
