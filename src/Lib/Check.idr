@@ -137,6 +137,7 @@ check ctx tm ty with (force ty)
               else if icit' == Implicit then do
                 let var = VVar (length ctx.env) [<]
                 ty' <- b $$ var
+                -- use nm' here if we want them automatically in scope
                 sc <- check (extend ctx nm' a) t ty'
                 pure $ Lam nm' sc
               else
@@ -175,8 +176,6 @@ infer ctx (RVar nm) = go 0 ctx.types
       else go (i + 1) xs
   -- need environment of name -> type..
 infer ctx (RApp t u icit) = do
-  -- icit will be used for insertion, lets get this working first...
-
   (icit, t, tty) <- case the Icit icit of
       Explicit => do
         (t, tty) <- infer ctx t

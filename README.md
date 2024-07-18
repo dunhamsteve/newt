@@ -53,6 +53,7 @@ Parser:
 - [x] simple decl
 - [ ] check (either check at _ or infer and let it throw)
 - [ ] nf (ditto, but print value. WHNF for now    )
+- [ ] operators / mixfix
 
 Misc:
 - [x] vscode support for .newt
