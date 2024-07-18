@@ -24,6 +24,7 @@ forceMeta (VMeta ix sp) = case !(lookupMeta ix) of
   (Solved k t) => vappSpine t sp
 forceMeta x = pure x
 
+
 parameters (ctx: Context)
   -- return renaming, the position is the new VVar
   invert : Nat -> SnocList Val -> M (List Nat)
@@ -63,7 +64,8 @@ parameters (ctx: Context)
 
   lams : Nat -> Tm -> Tm
   lams 0 tm = tm
-  lams (S k) tm = Lam "arg:\{show k}" (lams k tm)
+  -- REVIEW can I get better names in here?
+  lams (S k) tm = Lam "arg_\{show k}" (lams k tm)
 
 
   solve : Nat -> Nat -> SnocList Val -> Val  -> M  ()
@@ -142,7 +144,7 @@ check ctx tm ty with (force ty)
                 pure $ Lam nm' sc
               else
                 error [(DS "Icity issue checking \{show t} at \{show ty}")]
-          other => error [(DS "Expected pi type, got \{show !(quote 0 ty)}")]
+          other => error [(DS "Expected pi type, got \{!(prval ty)}")]
   check ctx tm _ | (VPi nm' Implicit a b) = do
     putStrLn "XXX edge \{show tm} against VPi"
     let var = VVar (length ctx.env) [<]
@@ -159,7 +161,7 @@ check ctx tm ty with (force ty)
     (tm', ty') <- case !(infer ctx tm) of
       (tm'@(Lam{}),ty') => pure (tm', ty')
       (tm', ty') => insert ctx tm' ty'
-    putStrLn "infer \{show tm} to \{show tm'} : \{show ty'} expect \{show ty}"
+    putStrLn "infer \{show tm} to \{pprint [] tm'} : \{show ty'} expect \{show ty}"
     when( ctx.lvl /= length ctx.env) $ error [DS "level mismatch \{show ctx.lvl} \{show ctx.env}"]
     unify ctx ctx.lvl ty' ty
     pure tm'
@@ -219,7 +221,7 @@ infer ctx (RLam nm icit tm) = do
   a <- freshMeta ctx >>= eval ctx.env CBN
   let ctx' = extend ctx nm a
   (tm', b) <- infer ctx' tm
-  putStrLn "make lam for \{show nm} scope \{show tm'} : \{show b}"
+  putStrLn "make lam for \{show nm} scope \{pprint (names ctx) tm'} : \{show b}"
   pure $ (Lam nm tm', VPi nm icit a $ MkClosure ctx.env !(quote (S ctx.lvl) b))
   -- error {ctx} [DS "can't infer lambda"]
 

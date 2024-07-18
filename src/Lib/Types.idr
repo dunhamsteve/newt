@@ -52,7 +52,7 @@ data Tm : Type where
 
 %name Tm t, u, v
 
-public export
+-- public export
 Show Tm where
   show (Bnd k) = "(Bnd \{show k})"
   show (Ref str _) = "(Ref \{show str})"
@@ -84,6 +84,23 @@ Eq (Tm) where
   (Pi n icit t u) == (Pi n' icit' t' u') = icit == icit' && t == t' && u == u'
   _ == _ = False
 
+
+export
+pprint : List String -> Tm -> String
+pprint names tm = render 80 $ go names tm
+  where
+    go : List String -> Tm -> Doc
+    go names (Bnd k) = case getAt k names of
+      Nothing => text "BND \{show k}"
+      Just nm => text "\{nm}:\{show k}"
+    go names (Ref str mt) = text str
+    go names (Meta k) = text "?m:\{show k}"
+    go names (Lam nm t) = text "(\\ \{nm} =>" <+> go (nm :: names) t <+> ")"
+    go names (App t u) = text "(" <+> go names t <+> go names u <+> ")"
+    go names U = "U"
+    go names (Pi nm icit t u) =
+      text "(" <+> text nm <+> ":" <+> go names t <+> ")" <+> "=>" <+> go (nm :: names) u <+> ")"
+
 public export
 Pretty Tm where
   pretty (Bnd k) = ?rhs_0
@@ -92,7 +109,7 @@ Pretty Tm where
   pretty (Lam str t) = text "(\\ \{str} => " <+> pretty t <+> ")"
   pretty (App t u) = text "(" <+> pretty t <+> pretty u <+> ")"
   pretty U = "U"
-  pretty (Pi str icit t u) = text "(" <+> text str <+> ":" <+> pretty t <+> "=>" <+> pretty u <+> ")"
+  pretty (Pi str icit t u) = text "(" <+> text str <+> ":" <+> pretty t <+> ")" <+> "=>" <+> pretty u <+> ")"
 
 -- public export
 -- data Closure : Nat -> Type
@@ -249,6 +266,10 @@ record Context where
   -- top : TopContext
   metas : IORef MetaContext
 
+
+export
+names : Context -> List String
+names ctx = toList $ map fst ctx.types
 
 public export
 M : Type -> Type

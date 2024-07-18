@@ -67,23 +67,6 @@ lookupMeta ix = do
     go (meta@(Unsolved _ k ys) :: xs) = if k == ix then pure meta else go xs
     go (meta@(Solved k x) :: xs) = if k == ix then pure meta else go xs
 
-export
-solveMeta : TopContext -> Nat -> Val -> M ()
-solveMeta ctx ix tm = do
-  mc <- readIORef ctx.metas
-  metas <- go mc.metas [<]
-  writeIORef ctx.metas $ {metas := metas} mc
-  where
-    go : List MetaEntry -> SnocList MetaEntry -> M (List MetaEntry)
-    go [] _ = error' "Meta \{show ix} not found"
-    go (meta@(Unsolved pos k _) :: xs) lhs = if k == ix
-      then do
-        putStrLn "INFO at \{show pos}: solve \{show k} as \{show tm}"
-        pure $ lhs <>> (Solved k tm :: xs)
-      else go xs (lhs :< meta)
-    go (meta@(Solved k _) :: xs) lhs = if k == ix
-      then error' "Meta \{show ix} already solved!"
-      else go xs (lhs :< meta)
 
 export partial
 Show Context where
@@ -187,4 +170,24 @@ export
 nf : Env -> Tm -> M Tm
 nf env t = quote (length env) !(eval env CBN t)
 
+export
+prval : Val -> M String
+prval v = pure $ pprint [] !(quote 0 v)
 
+export
+solveMeta : TopContext -> Nat -> Val -> M ()
+solveMeta ctx ix tm = do
+  mc <- readIORef ctx.metas
+  metas <- go mc.metas [<]
+  writeIORef ctx.metas $ {metas := metas} mc
+  where
+    go : List MetaEntry -> SnocList MetaEntry -> M (List MetaEntry)
+    go [] _ = error' "Meta \{show ix} not found"
+    go (meta@(Unsolved pos k _) :: xs) lhs = if k == ix
+      then do
+        putStrLn "INFO at \{show pos}: solve \{show k} as \{!(prval tm)}"
+        pure $ lhs <>> (Solved k tm :: xs)
+      else go xs (lhs :< meta)
+    go (meta@(Solved k _) :: xs) lhs = if k == ix
+      then error' "Meta \{show ix} already solved!"
+      else go xs (lhs :< meta)

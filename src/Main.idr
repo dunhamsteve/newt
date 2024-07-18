@@ -52,7 +52,7 @@ processDecl (TypeSig nm tm) = do
   putStrLn "TypeSig \{nm} \{show tm}"
   ty <- check (mkCtx top.metas) tm VU
   ty' <- nf [] ty
-  putStrLn "got \{show ty'}"
+  putStrLn "got \{pprint [] ty'}"
   modify $ claim nm ty'
 
 -- FIXME - this should be in another file
@@ -68,11 +68,11 @@ processDecl (Def nm raw) = do
     | Nothing => throwError $ E pos "skip def \{nm} without Decl"
   let (MkEntry name ty Axiom) := entry
     | _ => throwError $ E pos "\{nm} already defined"
-  putStrLn "check \{nm} = \{show raw} at \{show $ ty}"
+  putStrLn "check \{nm} = \{show raw} at \{pprint [] ty}"
   vty <- eval empty CBN ty
   putStrLn "vty is \{show vty}"
   tm <- check (mkCtx ctx.metas) raw vty
-  putStrLn "Ok \{show tm}"
+  putStrLn "Ok \{pprint [] tm}"
 
   mc <- readIORef ctx.metas
   for_ mc.metas $ \case
@@ -88,12 +88,12 @@ processDecl (DCheck tm ty) = do
   top <- get
   putStrLn "check \{show tm} at \{show ty}"
   ty' <- check (mkCtx top.metas) tm VU
-  putStrLn "got type \{show ty'}"
+  putStrLn "got type \{pprint [] ty'}"
   vty <- eval [] CBN ty'
   res <- check (mkCtx top.metas) ty vty
-  putStrLn "got \{show res}"
+  putStrLn "got \{pprint [] res}"
   norm <- nf [] res
-  putStrLn "norm \{show norm}"
+  putStrLn "norm \{pprint [] norm}"
   -- top <- get
   -- ctx <- mkCtx top.metas
   -- I need a type to check against
