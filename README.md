@@ -1,14 +1,20 @@
 
-- [ ] Add PRINTME / ?
+We're stopping at zoo4.
 
-Parser is in place.
-Ditched well-scoped for now.
 
-Fixed more issues, started processing stuff, we need real example code.
+- [ ] look into Lennart.newt issues
+- [ ] Type at point for the editor
+- [ ] add operators to parser state
+  - (Are we going to run this on LHS too?)
 
-Need to sort out eval. Currently List doesn't get substituted. We should make sure we're CBV. I guess I could always subst (or glue?) since we're head normal form. We need actual values (∏) for checking.
-
-ok, our kovacs eval puts the arg in the environment and continues. So CBN, but maybe duplicate work (for our version).
+- [ ] Data
+  - [ ] Read data as real constructors
+  - [ ] Typecheck / eval the same
+  - [ ] Add elimination / case
+    - [ ] Maybe some test cases from pi-forall
+- [ ] Code Gen
+- [ ] Less expansion
+  - Can we not expand top level - expand in unification and matching pi types?
 
 So smalltt has TopVar with a Level. typechecking binders end up as top too.
 
@@ -54,6 +60,16 @@ Parser:
 - [ ] check (either check at _ or infer and let it throw)
 - [ ] nf (ditto, but print value. WHNF for now    )
 - [ ] operators / mixfix
+  - Maybe put operators in parser state and update, ideally we'd have mixfix though
+  - how does agda handle clashes between names and mixfix?
+  - it seems to allow overlap: if, if_then, if_then_else_
+
+Testing:
+
+- [ ] black box testing
+  - [ ] bug.newt should fail with a certain parse error, but there will be noise, so look for specific error?
+  - [ ] zoo?.newt should complete successfully
+  - [ ]
 
 Misc:
 - [x] vscode support for .newt
@@ -86,6 +102,7 @@ Forward:
 - [ ] LSP?
 - [ ] white box testing
 - [ ] switches on logging
+- [ ] Add PRINTME / ? - Does it check and fake success? I don't think we can infer.
 
 ----
 

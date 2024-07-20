@@ -1,5 +1,13 @@
 module Lib.Parser.Impl
 
+-- For some reason I'm doing Idris' commit / mustWork dance here, even though it
+-- seems to be painful
+
+-- Probably would like to do "did consume anything" on the input, but we might need
+-- something other than a token list
+
+-- TODO see what Kovacs' flatparse does for error handling / <|>
+
 import Lib.Token
 import Data.String
 import Data.Nat
@@ -7,6 +15,9 @@ import Data.Nat
 public export
 TokenList : Type
 TokenList = List BTok
+
+public export
+data Fixity = InfixL | InfixR | Infix
 
 -- I was going to use a record, but we're peeling this off of bounds at the moment.
 public export
@@ -131,13 +142,9 @@ export
 commit : Parser ()
 commit = P $ \toks,com,col => OK () toks True
 
-export
-defer : (() -> (Parser a)) -> Parser a
-defer f = P $ \toks,com,col => runP (f ()) toks com col
-
 mutual
   export some : Parser a -> Parser (List a)
-  some p = defer $ \_ => [| p :: many p|] --(::) <$> p <*> many p)
+  some p = (::) <$> p <*> many p
 
   export many : Parser a -> Parser (List a)
   many p = some p <|> pure []

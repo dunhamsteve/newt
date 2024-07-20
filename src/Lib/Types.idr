@@ -156,6 +156,10 @@ Show Val where
   show (VPi str Explicit x y) = "(%pi (\{str} : \{show  x}). \{show  y})"
   show VU = "U"
 
+
+public export
+data Binder = Bind String BD Val
+
 public export
 Env : Type
 Env = List Val
@@ -249,6 +253,8 @@ record TopContext where
   defs : List TopEntry
   metas : IORef MetaContext
   -- metas : TODO
+
+
 
 -- we'll use this for typechecking, but need to keep a TopContext around too.
 public export

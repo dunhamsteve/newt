@@ -2,7 +2,7 @@ module Equality
 
 -- Leibniz equality
 Eq : {A : U} -> A -> A -> U
-Eq = \ {A} x y => (P : A -> U) -> P x -> P y
+Eq = \ x y => (P : A -> U) -> P x -> P y
 
 refl : {A : U} {x : A} -> Eq x x
 refl = \ P Px => Px
@@ -10,8 +10,6 @@ refl = \ P Px => Px
 trans : {A : U} {x y z : A} -> Eq x y -> Eq y z -> Eq x z
 trans = \ Exy Eyz => Eyz (\ w => Eq x w) Exy
 
--- This version has a universe issue, see Abel et al for
--- a better one
 sym : {A : U} {x y : A} -> Eq x y -> Eq y x
 sym = \ Exy => Exy (\ z => Eq z x) refl
 

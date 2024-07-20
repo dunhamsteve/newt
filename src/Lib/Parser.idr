@@ -71,12 +71,8 @@ atom = withPos (RU <$ keyword "U"
 
 -- Argument to a Spine
 pArg : Parser (Icit,Raw)
-pArg = (Explicit,) <$> atom <|> (Implicit,) <$> braces term
+pArg = (Explicit,) <$> atom <|> (Implicit,) <$> braces typeExpr
 
---
--- atom is lit or ident
-
-data Fixity = InfixL | InfixR | Infix
 
 -- starter pack, but we'll move some to prelude
 operators : List (String, Int, Fixity)
@@ -87,6 +83,7 @@ operators = [
   ("*",5,InfixL),
   ("/",5,InfixL)
 ]
+
 parseApp : Parser Raw
 parseApp = do
   hd <- atom
@@ -195,11 +192,14 @@ ibind = do
     -- getPos is a hack here, I would like to position at the name...
     pure $ map (\name => (name, Implicit, fromMaybe (RSrcPos pos RImplicit) ty)) names
 
+arrow : Parser Unit
+arrow = sym "->" <|> sym "→"
+
 -- Collect a bunch of binders (A : U) {y : A} -> ...
 binders : Parser Raw
 binders = do
   binds <- many (ibind <|> ebind)
-  sym "->"
+  arrow
   commit
   scope <- typeExpr
   pure $ foldr mkBind scope (join binds)
@@ -210,7 +210,7 @@ binders = do
 typeExpr = binders
   <|> do
         exp <- term
-        scope <- optional (sym "->" *> mustWork typeExpr)
+        scope <- optional (arrow *> mustWork typeExpr)
         case scope of
           Nothing      => pure exp
           -- consider Maybe String to represent missing

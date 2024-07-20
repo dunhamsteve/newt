@@ -110,7 +110,7 @@ parameters (ctx: Context)
       (VMeta i sp, t'           ) => solve l i sp t'
       (VU, VU) => pure ()
       -- REVIEW consider quoting back
-      _ => error [DS "unify failed", DS (show t'), DS "=?=", DS (show u') ]
+      _ => error [DS "unify failed \{show t'} =?= \{show u'} \n  env is \{show ctx.env}" ]
 
 insert : (ctx : Context) -> Tm -> Val -> M (Tm, Val)
 insert ctx tm ty = do
@@ -192,11 +192,12 @@ infer ctx (RApp t u icit) = do
         else error [DS "IcitMismatch \{show icit} \{show icit'}"]
 
     -- If it's not a VPi, try to unify it with a VPi
+    -- TODO test case to cover this.
     tty => do
       putStrLn "unify PI for \{show tty}"
       a <- eval ctx.env CBN !(freshMeta ctx)
-      b <- MkClosure ctx.env <$> freshMeta (extend ctx "x" ?hole)
-      unify ctx 0 tty (VPi "x" icit a b)
+      b <- MkClosure ctx.env <$> freshMeta (extend ctx ":ins" a)
+      unify ctx 0 tty (VPi ":ins" icit a b)
       pure (a,b)
 
   u <- check ctx u a

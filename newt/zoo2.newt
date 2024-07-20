@@ -9,6 +9,12 @@ const = \A B x y => x
 Nat : U
 Nat = (N : U) -> (N -> N) -> N -> N
 
+zero : Nat
+zero = \ _ s z => z
+
+succ : Nat -> Nat
+succ = \ n ty s z => s (n ty s z)
+
 -- need Nat to reduce (and syntax highlighting)
 five : Nat
 five = \ N s z => s (s (s (s (s z))))

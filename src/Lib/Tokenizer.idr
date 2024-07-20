@@ -5,7 +5,7 @@ import Text.Lexer.Tokenizer
 import Lib.Token
 
 keywords : List String
-keywords = ["let", "in", "where", "case", "of", "data"]
+keywords = ["let", "in", "where", "case", "of", "data", "U"]
 
 specialOps : List String
 specialOps = ["->", ":", "=>"]
