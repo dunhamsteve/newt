@@ -36,6 +36,9 @@ Show Icit where
 public export
 data BD = Bound | Defined
 
+Show BD where
+  show Bound = "bnd"
+  show Defined = "def"
 
 public export
 data Tm : Type where
@@ -157,8 +160,13 @@ Show Val where
   show VU = "U"
 
 
-public export
-data Binder = Bind String BD Val
+-- Not used yet
+data Binder : Type where
+  Bind : (nm : String) -> (bd : BD) -> (val : Val) -> (ty : Val) -> Binder
+
+export covering
+Show Binder where
+  show (Bind nm bd val ty) = "(\{show bd} \{show nm} \{show val} : \{show ty})"
 
 public export
 Env : Type
