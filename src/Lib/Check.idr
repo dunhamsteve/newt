@@ -1,6 +1,8 @@
 module Lib.Check
 
+import Control.Monad.Error.Either
 import Control.Monad.Error.Interface
+import Control.Monad.State
 import Control.Monad.Identity
 import Lib.Parser.Impl
 import Lib.Prettier
@@ -10,11 +12,11 @@ import Data.String
 import Lib.Types
 import Lib.TT
 import Lib.TopContext
-import Syntax
+import Lib.Syntax
 
 -- renaming
 -- dom gamma ren
-data PRen = PR Nat Nat (List Nat)
+data Pden = PR Nat Nat (List Nat)
 
 -- IORef for metas needs IO
 
@@ -23,6 +25,17 @@ forceMeta (VMeta ix sp) = case !(lookupMeta ix) of
   (Unsolved pos k xs) => pure (VMeta ix sp)
   (Solved k t) => vappSpine t sp
 forceMeta x = pure x
+
+-- Lennart needed more forcing
+forceType : Val -> M Val
+forceType (VRef nm sp) =
+    case lookup nm !(get) of
+      (Just (MkEntry name type (Fn t))) => eval [] CBN t
+      _ => pure (VRef nm sp)
+forceType (VMeta ix sp) = case !(lookupMeta ix) of
+  (Unsolved x k xs) => pure (VMeta ix sp)
+  (Solved k t) => vappSpine t sp >>= forceType
+forceType x = pure x
 
 
 parameters (ctx: Context)
@@ -87,9 +100,9 @@ parameters (ctx: Context)
   unifySpine l True _ _ = error [DS "meta spine length mismatch"]
 
   unify l t u = do
-    putStrLn "Unify \{show ctx.lvl}"
-    putStrLn "  \{show l} \{show t}"
-    putStrLn "  =?= \{show u}"
+    debug "Unify \{show ctx.lvl}"
+    debug "  \{show l} \{show t}"
+    debug "  =?= \{show u}"
     t' <- forceMeta t
     u' <- forceMeta u
     case (t',u') of
@@ -102,6 +115,7 @@ parameters (ctx: Context)
         else error [DS "vvar mismatch \{show k} \{show k'}"]
       (VRef k sp,   VRef k' sp'  ) =>
         if k == k' then unifySpine l (k == k') sp sp'
+        -- REVIEW - consider forcing?
         else error [DS "vref mismatch \{show k} \{show k'}"]
       (VMeta k sp,  VMeta k' sp' ) =>
         if k == k' then unifySpine l (k == k') sp sp'
@@ -109,8 +123,23 @@ parameters (ctx: Context)
       (t,           VMeta i' sp') => solve l i' sp' t
       (VMeta i sp, t'           ) => solve l i sp t'
       (VU, VU) => pure ()
-      -- REVIEW consider quoting back
-      _ => error [DS "unify failed \{show t'} =?= \{show u'} \n  env is \{show ctx.env}" ]
+      -- Lennart.newt cursed type references itself
+      -- We _could_ look up the ref, eval against [] and vappSpine...
+      (t,         VRef k' sp') => do
+        debug "expand \{show t} =?= %ref \{k'}"
+        case lookup k' !(get) of
+          Just (MkEntry name ty (Fn tm)) => unify l t !(vappSpine !(eval [] CBN tm) sp')
+          _ => error [DS "unify failed \{show t'} =?= \{show u'} [no Fn]\n  env is \{show ctx.env} \{show $ map fst ctx.types}" ]
+      -- REVIEW I'd like to quote this back, but we have l that aren't in the environment.
+      _ => error [DS "unify failed \{show t'} =?= \{show u'} \n  env is \{show ctx.env} \{show $ map fst ctx.types}" ]
+
+unifyCatch : Context -> Val -> Val -> M ()
+unifyCatch ctx ty' ty = catchError (unify ctx ctx.lvl ty' ty) $ \(E x str) => do
+    let names = toList $ map fst ctx.types
+    a <- quote ctx.lvl ty'
+    b <- quote ctx.lvl ty
+    let msg = "\n  failed to unify \{pprint names a}\n    with \{pprint names b}\n  " <+> str
+    throwError (E x msg)
 
 insert : (ctx : Context) -> Tm -> Val -> M (Tm, Val)
 insert ctx tm ty = do
@@ -121,51 +150,81 @@ insert ctx tm ty = do
       insert ctx (App tm m) !(b $$ mv)
     va => pure (tm, va)
 
+lookupName : Context -> Raw -> M (Maybe (Tm, Val))
+lookupName ctx (RVar nm) = go 0 ctx.types
+  where
+    go : Nat -> Vect n (String, Val)  -> M  (Maybe (Tm, Val))
+    go i [] = case lookup nm !(get) of
+      Just (MkEntry name ty (Fn t)) => pure $ Just (Ref nm (Just t), !(eval [] CBN ty))
+      Just (MkEntry name ty _) => pure $ Just (Ref nm Nothing, !(eval [] CBN ty))
+      Nothing => pure Nothing
+    go i ((x, ty) :: xs) = if x == nm then pure $ Just (Bnd i, ty)
+      else go (i + 1) xs
+lookupName ctx _ = pure Nothing
+
+
 export
 infer : Context -> Raw  -> M  (Tm, Val)
 
 export
 check : Context -> Raw -> Val  -> M  Tm
-check ctx tm ty with (force ty)
-  check ctx (RSrcPos x tm) _ | ty = check ({pos := x} ctx) tm ty
-  check ctx t@(RLam nm icit tm) _ | ty = case ty of
-          (VPi nm' icit' a b) => do
-            putStrLn "icits \{nm} \{show icit} \{nm'} \{show icit'}"
-            if icit == icit' then do
-                let var = VVar (length ctx.env) [<]
-                let ctx' = extend ctx nm a
-                tm' <- check ctx' tm !(b $$ var)
-                pure $ Lam nm tm'
-              else if icit' == Implicit then do
-                let var = VVar (length ctx.env) [<]
-                ty' <- b $$ var
-                -- use nm' here if we want them automatically in scope
-                sc <- check (extend ctx nm' a) t ty'
-                pure $ Lam nm' sc
-              else
-                error [(DS "Icity issue checking \{show t} at \{show ty}")]
-          other => error [(DS "Expected pi type, got \{!(prval ty)}")]
-  check ctx tm _ | (VPi nm' Implicit a b) = do
-    putStrLn "XXX edge \{show tm} against VPi"
+check ctx tm ty = case (tm, !(forceType ty)) of
+  (RSrcPos x tm, ty) => check ({pos := x} ctx) tm ty
+  -- Document a hole, pretend it's implemented
+  (RHole, ty) => do
+    ty' <- quote ctx.lvl ty
+    let names = (toList $ map fst ctx.types)
+    env <- for ctx.types $ \(n,ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)}"
+    let msg = unlines (toList $ reverse env) ++ "  -----------\n" ++ "  goal \{pprint names ty'}"
+    debug "INFO at \{show ctx.pos}: "
+    debug msg
+    -- let context = unlines foo
+    -- need to print 'warning' with position
+    -- fixme - just put a name on it like idris and stuff it into top.
+    -- error [DS "hole:\n\{msg}"]
+    pure $ Ref "?" Nothing
+  (t@(RLam nm icit tm), ty@(VPi nm' icit' a b)) => do
+          debug "icits \{nm} \{show icit} \{nm'} \{show icit'}"
+          if icit == icit' then do
+              let var = VVar (length ctx.env) [<]
+              let ctx' = extend ctx nm a
+              tm' <- check ctx' tm !(b $$ var)
+              pure $ Lam nm tm'
+            else if icit' == Implicit then do
+              let var = VVar (length ctx.env) [<]
+              ty' <- b $$ var
+              -- use nm' here if we want them automatically in scope
+              sc <- check (extend ctx nm' a) t ty'
+              pure $ Lam nm' sc
+            else
+              error [(DS "Icity issue checking \{show t} at \{show ty}")]
+  (t@(RLam nm icit tm), ty) =>
+            error [(DS "Expected pi type, got \{!(prvalCtx ty)}")]
+
+  (tm, ty@(VPi nm' Implicit a b)) => do
+    let names = toList $ map fst ctx.types
+    debug "XXX edge add implicit lambda to \{show tm}"
     let var = VVar (length ctx.env) [<]
     ty' <- b $$ var
+    debug "XXX ty' is \{!(prvalCtx {ctx=(extend ctx nm' a)} ty')}"
     sc <- check (extend ctx nm' a) tm ty'
     pure $ Lam nm' sc
-  -- TODO Work in progress
-  -- I'd like to continue and also this is useless without some var names
-  check ctx RHole _ | ty = do
-    error [DS "hole has type \{show ty}"]
-  check ctx tm _ | ty = do
-    -- We need to insert if it's not a Lam
-    -- TODO figure out why the exception is here (cribbed from kovacs)
-    (tm', ty') <- case !(infer ctx tm) of
-      (tm'@(Lam{}),ty') => pure (tm', ty')
-      (tm', ty') => insert ctx tm' ty'
-    putStrLn "infer \{show tm} to \{pprint [] tm'} : \{show ty'} expect \{show ty}"
-    when( ctx.lvl /= length ctx.env) $ error [DS "level mismatch \{show ctx.lvl} \{show ctx.env}"]
-    unify ctx ctx.lvl ty' ty
-    pure tm'
 
+  (tm,ty) => do
+    -- We need to insert if tm is not an Implicit Lam
+    -- assuming all of the implicit ty have been handled above
+    let names = toList $ map fst ctx.types
+    (tm', ty') <- case !(infer ctx tm) of
+      -- Kovacs doesn't insert on tm = Implicit Lam, we don't have Plicity there
+      -- so I'll check the inferred type for an implicit pi
+      (tm'@(Lam{}), ty'@(VPi _ Implicit _ _)) => do debug "Lambda"; pure (tm', ty')
+      (tm', ty') => do
+        debug "RUN INSERT ON \{pprint names tm'} at \{show ty'}"
+        insert ctx tm' ty'
+
+    debug "INFER \{show tm} to (\{pprint names tm'} : \{show ty'}) expect \{show ty}"
+    unifyCatch ctx ty' ty
+    pure tm'
 
 infer ctx (RVar nm) = go 0 ctx.types
   where
@@ -194,7 +253,7 @@ infer ctx (RApp t u icit) = do
     -- If it's not a VPi, try to unify it with a VPi
     -- TODO test case to cover this.
     tty => do
-      putStrLn "unify PI for \{show tty}"
+      debug "unify PI for \{show tty}"
       a <- eval ctx.env CBN !(freshMeta ctx)
       b <- MkClosure ctx.env <$> freshMeta (extend ctx ":ins" a)
       unify ctx 0 tty (VPi ":ins" icit a b)
@@ -222,7 +281,7 @@ infer ctx (RLam nm icit tm) = do
   a <- freshMeta ctx >>= eval ctx.env CBN
   let ctx' = extend ctx nm a
   (tm', b) <- infer ctx' tm
-  putStrLn "make lam for \{show nm} scope \{pprint (names ctx) tm'} : \{show b}"
+  debug "make lam for \{show nm} scope \{pprint (names ctx) tm'} : \{show b}"
   pure $ (Lam nm tm', VPi nm icit a $ MkClosure ctx.env !(quote (S ctx.lvl) b))
   -- error {ctx} [DS "can't infer lambda"]
 

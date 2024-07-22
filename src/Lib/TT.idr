@@ -175,6 +175,11 @@ prval : Val -> M String
 prval v = pure $ pprint [] !(quote 0 v)
 
 export
+prvalCtx : {auto ctx : Context} -> Val -> M String
+prvalCtx v = pure $ pprint (toList $ map fst ctx.types) !(quote ctx.lvl v)
+
+
+export
 solveMeta : TopContext -> Nat -> Val -> M ()
 solveMeta ctx ix tm = do
   mc <- readIORef ctx.metas
@@ -185,6 +190,7 @@ solveMeta ctx ix tm = do
     go [] _ = error' "Meta \{show ix} not found"
     go (meta@(Unsolved pos k _) :: xs) lhs = if k == ix
       then do
+        -- empty context should be ok, because this needs to be closed
         putStrLn "INFO at \{show pos}: solve \{show k} as \{!(prval tm)}"
         pure $ lhs <>> (Solved k tm :: xs)
       else go xs (lhs :< meta)

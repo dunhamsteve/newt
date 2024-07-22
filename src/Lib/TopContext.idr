@@ -18,11 +18,11 @@ lookup nm top = go top.defs
 -- Maybe pretty print?
 export
 Show TopContext where
-  show (MkTop defs metas) = "\nContext:\n [\{ joinBy "\n" $ map show defs}]"
+  show (MkTop defs metas _) = "\nContext:\n [\{ joinBy "\n" $ map show defs}]"
 
 public export
 empty : HasIO m => m TopContext
-empty = pure $ MkTop [] !(newIORef (MC [] 0))
+empty = pure $ MkTop [] !(newIORef (MC [] 0)) True
 
 public export
 claim : String -> Tm -> TopContext -> TopContext

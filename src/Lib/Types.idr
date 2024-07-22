@@ -4,20 +4,21 @@ module Lib.Types
 -- maybe watch https://www.youtube.com/watch?v=3gef0_NFz8Q
 -- or drop the indices for now.
 
--- For SourcePos
-import Lib.Parser.Impl
+-- For SourcePos, Error
+import public Lib.Parser.Impl
 import Lib.Prettier
 
 import public Control.Monad.Error.Either
 import public Control.Monad.Error.Interface
 import public Control.Monad.State
 
-import Data.IORef
 import Data.Fin
+import Data.IORef
 import Data.List
 import Data.SnocList
-import Data.Vect
 import Data.SortedMap
+import Data.String
+import Data.Vect
 
 public export
 Name : Type
@@ -87,6 +88,7 @@ Eq (Tm) where
   (Pi n icit t u) == (Pi n' icit' t' u') = icit == icit' && t == t' && u == u'
   _ == _ = False
 
+-- FIXME prec
 
 export
 pprint : List String -> Tm -> String
@@ -101,8 +103,10 @@ pprint names tm = render 80 $ go names tm
     go names (Lam nm t) = text "(\\ \{nm} =>" <+> go (nm :: names) t <+> ")"
     go names (App t u) = text "(" <+> go names t <+> go names u <+> ")"
     go names U = "U"
-    go names (Pi nm icit t u) =
-      text "(" <+> text nm <+> ":" <+> go names t <+> ")" <+> "=>" <+> go (nm :: names) u <+> ")"
+    go names (Pi nm Implicit t u) =
+      text "({" <+> text nm <+> ":" <+> go names t <+> "}" <+> "=>" <+> go (nm :: names) u <+> ")"
+    go names (Pi nm Explicit t u) =
+      text "((" <+> text nm <+> ":" <+> go names t <+> ")" <+> "=>" <+> go (nm :: names) u <+> ")"
 
 public export
 Pretty Tm where
@@ -159,12 +163,13 @@ Show Val where
   show (VPi str Explicit x y) = "(%pi (\{str} : \{show  x}). \{show  y})"
   show VU = "U"
 
-
--- Not used yet
+-- Not used - I was going to change context to have a List Binder
+-- instead of env, types, bds
+-- But when we get down into eval, we don't have types to put into the env
 data Binder : Type where
   Bind : (nm : String) -> (bd : BD) -> (val : Val) -> (ty : Val) -> Binder
 
-export covering
+covering
 Show Binder where
   show (Bind nm bd val ty) = "(\{show bd} \{show nm} \{show val} : \{show ty})"
 
@@ -260,6 +265,7 @@ record TopContext where
   -- We'll add a map later?
   defs : List TopEntry
   metas : IORef MetaContext
+  verbose : Bool
   -- metas : TODO
 
 
@@ -267,6 +273,7 @@ record TopContext where
 -- we'll use this for typechecking, but need to keep a TopContext around too.
 public export
 record Context where
+  [noHints]
   constructor MkCtx
   lvl : Nat
   -- shall we use lvl as an index?
@@ -294,3 +301,17 @@ M = (StateT TopContext (EitherT Impl.Error IO))
 export
 mkCtx : IORef MetaContext -> Context
 mkCtx metas = MkCtx 0 [] [] [] (0,0) metas
+
+||| Force argument and print if verbose is true
+export
+debug : Lazy String -> M ()
+debug x = do
+  top <- get
+  when top.verbose $ putStrLn x
+
+||| Version of debug that makes monadic computation lazy
+export
+debugM : M String -> M ()
+debugM x = do
+  top <- get
+  when top.verbose $ do putStrLn !(x)

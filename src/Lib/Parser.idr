@@ -12,7 +12,7 @@ import Lib.Types
 
 import Lib.Token
 import Lib.Parser.Impl
-import Syntax
+import Lib.Syntax
 import Data.List
 import Data.Maybe
 

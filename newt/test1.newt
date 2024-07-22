@@ -1,0 +1,8 @@
+module Scratch
+
+nat : U
+nat = {C : U} -> C -> (nat -> C) -> C
+
+-- TESTCASE This was broken when I wasn't expanding Ref ty in check
+succ : nat -> nat
+succ = \n => \ z s => s n

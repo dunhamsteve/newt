@@ -1,4 +1,4 @@
-module Syntax
+module Lib.Syntax
 
 import Data.String
 import Data.Maybe
