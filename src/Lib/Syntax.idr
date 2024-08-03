@@ -25,7 +25,7 @@ data Pattern
 
 -- could be a pair, but I suspect stuff will be added?
 public export
-data CaseAlt = MkAlt Pattern Raw
+data CaseAlt = MkAlt Raw Raw
 
 data Raw : Type where
   RVar : (nm : Name) -> Raw
@@ -113,6 +113,7 @@ Show Pattern where
   show PatWild = "PatWild"
   show (PatLit x) = foo ["PatLit" , show x]
 
+covering
 Show CaseAlt where
   show (MkAlt x y)= foo ["MkAlt", show x, assert_total $ show y]
 

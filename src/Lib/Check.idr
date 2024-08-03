@@ -168,7 +168,15 @@ infer : Context -> Raw  -> M  (Tm, Val)
 
 export
 check : Context -> Raw -> Val  -> M  Tm
+
+
+
+checkAlt : Context -> CaseAlt -> M ()
+
 check ctx tm ty = case (tm, !(forceType ty)) of
+  (RCase rsc alts, ty) => do
+    (sc, scty) <- infer ctx rsc
+    error [DS "implement check RCase sctype \{show scty}"]
   (RSrcPos x tm, ty) => check ({pos := x} ctx) tm ty
   -- Document a hole, pretend it's implemented
   (RHole, ty) => do
@@ -298,6 +306,7 @@ infer ctx tm = error [DS "Implement infer \{show tm}"]
 -- infer ctx (RLit (LInt i)) = ?rhs_11
 -- infer ctx (RLit (LBool x)) = ?rhs_12
 -- infer ctx (RCase tm xs) = ?rhs_9
--- infer ctx RImplicit = ?todo_meta2
+
 -- The idea here is to insert a hole for a parse error
+-- but the parser doesn't emit this yet.
 -- infer ctx (RParseError str) = ?todo_insert_meta

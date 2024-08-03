@@ -231,12 +231,12 @@ record MetaContext where
 
 
 public export
-data Def = Axiom | TCon (List String) | DCon Nat | Fn Tm
+data Def = Axiom | TCon (List String) | DCon Nat String | Fn Tm
 
 Show Def where
   show Axiom = "axiom"
   show (TCon strs) = "TCon \{show strs}"
-  show (DCon k) = "DCon \{show k}"
+  show (DCon k tyname) = "DCon \{show k} \{show tyname}"
   show (Fn t) = "Fn \{show t}"
 
 ||| entry in the top level context

@@ -149,7 +149,7 @@ pPattern
 
 caseAlt : Parser CaseAlt
 caseAlt = do
-  pat <- pPattern -- term and sort it out later?
+  pat <- parseOp -- pPattern -- term and sort it out later?
   keyword "=>"
   commit
   t <- term

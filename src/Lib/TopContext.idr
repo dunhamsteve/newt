@@ -28,6 +28,16 @@ public export
 claim : String -> Tm -> TopContext -> TopContext
 claim name ty = { defs $= (MkEntry name ty Axiom ::) }
 
+
+public export
+deftype : String -> Tm -> List String -> TopContext -> TopContext
+deftype name ty cons = { defs $= (MkEntry name ty (TCon cons) :: )}
+
+public export
+defcon : String -> Nat -> String -> Tm -> TopContext -> TopContext
+defcon cname arity tyname ty = { defs $= (MkEntry cname ty (DCon arity tyname) ::) }
+
+
 -- TODO update existing, throw, etc.
 
 public export

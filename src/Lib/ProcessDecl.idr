@@ -20,7 +20,6 @@ processDecl (TypeSig nm tm) = do
   putStrLn "got \{pprint [] ty'}"
   modify $ claim nm ty'
 
--- FIXME - this should be in another file
 processDecl (Def nm raw) = do
   putStrLn "-----"
   putStrLn "def \{show nm}"
@@ -43,6 +42,7 @@ processDecl (Def nm raw) = do
   for_ mc.metas $ \case
     (Solved k x) => pure ()
     (Unsolved (l,c) k xs) => do
+      -- should just print, but it's too subtle in the sea of messages
       -- putStrLn "ERROR at (\{show l}, \{show c}): Unsolved meta \{show k}"
       throwError $ E (l,c) "Unsolved meta \{show k}"
 
@@ -71,21 +71,24 @@ processDecl (Data nm ty cons) = do
   -- It seems like the FC for the errors are not here?
   ctx <- get
   tyty <- check (mkCtx ctx.metas) ty VU
-  -- TODO check tm is VU or Pi ending in VU
-  -- Maybe a pi -> binders function
-  -- TODO we're putting in axioms, we need constructors
-  -- for each constructor, check and add
+  -- FIXME we need this in scope, but need to update
   modify $ claim nm tyty
   ctx <- get
-  for_ cons $ \x => case x of
+  cnames <- for cons $ \x => case x of
       -- expecting tm to be a Pi type
       (TypeSig nm' tm) => do
           ctx <- get
           -- TODO check pi type ending in full tyty application
+          -- TODO count arity
           dty <- check (mkCtx ctx.metas) tm VU
-          modify $ claim nm' dty
-      _ => throwError $ E (0,0) "expected TypeSig"
-
+          modify $ defcon nm' 0 nm dty
+          pure nm'
+      _ => throwError $ E (0,0) "expected constructor declaration"
+  -- TODO check tm is VU or Pi ending in VU
+  -- Maybe a pi -> binders function
+  -- TODO we're putting in axioms, we need constructors
+  -- for each constructor, check and add
+  modify $ deftype nm tyty cnames
   pure ()
   where
     checkDeclType : Tm -> M ()
