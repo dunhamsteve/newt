@@ -25,7 +25,7 @@ data Pattern
 
 -- could be a pair, but I suspect stuff will be added?
 public export
-data CaseAlt = MkAlt Raw Raw
+data RCaseAlt = MkAlt Raw Raw
 
 data Raw : Type where
   RVar : (nm : Name) -> Raw
@@ -38,7 +38,7 @@ data Raw : Type where
   RSrcPos : SourcePos -> Raw -> Raw
   RAnn  : (tm : Raw) -> (ty : Raw) -> Raw
   RLit : Literal -> Raw
-  RCase : (scrut : Raw) -> (alts : List CaseAlt) -> Raw
+  RCase : (scrut : Raw) -> (alts : List RCaseAlt) -> Raw
   RImplicit : Raw
   RHole : Raw
   -- not used, but intended to allow error recovery
@@ -114,7 +114,7 @@ Show Pattern where
   show (PatLit x) = foo ["PatLit" , show x]
 
 covering
-Show CaseAlt where
+Show RCaseAlt where
   show (MkAlt x y)= foo ["MkAlt", show x, assert_total $ show y]
 
 covering

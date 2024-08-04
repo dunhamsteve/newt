@@ -76,7 +76,7 @@ error ((MkBounded val isIrrelevant (MkBounds line col _ _)) :: _) msg = E (line,
 
 export
 parse : Parser a -> TokenList -> Either Error a
-parse pa toks = case runP pa toks False emptyPos of
+parse pa toks = case runP pa toks False (-1,-1) of
   Fail fatal err toks com => Left err
   OK a [] _ => Right a
   OK a ts _ => Left (error ts "Extra toks")
@@ -167,8 +167,10 @@ startBlock : Parser a -> Parser a
 startBlock (P p) = P $ \toks,com,(l,c) => case toks of
   [] => p toks com (l,c)
   (t :: _) =>
+    -- If next token is at or before the current level, we've got an empty block
     let (tl,tc) = start t
-    in p toks com (tl,tc)
+    in p toks com (tl,ifThenElse (tc <= c) (c + 1) tc)
+    -- in p toks com (tl,tc)
 
 ||| Assert that parser starts at our current column by
 ||| checking column and then updating line to match the current

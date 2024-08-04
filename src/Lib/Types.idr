@@ -42,10 +42,21 @@ Show BD where
   show Defined = "def"
 
 public export
+data Tm : Type
+
+public export
+data CaseAlt : Type where
+  CaseDefault : Tm -> CaseAlt
+  -- I've also seen a list of stuff that gets replaced
+  CaseCons : (name : String) -> (args : List String) -> Tm ->  CaseAlt
+  -- CaseLit : Literal -> Tm ->  CaseAlt
+
+data Def : Type
+
 data Tm : Type where
   Bnd : Nat -> Tm
   -- Maybe Def here instead of Maybe Tm, we'll have DCon, TCon, etc.
-  Ref : String -> Maybe Tm -> Tm
+  Ref : String -> Def -> Tm
   Meta : Nat -> Tm
   -- kovacs optimization, I think we can App out meta instead
   -- InsMeta : Nat -> List BD -> Tm
@@ -53,8 +64,13 @@ data Tm : Type where
   App : Tm -> Tm -> Tm
   U   : Tm
   Pi  : Name -> Icit -> Tm -> Tm -> Tm
+  -- REVIEW - do we want to just push it up like idris?
+  Case : Tm -> List CaseAlt -> Tm
 
 %name Tm t, u, v
+
+Show CaseAlt where
+  show alt = "FIXME"
 
 -- public export
 Show Tm where
@@ -66,6 +82,7 @@ Show Tm where
   show U = "U"
   show (Pi str Implicit t u) = "(Pi (\{str} : \{show t}) => \{show u})"
   show (Pi str Explicit t u) = "(Pi {\{str} : \{show t}} => \{show u})"
+  show (Case sc alts) = "(Case \{show sc} \{show alts})"
 
 -- I can't really show val because it's HOAS...
 
@@ -107,6 +124,7 @@ pprint names tm = render 80 $ go names tm
       text "({" <+> text nm <+> ":" <+> go names t <+> "}" <+> "=>" <+> go (nm :: names) u <+> ")"
     go names (Pi nm Explicit t u) =
       text "((" <+> text nm <+> ":" <+> go names t <+> ")" <+> "=>" <+> go (nm :: names) u <+> ")"
+    go names (Case _ _) = "FIXME CASE"
 
 public export
 Pretty Tm where
@@ -117,6 +135,7 @@ Pretty Tm where
   pretty (App t u) = text "(" <+> pretty t <+> pretty u <+> ")"
   pretty U = "U"
   pretty (Pi str icit t u) = text "(" <+> text str <+> ":" <+> pretty t <+> ")" <+> "=>" <+> pretty u <+> ")"
+  pretty (Case _ _) = text "FIXME CASE"
 
 -- public export
 -- data Closure : Nat -> Type
@@ -143,11 +162,11 @@ data Val : Type where
   VVar : (k : Nat) -> (sp : SnocList Val) -> Val
   -- I wanted the Maybe Tm in here, but for now we're always expanding.
   -- Maybe this is where I glue
-  VRef : (nm : String) -> (sp : SnocList Val) -> Val
+  VRef : (nm : String) -> Def -> (sp : SnocList Val) -> Val
   -- we'll need to look this up in ctx with IO
   VMeta : (ix : Nat) -> (sp : SnocList Val) -> Val
   VLam : Name -> Closure -> Val
-  VPi : Name -> Icit -> Lazy Val -> Closure -> Val
+  VPi : Name -> Icit -> (a : Lazy Val) -> (b : Closure) -> Val
   VU : Val
 
 
@@ -156,7 +175,7 @@ Show Closure
 covering export
 Show Val where
   show (VVar k sp) = "(%var \{show k} \{show sp})"
-  show (VRef nm sp) = "(%ref \{nm} \{show sp})"
+  show (VRef nm _ sp) = "(%ref \{nm} \{show sp})"
   show (VMeta ix sp) = "(%meta \{show ix} \{show sp})"
   show (VLam str x) = "(%lam \{str} \{show x})"
   show (VPi str Implicit x y) = "(%pi {\{str} : \{show  x}}. \{show  y})"
@@ -233,6 +252,7 @@ record MetaContext where
 public export
 data Def = Axiom | TCon (List String) | DCon Nat String | Fn Tm
 
+public export
 Show Def where
   show Axiom = "axiom"
   show (TCon strs) = "TCon \{show strs}"

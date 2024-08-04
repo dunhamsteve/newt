@@ -1,0 +1,21 @@
+module Scratch
+
+
+
+data Nat : U where
+  Z : Nat
+  S : Nat -> Nat
+
+data Vect : Nat -> U -> U where
+  Nil : {a : U} -> Vect Z a
+  Cons : {a : U} {n : Nat} -> a -> Vect n a -> Vect (S n) a
+
+plus : Nat -> Nat -> Nat
+plus = \ n m => case n of
+  Z => m
+  S k => S (plus k m)
+
+length : {a : U} {n : Nat} -> Vect n a -> Nat
+length = \ v => case v of
+  Nil => Z
+  Cons x xs => S (length {a} xs)

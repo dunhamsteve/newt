@@ -1,6 +1,20 @@
 
 We're stopping at zoo4.
 
+- [ ] empty data is broken when followed by a function, need to check that new indent level is deeper
+
+Going ahead with data. scratch.newt for starters, build out enough for plus to typecheck. See where we are at that point, and fix up the dependent stuff. Add another test case that exercises this.
+
+v1 of cases requires a constructor and vars, var, or default.
+
+When we do impossible, take agda approach
+
+- [ ] typecheck plus
+  - [ ] checkAlt
+  - [ ] process data decl should check some stuff
+- [ ] switch to FC
+
+- [ ] think about whether there needs to be a desugar step separate from check/infer
 
 - [ ] look into Lennart.newt issues
 - [ ] Type at point for the editor
@@ -11,7 +25,7 @@ We're stopping at zoo4.
   - [ ] Read data as real constructors
   - [ ] Typecheck / eval the same
   - [ ] Add elimination / case
-    - [ ] Maybe some test cases from pi-forall
+    - [ ] test cases. Maybe from pi-forall
 - [ ] Code Gen
 - [ ] Less expansion
   - Can we not expand top level - expand in unification and matching pi types?

@@ -147,7 +147,7 @@ pPattern
   <|> PatVar <$> ident
 
 
-caseAlt : Parser CaseAlt
+caseAlt : Parser RCaseAlt
 caseAlt = do
   pat <- parseOp -- pPattern -- term and sort it out later?
   keyword "=>"
@@ -258,7 +258,7 @@ parseDecl = parseImport <|> parseSig <|> parseDef <|> parseNorm <|> parseData
 export
 parseMod : Parser Module
 parseMod = do
-  sameLevel $ keyword "module"
+  keyword "module"
   name <- ident
   -- probably should be manySame, and we want to start with col -1
   -- if we enforce blocks indent more than parent

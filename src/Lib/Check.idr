@@ -26,12 +26,12 @@ forceMeta (VMeta ix sp) = case !(lookupMeta ix) of
   (Solved k t) => vappSpine t sp
 forceMeta x = pure x
 
--- Lennart needed more forcing
+-- Lennart needed more forcing for recursive nat,
 forceType : Val -> M Val
-forceType (VRef nm sp) =
+forceType (VRef nm def sp) =
     case lookup nm !(get) of
-      (Just (MkEntry name type (Fn t))) => eval [] CBN t
-      _ => pure (VRef nm sp)
+      (Just (MkEntry name type (Fn t))) => vappSpine !(eval [] CBN t) sp
+      _ => pure (VRef nm def sp)
 forceType (VMeta ix sp) = case !(lookupMeta ix) of
   (Unsolved x k xs) => pure (VMeta ix sp)
   (Solved k t) => vappSpine t sp >>= forceType
@@ -67,7 +67,7 @@ parameters (ctx: Context)
       go ren lvl (VVar k sp) = case findIndex (== k) ren of
         Nothing => error [DS "scope/skolem thinger"]
         Just x => goSpine ren lvl (Bnd $ cast x) sp
-      go ren lvl (VRef nm sp) = goSpine ren lvl (Ref nm Nothing) sp
+      go ren lvl (VRef nm def sp) = goSpine ren lvl (Ref nm def) sp
       go ren lvl (VMeta ix sp) = if ix == meta
         then error [DS "meta occurs check"]
         else goSpine ren lvl (Meta ix) sp
@@ -113,7 +113,7 @@ parameters (ctx: Context)
       (VVar k sp,   VVar k' sp'  ) =>
         if k == k' then unifySpine l (k == k') sp sp'
         else error [DS "vvar mismatch \{show k} \{show k'}"]
-      (VRef k sp,   VRef k' sp'  ) =>
+      (VRef k def sp,   VRef k' def' sp'  ) =>
         if k == k' then unifySpine l (k == k') sp sp'
         -- REVIEW - consider forcing?
         else error [DS "vref mismatch \{show k} \{show k'}"]
@@ -125,7 +125,7 @@ parameters (ctx: Context)
       (VU, VU) => pure ()
       -- Lennart.newt cursed type references itself
       -- We _could_ look up the ref, eval against [] and vappSpine...
-      (t,         VRef k' sp') => do
+      (t,         VRef k' def sp') => do
         debug "expand \{show t} =?= %ref \{k'}"
         case lookup k' !(get) of
           Just (MkEntry name ty (Fn tm)) => unify l t !(vappSpine !(eval [] CBN tm) sp')
@@ -155,8 +155,7 @@ lookupName ctx (RVar nm) = go 0 ctx.types
   where
     go : Nat -> Vect n (String, Val)  -> M  (Maybe (Tm, Val))
     go i [] = case lookup nm !(get) of
-      Just (MkEntry name ty (Fn t)) => pure $ Just (Ref nm (Just t), !(eval [] CBN ty))
-      Just (MkEntry name ty _) => pure $ Just (Ref nm Nothing, !(eval [] CBN ty))
+      Just (MkEntry name ty def) => pure $ Just (Ref nm def, !(eval [] CBN ty))
       Nothing => pure Nothing
     go i ((x, ty) :: xs) = if x == nm then pure $ Just (Bnd i, ty)
       else go (i + 1) xs
@@ -169,14 +168,84 @@ infer : Context -> Raw  -> M  (Tm, Val)
 export
 check : Context -> Raw -> Val  -> M  Tm
 
+-- FIXME we need to switch to FC
 
+checkAlt : Val -> Context -> Val -> RCaseAlt -> M CaseAlt
+checkAlt scty ctx ty (MkAlt ptm body) = do
+  -- we have a pattern term and a body
+  (con, args) <- getArgs ptm []
+  debug "ALT con \{con} args \{show args}"
+  let Just (MkEntry _ dcty (DCon arity _)) = lookup con !(get)
+    | _ => error [DS "expected datacon, got \{con}"]
 
-checkAlt : Context -> CaseAlt -> M ()
+  -- arity is wrong, but we actually need the type anyway
+  -- in fact arity is for later (eval?) and we need to do implicits first
+  debug "arity is \{show arity} dcty \{pprint [] dcty}"
+  -- and then we run the names against the type
+  -- get all that into a context and run the body
+
+  -- So, how does this work?
+  -- The constructor has arguments
+  -- they may or may not be bound to names.
+  -- their types may depend on nameless arguments
+  -- the RHS is a function of some or all of this
+
+  -- I suspect I'll rewrite this a few times
+  vdcty <- eval [] CBN dcty
+  debug "go \{show vdcty} \{show ptm}"
+  alttm <- go vdcty ptm ctx
+  debug "GOT \{pprint (names ctx) alttm}"
+
+  -- package up the results into something.
+  -- REVIEW args, also probably want the tag not the name.
+  pure $ CaseCons con args alttm
+
+  where
+
+    go : Val -> Raw -> Context -> M Tm
+    go ctype (RSrcPos x tm) ctx = go ctype tm ctx
+    -- FIXME icit
+    go (VPi str Explicit a b) (RApp t (RSrcPos _ (RVar nm)) Explicit) ctx = do
+      debug "*** \{nm} : \{show a}"
+      let var = VVar (length ctx.env) [<]
+      let ctx' = extend ctx nm a
+      Lam nm <$> go !(b $$ var) t ctx'
+    go (VPi str Implicit a b) t ctx = do
+      let var = VVar (length ctx.env) [<]
+      let ctx' = extend ctx "_" a
+      Lam "_" <$> go !(b $$ var) t ctx'
+    -- same deal with _ for name
+    go (VPi str icit x y) (RApp t RImplicit icit') ctx = ?rhs_19
+    go (VPi str icit x y) tm ctx = error {ctx} [DS "Can't use \{show tm} as pattern"]
+
+    -- nameless variable
+    go ctype RImplicit ctx = ?rhs_2
+    go ctype (RVar nm) ctx = do
+      debug "*** end"
+      check ctx body ty
+      -- pure ctx -- this should be our constructor.
+    -- This happens if we run out of runway (more args and no pi)
+    go ctype tm ctx = error {ctx} [DS "unhandled in go \{show ctype} \{show tm}"]
+
+    getArgs : Raw -> List String -> M (String, List String)
+    getArgs (RVar nm) acc = pure (nm, acc)
+    -- TODO implicits
+    getArgs (RApp t (RSrcPos _ (RVar nm)) icit) acc = getArgs t (nm :: acc)
+    getArgs (RApp t (RVar nm) icit) acc = getArgs t (nm :: acc)
+    getArgs (RApp t RHole icit) acc = getArgs t ("_" :: acc)
+    getArgs (RSrcPos _ t) acc = getArgs t acc
+    getArgs tm _ = error [DS "Patterns must be constructor and vars, got \{show tm}"]
+
 
 check ctx tm ty = case (tm, !(forceType ty)) of
   (RCase rsc alts, ty) => do
     (sc, scty) <- infer ctx rsc
-    error [DS "implement check RCase sctype \{show scty}"]
+    let (VRef nm (TCon cnames) sp) = scty
+      | _ => error [DS "expected TCon for scrutinee type, got: \{show scty}"]
+    debug "constructor names \{show cnames}"
+    alts' <- for alts $ checkAlt scty ctx ty
+    pure $ Case sc alts'
+    -- error [DS "implement check RCase sctype \{show scty}"]
   (RSrcPos x tm, ty) => check ({pos := x} ctx) tm ty
   -- Document a hole, pretend it's implemented
   (RHole, ty) => do
@@ -190,7 +259,7 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     -- need to print 'warning' with position
     -- fixme - just put a name on it like idris and stuff it into top.
     -- error [DS "hole:\n\{msg}"]
-    pure $ Ref "?" Nothing
+    pure $ Ref "?" Axiom  -- TODO - probably want hole opt on Def
   (t@(RLam nm icit tm), ty@(VPi nm' icit' a b)) => do
           debug "icits \{nm} \{show icit} \{nm'} \{show icit'}"
           if icit == icit' then do
@@ -238,8 +307,9 @@ infer ctx (RVar nm) = go 0 ctx.types
   where
     go : Nat -> Vect n (String, Val)  -> M  (Tm, Val)
     go i [] = case lookup nm !(get) of
-      Just (MkEntry name ty (Fn t)) => pure (Ref nm (Just t), !(eval [] CBN ty))
-      Just (MkEntry name ty _) => pure (Ref nm Nothing, !(eval [] CBN ty))
+      Just (MkEntry name ty def) => do
+        debug "lookup \{name} as \{show def}"
+        pure (Ref nm def, !(eval [] CBN ty))
       Nothing => error [DS "\{show nm} not in scope"]
     go i ((x, ty) :: xs) = if x == nm then pure $ (Bnd i, ty)
       else go (i + 1) xs

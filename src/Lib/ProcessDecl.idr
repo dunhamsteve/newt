@@ -45,7 +45,7 @@ processDecl (Def nm raw) = do
       -- should just print, but it's too subtle in the sea of messages
       -- putStrLn "ERROR at (\{show l}, \{show c}): Unsolved meta \{show k}"
       throwError $ E (l,c) "Unsolved meta \{show k}"
-
+  debug "Add def \{nm} \{pprint [] tm} : \{pprint [] ty}"
   put (addDef ctx nm tm ty)
 
 processDecl (DCheck tm ty) = do

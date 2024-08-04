@@ -117,7 +117,7 @@ export
 vapp : Val -> Val -> M Val
 vapp (VLam _ t) u = t $$ u
 vapp (VVar k sp) u = pure $ VVar k (sp :< u)
-vapp (VRef nm sp) u = pure $ VRef nm (sp :< u)
+vapp (VRef nm def sp) u = pure $ VRef nm def (sp :< u)
 vapp (VMeta k sp) u = pure $ VMeta k (sp :< u)
 vapp t u = error' "impossible in vapp \{show t} to \{show u}"
 
@@ -129,11 +129,19 @@ vappSpine t (xs :< x) = vapp !(vappSpine t xs) x
 bind : Val -> Env -> Env
 bind v env = v :: env
 
+-- So smalltt says:
+--   Smalltt has the following approach:
+--   - Top-level and local definitions are lazy.
+--   - We instantiate Pi types during elaboration with lazy values.
+--   - Applications headed by top-level variables are lazy.
+--   - Any other function application is call-by-value during evaluation.
+
 -- Do we want a def in here instead?  We'll need DCon/TCon eventually
 -- I need to be aggressive about reduction, I guess. I'll figure it out
 -- later, maybe need lazy glued values.
-eval env mode (Ref x (Just tm)) = eval env mode tm
-eval env mode (Ref x Nothing) = pure $ VRef x [<]
+-- TODO - probably want to figure out gluing and handle constructors
+eval env mode (Ref x (Fn tm)) = eval env mode tm
+eval env mode (Ref x def) = pure $ VRef x def [<]
 eval env mode (App t u) = vapp !(eval env mode t) !(eval env mode u)
 eval env mode U = pure VU
 eval env mode (Meta i) =
@@ -145,6 +153,7 @@ eval env mode (Pi x icit a b) = pure $ VPi x icit !(eval env mode a) (MkClosure 
 eval env mode (Bnd i) = case getAt i env of
   Just rval => pure rval
   Nothing => error' "Bad deBruin index \{show i}"
+eval env mode (Case{}) = ?todo
 
 export
 quote : (lvl : Nat) -> Val -> M Tm
@@ -162,7 +171,7 @@ quote l (VMeta i sp) = quoteSp l (Meta i) sp
 quote l (VLam x t) = pure $ Lam x !(quote (S l) !(t $$ VVar l [<]))
 quote l (VPi x icit a b) = pure $ Pi x icit !(quote l a) !(quote (S l) !(b $$ VVar l [<]))
 quote l VU = pure U
-quote l (VRef n sp) = quoteSp l (Ref n Nothing) sp
+quote l (VRef n def sp) = quoteSp l (Ref n def) sp
 
 -- Can we assume closed terms?
 -- ezoo only seems to use it at [], but essentially does this:

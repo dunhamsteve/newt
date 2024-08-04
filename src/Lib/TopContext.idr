@@ -44,8 +44,12 @@ public export
 addDef : TopContext -> String -> Tm -> Tm -> TopContext
 addDef tc name tm ty = { defs $= go } tc
   where
+  -- What did I do here?
     go : List TopEntry -> List TopEntry
     -- FIXME throw if we hit [] or is not an axiom
-    go [] = []
-    go ((MkEntry nm _ _) :: xs) = MkEntry nm ty (Fn tm) :: xs
+    -- FIXME use a map, I want updates
+    go [] = ?addDEF_fail
+    go (x@(MkEntry nm _ _) :: xs) = if nm == name
+      then MkEntry nm ty (Fn tm) :: xs
+      else x :: go xs
 
