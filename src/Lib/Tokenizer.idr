@@ -20,7 +20,7 @@ opChar : Lexer
 opChar = pred isOpChar
 
 identMore : Lexer
-identMore = alphaNum <|> exact "."
+identMore = alphaNum <|> exact "." <|> exact "'"
 
 rawTokens : Tokenizer (Token Kind)
 rawTokens

@@ -15,7 +15,9 @@ plus = \ n m => case n of
   Z => m
   S k => S (plus k m)
 
+-- So this isn't working at the moment, I think I need
+-- to replace the n with S ?k
 length : {a : U} {n : Nat} -> Vect n a -> Nat
 length = \ v => case v of
   Nil => Z
-  Cons x xs => S (length {a} xs)
+  Cons {a} {n'} x xs => S (length {a} xs)

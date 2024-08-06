@@ -131,7 +131,7 @@ Show Raw where
   show (RCase x xs) = foo [ "Case", show x, show xs]
   show (RParseError str) = foo [ "ParseError", "str"]
   show RU = "U"
-  show (RSrcPos pos tm) = show tm
+  show (RSrcPos pos tm) = foo [ "#", show tm]
 
 
 export

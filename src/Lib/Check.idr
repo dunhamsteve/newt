@@ -210,6 +210,11 @@ checkAlt scty ctx ty (MkAlt ptm body) = do
       let var = VVar (length ctx.env) [<]
       let ctx' = extend ctx nm a
       Lam nm <$> go !(b $$ var) t ctx'
+    go (VPi str Implicit a b) (RApp t (RSrcPos _ (RVar nm)) Implicit) ctx = do
+      debug "*** \{nm} : \{show a}"
+      let var = VVar (length ctx.env) [<]
+      let ctx' = extend ctx nm a
+      Lam nm <$> go !(b $$ var) t ctx'
     go (VPi str Implicit a b) t ctx = do
       let var = VVar (length ctx.env) [<]
       let ctx' = extend ctx "_" a
