@@ -4,7 +4,7 @@ module Lib.Types
 -- maybe watch https://www.youtube.com/watch?v=3gef0_NFz8Q
 -- or drop the indices for now.
 
--- For SourcePos, Error
+-- For FC, Error
 import public Lib.Parser.Impl
 import Lib.Prettier
 
@@ -54,35 +54,47 @@ data CaseAlt : Type where
 data Def : Type
 
 data Tm : Type where
-  Bnd : Nat -> Tm
+  Bnd : FC -> Nat -> Tm
   -- Maybe Def here instead of Maybe Tm, we'll have DCon, TCon, etc.
-  Ref : String -> Def -> Tm
-  Meta : Nat -> Tm
+  Ref : FC -> String -> Def -> Tm
+  Meta : FC -> Nat -> Tm
   -- kovacs optimization, I think we can App out meta instead
   -- InsMeta : Nat -> List BD -> Tm
-  Lam : Name -> Tm -> Tm
-  App : Tm -> Tm -> Tm
-  U   : Tm
-  Pi  : Name -> Icit -> Tm -> Tm -> Tm
+  Lam : FC -> Name -> Tm -> Tm
+  App : FC -> Tm -> Tm -> Tm
+  U   : FC -> Tm
+  Pi  : FC -> Name -> Icit -> Tm -> Tm -> Tm
   -- REVIEW - do we want to just push it up like idris?
-  Case : Tm -> List CaseAlt -> Tm
+  Case : FC -> Tm -> List CaseAlt -> Tm
 
 %name Tm t, u, v
+
+export
+getFC : Tm -> FC
+getFC (Bnd fc k) = fc
+getFC (Ref fc str x) = fc
+getFC (Meta fc k) = fc
+getFC (Lam fc str t) = fc
+getFC (App fc t u) = fc
+getFC (U fc) = fc
+getFC (Pi fc str icit t u) = fc
+getFC (Case fc t xs) = fc
+
 
 Show CaseAlt where
   show alt = "FIXME"
 
 -- public export
 Show Tm where
-  show (Bnd k) = "(Bnd \{show k})"
-  show (Ref str _) = "(Ref \{show str})"
-  show (Lam nm t) = "(\\ \{nm}  => \{show  t})"
-  show (App t u) = "(\{show t} \{show u})"
-  show (Meta i) = "(Meta \{show i})"
-  show U = "U"
-  show (Pi str Implicit t u) = "(Pi (\{str} : \{show t}) => \{show u})"
-  show (Pi str Explicit t u) = "(Pi {\{str} : \{show t}} => \{show u})"
-  show (Case sc alts) = "(Case \{show sc} \{show alts})"
+  show (Bnd _ k) = "(Bnd \{show k})"
+  show (Ref _ str _) = "(Ref \{show str})"
+  show (Lam _ nm t) = "(\\ \{nm}  => \{show  t})"
+  show (App _ t u) = "(\{show t} \{show u})"
+  show (Meta _ i) = "(Meta \{show i})"
+  show (U _) = "U"
+  show (Pi _ str Implicit t u) = "(Pi (\{str} : \{show t}) => \{show u})"
+  show (Pi _ str Explicit t u) = "(Pi {\{str} : \{show t}} => \{show u})"
+  show (Case _ sc alts) = "(Case \{show sc} \{show alts})"
 
 -- I can't really show val because it's HOAS...
 
@@ -97,12 +109,12 @@ Eq Icit where
 export
 Eq (Tm) where
   -- (Local x) == (Local y) = x == y
-  (Bnd x) == (Bnd y) = x == y
-  (Ref x _) == (Ref y _) = x == y
-  (Lam n t) == (Lam n' t') = t == t'
-  (App t u) == App t' u' = t == t' && u == u'
-  U == U = True
-  (Pi n icit t u) == (Pi n' icit' t' u') = icit == icit' && t == t' && u == u'
+  (Bnd _ x) == (Bnd _ y) = x == y
+  (Ref _ x _) == Ref _ y _ = x == y
+  (Lam _ n t) == Lam _ n' t' = t == t'
+  (App _ t u) == App _ t' u' = t == t' && u == u'
+  (U _) == (U _) = True
+  (Pi _ n icit t u) == (Pi _ n' icit' t' u') = icit == icit' && t == t' && u == u'
   _ == _ = False
 
 -- FIXME prec
@@ -112,30 +124,30 @@ pprint : List String -> Tm -> String
 pprint names tm = render 80 $ go names tm
   where
     go : List String -> Tm -> Doc
-    go names (Bnd k) = case getAt k names of
+    go names (Bnd _ k) = case getAt k names of
       Nothing => text "BND \{show k}"
       Just nm => text "\{nm}:\{show k}"
-    go names (Ref str mt) = text str
-    go names (Meta k) = text "?m:\{show k}"
-    go names (Lam nm t) = text "(\\ \{nm} =>" <+> go (nm :: names) t <+> ")"
-    go names (App t u) = text "(" <+> go names t <+> go names u <+> ")"
-    go names U = "U"
-    go names (Pi nm Implicit t u) =
+    go names (Ref _ str mt) = text str
+    go names (Meta _ k) = text "?m:\{show k}"
+    go names (Lam _ nm t) = text "(\\ \{nm} =>" <+> go (nm :: names) t <+> ")"
+    go names (App _ t u) = text "(" <+> go names t <+> go names u <+> ")"
+    go names (U _) = "U"
+    go names (Pi _ nm Implicit t u) =
       text "({" <+> text nm <+> ":" <+> go names t <+> "}" <+> "=>" <+> go (nm :: names) u <+> ")"
-    go names (Pi nm Explicit t u) =
+    go names (Pi _ nm Explicit t u) =
       text "((" <+> text nm <+> ":" <+> go names t <+> ")" <+> "=>" <+> go (nm :: names) u <+> ")"
-    go names (Case _ _) = "FIXME CASE"
+    go names (Case _ _ _) = "FIXME CASE"
 
 public export
 Pretty Tm where
-  pretty (Bnd k) = ?rhs_0
-  pretty (Ref str mt) = text str
-  pretty (Meta k) = text "?m\{show k}"
-  pretty (Lam str t) = text "(\\ \{str} => " <+> pretty t <+> ")"
-  pretty (App t u) = text "(" <+> pretty t <+> pretty u <+> ")"
-  pretty U = "U"
-  pretty (Pi str icit t u) = text "(" <+> text str <+> ":" <+> pretty t <+> ")" <+> "=>" <+> pretty u <+> ")"
-  pretty (Case _ _) = text "FIXME CASE"
+  pretty (Bnd _ k) = ?rhs_0
+  pretty (Ref _ str mt) = text str
+  pretty (Meta _ k) = text "?m\{show k}"
+  pretty (Lam _ str t) = text "(\\ \{str} => " <+> pretty t <+> ")"
+  pretty (App _ t u) = text "(" <+> pretty t <+> pretty u <+> ")"
+  pretty (U _) = "U"
+  pretty (Pi _ str icit t u) = text "(" <+> text str <+> ":" <+> pretty t <+> ")" <+> "=>" <+> pretty u <+> ")"
+  pretty (Case _ _ _) = text "FIXME CASE"
 
 -- public export
 -- data Closure : Nat -> Type
@@ -159,28 +171,28 @@ data Closure : Type
 public export
 data Val : Type where
   -- This will be local / flex with spine.
-  VVar : (k : Nat) -> (sp : SnocList Val) -> Val
+  VVar : FC -> (k : Nat) -> (sp : SnocList Val) -> Val
   -- I wanted the Maybe Tm in here, but for now we're always expanding.
   -- Maybe this is where I glue
-  VRef : (nm : String) -> Def -> (sp : SnocList Val) -> Val
+  VRef : FC -> (nm : String) -> Def -> (sp : SnocList Val) -> Val
   -- we'll need to look this up in ctx with IO
-  VMeta : (ix : Nat) -> (sp : SnocList Val) -> Val
-  VLam : Name -> Closure -> Val
-  VPi : Name -> Icit -> (a : Lazy Val) -> (b : Closure) -> Val
-  VU : Val
+  VMeta : FC -> (ix : Nat) -> (sp : SnocList Val) -> Val
+  VLam : FC -> Name -> Closure -> Val
+  VPi : FC -> Name -> Icit -> (a : Lazy Val) -> (b : Closure) -> Val
+  VU : FC -> Val
 
 
 Show Closure
 
 covering export
 Show Val where
-  show (VVar k sp) = "(%var \{show k} \{show sp})"
-  show (VRef nm _ sp) = "(%ref \{nm} \{show sp})"
-  show (VMeta ix sp) = "(%meta \{show ix} \{show sp})"
-  show (VLam str x) = "(%lam \{str} \{show x})"
-  show (VPi str Implicit x y) = "(%pi {\{str} : \{show  x}}. \{show  y})"
-  show (VPi str Explicit x y) = "(%pi (\{str} : \{show  x}). \{show  y})"
-  show VU = "U"
+  show (VVar _ k sp) = "(%var \{show k} \{show sp})"
+  show (VRef _ nm _ sp) = "(%ref \{nm} \{show sp})"
+  show (VMeta _ ix sp) = "(%meta \{show ix} \{show sp})"
+  show (VLam _ str x) = "(%lam \{str} \{show x})"
+  show (VPi fc str Implicit x y) = "(%pi {\{str} : \{show  x}}. \{show  y})"
+  show (VPi fc str Explicit x y) = "(%pi (\{str} : \{show  x}). \{show  y})"
+  show (VU _) = "U"
 
 -- Not used - I was going to change context to have a List Binder
 -- instead of env, types, bds
@@ -234,7 +246,7 @@ Can I get val back? Do we need to quote? What happens if we don't?
 -}
 
 public export
-data MetaEntry = Unsolved SourcePos Nat (List BD) | Solved Nat Val
+data MetaEntry = Unsolved FC Nat (List BD) | Solved Nat Val
 
 export
 covering
@@ -301,7 +313,6 @@ record Context where
   types : Vect lvl (String, Val) -- types and names in scope
   -- so we'll try "bds" determines length of local context
   bds  : List BD          -- bound or defined
-  pos : SourcePos            -- the last SourcePos that we saw
 
   -- We only need this here if we don't pass TopContext
   -- top : TopContext
@@ -320,7 +331,7 @@ M = (StateT TopContext (EitherT Impl.Error IO))
 -- around top
 export
 mkCtx : IORef MetaContext -> Context
-mkCtx metas = MkCtx 0 [] [] [] (0,0) metas
+mkCtx metas = MkCtx 0 [] [] [] metas
 
 ||| Force argument and print if verbose is true
 export

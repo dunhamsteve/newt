@@ -11,27 +11,23 @@ import Lib.Syntax
 
 export
 processDecl : Decl -> M ()
-processDecl (TypeSig nm tm) = do
+processDecl (TypeSig fc nm tm) = do
   top <- get
   putStrLn "-----"
   putStrLn "TypeSig \{nm} \{show tm}"
-  ty <- check (mkCtx top.metas) tm VU
+  ty <- check (mkCtx top.metas) tm (VU fc)
   ty' <- nf [] ty
   putStrLn "got \{pprint [] ty'}"
   modify $ claim nm ty'
 
-processDecl (Def nm raw) = do
+processDecl (Def fc nm raw) = do
   putStrLn "-----"
   putStrLn "def \{show nm}"
   ctx <- get
-  let pos = case raw of
-        RSrcPos pos _ => pos
-        _ => (0,0)
-
   let Just entry = lookup nm ctx
-    | Nothing => throwError $ E pos "skip def \{nm} without Decl"
+    | Nothing => throwError $ E fc "skip def \{nm} without Decl"
   let (MkEntry name ty Axiom) := entry
-    | _ => throwError $ E pos "\{nm} already defined"
+    | _ => throwError $ E fc "\{nm} already defined"
   putStrLn "check \{nm} = \{show raw} at \{pprint [] ty}"
   vty <- eval empty CBN ty
   putStrLn "vty is \{show vty}"
@@ -48,11 +44,11 @@ processDecl (Def nm raw) = do
   debug "Add def \{nm} \{pprint [] tm} : \{pprint [] ty}"
   put (addDef ctx nm tm ty)
 
-processDecl (DCheck tm ty) = do
+processDecl (DCheck fc tm ty) = do
 
   top <- get
   putStrLn "check \{show tm} at \{show ty}"
-  ty' <- check (mkCtx top.metas) tm VU
+  ty' <- check (mkCtx top.metas) tm (VU fc)
   putStrLn "got type \{pprint [] ty'}"
   vty <- eval [] CBN ty'
   res <- check (mkCtx top.metas) ty vty
@@ -65,22 +61,22 @@ processDecl (DCheck tm ty) = do
   -- norm <- nf [] x
   putStrLn "NF "
 
-processDecl (DImport str) = throwError $ E (0,0) "import not implemented"
+processDecl (DImport fc str) = throwError $ E fc "import not implemented"
 
-processDecl (Data nm ty cons) = do
+processDecl (Data fc nm ty cons) = do
   -- It seems like the FC for the errors are not here?
   ctx <- get
-  tyty <- check (mkCtx ctx.metas) ty VU
+  tyty <- check (mkCtx ctx.metas) ty (VU fc)
   -- FIXME we need this in scope, but need to update
   modify $ claim nm tyty
   ctx <- get
   cnames <- for cons $ \x => case x of
       -- expecting tm to be a Pi type
-      (TypeSig nm' tm) => do
+      (TypeSig fc nm' tm) => do
           ctx <- get
           -- TODO check pi type ending in full tyty application
           -- TODO count arity
-          dty <- check (mkCtx ctx.metas) tm VU
+          dty <- check (mkCtx ctx.metas) tm (VU fc)
           modify $ defcon nm' 0 nm dty
           pure nm'
       _ => throwError $ E (0,0) "expected constructor declaration"
@@ -92,8 +88,6 @@ processDecl (Data nm ty cons) = do
   pure ()
   where
     checkDeclType : Tm -> M ()
-    checkDeclType U = pure ()
-    checkDeclType (Pi str icit t u) = checkDeclType u
-    checkDeclType _ = throwError $ E (0,0) "data type doesn't return U"
-
-
+    checkDeclType (U _) = pure ()
+    checkDeclType (Pi _ str icit t u) = checkDeclType u
+    checkDeclType _ = error fc "data type doesn't return U"

@@ -27,27 +27,43 @@ data Pattern
 public export
 data RCaseAlt = MkAlt Raw Raw
 
+-- FC = MkPair Int Int
+
+
 data Raw : Type where
-  RVar : (nm : Name) -> Raw
-  RLam : (nm : String) -> (icit : Icit) -> (ty : Raw) -> Raw
-  RApp : (t : Raw) -> (u : Raw) -> (icit : Icit) -> Raw
-  RU   : Raw
-  RPi  : (nm : Maybe Name) -> (icit : Icit) -> (ty : Raw) -> (sc : Raw) -> Raw
-  RLet : (nm : Name) -> (ty : Raw) -> (v : Raw) -> (sc : Raw) -> Raw
-  -- REVIEW do we want positions on terms?
-  RSrcPos : SourcePos -> Raw -> Raw
-  RAnn  : (tm : Raw) -> (ty : Raw) -> Raw
-  RLit : Literal -> Raw
-  RCase : (scrut : Raw) -> (alts : List RCaseAlt) -> Raw
-  RImplicit : Raw
-  RHole : Raw
+  RVar : FC -> (nm : Name) -> Raw
+  RLam : FC -> (nm : String) -> (icit : Icit) -> (ty : Raw) -> Raw
+  RApp : FC -> (t : Raw) -> (u : Raw) -> (icit : Icit) -> Raw
+  RU   : FC -> Raw
+  RPi  : FC -> (nm : Maybe Name) -> (icit : Icit) -> (ty : Raw) -> (sc : Raw) -> Raw
+  RLet : FC -> (nm : Name) -> (ty : Raw) -> (v : Raw) -> (sc : Raw) -> Raw
+  RAnn  : FC -> (tm : Raw) -> (ty : Raw) -> Raw
+  RLit : FC -> Literal -> Raw
+  RCase : FC -> (scrut : Raw) -> (alts : List RCaseAlt) -> Raw
+  RImplicit : FC -> Raw
+  RHole : FC -> Raw
   -- not used, but intended to allow error recovery
-  RParseError : String -> Raw
+  RParseError : FC -> String -> Raw
 
 %name Raw tm
 
+export
+getFC : Raw -> FC
+getFC (RVar fc nm) = fc
+getFC (RLam fc nm icit ty) = fc
+getFC (RApp fc t u icit) = fc
+getFC (RU fc) = fc
+getFC (RPi fc nm icit ty sc) = fc
+getFC (RLet fc nm ty v sc) = fc
+getFC (RAnn fc tm ty) = fc
+getFC (RLit fc y) = fc
+getFC (RCase fc scrut alts) = fc
+getFC (RImplicit fc) = fc
+getFC (RHole fc) = fc
+getFC (RParseError fc str) = fc
 -- derive some stuff - I'd like json, eq, show, ...
 
+-- FIXME - I think I don't want "where" here, but the parser has an issue
 public export
 data Decl : Type where
 
@@ -57,11 +73,11 @@ Telescope = List Decl -- pi-forall, always typeSig?
 data ConstrDef = MkCDef Name Telescope
 
 data Decl
-  = TypeSig Name Raw
-  | Def Name Raw
-  | DImport Name
-  | DCheck Raw Raw
-  | Data Name Raw (List Decl)
+  = TypeSig FC Name Raw
+  | Def FC Name Raw
+  | DImport FC Name
+  | DCheck FC Raw Raw
+  | Data FC Name Raw (List Decl)
 
 public export
 record Module where
@@ -93,11 +109,11 @@ Show ConstrDef where
 
 covering
 Show Decl where
-  show (TypeSig str x) = foo ["TypeSig", show str, show x]
-  show (Def str x) = foo ["Def", show str, show x]
-  show (Data str xs ys) = foo ["Data", show str, show xs, show ys]
-  show (DImport str) = foo ["DImport", show str]
-  show (DCheck x y) = foo ["DCheck", show x, show y]
+  show (TypeSig _ str x) = foo ["TypeSig", show str, show x]
+  show (Def _ str x) = foo ["Def", show str, show x]
+  show (Data _ str xs ys) = foo ["Data", show str, show xs, show ys]
+  show (DImport _ str) = foo ["DImport", show str]
+  show (DCheck _ x y) = foo ["DCheck", show x, show y]
 
 export covering
 Show Module where
@@ -119,20 +135,18 @@ Show RCaseAlt where
 
 covering
 Show Raw where
-  show RImplicit = "_"
-  show RHole = "?"
-  show (RVar name) = foo ["RVar", show name]
-  show (RAnn t ty) = foo [ "RAnn", show t, show ty]
-  show (RLit x) = foo [ "RLit", show x]
-  show (RLet x ty v scope) = foo [ "Let", show x, " : ", show ty, " = ", show v, " in ", show scope]
-  show (RPi str x y z) = foo [ "Pi", show str, show x, show y, show z]
-  show (RApp x y z) = foo [ "App", show x, show y, show z]
-  show (RLam x i y) = foo [ "Lam", show x, show i, show y]
-  show (RCase x xs) = foo [ "Case", show x, show xs]
-  show (RParseError str) = foo [ "ParseError", "str"]
-  show RU = "U"
-  show (RSrcPos pos tm) = foo [ "#", show tm]
-
+  show (RImplicit _) = "_"
+  show (RHole _) = "?"
+  show (RVar _ name) = foo ["RVar", show name]
+  show (RAnn _ t ty) = foo [ "RAnn", show t, show ty]
+  show (RLit _ x) = foo [ "RLit", show x]
+  show (RLet _ x ty v scope) = foo [ "Let", show x, " : ", show ty, " = ", show v, " in ", show scope]
+  show (RPi _ str x y z) = foo [ "Pi", show str, show x, show y, show z]
+  show (RApp _ x y z) = foo [ "App", show x, show y, show z]
+  show (RLam _ x i y) = foo [ "Lam", show x, show i, show y]
+  show (RCase _ x xs) = foo [ "Case", show x, show xs]
+  show (RParseError _ str) = foo [ "ParseError", "str"]
+  show (RU _) = "U"
 
 export
 Pretty Raw where
@@ -146,31 +160,30 @@ Pretty Raw where
     par p p' d = if p' < p then text "(" ++ d ++ text ")" else d
 
     asDoc : Nat -> Raw -> Doc
-    asDoc p (RVar str) = text str
-    asDoc p (RLam str icit x) = par p 0 $ text "\\" ++ wrap icit (text str) <+> text "=>" <+> asDoc 0 x
+    asDoc p (RVar _ str) = text str
+    asDoc p (RLam _ str icit x) = par p 0 $ text "\\" ++ wrap icit (text str) <+> text "=>" <+> asDoc 0 x
     -- This needs precedence and operators...
-    asDoc p (RApp x y Explicit) = par p 2 $ asDoc 2 x <+> asDoc 3 y
-    asDoc p (RApp x y Implicit) = par p 2 $ asDoc 2 x <+> text "{" ++ asDoc 0 y ++ text "}"
-    asDoc p RU = text "U"
-    asDoc p (RPi Nothing Explicit ty scope) = par p 1 $ asDoc p ty <+> text "->" <+/> asDoc p scope
-    asDoc p (RPi (Just x) Explicit ty scope) =
+    asDoc p (RApp _ x y Explicit) = par p 2 $ asDoc 2 x <+> asDoc 3 y
+    asDoc p (RApp _ x y Implicit) = par p 2 $ asDoc 2 x <+> text "{" ++ asDoc 0 y ++ text "}"
+    asDoc p (RU _) = text "U"
+    asDoc p (RPi _ Nothing Explicit ty scope) = par p 1 $ asDoc p ty <+> text "->" <+/> asDoc p scope
+    asDoc p (RPi _ (Just x) Explicit ty scope) =
       par p 1 $ text "(" <+> text x <+> text ":" <+> asDoc p ty <+> text ")" <+> text "->" <+/> asDoc p scope
-    asDoc p (RPi nm Implicit ty scope) =
+    asDoc p (RPi _ nm Implicit ty scope) =
       par p 1 $ text "{" <+> text (fromMaybe "_" nm) <+> text ":" <+> asDoc p ty <+> text "}" <+> text "->" <+/> asDoc 1 scope
-    asDoc p (RLet x v ty scope) =
+    asDoc p (RLet _ x v ty scope) =
       par p 0 $ text "let" <+> text x <+> text ":" <+> asDoc p ty
           <+> text "=" <+> asDoc p v
           <+/> text "in" <+> asDoc p scope
-    asDoc p (RSrcPos x y) = asDoc p y
     -- does this exist?
-    asDoc p (RAnn x y) = text "TODO - RAnn"
-    asDoc p (RLit (LString str)) = text $ interpolate str
-    asDoc p (RLit (LInt i)) = text $ show i
-    asDoc p (RLit (LBool x)) = text $ show x
-    asDoc p (RCase x xs) = text "TODO - RCase"
-    asDoc p RImplicit = text "_"
-    asDoc p RHole = text "?"
-    asDoc p (RParseError str) = text "ParseError \{str}"
+    asDoc p (RAnn _ x y) = text "TODO - RAnn"
+    asDoc p (RLit _ (LString str)) = text $ interpolate str
+    asDoc p (RLit _ (LInt i)) = text $ show i
+    asDoc p (RLit _ (LBool x)) = text $ show x
+    asDoc p (RCase _ x xs) = text "TODO - RCase"
+    asDoc p (RImplicit _) = text "_"
+    asDoc p (RHole _) = text "?"
+    asDoc p (RParseError _ str) = text "ParseError \{str}"
 
 export
 Pretty Module where
@@ -178,9 +191,9 @@ Pretty Module where
     text "module" <+> text name </> stack (map doDecl decls)
       where
         doDecl : Decl -> Doc
-        doDecl (TypeSig nm ty) = text nm <+> text ":" <+> nest 2 (pretty ty)
-        doDecl (Def nm tm) = text nm <+> text "=" <+> nest 2 (pretty tm)
-        doDecl (DImport nm) = text "import" <+> text nm ++ line
+        doDecl (TypeSig _ nm ty) = text nm <+> text ":" <+> nest 2 (pretty ty)
+        doDecl (Def _ nm tm) = text nm <+> text "=" <+> nest 2 (pretty tm)
+        doDecl (DImport _ nm) = text "import" <+> text nm ++ line
         -- the behavior of nest is kinda weird, I have to do the nest before/around the </>.
-        doDecl (Data nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map doDecl xs))
-        doDecl (DCheck x y) = text "#check" <+> pretty x <+> ":" <+> pretty y
+        doDecl (Data _ nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map doDecl xs))
+        doDecl (DCheck _ x y) = text "#check" <+> pretty x <+> ":" <+> pretty y

@@ -1,7 +1,7 @@
 module Lib.Parser
 import Lib.Types
 
--- The SourcePos stuff is awkward later on. We might want bounds on productions
+-- The FC stuff is awkward later on. We might want bounds on productions
 -- But we might want to consider something more generic and closer to lean?
 
 -- app: foo {a} a b
@@ -51,22 +51,20 @@ optional pa = Just <$> pa <|> pure Nothing
 lit : Parser Raw
 lit = do
   t <- token Number
-  pure $ RLit (LInt (cast t))
+  fc <- getFC
+  pure $ RLit fc (LInt (cast t))
 
 -- typeExpr is term with arrows.
 export typeExpr : Parser Raw
 export term : (Parser Raw)
 
-withPos : Parser Raw -> Parser Raw
-withPos p = RSrcPos <$> getPos <*> p
-
 -- the inside of Raw
 atom : Parser Raw
-atom = withPos (RU <$ keyword "U"
-              <|> RVar <$> ident
-              <|> lit
-              <|> RImplicit <$ keyword "_"
-              <|> RHole <$ keyword "?")
+atom = RU <$> getFC <* keyword "U"
+    <|> RVar <$> getFC <*> ident
+    <|> lit
+    <|> RImplicit <$> getFC <* keyword "_"
+    <|> RHole <$> getFC <* keyword "?"
     <|> parens typeExpr
 
 -- Argument to a Spine
@@ -88,7 +86,8 @@ parseApp : Parser Raw
 parseApp = do
   hd <- atom
   rest <- many pArg
-  pure $ foldl (\a, (c,b) => RApp a b c) hd rest
+  fc <- getFC
+  pure $ foldl (\a, (c,b) => RApp fc a b c) hd rest
 
 parseOp : Parser Raw
 parseOp = parseApp >>= go 0
@@ -96,13 +95,14 @@ parseOp = parseApp >>= go 0
     go : Int -> Raw -> Parser Raw
     go prec left =
       do
+        fc <- getFC
         op <- token Oper
         let Just (p,fix) = lookup op operators
          | Nothing => fail "expected operator"
         if p >= prec then pure () else fail ""
         let pr = case fix of InfixR => p; _ => p + 1
         right <- go pr !(parseApp)
-        go prec (RApp (RApp (RVar op) left Explicit) right Explicit)
+        go prec (RApp fc (RApp fc (RVar fc op) left Explicit) right Explicit)
       <|> pure left
 
 export
@@ -113,16 +113,17 @@ letExpr = do
   alts <- startBlock $ someSame $ letAssign
   keyword' "in"
   scope <- typeExpr
-
-  pure $ foldl (\ acc, (n,v) => RLet n RImplicit v acc) scope alts
+  fc <- getFC
+  pure $ foldl (\ acc, (n,fc,v) => RLet fc n (RImplicit fc) v acc) scope alts
   where
-    letAssign : Parser (Name,Raw)
+    letAssign : Parser (Name,FC,Raw)
     letAssign = do
+      fc <- getFC
       name <- ident
       -- TODO type assertion
       keyword "="
       t <- typeExpr
-      pure (name,t)
+      pure (name,fc,t)
 
 pLetArg : Parser (Icit, String, Maybe Raw)
 pLetArg = (Implicit,,) <$> braces ident <*> optional (sym ":" >> typeExpr)
@@ -139,7 +140,8 @@ lamExpr = do
   args <- some pLetArg
   keyword "=>"
   scope <- typeExpr
-  pure $ foldr (\(icit, name, ty), sc => RLam name icit sc) scope args
+  fc <- getFC
+  pure $ foldr (\(icit, name, ty), sc => RLam fc name icit sc) scope args
 
 pPattern : Parser Pattern
 pPattern
@@ -163,10 +165,10 @@ caseExpr = do
   sc <- term
   keyword "of"
   alts <- startBlock $ someSame $ caseAlt
-  pure $ RCase sc alts
+  pure $ RCase !(getFC) sc alts
 
 -- This hits an idris codegen bug if parseOp is last and Lazy
-term =  withPos $ caseExpr
+term =  caseExpr
     <|> letExpr
     <|> lamExpr
     <|> parseOp
@@ -187,10 +189,10 @@ ibind = do
   mustWork $ do
     names <- some ident
     ty <- optional (sym ":" >> typeExpr)
-    pos <- getPos
+    pos <- getFC
     sym "}"
-    -- getPos is a hack here, I would like to position at the name...
-    pure $ map (\name => (name, Implicit, fromMaybe (RSrcPos pos RImplicit) ty)) names
+    -- getFC is a hack here, I would like to position at the name...
+    pure $ map (\name => (name, Implicit, fromMaybe (RImplicit pos) ty)) names
 
 arrow : Parser Unit
 arrow = sym "->" <|> sym "→"
@@ -202,10 +204,11 @@ binders = do
   arrow
   commit
   scope <- typeExpr
-  pure $ foldr mkBind scope (join binds)
+  fc <- getFC
+  pure $ foldr (mkBind fc) scope (join binds)
   where
-    mkBind : (String, Icit, Raw) -> Raw -> Raw
-    mkBind (name, icit, ty) scope = RPi (Just name) icit ty scope
+    mkBind : FC -> (String, Icit, Raw) -> Raw -> Raw
+    mkBind fc (name, icit, ty) scope = RPi fc (Just name) icit ty scope
 
 typeExpr = binders
   <|> do
@@ -214,7 +217,7 @@ typeExpr = binders
         case scope of
           Nothing      => pure exp
           -- consider Maybe String to represent missing
-          (Just scope) => pure $ RPi Nothing Explicit exp scope
+          (Just scope) => pure $ RPi !(getFC) Nothing Explicit exp scope
 
 
 -- And top level stuff
@@ -222,20 +225,21 @@ typeExpr = binders
 
 export
 parseSig : Parser Decl
-parseSig = TypeSig <$> ident <* keyword ":" <*> mustWork typeExpr
+parseSig = TypeSig <$> getFC <*> ident <* keyword ":" <*> mustWork typeExpr
 
 parseImport : Parser Decl
-parseImport = DImport <$ keyword "import" <* commit <*> ident
+parseImport = DImport <$> getFC <* keyword "import" <* commit <*> ident
 
 -- Do we do pattern stuff now? or just name = lambda?
 
 export
 parseDef : Parser Decl
-parseDef = Def <$> ident <* keyword "=" <*> mustWork typeExpr
+parseDef = Def <$> getFC <*> ident <* keyword "=" <*> mustWork typeExpr
 
 export
 parseData : Parser Decl
 parseData = do
+  fc <- getFC
   keyword "data"
   name <- ident
   keyword ":"
@@ -244,12 +248,12 @@ parseData = do
   commit
   decls <- startBlock $ manySame $ parseSig
   -- TODO - turn decls into something more useful
-  pure $ Data name ty decls
+  pure $ Data fc name ty decls
 
 -- Not sure what I want here.
 -- I can't get a Tm without a type, and then we're covered by the other stuff
 parseNorm : Parser Decl
-parseNorm = DCheck <$ keyword "#check" <*> typeExpr <* keyword ":" <*> typeExpr
+parseNorm = DCheck <$> getFC <* keyword "#check" <*> typeExpr <* keyword ":" <*> typeExpr
 
 export
 parseDecl : Parser Decl

@@ -21,15 +21,18 @@ data Fixity = InfixL | InfixR | Infix
 
 -- I was going to use a record, but we're peeling this off of bounds at the moment.
 public export
-SourcePos : Type
-SourcePos = (Int,Int)
+FC : Type
+FC = (Int,Int)
 
-emptyPos : SourcePos
-emptyPos = (0,0)
+%name FC fc
+
+export
+emptyFC : FC
+emptyFC = (0,0)
 
 -- Error of a parse
 public export
-data Error = E SourcePos String
+data Error = E FC String
 %name Error err
 
 public export
@@ -64,14 +67,14 @@ Functor Result where
 
 -- dunno why I'm making that a pair..
 export
-data Parser a = P (TokenList -> Bool -> (lc : SourcePos) -> Result a)
+data Parser a = P (TokenList -> Bool -> (lc : FC) -> Result a)
 
 export
-runP : Parser a -> TokenList -> Bool -> SourcePos -> Result a
+runP : Parser a -> TokenList -> Bool -> FC -> Result a
 runP (P f) = f
 
 error : TokenList -> String -> Error
-error [] msg = E emptyPos msg
+error [] msg = E emptyFC msg
 error ((MkBounded val isIrrelevant (MkBounds line col _ _)) :: _) msg = E (line, col) msg
 
 export
@@ -156,9 +159,9 @@ mutual
 
 -- withIndentationBlock - sets the col
 export
-getPos : Parser SourcePos
-getPos = P $ \toks,com, (l,c) => case toks of
-  [] => Fail False (error toks "End of file") toks com -- OK emptyPos toks com
+getFC : Parser FC
+getFC = P $ \toks,com, (l,c) => case toks of
+  [] => OK emptyFC toks com
   (t :: ts) => OK (start t) toks com
 
 ||| Start an indented block and run parser in it
