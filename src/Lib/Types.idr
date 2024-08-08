@@ -80,11 +80,16 @@ getFC (U fc) = fc
 getFC (Pi fc str icit t u) = fc
 getFC (Case fc t xs) = fc
 
+covering
+Show Tm
 
+covering
 Show CaseAlt where
-  show alt = "FIXME"
+  show (CaseDefault tm) = "_ => \{show tm}"
+  show (CaseCons nm args tm) = "\{nm} \{unwords args} => \{show tm}"
 
 -- public export
+covering
 Show Tm where
   show (Bnd _ k) = "(Bnd \{show k})"
   show (Ref _ str _) = "(Ref \{show str})"
@@ -92,8 +97,8 @@ Show Tm where
   show (App _ t u) = "(\{show t} \{show u})"
   show (Meta _ i) = "(Meta \{show i})"
   show (U _) = "U"
-  show (Pi _ str Implicit t u) = "(Pi (\{str} : \{show t}) => \{show u})"
-  show (Pi _ str Explicit t u) = "(Pi {\{str} : \{show t}} => \{show u})"
+  show (Pi _ str Explicit t u) = "(Pi (\{str} : \{show t}) => \{show u})"
+  show (Pi _ str Implicit t u) = "(Pi {\{str} : \{show t}} => \{show u})"
   show (Case _ sc alts) = "(Case \{show sc} \{show alts})"
 
 -- I can't really show val because it's HOAS...
@@ -265,6 +270,7 @@ public export
 data Def = Axiom | TCon (List String) | DCon Nat String | Fn Tm
 
 public export
+covering
 Show Def where
   show Axiom = "axiom"
   show (TCon strs) = "TCon \{show strs}"
@@ -282,6 +288,7 @@ record TopEntry where
 -- FIXME snoc
 
 export
+covering
 Show TopEntry where
   show (MkEntry name type def) = "\{name} : \{show type} := \{show def}"
 

@@ -133,13 +133,13 @@ parameters (ctx: Context)
       -- REVIEW I'd like to quote this back, but we have l that aren't in the environment.
       _ => error emptyFC "unify failed \{show t'} =?= \{show u'} \n  env is \{show ctx.env} \{show $ map fst ctx.types}"
 
-unifyCatch : Context -> Val -> Val -> M ()
-unifyCatch ctx ty' ty = catchError (unify ctx ctx.lvl ty' ty) $ \(E x str) => do
+unifyCatch : FC -> Context -> Val -> Val -> M ()
+unifyCatch fc ctx ty' ty = catchError (unify ctx ctx.lvl ty' ty) $ \(E x str) => do
     let names = toList $ map fst ctx.types
     a <- quote ctx.lvl ty'
     b <- quote ctx.lvl ty
     let msg = "\n  failed to unify \{pprint names a}\n    with \{pprint names b}\n  " <+> str
-    throwError (E x msg)
+    throwError (E fc msg)
 
 insert : (ctx : Context) -> Tm -> Val -> M (Tm, Val)
 insert ctx tm ty = do
@@ -180,7 +180,7 @@ checkAlt scty ctx ty (MkAlt ptm body) = do
 
   -- arity is wrong, but we actually need the type anyway
   -- in fact arity is for later (eval?) and we need to do implicits first
-  debug "arity is \{show arity} dcty \{pprint [] dcty}"
+  debug "arity is \{show arity} dcty \{pprint [] dcty} con \{show con} pats \{show args}"
   -- and then we run the names against the type
   -- get all that into a context and run the body
 
@@ -193,50 +193,56 @@ checkAlt scty ctx ty (MkAlt ptm body) = do
   -- I suspect I'll rewrite this a few times
   vdcty <- eval [] CBN dcty
   debug "go \{show vdcty} \{show ptm}"
-  alttm <- go vdcty ptm ctx
+  alttm <- go vdcty args ctx
   debug "GOT \{pprint (names ctx) alttm}"
 
   -- package up the results into something.
   -- REVIEW args, also probably want the tag not the name.
-  pure $ CaseCons con args alttm
+  pure $ CaseCons con (map (snd . snd) args) alttm
 
   where
+    argsFC : List (FC, Icit, String) -> FC
+    argsFC [] = emptyFC
+    argsFC ((fc,_) :: xs) = fc
 
-    go : Val -> Raw -> Context -> M Tm
+    go : Val -> List (FC, Icit, String) -> Context -> M Tm
     -- FIXME icit
-    go (VPi fc str Explicit a b) (RApp _ t (RVar _ nm) Explicit) ctx = do
-      debug "*** \{nm} : \{show a}"
+    -- backwards?
+    go (VPi fc str Explicit a b) ((fc', Explicit, nm) :: rest) ctx = do
+      debug "*** \{nm} : \{show a} Explicit \{str}"
+      let var = VVar fc' (length ctx.env) [<]
+      let ctx' = extend ctx nm a
+      Lam fc' nm <$> go !(b $$ var) rest ctx'
+    go (VPi fc str Implicit a b) ((fc', Implicit, nm) :: rest) ctx = do
+      debug "*** \{nm} : \{show a} Implicit \{str}"
       let var = VVar emptyFC (length ctx.env) [<]
       let ctx' = extend ctx nm a
-      Lam emptyFC nm <$> go !(b $$ var) t ctx'
-    go (VPi fc str Implicit a b) (RApp _ t (RVar _ nm) Implicit) ctx = do
-      debug "*** \{nm} : \{show a}"
-      let var = VVar emptyFC (length ctx.env) [<]
-      let ctx' = extend ctx nm a
-      Lam emptyFC nm <$> go !(b $$ var) t ctx'
-    go (VPi fc str Implicit a b) t ctx = do
-      let var = VVar emptyFC (length ctx.env) [<]
+      Lam emptyFC nm <$> go !(b $$ var) rest ctx'
+    go (VPi fc str Implicit a b) args ctx = do
+      debug "*** insert \{str}"
+      let fc' = argsFC args
+      let var = VVar fc' (length ctx.env) [<]
       let ctx' = extend ctx "_" a
-      Lam emptyFC "_" <$> go !(b $$ var) t ctx'
+      Lam fc' "_" <$> go !(b $$ var) args ctx'
     -- same deal with _ for name
-    go (VPi fc str icit x y) (RApp _ t (RImplicit _) icit') ctx = ?rhs_19
-    go (VPi fc str icit x y) tm ctx = error emptyFC "Can't use \{show tm} as pattern"
+    go (VPi fc str Explicit a b) ((fc', Implicit, nm) :: rest) ctx = do
+      error fc' "Implicit/Explicit mismatch \{show str} \{show nm}"
+    go (VPi fc str icit x y) [] ctx = error emptyFC "Not enough arguments"
 
     -- nameless variable
-    go ctype (RImplicit _) ctx = ?rhs_2
-    go ctype (RVar _ nm) ctx = do
-      debug "*** end"
+    go ctype [] ctx = do
+      debug "*** end \{show ctype}"
       check ctx body ty
       -- pure ctx -- this should be our constructor.
     -- This happens if we run out of runway (more args and no pi)
-    go ctype tm ctx = error (getFC tm) "unhandled in go \{show ctype} \{show tm}"
-
-    getArgs : Raw -> List String -> M (String, List String)
+    -- go ctype tm ctx = error (getF "unhandled in checkAlt.go type: \{show ctype} term: \{show tm}"
+    go ctype args ctx = error (argsFC args) "Extra args"
+    getArgs : Raw -> List (FC,Icit, String) -> M (String, List (FC,Icit, String))
     getArgs (RVar _ nm) acc = pure (nm, acc)
     -- TODO implicits
-    getArgs (RApp _ t (RVar _ nm) icit) acc = getArgs t (nm :: acc)
-    getArgs (RApp _ t (RHole _) icit) acc = getArgs t ("_" :: acc)
-    getArgs tm _ = error emptyFC "Patterns must be constructor and vars, got \{show tm}"
+    getArgs (RApp _ t (RVar fc nm) icit) acc = getArgs t ((fc,icit,nm) :: acc)
+    getArgs (RApp _ t (RHole fc) icit) acc = getArgs t ((fc,icit,"_") :: acc)
+    getArgs tm _ = error (getFC tm) "Patterns must be constructor and vars, got \{show tm}"
 
 
 check ctx tm ty = case (tm, !(forceType ty)) of
@@ -300,7 +306,7 @@ check ctx tm ty = case (tm, !(forceType ty)) of
         insert ctx tm' ty'
 
     debug "INFER \{show tm} to (\{pprint names tm'} : \{show ty'}) expect \{show ty}"
-    unifyCatch ctx ty' ty
+    unifyCatch (getFC tm) ctx ty' ty
     pure tm'
 
 infer ctx (RVar fc nm) = go 0 ctx.types

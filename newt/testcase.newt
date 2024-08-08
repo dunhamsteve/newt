@@ -1,7 +1,5 @@
 module Scratch
 
-
-
 data Nat : U where
   Z : Nat
   S : Nat -> Nat
@@ -16,8 +14,39 @@ plus = \ n m => case n of
   S k => S (plus k m)
 
 -- So this isn't working at the moment, I think I need
--- to replace the n with S ?k
+-- to replace the n with S k
+--
+-- this is working kinda, but `length {a}` xs doesn't, so we
+-- don't know the a's are the same
+--
+-- I think "unify" scty with the end of the constructor type
+-- But it's going to be something like
+--   Vect (S k) a' =?= Vect n a
 length : {a : U} {n : Nat} -> Vect n a -> Nat
 length = \ v => case v of
   Nil => Z
-  Cons {a} {n'} x xs => S (length {a} xs)
+  Cons x xs => S (length xs)
+
+data Unit : U where
+  MkUnit : Unit
+
+foo : Vect (S Z) Unit
+foo = Cons MkUnit Nil
+
+-- This should fail (and does!)
+-- bar : Vect (S Z) Unit
+-- bar = (Cons MkUnit (Cons MkUnit Nil))
+
+data Bool : U where
+  True : Bool
+  False : Bool
+
+not : Bool -> Bool
+not = \ v => case v of
+  True => False
+  False => True
+
+data Void : U where
+
+falseElim : {A : U} -> Void -> A
+falseElim = \ v => case v of

@@ -17,6 +17,7 @@ lookup nm top = go top.defs
 
 -- Maybe pretty print?
 export
+covering
 Show TopContext where
   show (MkTop defs metas _) = "\nContext:\n [\{ joinBy "\n" $ map show defs}]"
 
