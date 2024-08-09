@@ -4,12 +4,7 @@ import Lib.Types
 import Lib.Prettier
 import Data.String
 
--- return is in the wrong spot
--- case is still FIXME
--- case missing break
-
 data Kind = Plain | Return | Assign String
-
 
 data JSStmt : Kind -> Type
 

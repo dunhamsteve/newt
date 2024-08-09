@@ -1,33 +1,40 @@
 
-We're stopping at zoo4.
-
-- [ ] empty data is broken when followed by a function, need to check that new indent level is deeper
+We're stopping at zoo4 for now.
 
 Going ahead with data. scratch.newt for starters, build out enough for plus to typecheck. See where we are at that point, and fix up the dependent stuff. Add another test case that exercises this.
 
+Compiling to js including data.
+
 v1 of cases requires a constructor and vars, var, or default.
+
+- [ ] Handle meta in compile
+- [ ] Default case (need to process list to cases and maybe default)
+- [ ] Arity for top level functions (and lombda for partial application)
+     - I can do this here, but I'll have to wire in M, otherwise maybe a transform
+       before this (we could pull out default case too)
+
 
 When we do impossible, take agda approach
 
-- [ ] typecheck plus
-  - [ ] checkAlt
+- [x] typecheck plus
+  - [x] checkAlt
   - [ ] process data decl should check some stuff
-- [ ] switch to FC
+- [x] switch to FC
 
 - [ ] think about whether there needs to be a desugar step separate from check/infer
 
 - [ ] look into Lennart.newt issues
 - [ ] Type at point for the editor
-- [ ] add operators to parser state
-  - (Are we going to run this on LHS too?)
+- [ ] add operators to parser state (Are we going to run this on LHS too?)
 
 - [ ] Data
-  - [ ] Read data as real constructors
-  - [ ] Typecheck / eval the same
-  - [ ] Add elimination / case
+  - [x] Read data as real constructors
+  - [x] Typecheck / eval the same
+  - [x] Add data elimination / case #partial
     - [ ] test cases. Maybe from pi-forall
-- [ ] Code Gen
+- [x] Code Gen #partial
 - [ ] Less expansion
+  - Look at smallTT rules
   - Can we not expand top level - expand in unification and matching pi types?
 
 So smalltt has TopVar with a Level. typechecking binders end up as top too.
