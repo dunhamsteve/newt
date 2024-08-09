@@ -48,5 +48,3 @@ not = \ v => case v of
 
 data Void : U where
 
-falseElim : {A : U} -> Void -> A
-falseElim = \ v => case v of

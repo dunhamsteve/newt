@@ -9,6 +9,7 @@ import Data.String
 import Data.Vect
 import Data.IORef
 -- import Lib.Check
+import Lib.Compile
 import Lib.Parser
 -- import Lib.Parser.Impl
 import Lib.Prettier
@@ -46,6 +47,11 @@ dumpContext top = do
     go [] = pure ()
     go (x :: xs) = go xs >> putStrLn "    \{show x}"
 
+dumpSource : M ()
+dumpSource = do
+  doc <- compile
+  putStrLn $ render 80 doc
+
 processFile : String -> M ()
 processFile fn = do
   putStrLn "*** Process \{fn}"
@@ -60,6 +66,7 @@ processFile fn = do
     | Left y => putStrLn (showError src y)
 
   dumpContext !get
+  dumpSource
 
 main' : M ()
 main' = do
