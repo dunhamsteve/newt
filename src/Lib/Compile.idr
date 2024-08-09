@@ -21,6 +21,7 @@ data JSExp : Type where
   JLam : String -> JSStmt Return -> JSExp
   JUndefined : JSExp
   Index : JSExp -> JSExp -> JSExp
+  Dot : JSExp -> String -> JSExp
 
 data JSStmt : Kind -> Type where
   -- Maybe make this a snoc...
@@ -62,12 +63,12 @@ termToJS env (Case _ t alts) f =
     let (l,c) = getFC t in
     let nm = "sc$\{show l}$\{show c}" in
     JSeq (JConst nm t')
-      (JCase (Index (Var nm) (LitString "tag")) (map (termToJSAlt nm) alts) Nothing))
+      (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts) Nothing))
   where
     -- Stuff nm.h1, nm.h2, ... into environment
     mkEnv : String -> Nat -> List JSExp -> List String -> List JSExp
     mkEnv nm k env [] = env
-    mkEnv nm k env (x :: xs) = mkEnv nm (S k) (Index (Var nm) (LitString "h\{show k}") :: env) xs
+    mkEnv nm k env (x :: xs) = mkEnv nm (S k) (Dot (Var nm) "h\{show k}" :: env) xs
 
     termToJSAlt : String -> CaseAlt -> (String, JSStmt e)
     termToJSAlt nm (CaseDefault u) = ?handle_default_case
@@ -87,9 +88,11 @@ expToDoc (LitObject xs) = ?expToDoc_rhs_1
 expToDoc (LitString str) = jsString str
 expToDoc (Apply x xs) = expToDoc x ++ "(" ++ spread (map expToDoc xs) ++ ")"
 expToDoc (Var nm) = text nm
+expToDoc (JLam nm (JReturn exp)) = text "(" <+> text nm <+> ") =>" <+> expToDoc exp
 expToDoc (JLam nm body) = text "(" <+> text nm <+> ") =>" <+> bracket "{" (stmtToDoc body) "}"
 expToDoc JUndefined = text "undefined"
 expToDoc (Index obj ix) = expToDoc obj ++ "[" ++ expToDoc ix ++ "]"
+expToDoc (Dot obj nm) = expToDoc obj ++ "." ++ text nm
 
 altToDoc : (String, JSStmt e) -> Doc
 -- line is an extra newline, but nest seems borken
