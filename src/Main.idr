@@ -50,7 +50,7 @@ dumpContext top = do
 dumpSource : M ()
 dumpSource = do
   doc <- compile
-  putStrLn $ render 80 doc
+  putStrLn $ render 90 doc
 
 processFile : String -> M ()
 processFile fn = do

@@ -9,6 +9,12 @@ import Lib.TopContext
 import Lib.Check
 import Lib.Syntax
 
+getArity : Tm -> Nat
+getArity (Pi x str icit t u) = S (getArity u)
+-- Ref or App (of type constructor) are valid
+getArity _ = Z
+
+
 export
 processDecl : Decl -> M ()
 processDecl (TypeSig fc nm tm) = do
@@ -77,7 +83,8 @@ processDecl (Data fc nm ty cons) = do
           -- TODO check pi type ending in full tyty application
           -- TODO count arity
           dty <- check (mkCtx ctx.metas) tm (VU fc)
-          modify $ defcon nm' 0 nm dty
+          debug "dty \{nm'} is \{pprint [] dty}"
+          modify $ defcon nm' (getArity dty) nm dty
           pure nm'
       _ => throwError $ E (0,0) "expected constructor declaration"
   -- TODO check tm is VU or Pi ending in VU

@@ -2,6 +2,7 @@ module Lib.Compile
 
 import Lib.Types
 import Lib.Prettier
+import Data.String
 
 -- return is in the wrong spot
 -- case is still FIXME
@@ -18,14 +19,14 @@ data JSExp : Type where
   LitString : String -> JSExp
   Apply : JSExp -> List JSExp -> JSExp
   Var : String -> JSExp
-  JLam : String -> JSStmt Return -> JSExp
+  JLam : List String -> JSStmt Return -> JSExp
   JUndefined : JSExp
   Index : JSExp -> JSExp -> JSExp
   Dot : JSExp -> String -> JSExp
 
 data JSStmt : Kind -> Type where
   -- Maybe make this a snoc...
-  JSeq : JSStmt Plain -> JSStmt a -> JSStmt a
+  JSnoc : JSStmt Plain -> JSStmt a -> JSStmt a
   JPlain : JSExp -> JSStmt Plain
   JConst : (nm : String) -> JSExp -> JSStmt Plain
   JReturn : JSExp -> JSStmt Return
@@ -38,11 +39,11 @@ data JSStmt : Kind -> Type where
 Cont e = JSExp -> JSStmt e
 
 -- This is inspired by A-normalization, look into the continuation monad
--- There is an index on JSStmt, adopted from Stefan's code.
+-- There is an index on JSStmt, adopted from Stefan Hoeck's code.
 --
 -- Here we turn a Term into a statement (which may be a sequence of statements), there
 -- is a continuation, which turns the final JSExpr into a JSStmt, and the function returns
--- a JSStmt, possibly wrapping recursive calls with JSeq
+-- a JSStmt, wrapping recursive calls in JSnoc if necessary.
 termToJS : List JSExp -> Tm -> Cont e -> JSStmt e
 termToJS env (Bnd _ k) f = case getAt k env of
   (Just e) => f e
@@ -52,7 +53,7 @@ termToJS env (Meta _ k) f = f $ LitString "META \{show k}"
 termToJS env (Lam _ nm t) f =
   let nm' = "nm$\{show $ length env}"
       env' = (Var nm' :: env)
-  in f $ JLam nm' (termToJS env' t JReturn)
+  in f $ JLam [nm'] (termToJS env' t JReturn)
 termToJS env (App _ t u) f = termToJS env t (\ t' => termToJS env u (\ u' => f (Apply t' [u'])))
 termToJS env (U _) f = f $ LitString "U"
 termToJS env (Pi _ nm icit t u) f = f $ LitString "Pi \{nm}"
@@ -62,7 +63,7 @@ termToJS env (Case _ t alts) f =
   termToJS env t (\ t' =>
     let (l,c) = getFC t in
     let nm = "sc$\{show l}$\{show c}" in
-    JSeq (JConst nm t')
+    JSnoc (JConst nm t')
       (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts) Nothing))
   where
     -- Stuff nm.h1, nm.h2, ... into environment
@@ -84,12 +85,17 @@ stmtToDoc : JSStmt e -> Doc
 
 expToDoc : JSExp -> Doc
 expToDoc (LitArray xs) = ?expToDoc_rhs_0
-expToDoc (LitObject xs) = ?expToDoc_rhs_1
+expToDoc (LitObject xs) = text "{" <+> folddoc (\ a, e => a ++ ", " <+/> e) (map entry xs) <+> text "}"
+  where
+    entry : (String, JSExp) -> Doc
+    -- TODO quote if needed
+    entry (nm, exp) = text nm ++ ":" <+> expToDoc exp
+
 expToDoc (LitString str) = jsString str
 expToDoc (Apply x xs) = expToDoc x ++ "(" ++ spread (map expToDoc xs) ++ ")"
 expToDoc (Var nm) = text nm
-expToDoc (JLam nm (JReturn exp)) = text "(" <+> text nm <+> ") =>" <+> expToDoc exp
-expToDoc (JLam nm body) = text "(" <+> text nm <+> ") =>" <+> bracket "{" (stmtToDoc body) "}"
+expToDoc (JLam nms (JReturn exp)) = text "(" <+> text (joinBy ", " nms) <+> ") =>" <+> expToDoc exp
+expToDoc (JLam nms body) = text "(" <+> text (joinBy ", " nms) <+> ") =>" <+> bracket "{" (stmtToDoc body) "}"
 expToDoc JUndefined = text "undefined"
 expToDoc (Index obj ix) = expToDoc obj ++ "[" ++ expToDoc ix ++ "]"
 expToDoc (Dot obj nm) = expToDoc obj ++ "." ++ text nm
@@ -99,8 +105,7 @@ altToDoc : (String, JSStmt e) -> Doc
 altToDoc (nm, (JReturn exp)) = text "case" <+> jsString nm ++ ":" </> nest 2 (line ++ "return" <+> expToDoc exp)
 altToDoc (nm, stmt) = text "case" <+> jsString nm ++ ":" </> nest 2 (line ++ stmtToDoc stmt </> text "break;")
 
-
-stmtToDoc (JSeq x y) = stmtToDoc x </> stmtToDoc y
+stmtToDoc (JSnoc x y) = stmtToDoc x </> stmtToDoc y
 stmtToDoc (JPlain x) = expToDoc x
 stmtToDoc (JConst nm x) = text "const" <+> text nm <+> "=" <+/> expToDoc x
 stmtToDoc (JReturn x) = text "return" <+> expToDoc x
@@ -108,10 +113,21 @@ stmtToDoc (JError str) = text "throw new Error(" ++ text str ++ ")"
 stmtToDoc (JCase sc alts y) =
   text "switch (" ++ expToDoc sc ++ ")" <+> bracket "{" (stack $ map altToDoc alts) "}"
 
+-- FIXME - if the result is JSnoc, we get extra top level code
+-- If we make top level 0-arity values lazy, this won't happen
 function : String -> Tm -> Doc
-function nm tm =
-  let body = stmtToDoc $ termToJS [] tm JReturn in
-  text "const" <+> text nm <+> "=" <+/> body
+function nm tm = stmtToDoc $ termToJS [] tm (JConst nm)
+
+dcon : String -> Nat -> Doc
+dcon nm arity =
+  let args := mkArgs arity []
+      obj := ("tag", LitString nm) :: map (\x => (x, Var x)) args
+  in stmtToDoc $ JConst nm (JLam args (JReturn (LitObject obj)))
+  where
+    -- FIXME arity wrong
+    mkArgs : Nat -> List String -> List String
+    mkArgs Z acc = acc
+    mkArgs (S k) acc = mkArgs k ("h\{show k}" :: acc)
 
 entryToDoc : TopEntry -> Maybe Doc
 entryToDoc (MkEntry name type (Fn tm)) =
@@ -119,7 +135,7 @@ entryToDoc (MkEntry name type (Fn tm)) =
   Just (text "const" <+> text name <+> "=" <+/> body)
 entryToDoc (MkEntry name type Axiom) = Nothing
 entryToDoc (MkEntry name type (TCon strs)) = Nothing
-entryToDoc (MkEntry name type (DCon k str)) = Nothing
+entryToDoc (MkEntry name type (DCon arity str)) = Just $ dcon name arity
 
 export
 compile : M Doc
