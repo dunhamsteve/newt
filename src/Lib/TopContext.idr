@@ -23,34 +23,15 @@ Show TopContext where
 
 public export
 empty : HasIO m => m TopContext
-empty = pure $ MkTop [] !(newIORef (MC [] 0)) True
+empty = pure $ MkTop [] !(newIORef (MC [] 0)) False
 
+||| set or replace def. probably need to check types and Axiom on replace
 public export
-claim : String -> Tm -> TopContext -> TopContext
-claim name ty = { defs $= (MkEntry name ty Axiom ::) }
-
-
-public export
-deftype : String -> Tm -> List String -> TopContext -> TopContext
-deftype name ty cons = { defs $= (MkEntry name ty (TCon cons) :: )}
-
-public export
-defcon : String -> Nat -> String -> Tm -> TopContext -> TopContext
-defcon cname arity tyname ty = { defs $= (MkEntry cname ty (DCon arity tyname) ::) }
-
-
--- TODO update existing, throw, etc.
-
-public export
-addDef : TopContext -> String -> Tm -> Tm -> TopContext
-addDef tc name tm ty = { defs $= go } tc
+setDef : String -> Tm -> Def -> TopContext -> TopContext
+setDef name ty def = { defs $= go }
   where
-  -- What did I do here?
     go : List TopEntry -> List TopEntry
-    -- FIXME throw if we hit [] or is not an axiom
-    -- FIXME use a map, I want updates
-    go [] = ?addDEF_fail
-    go (x@(MkEntry nm _ _) :: xs) = if nm == name
-      then MkEntry nm ty (Fn tm) :: xs
-      else x :: go xs
-
+    go [] = [MkEntry name ty def]
+    go (x@(MkEntry nm ty' def') :: defs) = if nm == name
+      then MkEntry name ty def :: defs
+      else x :: go defs

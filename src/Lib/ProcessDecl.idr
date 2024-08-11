@@ -24,7 +24,7 @@ processDecl (TypeSig fc nm tm) = do
   ty <- check (mkCtx top.metas) tm (VU fc)
   ty' <- nf [] ty
   putStrLn "got \{pprint [] ty'}"
-  modify $ claim nm ty'
+  modify $ setDef nm ty' Axiom
 
 processDecl (Def fc nm raw) = do
   putStrLn "-----"
@@ -48,7 +48,7 @@ processDecl (Def fc nm raw) = do
       -- putStrLn "ERROR at (\{show l}, \{show c}): Unsolved meta \{show k}"
       throwError $ E (l,c) "Unsolved meta \{show k}"
   debug "Add def \{nm} \{pprint [] tm} : \{pprint [] ty}"
-  put (addDef ctx nm tm ty)
+  modify $ setDef nm ty (Fn tm)
 
 processDecl (DCheck fc tm ty) = do
 
@@ -74,7 +74,7 @@ processDecl (Data fc nm ty cons) = do
   ctx <- get
   tyty <- check (mkCtx ctx.metas) ty (VU fc)
   -- FIXME we need this in scope, but need to update
-  modify $ claim nm tyty
+  modify $ setDef nm tyty Axiom
   ctx <- get
   cnames <- for cons $ \x => case x of
       -- expecting tm to be a Pi type
@@ -84,14 +84,14 @@ processDecl (Data fc nm ty cons) = do
           -- TODO count arity
           dty <- check (mkCtx ctx.metas) tm (VU fc)
           debug "dty \{nm'} is \{pprint [] dty}"
-          modify $ defcon nm' (getArity dty) nm dty
+          modify $ setDef nm' dty (DCon (getArity dty) nm)
           pure nm'
       _ => throwError $ E (0,0) "expected constructor declaration"
   -- TODO check tm is VU or Pi ending in VU
   -- Maybe a pi -> binders function
   -- TODO we're putting in axioms, we need constructors
   -- for each constructor, check and add
-  modify $ deftype nm tyty cnames
+  modify $ setDef nm tyty (TCon cnames)
   pure ()
   where
     checkDeclType : Tm -> M ()

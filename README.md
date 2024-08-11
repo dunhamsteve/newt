@@ -7,35 +7,75 @@ Compiling to js including data.
 
 v1 of cases requires a constructor and vars, var, or default.
 
+
+### Main
+
+- [ ] flag for debug?
+
+### Data
+
+- [x] typecheck `plus`
+- [ ] don't leave extra "Axiom" entries for incomplete `data` (switch to a map or drop the order)
+- [ ] Check types when declaring data (collect telescope and check final type against type constructor)
+- [ ] Learn stuff like `n = S k` in case trees.
+  - Need test case
+  - If this is all var = tm, I could mutate the local env (Would it need to be `let` to be used in unification?)
+  - I could subst into something (environment / goal?)
+  - I could carry around extra stuff for unification
+  - With names, I could dump a `let` into the env
+- [ ] Handle default cases (non-constructor)
+- [ ] When we do impossible, take agda approach
+- [ ] test cases. Maybe from pi-forall
+
+### Primitives
+
+Maybe we can declare primitive ops and not hardwire a list in the codegen?
+
+- [ ] Add primitive strings
+- [ ] Add primitive numbers
+- [ ] Wire through compilation
+- [ ] Magic Nat in compilation
+
+### Erasure
+
+We need some erasure for runtime. The pi-forall notation isn't compatible with implicits. Maybe use Idris2 or Agda notation. Prop is another option.
+
+- [ ] Erased values?
+  - pi-forall handles this, so it's probably not too crazy. She won't go near implicits and I think I understand why.
+  - I don't think I Want to go full QTT at the moment
+  - Is erased different from 0/many?
+
+### Compilation
+
+Code generation is partially done.
+
 - [ ] Handle meta in compile
 - [ ] Default case (need to process list to cases and maybe default)
-- [ ] Arity for top level functions (and lombda for partial application)
+- [ ] Arity for top level functions (and lambda for partial application)
      - I can do this here, but I'll have to wire in M, otherwise maybe a transform
        before this (we could pull out default case too)
+- [ ] Javascript operators / primitives
+- [ ] Don't do assign var to fresh var
 
+### Parsing / Language
 
-When we do impossible, take agda approach
-
-- [x] typecheck plus
-  - [x] checkAlt
-  - [ ] process data decl should check some stuff
 - [x] switch to FC
+- [ ] add operators to parser state (Are we going to run this on LHS too?)
+- [ ] Modules and namespaces
+- [ ] List sugar
+
+### Editor
+
+- [ ] Type at point for the editor
+
+### Typecheck / Elaboration
 
 - [ ] think about whether there needs to be a desugar step separate from check/infer
-
-- [ ] look into Lennart.newt issues
-- [ ] Type at point for the editor
-- [ ] add operators to parser state (Are we going to run this on LHS too?)
-
-- [ ] Data
-  - [x] Read data as real constructors
-  - [x] Typecheck / eval the same
-  - [x] Add data elimination / case #partial
-    - [ ] test cases. Maybe from pi-forall
 - [x] Code Gen #partial
 - [ ] Less expansion
   - Look at smallTT rules
   - Can we not expand top level - expand in unification and matching pi types?
+- [ ] look into Lennart.newt issues
 
 So smalltt has TopVar with a Level. typechecking binders end up as top too.
 
@@ -57,8 +97,6 @@ I've added a bunch of info logs for the editor support.
 
 Zoo4 examples run now.
 
-Maybe do `data` next.  There is a crude version in place, we'll want to fix that, typecheck the new stuff, and then add cases. (Maybe introduce eliminators.)
-
 When I generate code, I'll eventually run up against the erased thing. (I'll want to erase some of the stuff that is compile time.)  But we'll generate code and decide how far we need to take this.  It's probably pointless to just reproduce Idris.
 
 When I self host, I'll have to drop or implement typeclasses. I do understand auto enough to make it happen.
@@ -66,20 +104,16 @@ When I self host, I'll have to drop or implement typeclasses. I do understand au
 Ok, for code gen, I think I'll need something like primitive values and definitely primitive functions. For v0, I could leave the holes as undefined and if there is a function with that name, it's magically FFI.
 
 Questions:
-- [ ] Code gen or data next?
 - [ ] Should I write this up properly?
-- [ ] Erased values?
-  - pi-forall handles this, so it's probably not too crazy. She won't go near implicits and I think I understand why.
-  - I don't think I Want to go full QTT at the moment
-  - Is erased different from 0/many?
 
 Parser:
 - [x] parser for block comments
 - [x] import statement
 - [x] def
 - [x] simple decl
-- [ ] check (either check at _ or infer and let it throw)
-- [ ] nf (ditto, but print value. WHNF for now    )
+- [ ] %check (either check at _ or infer and let it throw)
+  - Lean checks (λ x => x) to ?m.249 → ?m.249
+- [ ] %nf (ditto, but print value. WHNF for now, eval in lean?)
 - [ ] operators / mixfix
   - Maybe put operators in parser state and update, ideally we'd have mixfix though
   - how does agda handle clashes between names and mixfix?
@@ -88,9 +122,9 @@ Parser:
 Testing:
 
 - [ ] black box testing
+  - [ ] Proper exit code
   - [ ] bug.newt should fail with a certain parse error, but there will be noise, so look for specific error?
   - [ ] zoo?.newt should complete successfully
-  - [ ]
 
 Misc:
 - [x] vscode support for .newt
@@ -110,9 +144,8 @@ Misc:
 - [x] figure out context representation - Global context?
 - [x] type checking / elab
   - What does this represent? The basics, implicits? pattern unification?
-- [ ] check for unsolved metas (after each def or at end?)
+- [x] check for unsolved metas (after each def or at end?)
 - [ ] compilation
-  - I'm thinking I get data working first
 - [ ] repl
 - [ ] write tests
 - [ ] Split up code better

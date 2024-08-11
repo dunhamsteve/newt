@@ -18,27 +18,11 @@ import Lib.Token
 import Lib.Tokenizer
 import Lib.TopContext
 import Lib.Types
--- import Lib.TT
 import Lib.Syntax
 import Lib.Syntax
 import System
 import System.Directory
 import System.File
-
-{-
-
-Main2.idr has an older App attempt without the code below.
-
-It has a repl, so we might want to re-integrate that code. And it uses
-App, but we have a way to make that work on javascript.
-
-I still want to stay in MonadError outside this file though.
-
-
-
-
--}
-
 
 dumpContext : TopContext -> M ()
 dumpContext top = do
@@ -79,7 +63,7 @@ main' = do
     | _ => putStrLn "Usage: newt foo.newt"
   -- Right files <- listDir "eg"
   --   | Left err => printLn err
-
+  when ("-v" `elem` files) $ modify { verbose := True }
   traverse_ processFile (filter (".newt" `isSuffixOf`) files)
 
 main : IO ()
