@@ -2,6 +2,7 @@ module Lib.Compile
 
 import Lib.Types
 import Lib.Prettier
+import Lib.CompileExp
 import Data.String
 
 data Kind = Plain | Return | Assign String
@@ -33,42 +34,56 @@ data JSStmt : Kind -> Type where
 
 Cont e = JSExp -> JSStmt e
 
+-- FIXME - add names to env so we can guarantee fresh names in the generated javascript.
+JSEnv = List JSExp
+
+-- Stuff nm.h1, nm.h2, ... into environment
+mkEnv : String -> Nat -> List JSExp -> List String -> List JSExp
+mkEnv nm k env [] = env
+mkEnv nm k env (x :: xs) = mkEnv nm (S k) (Dot (Var nm) "h\{show k}" :: env) xs
+
+
 -- This is inspired by A-normalization, look into the continuation monad
 -- There is an index on JSStmt, adopted from Stefan Hoeck's code.
 --
 -- Here we turn a Term into a statement (which may be a sequence of statements), there
 -- is a continuation, which turns the final JSExpr into a JSStmt, and the function returns
 -- a JSStmt, wrapping recursive calls in JSnoc if necessary.
-termToJS : List JSExp -> Tm -> Cont e -> JSStmt e
-termToJS env (Bnd _ k) f = case getAt k env of
+termToJS : List JSExp -> CExp -> Cont e -> JSStmt e
+termToJS env (CBnd k) f = case getAt k env of
   (Just e) => f e
   Nothing => ?bad_bounds
-termToJS env (Ref _ nm y) f = f $ Var nm
-termToJS env (Meta _ k) f = f $ LitString "META \{show k}"
-termToJS env (Lam _ nm t) f =
-  let nm' = "nm$\{show $ length env}"
+termToJS env (CLam nm t) f =
+  let nm' = "\{nm}$\{show $ length env}"
       env' = (Var nm' :: env)
   in f $ JLam [nm'] (termToJS env' t JReturn)
-termToJS env (App _ t u) f = termToJS env t (\ t' => termToJS env u (\ u' => f (Apply t' [u'])))
-termToJS env (U _) f = f $ LitString "U"
-termToJS env (Pi _ nm icit t u) f = f $ LitString "Pi \{nm}"
-termToJS env (Case _ t alts) f =
-  -- need to assign the scrutinee to a variable
-  -- and add (Bnd -> JSExpr map)
-  termToJS env t (\ t' =>
-    let (l,c) = getFC t in
-    let nm = "sc$\{show l}$\{show c}" in
-    JSnoc (JConst nm t')
-      (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts) Nothing))
+termToJS env (CFun nms t) f =
+  let nms' = map (\nm => "\{nm}$\{show $ length env}") nms
+      env' = foldl (\ e, nm => Var nm :: e) env nms'
+  in f $ JLam nms' (termToJS env' t JReturn)
+termToJS env (CRef nm) f = f $ Var nm
+termToJS env (CMeta k) f = f $ LitString "META \{show k}"
+termToJS env (CApp t args) f = termToJS env t (\ t' => argsToJS args [<] (\ args' => f (Apply t' args')))
   where
-    -- Stuff nm.h1, nm.h2, ... into environment
-    mkEnv : String -> Nat -> List JSExp -> List String -> List JSExp
-    mkEnv nm k env [] = env
-    mkEnv nm k env (x :: xs) = mkEnv nm (S k) (Dot (Var nm) "h\{show k}" :: env) xs
+    argsToJS : List CExp -> SnocList JSExp -> (List JSExp -> JSStmt e) -> JSStmt e
+    argsToJS [] acc k = k (acc <>> [])
+    argsToJS (x :: xs) acc k = termToJS env x (\ x' => argsToJS xs (acc :< x') k)
 
-    termToJSAlt : String -> CaseAlt -> (String, JSStmt e)
-    termToJSAlt nm (CaseDefault u) = ?handle_default_case
-    termToJSAlt nm (CaseCons name args u) =
+
+termToJS env (CCase t alts def) f =
+  -- need to assign the scrutinee to a variable (unless it is a var already?)
+  -- and add (Bnd -> JSExpr map)
+  -- TODO default case, let's drop the extra field.
+
+  termToJS env t $ \case
+     (Var nm) =>       (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts) Nothing)
+     t' =>
+      let nm = "sc$\{show $ length env}" in
+        JSnoc (JConst nm t')
+          (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts) Nothing)
+  where
+    termToJSAlt : String -> CAlt -> (String, JSStmt e)
+    termToJSAlt nm (CConAlt name args u) =
       let env' = mkEnv nm 0 env args in
       (name, termToJS env' u f)
 
@@ -110,30 +125,34 @@ stmtToDoc (JCase sc alts y) =
 
 -- FIXME - if the result is JSnoc, we get extra top level code
 -- If we make top level 0-arity values lazy, this won't happen
-function : String -> Tm -> Doc
-function nm tm = stmtToDoc $ termToJS [] tm (JConst nm)
+-- function : String -> Tm -> Doc
+-- function nm tm = stmtToDoc $ termToJS [] tm (JConst nm)
+
+
+mkArgs : Nat -> List String -> List String
+mkArgs Z acc = acc
+mkArgs (S k) acc = mkArgs k ("h\{show k}" :: acc)
 
 dcon : String -> Nat -> Doc
 dcon nm arity =
   let args := mkArgs arity []
       obj := ("tag", LitString nm) :: map (\x => (x, Var x)) args
   in stmtToDoc $ JConst nm (JLam args (JReturn (LitObject obj)))
-  where
-    -- FIXME arity wrong
-    mkArgs : Nat -> List String -> List String
-    mkArgs Z acc = acc
-    mkArgs (S k) acc = mkArgs k ("h\{show k}" :: acc)
 
-entryToDoc : TopEntry -> Maybe Doc
-entryToDoc (MkEntry name type (Fn tm)) =
-  let body = stmtToDoc $ termToJS [] tm JPlain in
-  Just (text "const" <+> text name <+> "=" <+/> body)
-entryToDoc (MkEntry name type Axiom) = Nothing
-entryToDoc (MkEntry name type (TCon strs)) = Nothing
-entryToDoc (MkEntry name type (DCon arity str)) = Just $ dcon name arity
+
+entryToDoc : TopEntry -> M Doc
+entryToDoc (MkEntry name ty (Fn tm)) = do
+  -- so this has a bunch of lambdas on it now, which we want to consolidate
+  -- and we might need betas? It seems like a mirror of what happens in CExp
+  ct <- compileFun tm
+  let body = stmtToDoc $ termToJS [] ct JPlain
+  pure (text "const" <+> text name <+> text "=" <+/> body)
+entryToDoc (MkEntry name type Axiom) = pure ""
+entryToDoc (MkEntry name type (TCon strs)) = pure ""
+entryToDoc (MkEntry name type (DCon arity str)) = pure $ dcon name arity
 
 export
 compile : M Doc
 compile = do
   top <- get
-  pure $ stack $ mapMaybe entryToDoc top.defs
+  pure $ stack $ !(traverse entryToDoc top.defs)

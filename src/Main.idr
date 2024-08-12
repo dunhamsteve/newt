@@ -71,5 +71,5 @@ main = do
   -- we'll need to reset for each file, etc.
   ctx <- empty
   Right _  <- runEitherT $ runStateT ctx $ main'
-    | Left (E (c, r) str) => putStrLn "Error: \{show c} \{show r} \{show str}"
+    | Left (E (c, r) str) => putStrLn "ERROR at (\{show c}, \{show r}): \{show str}"
   putStrLn "done"
