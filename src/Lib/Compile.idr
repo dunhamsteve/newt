@@ -1,3 +1,5 @@
+-- TODO fresh names
+
 module Lib.Compile
 
 import Lib.Types
@@ -8,6 +10,10 @@ import Data.String
 data Kind = Plain | Return | Assign String
 
 data JSStmt : Kind -> Type
+
+data JAlt : Type where
+  JConAlt : String -> JSStmt e -> JAlt
+  JDefAlt : JSStmt e -> JAlt
 
 data JSExp : Type where
   LitArray : List JSExp -> JSExp
@@ -28,7 +34,8 @@ data JSStmt : Kind -> Type where
   JReturn : JSExp -> JSStmt Return
   -- JAssign : (nm : String) -> JSExp -> JSStmt (Assign nm)
   -- TODO - switch to Nat tags
-  JCase : JSExp -> List (String, JSStmt a) -> Maybe (JSStmt a) -> JSStmt a
+  -- FIXME add e to JAlt (or just drop it?)
+  JCase : JSExp -> List JAlt -> JSStmt a
   -- throw can't be used
   JError : String -> JSStmt a
 
@@ -70,22 +77,26 @@ termToJS env (CApp t args) f = termToJS env t (\ t' => argsToJS args [<] (\ args
     argsToJS (x :: xs) acc k = termToJS env x (\ x' => argsToJS xs (acc :< x') k)
 
 
-termToJS env (CCase t alts def) f =
+termToJS env (CCase t alts) f =
   -- need to assign the scrutinee to a variable (unless it is a var already?)
   -- and add (Bnd -> JSExpr map)
   -- TODO default case, let's drop the extra field.
 
   termToJS env t $ \case
-     (Var nm) =>       (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts) Nothing)
-     t' =>
+    (Var nm) => (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts))
+    t' =>
       let nm = "sc$\{show $ length env}" in
         JSnoc (JConst nm t')
-          (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts) Nothing)
+          (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts))
   where
-    termToJSAlt : String -> CAlt -> (String, JSStmt e)
-    termToJSAlt nm (CConAlt name args u) =
-      let env' = mkEnv nm 0 env args in
-      (name, termToJS env' u f)
+    termToJSAlt : String -> CAlt -> JAlt
+    termToJSAlt nm (CConAlt name args u) = JConAlt name (termToJS (mkEnv nm 0 env args) u f)
+    -- intentially reusing scrutinee name here
+    termToJSAlt nm (CDefAlt u) = JDefAlt (termToJS (Var nm :: env) u f)
+    label : JSExp -> (String -> JSStmt e) -> JSStmt e
+    label (Var nm) f = f nm
+    label t f = ?label_rhs
+
 
 -- FIXME escape
 jsString : String -> Doc
@@ -110,24 +121,21 @@ expToDoc JUndefined = text "undefined"
 expToDoc (Index obj ix) = expToDoc obj ++ "[" ++ expToDoc ix ++ "]"
 expToDoc (Dot obj nm) = expToDoc obj ++ "." ++ text nm
 
-altToDoc : (String, JSStmt e) -> Doc
--- line is an extra newline, but nest seems borken
-altToDoc (nm, (JReturn exp)) = text "case" <+> jsString nm ++ ":" </> nest 2 (line ++ "return" <+> expToDoc exp)
-altToDoc (nm, stmt) = text "case" <+> jsString nm ++ ":" </> nest 2 (line ++ stmtToDoc stmt </> text "break;")
+caseBody : JSStmt e -> Doc
+caseBody stmt@(JReturn x) = nest 2 (line ++ stmtToDoc stmt)
+caseBody stmt = nest 2 (line ++ stmtToDoc stmt </> text "break;")
+
+altToDoc : JAlt -> Doc
+altToDoc (JConAlt nm stmt) = text "case" <+> jsString nm ++ ":" ++ caseBody stmt
+altToDoc (JDefAlt stmt) = text "default" ++ ":" ++ caseBody stmt
 
 stmtToDoc (JSnoc x y) = stmtToDoc x </> stmtToDoc y
-stmtToDoc (JPlain x) = expToDoc x
-stmtToDoc (JConst nm x) = text "const" <+> text nm <+> "=" <+/> expToDoc x
-stmtToDoc (JReturn x) = text "return" <+> expToDoc x
-stmtToDoc (JError str) = text "throw new Error(" ++ text str ++ ")"
-stmtToDoc (JCase sc alts y) =
+stmtToDoc (JPlain x) = expToDoc x ++ ";"
+stmtToDoc (JConst nm x) = text "const" <+> text nm <+> "=" <+/> expToDoc x ++ ";"
+stmtToDoc (JReturn x) = text "return" <+> expToDoc x ++ ";"
+stmtToDoc (JError str) = text "throw new Error(" ++ text str ++ ");"
+stmtToDoc (JCase sc alts) =
   text "switch (" ++ expToDoc sc ++ ")" <+> bracket "{" (stack $ map altToDoc alts) "}"
-
--- FIXME - if the result is JSnoc, we get extra top level code
--- If we make top level 0-arity values lazy, this won't happen
--- function : String -> Tm -> Doc
--- function nm tm = stmtToDoc $ termToJS [] tm (JConst nm)
-
 
 mkArgs : Nat -> List String -> List String
 mkArgs Z acc = acc

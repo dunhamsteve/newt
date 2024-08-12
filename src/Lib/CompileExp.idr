@@ -16,6 +16,8 @@ data CExp : Type
 public export
 data CAlt : Type where
   CConAlt : String -> List String -> CExp -> CAlt
+  -- REVIEW keep var name?
+  CDefAlt : CExp -> CAlt
   -- literal
 
 data CExp : Type where
@@ -25,7 +27,7 @@ data CExp : Type where
   CApp : CExp -> List CExp -> CExp
   -- TODO make DCon/TCon app separate so we can specialize
   -- U / Pi are compiled to type constructors
-  CCase : CExp -> List CAlt -> Maybe CExp -> CExp
+  CCase : CExp -> List CAlt -> CExp
   CRef : Name -> CExp
   CMeta : Nat -> CExp
 
@@ -100,16 +102,10 @@ compileTerm (U _) = pure $ CRef "U"
 compileTerm (Pi _ nm icit t u) = pure $ CApp (CRef "PiType") [ !(compileTerm t), CLam nm !(compileTerm u)]
 compileTerm (Case _ t alts) = do
   t' <- compileTerm t
-  alts' <- catMaybes <$> traverse (\case
-    CaseDefault tm => pure Nothing
-    CaseCons nm args tm => pure $ Just $ CConAlt nm args !(compileTerm tm)) alts
-  def <- getDefault alts
-  pure $ CCase t' alts' def
-  where
-    getDefault : List CaseAlt -> M (Maybe CExp)
-    getDefault [] = pure Nothing
-    getDefault (CaseDefault u :: _) = Just <$> compileTerm u
-    getDefault (_ :: xs) = getDefault xs
+  alts' <- traverse (\case
+    CaseDefault tm => pure $ CDefAlt !(compileTerm tm)
+    CaseCons nm args tm => pure $ CConAlt nm args !(compileTerm tm)) alts
+  pure $ CCase t' alts'
 
 
 export

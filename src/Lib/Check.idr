@@ -176,6 +176,11 @@ checkAlt scty ctx ty (MkAlt ptm body) = do
   (con, args) <- getArgs ptm []
   debug "ALT con \{con} args \{show args}"
   let Just (MkEntry _ dcty (DCon arity _)) = lookup con !(get)
+    | Nothing => do
+        -- check body with con bound at scty against ty
+        let ctx' = extend ctx con scty
+        body' <- check ctx' body ty
+        pure $ CaseDefault body'
     | _ => error emptyFC "expected datacon, got \{con}"
 
   -- arity is wrong, but we actually need the type anyway
@@ -218,7 +223,8 @@ checkAlt scty ctx ty (MkAlt ptm body) = do
       let var = VVar emptyFC (length ctx.env) [<]
       let ctx' = extend ctx nm a
       Lam emptyFC nm <$> go !(b $$ var) rest ctx'
-    go (VPi fc str Implicit a b) args ctx = do
+
+    go (VPi _ str Implicit a b) args ctx = do
       debug "*** insert \{str}"
       let fc' = argsFC args
       let var = VVar fc' (length ctx.env) [<]
@@ -226,7 +232,7 @@ checkAlt scty ctx ty (MkAlt ptm body) = do
       Lam fc' "_" <$> go !(b $$ var) args ctx'
     -- same deal with _ for name
     go (VPi fc str Explicit a b) ((fc', Implicit, nm) :: rest) ctx = do
-      error fc' "Implicit/Explicit mismatch \{show str} \{show nm}"
+      error fc' "Implicit/Explicit mismatch \{show str} at \{show nm}"
     go (VPi fc str icit x y) [] ctx = error emptyFC "Not enough arguments"
 
     -- nameless variable

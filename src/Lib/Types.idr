@@ -152,7 +152,7 @@ Pretty Tm where
   pretty (App _ t u) = text "(" <+> pretty t <+> pretty u <+> ")"
   pretty (U _) = "U"
   pretty (Pi _ str icit t u) = text "(" <+> text str <+> ":" <+> pretty t <+> ")" <+> "=>" <+> pretty u <+> ")"
-  pretty (Case _ _ _) = text "FIXME CASE"
+  pretty (Case _ _ _) = text "FIXME PRETTY CASE"
 
 -- public export
 -- data Closure : Nat -> Type

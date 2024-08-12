@@ -46,5 +46,12 @@ not = \ v => case v of
   True => False
   False => True
 
+
+not2 : Bool -> Bool
+not2 = \ v => case v of
+  True => False
+  x => True
+
+
 data Void : U where
 
