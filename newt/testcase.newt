@@ -52,6 +52,21 @@ not2 = \ v => case v of
   True => False
   x => True
 
+and : Bool -> Bool -> Bool
+and = \ x y => case x of
+  True => y
+  False => False
+
+-- FIXME - a case is evaluated here, and I don't know why.
+
+nand : Bool -> Bool -> Bool
+nand = \ x y => not (case x of
+    True => y
+    False => False)
+
+-- -- this should be an error.
+-- foo : Bool -> Bool
 
 data Void : U where
+
 

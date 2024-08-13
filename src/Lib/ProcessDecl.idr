@@ -15,10 +15,14 @@ getArity (Pi x str icit t u) = S (getArity u)
 getArity _ = Z
 
 
+-- Can metas live in context for now?
+
 export
 processDecl : Decl -> M ()
 processDecl (TypeSig fc nm tm) = do
   top <- get
+  let Nothing := lookup nm top
+    | _ => error fc "\{show nm} is already defined"
   putStrLn "-----"
   putStrLn "TypeSig \{nm} \{show tm}"
   ty <- check (mkCtx top.metas) tm (VU fc)

@@ -1,5 +1,6 @@
--- TODO fresh names
-
+-- TODO I think I'm missing the bit where a case might need to be assigned to a variable.
+-- TODO And then get primitives and a way to declare extern functions.  That may get us
+-- to utility
 module Lib.Compile
 
 import Lib.Types
@@ -41,7 +42,9 @@ data JSStmt : Kind -> Type where
 
 Cont e = JSExp -> JSStmt e
 
--- FIXME - add names to env so we can guarantee fresh names in the generated javascript.
+||| JSEnv contains `Var` for binders or `Dot` for destructured data. It
+||| used to translate binders
+JSEnv : Type
 JSEnv = List JSExp
 
 -- Stuff nm.h1, nm.h2, ... into environment
@@ -49,6 +52,21 @@ mkEnv : String -> Nat -> List JSExp -> List String -> List JSExp
 mkEnv nm k env [] = env
 mkEnv nm k env (x :: xs) = mkEnv nm (S k) (Dot (Var nm) "h\{show k}" :: env) xs
 
+envNames : Env -> List String
+
+-- If I was golfing, I'd be tempted to stick with deBruijn
+
+||| given a name, find a similar one that doesn't shadow in Env
+fresh : String -> JSEnv -> String
+fresh nm env = if free env nm then nm else go nm 1
+  where
+    free : JSEnv -> String -> Bool
+    free [] nm = True
+    free (Var n :: xs) nm = if n == nm then False else free xs nm
+    free (_ :: xs) nm = free xs nm
+
+    go : String -> Nat -> String
+    go nm k = let nm' = "\{nm}\{show k}" in if free env nm' then nm' else go nm (S k)
 
 -- This is inspired by A-normalization, look into the continuation monad
 -- There is an index on JSStmt, adopted from Stefan Hoeck's code.
@@ -61,11 +79,11 @@ termToJS env (CBnd k) f = case getAt k env of
   (Just e) => f e
   Nothing => ?bad_bounds
 termToJS env (CLam nm t) f =
-  let nm' = "\{nm}$\{show $ length env}"
+  let nm' = fresh nm env -- "\{nm}$\{show $ length env}"
       env' = (Var nm' :: env)
   in f $ JLam [nm'] (termToJS env' t JReturn)
 termToJS env (CFun nms t) f =
-  let nms' = map (\nm => "\{nm}$\{show $ length env}") nms
+  let nms' = map (\nm => fresh nm env) nms
       env' = foldl (\ e, nm => Var nm :: e) env nms'
   in f $ JLam nms' (termToJS env' t JReturn)
 termToJS env (CRef nm) f = f $ Var nm
@@ -85,7 +103,7 @@ termToJS env (CCase t alts) f =
   termToJS env t $ \case
     (Var nm) => (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts))
     t' =>
-      let nm = "sc$\{show $ length env}" in
+      let nm = fresh "sc" env in
         JSnoc (JConst nm t')
           (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts))
   where

@@ -7,25 +7,27 @@ Compiling to js including data.
 
 v1 of cases requires a constructor and vars, var, or default.
 
-
 ### Main
 
-- [ ] flag for debug?
+- [x] flag for debug?
 
 ### Data
 
 - [x] typecheck `plus`
-- [ ] don't leave extra "Axiom" entries for incomplete `data` (switch to a map or drop the order)
+- [x] don't leave extra "Axiom" entries for incomplete `data` (switch to a map or drop the order)
 - [ ] Check types when declaring data (collect telescope and check final type against type constructor)
 - [ ] Learn stuff like `n = S k` in case trees.
-  - Need test case
-  - If this is all var = tm, I could mutate the local env (Would it need to be `let` to be used in unification?)
+  - Need test case, but existing plus case fails unification if we try.
+  - I guess I need to let these pattern vars unify/match and learn equalities
+  - If this is all var = tm, I could mutate the local env, so var is now a let. (Would it need to be `let` to be used in unification?)
   - I could subst into something (environment / goal?)
   - I could carry around extra stuff for unification
   - With names, I could dump a `let` into the env
 - [ ] Handle default cases (non-constructor)
 - [ ] When we do impossible, take agda approach
 - [ ] test cases. Maybe from pi-forall
+- [ ] coverage checking
+- [ ] case tree builder
 
 ### Primitives
 
@@ -49,13 +51,13 @@ We need some erasure for runtime. The pi-forall notation isn't compatible with i
 
 Code generation is partially done.
 
-- [ ] Handle meta in compile
+- [ ] Handle meta in compile (inline solved metas?)
 - [ ] Default case (need to process list to cases and maybe default)
 - [ ] Arity for top level functions (and lambda for partial application)
      - I can do this here, but I'll have to wire in M, otherwise maybe a transform
        before this (we could pull out default case too)
 - [ ] Javascript operators / primitives
-- [ ] Don't do assign var to fresh var
+- [x] Don't do assign var to fresh var
 
 ### Parsing / Language
 
@@ -76,6 +78,7 @@ Code generation is partially done.
   - Look at smallTT rules
   - Can we not expand top level - expand in unification and matching pi types?
 - [ ] look into Lennart.newt issues
+- [ ] figure out how to add laziness (might have to be via the monad)
 
 So smalltt has TopVar with a Level. typechecking binders end up as top too.
 

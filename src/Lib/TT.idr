@@ -106,6 +106,10 @@ lookup ctx nm = go ctx.types
 export
 eval : Env -> Mode -> Tm -> M Val
 
+-- REVIEW everything is evalutated whether it's needed or not
+-- It would be nice if the environment were lazy.
+-- e.g. case is getting evaluated when passed to a function because
+-- of dependencies in pi-types, even if the dependency isn't used
 public export
 ($$) : {auto mode : Mode} -> Closure -> Val -> M Val
 ($$) {mode} (MkClosure env tm) u = eval (u :: env) mode tm
@@ -153,7 +157,9 @@ eval env mode (Pi fc x icit a b) = pure $ VPi fc x icit !(eval env mode a) (MkCl
 eval env mode (Bnd fc i) = case getAt i env of
   Just rval => pure rval
   Nothing => error' "Bad deBruin index \{show i}"
-eval env mode (Case{}) = ?todo
+
+-- We need a neutral and some code to run the case tree
+eval env mode tm@(Case{}) = ?todo_eval_case
 
 export
 quote : (lvl : Nat) -> Val -> M Tm
@@ -206,3 +212,4 @@ solveMeta ctx ix tm = do
     go (meta@(Solved k _) :: xs) lhs = if k == ix
       then error' "Meta \{show ix} already solved!"
       else go xs (lhs :< meta)
+

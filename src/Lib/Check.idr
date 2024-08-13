@@ -238,8 +238,13 @@ checkAlt scty ctx ty (MkAlt ptm body) = do
     -- nameless variable
     go ctype [] ctx = do
       debug "*** end \{show ctype}"
+      -- FIXME FIXME - I think I should be unifying ctype against scty and learning stuff from it
+      -- like n = S k.
+      -- debug "Unifying constructor"
+      -- unifyCatch emptyFC ctx ctype scty
+      -- my first example has issues with Vect Z 0 =?=
+
       check ctx body ty
-      -- pure ctx -- this should be our constructor.
     -- This happens if we run out of runway (more args and no pi)
     -- go ctype tm ctx = error (getF "unhandled in checkAlt.go type: \{show ctype} term: \{show tm}"
     go ctype args ctx = error (argsFC args) "Extra args"
