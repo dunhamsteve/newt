@@ -27,9 +27,6 @@ data Pattern
 public export
 data RCaseAlt = MkAlt Raw Raw
 
--- FC = MkPair Int Int
-
-
 data Raw : Type where
   RVar : FC -> (nm : Name) -> Raw
   RLam : FC -> (nm : String) -> (icit : Icit) -> (ty : Raw) -> Raw
@@ -67,11 +64,6 @@ getFC (RParseError fc str) = fc
 public export
 data Decl : Type where
 
-Telescope: Type
-Telescope = List Decl -- pi-forall, always typeSig?
-
-data ConstrDef = MkCDef Name Telescope
-
 data Decl
   = TypeSig FC Name Raw
   | Def FC Name Raw
@@ -101,11 +93,6 @@ implementation Show Raw
 
 export
 implementation Show Decl
-
-covering
-Show ConstrDef where
-  show (MkCDef str xs) = foo ["MkCDef", show str, show xs]
-
 
 covering
 Show Decl where

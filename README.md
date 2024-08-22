@@ -1,5 +1,7 @@
 
-Need eval for case.
+- Support primitives
+- Make DCon/TCon separate from Ref? (Or add flavor to VRef/Ref? If processing is often the same. I think I want arity though. I don't think a checked DCon can be overapplied, but it could be underapplied without special form. And special form is possibly difficult if not collecting a stack on the way down...
+
 
 Need to typecheck case - learning stuff like `n = S k` is not happening and the final bit of the data constructor doesn't unify with the data type, because we're not handling `Bnd n =?= Val`. Cockx collects a list of constraints.  We might want flags on unification to enable that?
 
