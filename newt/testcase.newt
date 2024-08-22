@@ -13,6 +13,14 @@ plus = \ n m => case n of
   Z => m
   S k => S (plus k m)
 
+-- Example from Jesper talk (translated to case tree)
+max : Nat -> Nat -> Nat
+max = \ n m => case n of
+  Z => m
+  S k => case m of
+    Z => S k
+    S l => S (max k l)
+
 -- So this isn't working at the moment, I think I need
 -- to replace the n with S k
 --

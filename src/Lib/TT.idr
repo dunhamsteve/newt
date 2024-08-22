@@ -106,6 +106,8 @@ lookup ctx nm = go ctx.types
 export
 eval : Env -> Mode -> Tm -> M Val
 
+
+
 -- REVIEW everything is evalutated whether it's needed or not
 -- It would be nice if the environment were lazy.
 -- e.g. case is getting evaluated when passed to a function because
@@ -129,6 +131,24 @@ export
 vappSpine : Val -> SnocList Val -> M Val
 vappSpine t [<] = pure t
 vappSpine t (xs :< x) = vapp !(vappSpine t xs) x
+
+-- So we need:
+-- - a Neutral case statement
+-- - split out data / type constructors from VRef application
+-- - should we sort out what the case tree really looks like first?
+
+-- Technically I don't need this now, as a neutral would be fine.
+
+evalAlt : Env -> Mode -> Val -> List CaseAlt -> M (Maybe Val)
+-- FIXME spine length? Should this be VRef or do we specialize?
+evalAlt env mode (VRef _ nm y sp) ((CaseCons name args t) :: xs) =
+  if nm == name
+    -- Here we bind the args and push on. Do we have enough? Too many?
+    then ?evalAlt_success
+    -- here we need to know if we've got a mismatched constructor or some function app
+    else ?evalAlt_what
+evalAlt env mode sc (CaseDefault u :: xs) = pure $ Just !(eval (sc :: env) mode u)
+evalAlt env mode sc _ = pure Nothing -- stuck
 
 bind : Val -> Env -> Env
 bind v env = v :: env
@@ -154,15 +174,23 @@ eval env mode (Meta fc i) =
         (Solved k t) => pure $ t
 eval env mode (Lam fc x t) = pure $ VLam fc x (MkClosure env t)
 eval env mode (Pi fc x icit a b) = pure $ VPi fc x icit !(eval env mode a) (MkClosure env b)
+-- Here, we assume env has everything. We push levels onto it during type checking.
+-- I think we could pass in an l and assume everything outside env is free and
+-- translate to a level
 eval env mode (Bnd fc i) = case getAt i env of
   Just rval => pure rval
   Nothing => error' "Bad deBruin index \{show i}"
 
 -- We need a neutral and some code to run the case tree
-eval env mode tm@(Case{}) = ?todo_eval_case
+
+eval env mode tm@(Case fc sc alts) = pure $ VCase fc !(eval env mode sc) alts
+  -- case !(evalAlt env mode !(eval env mode sc) alts) of
+  --   Just foo => ?goodAlt
+  --   Nothing => ?stuckAlt
 
 export
 quote : (lvl : Nat) -> Val -> M Tm
+
 
 quoteSp : (lvl : Nat) -> Tm -> SnocList Val -> M Tm
 quoteSp lvl t [<] = pure t
@@ -178,6 +206,7 @@ quote l (VLam fc x t) = pure $ Lam fc x !(quote (S l) !(t $$ VVar emptyFC l [<])
 quote l (VPi fc x icit a b) = pure $ Pi fc x icit !(quote l a) !(quote (S l) !(b $$ VVar emptyFC l [<]))
 quote l (VU fc) = pure (U fc)
 quote l (VRef fc n def sp) = quoteSp l (Ref fc n def) sp
+quote l (VCase fc sc alts) = pure $ Case fc !(quote l sc) alts
 
 -- Can we assume closed terms?
 -- ezoo only seems to use it at [], but essentially does this:

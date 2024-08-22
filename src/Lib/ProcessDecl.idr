@@ -2,18 +2,18 @@ module Lib.ProcessDecl
 
 import Data.IORef
 
-import Lib.Types
-import Lib.Parser
-import Lib.TT
-import Lib.TopContext
 import Lib.Check
+import Lib.Parser
 import Lib.Syntax
+import Lib.TopContext
+import Lib.TT
+import Lib.Types
+import Lib.Util
 
 getArity : Tm -> Nat
 getArity (Pi x str icit t u) = S (getArity u)
 -- Ref or App (of type constructor) are valid
 getArity _ = Z
-
 
 -- Can metas live in context for now?
 
@@ -84,10 +84,19 @@ processDecl (Data fc nm ty cons) = do
       -- expecting tm to be a Pi type
       (TypeSig fc nm' tm) => do
           ctx <- get
-          -- TODO check pi type ending in full tyty application
-          -- TODO count arity
           dty <- check (mkCtx ctx.metas) tm (VU fc)
           debug "dty \{nm'} is \{pprint [] dty}"
+
+          -- We only check that codomain uses the right type constructor
+          -- We know it's in U because it's part of a checked Pi type
+          let (codomain, tele) = splitTele dty
+          -- for printing
+          let tnames = reverse $ map (\(MkBind _ nm _ _) => nm) tele
+          let (Ref _ hn _, args) := funArgs codomain
+            | (tm, _) => error (getFC tm) "expected \{nm} got \{pprint tnames tm}"
+          when (hn /= nm) $
+            error (getFC codomain) "Constructor codomain is \{pprint tnames codomain} rather than \{nm}"
+
           modify $ setDef nm' dty (DCon (getArity dty) nm)
           pure nm'
       _ => throwError $ E (0,0) "expected constructor declaration"

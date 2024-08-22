@@ -69,11 +69,17 @@ parameters (ctx: Context)
         Just x => goSpine ren lvl (Bnd fc $ cast x) sp
       go ren lvl (VRef fc nm def sp) = goSpine ren lvl (Ref fc nm def) sp
       go ren lvl (VMeta fc ix sp) = if ix == meta
-        then error emptyFC "meta occurs check"
+        -- REVIEW is this the right fc?
+        then error fc "meta occurs check"
         else goSpine ren lvl (Meta fc ix) sp
       go ren lvl (VLam fc n t) = pure (Lam fc n !(go (lvl :: ren) (S lvl) !(t $$ VVar emptyFC lvl [<])))
       go ren lvl (VPi fc n icit ty tm) = pure (Pi fc n icit !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar emptyFC lvl [<])))
       go ren lvl (VU fc) = pure (U fc)
+      go ren lvl (VCase fc sc alts) = error fc "Case in solution"
+          -- This seems dicey, for VLam we eval and then process the levels.
+          -- Here we have raw Tm so we haven't even done occurs check. I'm thinking
+          -- we don't allow solutions with Case in them
+          -- pure (Case fc !(go ren lvl sc) alts)
 
   lams : Nat -> Tm -> Tm
   lams 0 tm = tm

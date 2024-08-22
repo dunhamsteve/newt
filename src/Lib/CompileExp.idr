@@ -9,6 +9,7 @@ import Data.List
 import Lib.Types -- Name / Tm
 import Lib.TopContext
 import Lib.TT -- lookupMeta
+import Lib.Util
 
 public export
 data CExp : Type
@@ -30,13 +31,6 @@ data CExp : Type where
   CCase : CExp -> List CAlt -> CExp
   CRef : Name -> CExp
   CMeta : Nat -> CExp
-
-funArgs : Tm -> (Tm, List Tm)
-funArgs tm = go tm []
-  where
-    go : Tm -> List Tm -> (Tm, List Tm)
-    go (App _ t u) args = go t (u :: args)
-    go t args = (t, args)
 
 ||| I'm counting Lam in the term for arity.  This matches what I need in
 ||| code gen.

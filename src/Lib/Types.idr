@@ -180,11 +180,14 @@ data Val : Type where
   -- I wanted the Maybe Tm in here, but for now we're always expanding.
   -- Maybe this is where I glue
   VRef : FC -> (nm : String) -> Def -> (sp : SnocList Val) -> Val
+  -- neutral case
+  VCase : FC -> (sc : Val) -> List CaseAlt -> Val
   -- we'll need to look this up in ctx with IO
   VMeta : FC -> (ix : Nat) -> (sp : SnocList Val) -> Val
   VLam : FC -> Name -> Closure -> Val
   VPi : FC -> Name -> Icit -> (a : Lazy Val) -> (b : Closure) -> Val
   VU : FC -> Val
+
 
 
 Show Closure
@@ -197,6 +200,7 @@ Show Val where
   show (VLam _ str x) = "(%lam \{str} \{show x})"
   show (VPi fc str Implicit x y) = "(%pi {\{str} : \{show  x}}. \{show  y})"
   show (VPi fc str Explicit x y) = "(%pi (\{str} : \{show  x}). \{show  y})"
+  show (VCase fc sc alts) = "(%case \{show sc} ...)"
   show (VU _) = "U"
 
 -- Not used - I was going to change context to have a List Binder

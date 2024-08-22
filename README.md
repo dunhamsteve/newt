@@ -1,11 +1,47 @@
 
-We're stopping at zoo4 for now.
+Need eval for case.
 
-Going ahead with data. scratch.newt for starters, build out enough for plus to typecheck. See where we are at that point, and fix up the dependent stuff. Add another test case that exercises this.
+Need to typecheck case - learning stuff like `n = S k` is not happening and the final bit of the data constructor doesn't unify with the data type, because we're not handling `Bnd n =?= Val`. Cockx collects a list of constraints.  We might want flags on unification to enable that?
 
-Compiling to js including data.
+I may want to collect a telescope instead of a type.
+
+Cockx lecture suggests something about going backwards. I'm thinking unifying the codomain of the DCon with the type of the TCon will give us some constraints like `n =?= S k`.
+
+
+Cockx paper §5.2 builds type-correct case trees. It doesn't have indicies, but they can be mapped to additional equality arguments. We can follow suit, or try to do the translation on the fly.
+
+Proceed by:
+
+context is snoc, telescope is cons
+
+- [x] Add eval for case
+  - These are just neutral for now
+- [x] Check data constructors
+  - I'm checking pi type, then checking codomain is application of appropriate type constructor
+- [ ] Build case trees (Section 5.2)
+  Write this for a function, but start with `case` statement and singleton list. We'll end up with a longer list when we hit `Just x :: xs` etc.
+  Then add
+
+- [ ] Add primitives
+- [ ] Compile and run something
+- [ ] Add modules
+
+- [ ] Start translating self?
 
 v1 of cases requires a constructor and vars, var, or default.
+
+narya has a `with_loc`
+
+> with_loc loc f runs the thunk f with loc as the new default location for val:emit and val:fatal. Note that with_loc None will clear the current default location, while merge_loc None will keep it. See val:merge_loc.
+
+So it's using ocaml `algaeff` package, with a reader effect for the location.  I think it's accumulating a stack of them. Additionally `asai` has functions to emit messages that can pick up the location from context.
+
+This is interesting in that we could include location in context or the monad for cases where we have an error say unifying, and want to know what we were processing when it happened (either instead of or in addition to reporting some FC of the terms being unified).
+
+## Now
+
+- Eval case
+- constraints from case
 
 ### Main
 
@@ -58,6 +94,7 @@ Code generation is partially done.
        before this (we could pull out default case too)
 - [ ] Javascript operators / primitives
 - [x] Don't do assign var to fresh var
+- [ ] Write output file
 
 ### Parsing / Language
 
@@ -70,6 +107,11 @@ Code generation is partially done.
 
 - [ ] Type at point for the editor
 
+### Unification
+
+We're stopping at zoo4 for now.
+
+
 ### Typecheck / Elaboration
 
 - [ ] think about whether there needs to be a desugar step separate from check/infer
@@ -77,6 +119,7 @@ Code generation is partially done.
 - [ ] Less expansion
   - Look at smallTT rules
   - Can we not expand top level - expand in unification and matching pi types?
+  - should the environment be lazy?
 - [ ] look into Lennart.newt issues
 - [ ] figure out how to add laziness (might have to be via the monad)
 
@@ -164,4 +207,25 @@ Forward:
 ----
 
 pi-forall sticks equality into scope as something like let. Not sure if this is compatible with deBruijn.  Possibly if we have everything at elab time?  But if `x = y` then previous stuff has a different `x`?
+
+
+
+## Dep Ty Check
+
+### pi-forall
+
+unify returns a list of Entry, but "either term is "ambiguous" (i.e. neutral), give up and succeed with an empty list" seems wrong. fine for case refinement I guess, but wrong for conversion checking?  I suppose conv check could look for `[]`.
+
+TODO find out what it does for conv checking
+
+### idris / tiny idris
+
+TODO how does idris mnage this?
+
+
+### narya
+
+TODO how does narya handle it?
+
+Mybe a Conor paper or a Cockx paper would also shed some light.  And do ny "tutorial implementation" handle if properly?
 
