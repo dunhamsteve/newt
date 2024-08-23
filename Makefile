@@ -10,3 +10,7 @@ build/exec/newt.js: ${SRCS}
 
 test: build/exec/newt
 	build/exec/newt newt/*.newt
+
+vscode:
+	cd newt-vscode && vsce package && code --install-extension *.vsix
+

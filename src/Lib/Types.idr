@@ -64,6 +64,13 @@ data CaseAlt : Type where
 
 data Def : Type
 
+public export
+data Literal = LString String | LInt Int
+
+Show Literal where
+  show (LString str) = show str
+  show (LInt i) = show i
+
 data Tm : Type where
   Bnd : FC -> Nat -> Tm
   -- Maybe Def here instead of Maybe Tm, we'll have DCon, TCon, etc.
@@ -77,6 +84,7 @@ data Tm : Type where
   Pi  : FC -> Name -> Icit -> Tm -> Tm -> Tm
   -- REVIEW - do we want to just push it up like idris?
   Case : FC -> Tm -> List CaseAlt -> Tm
+  Lit : FC -> Literal -> Tm
 
 %name Tm t, u, v
 
@@ -90,6 +98,7 @@ getFC (App fc t u) = fc
 getFC (U fc) = fc
 getFC (Pi fc str icit t u) = fc
 getFC (Case fc t xs) = fc
+getFC (Lit fc _) = fc
 
 covering
 Show Tm
@@ -107,6 +116,7 @@ Show Tm where
   show (Lam _ nm t) = "(\\ \{nm}  => \{show  t})"
   show (App _ t u) = "(\{show t} \{show u})"
   show (Meta _ i) = "(Meta \{show i})"
+  show (Lit _ l) = "(Lit \{show l})"
   show (U _) = "U"
   show (Pi _ str Explicit t u) = "(Pi (\{str} : \{show t}) => \{show u})"
   show (Pi _ str Implicit t u) = "(Pi {\{str} : \{show t}} => \{show u})"
@@ -153,6 +163,7 @@ pprint names tm = render 80 $ go names tm
     go names (Pi _ nm Explicit t u) =
       text "((" <+> text nm <+> ":" <+> go names t <+> ")" <+> "=>" <+> go (nm :: names) u <+> ")"
     go names (Case _ _ _) = "FIXME CASE"
+    go names (Lit _ lit) = text "\{show lit}"
 
 public export
 Pretty Tm where
@@ -164,6 +175,7 @@ Pretty Tm where
   pretty (U _) = "U"
   pretty (Pi _ str icit t u) = text "(" <+> text str <+> ":" <+> pretty t <+> ")" <+> "=>" <+> pretty u <+> ")"
   pretty (Case _ _ _) = text "FIXME PRETTY CASE"
+  pretty (Lit _ lit) = text (show lit)
 
 -- public export
 -- data Closure : Nat -> Type
@@ -198,6 +210,7 @@ data Val : Type where
   VLam : FC -> Name -> Closure -> Val
   VPi : FC -> Name -> Icit -> (a : Lazy Val) -> (b : Closure) -> Val
   VU : FC -> Val
+  VLit : FC -> Literal -> Val
 
 
 
@@ -213,6 +226,7 @@ Show Val where
   show (VPi fc str Explicit x y) = "(%pi (\{str} : \{show  x}). \{show  y})"
   show (VCase fc sc alts) = "(%case \{show sc} ...)"
   show (VU _) = "U"
+  show (VLit _ lit) = show lit
 
 -- Not used - I was going to change context to have a List Binder
 -- instead of env, types, bds
@@ -282,7 +296,7 @@ record MetaContext where
 
 
 public export
-data Def = Axiom | TCon (List String) | DCon Nat String | Fn Tm
+data Def = Axiom | TCon (List String) | DCon Nat String | Fn Tm | PrimTCon | PrimFn String
 
 public export
 covering
@@ -291,6 +305,8 @@ Show Def where
   show (TCon strs) = "TCon \{show strs}"
   show (DCon k tyname) = "DCon \{show k} \{show tyname}"
   show (Fn t) = "Fn \{show t}"
+  show (PrimTCon) = "PrimTCon"
+  show (PrimFn src) = "PrimFn \{show src}"
 
 ||| entry in the top level context
 public export

@@ -5,11 +5,12 @@ module Lib.Token
 import public Text.Lexer
 
 public export
-data Kind 
-  = Ident 
-  | Keyword 
-  | Oper 
-  | Number 
+data Kind
+  = Ident
+  | Keyword
+  | Oper
+  | Number
+  | StringKind
   | Symbol
   | Space
   | Comment
@@ -34,6 +35,7 @@ Show Kind where
   show Comment = "Comment"
   show EOI     = "EOI"
   show Pragma  = "Pragma"
+  show StringKind = "String"
 export
 Eq Kind where
   Ident   == Ident = True
@@ -45,6 +47,7 @@ Eq Kind where
   LBrace  == LBrace = True
   Semi    == Semi   = True
   RBrace  == RBrace = True
+  StringKind == StringKind = True
   _ == _ = False
 
 export
@@ -58,3 +61,7 @@ BTok = WithBounds (Token Kind)
 export
 value : BTok -> String
 value (MkBounded (Tok _ s) _ _) = s
+
+export
+kind : BTok -> Kind
+kind (MkBounded (Tok k s) _ _) = k

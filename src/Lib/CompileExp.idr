@@ -31,6 +31,7 @@ data CExp : Type where
   CCase : CExp -> List CAlt -> CExp
   CRef : Name -> CExp
   CMeta : Nat -> CExp
+  CLit : Literal -> CExp
 
 ||| I'm counting Lam in the term for arity.  This matches what I need in
 ||| code gen.
@@ -39,6 +40,11 @@ getArity : Tm -> Nat
 getArity (Lam _ _ t) = S (getArity t)
 getArity _ = Z
 
+export
+piArity : Tm -> Nat
+piArity (Pi _ _ _ _ b) = S (piArity b)
+piArity _ = Z
+
 arityForName : FC -> Name -> M Nat
 arityForName fc nm = case lookup nm !get of
   Nothing => error fc "Name \{show nm} not in scope"
@@ -46,6 +52,9 @@ arityForName fc nm = case lookup nm !get of
   (Just (MkEntry name type (TCon strs))) => pure 0 -- FIXME
   (Just (MkEntry name type (DCon k str))) => pure k
   (Just (MkEntry name type (Fn t))) => pure $ getArity t
+  (Just (MkEntry name type (PrimTCon))) => pure 0
+  -- Assuming a primitive can't return a function
+  (Just (MkEntry name type (PrimFn t))) => pure $ piArity type
 
 export
 compileTerm : Tm -> M CExp
@@ -84,11 +93,11 @@ compileTerm tm@(App _ _ _) with (funArgs tm)
                 (Solved j tm) => pure $ getArity !(quote 0 tm)
         apply (CRef "Meta\{show k}") args' [<] arity
   _ | (t@(Ref fc nm _), args) = do
-        t' <- compileTerm t
         args' <- traverse compileTerm args
-        apply t' args' [<] !(arityForName fc nm)
+        arity <- arityForName fc nm
+        apply (CRef nm) args' [<] arity
   _ | (t, args) = do
-        debug "apply \{pprint [] t}"
+        debug "apply other \{pprint [] t}"
         t' <- compileTerm t
         args' <- traverse compileTerm args
         apply t' args' [<] 0
@@ -100,6 +109,7 @@ compileTerm (Case _ t alts) = do
     CaseDefault tm => pure $ CDefAlt !(compileTerm tm)
     CaseCons nm args tm => pure $ CConAlt nm args !(compileTerm tm)) alts
   pure $ CCase t' alts'
+compileTerm (Lit _ lit) = pure $ CLit lit
 
 
 export

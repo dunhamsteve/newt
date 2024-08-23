@@ -30,6 +30,16 @@ processDecl (TypeSig fc nm tm) = do
   putStrLn "got \{pprint [] ty'}"
   modify $ setDef nm ty' Axiom
 
+processDecl (PType fc nm) = do
+  ctx <- get
+  modify $ setDef nm (U fc) PrimTCon
+processDecl (PFunc fc nm ty src) = do
+  top <- get
+  ty <- check (mkCtx top.metas) ty (VU fc)
+  ty' <- nf [] ty
+  putStrLn "pfunc \{nm} : \{pprint [] ty'} := \{show src}"
+  modify $ setDef nm ty' (PrimFn src)
+
 processDecl (Def fc nm raw) = do
   putStrLn "-----"
   putStrLn "def \{show nm}"

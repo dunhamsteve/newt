@@ -47,7 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
           ) {
             message += "\n" + lines[++i];
           }
-          const severity = kind === 'ERROR' ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Information
+          const severity = kind === 'ERROR' ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Information;
           const diag = new vscode.Diagnostic(range, message, severity);
           diagnostics.push(diag);
         }

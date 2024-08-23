@@ -80,6 +80,7 @@ parameters (ctx: Context)
           -- Here we have raw Tm so we haven't even done occurs check. I'm thinking
           -- we don't allow solutions with Case in them
           -- pure (Case fc !(go ren lvl sc) alts)
+      go ren lvl (VLit fc lit) = pure (Lit fc lit)
 
   lams : Nat -> Tm -> Tm
   lams 0 tm = tm
@@ -166,6 +167,12 @@ lookupName ctx (RVar fc nm) = go 0 ctx.types
     go i ((x, ty) :: xs) = if x == nm then pure $ Just (Bnd fc i, ty)
       else go (i + 1) xs
 lookupName ctx _ = pure Nothing
+
+
+primType : FC -> String -> M Val
+primType fc nm = case lookup nm !(get) of
+      Just (MkEntry name ty PrimTCon) => pure $ VRef fc name PrimTCon [<]
+      _ => error fc "Primitive type \{show nm} not in scope"
 
 
 export
@@ -391,13 +398,10 @@ infer ctx (RImplicit fc) = do
   tm <- freshMeta ctx fc
   pure (tm, vty)
 
-infer ctx tm = error (getFC tm) "Implement infer \{show tm}"
+infer ctx (RLit fc (LString str)) = pure (Lit fc (LString str), !(primType fc "String"))
+infer ctx (RLit fc (LInt i)) = pure (Lit fc (LInt i), !(primType fc "Int"))
 
--- I don't have types for these yet...
--- infer ctx (RLit (LString str)) = ?rhs_10
--- infer ctx (RLit (LInt i)) = ?rhs_11
--- infer ctx (RLit (LBool x)) = ?rhs_12
--- infer ctx (RCase tm xs) = ?rhs_9
+infer ctx tm = error (getFC tm) "Implement infer \{show tm}"
 
 -- The idea here is to insert a hole for a parse error
 -- but the parser doesn't emit this yet.

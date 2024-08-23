@@ -48,11 +48,21 @@ braces pa = do
 optional : Parser a -> Parser (Maybe a)
 optional pa = Just <$> pa <|> pure Nothing
 
-lit : Parser Raw
-lit = do
-  t <- token Number
+stringLit : Parser Raw
+stringLit = do
   fc <- getFC
+  t <- token StringKind
+  pure $ RLit fc (LString (cast t))
+
+intLit : Parser Raw
+intLit = do
+  fc <- getFC
+  t <- token Number
   pure $ RLit fc (LInt (cast t))
+
+
+lit : Parser Raw
+lit = intLit <|> stringLit
 
 -- typeExpr is term with arrows.
 export typeExpr : Parser Raw
@@ -237,6 +247,23 @@ parseDef : Parser Decl
 parseDef = Def <$> getFC <*> ident <* keyword "=" <*> mustWork typeExpr
 
 export
+parsePType : Parser Decl
+parsePType = PType <$> getFC <* keyword "ptype" <*> ident
+
+parsePFunc : Parser Decl
+parsePFunc = do
+  fc <- getFC
+  keyword "pfunc"
+  nm <- ident
+  keyword ":"
+  ty <- typeExpr
+  keyword ":="
+  src <- mustWork (cast <$> token StringKind)
+  pure $ PFunc fc nm ty src
+  -- PFunc <$> getFC <* keyword "pfunc" <*> mustWork ident <* keyword ":" <*> mustWork typeExpr <* keyword ":=" <*> (cast <$> token StringKind)
+
+
+export
 parseData : Parser Decl
 parseData = do
   fc <- getFC
@@ -257,7 +284,7 @@ parseNorm = DCheck <$> getFC <* keyword "#check" <*> typeExpr <* keyword ":" <*>
 
 export
 parseDecl : Parser Decl
-parseDecl = parseImport <|> parseSig <|> parseDef <|> parseNorm <|> parseData
+parseDecl = parsePType <|> parsePFunc <|> parseImport <|> parseNorm <|> parseData <|> parseSig <|> parseDef
 
 export
 parseMod : Parser Module

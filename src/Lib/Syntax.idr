@@ -10,8 +10,6 @@ public export
 data Raw : Type where
 
 public export
-data Literal = LString String | LInt Int | LBool Bool
-public export
 data RigCount = Rig0 | RigW
 
 public export
@@ -70,6 +68,9 @@ data Decl
   | DImport FC Name
   | DCheck FC Raw Raw
   | Data FC Name Raw (List Decl)
+  | PType FC Name
+  | PFunc FC Name Raw String
+
 
 public export
 record Module where
@@ -84,7 +85,6 @@ foo ts = "(" ++ unwords ts ++ ")"
 Show Literal where
   show (LString str) = foo [ "LString", show str]
   show (LInt i) = foo [ "LInt", show i]
-  show (LBool x) = foo [ "LBool", show x]
 
 
 export
@@ -101,6 +101,8 @@ Show Decl where
   show (Data _ str xs ys) = foo ["Data", show str, show xs, show ys]
   show (DImport _ str) = foo ["DImport", show str]
   show (DCheck _ x y) = foo ["DCheck", show x, show y]
+  show (PType _ name) = foo ["PType", name]
+  show (PFunc _ nm ty src) = foo ["PFunc", nm, show ty, show src]
 
 export covering
 Show Module where
@@ -166,7 +168,6 @@ Pretty Raw where
     asDoc p (RAnn _ x y) = text "TODO - RAnn"
     asDoc p (RLit _ (LString str)) = text $ interpolate str
     asDoc p (RLit _ (LInt i)) = text $ show i
-    asDoc p (RLit _ (LBool x)) = text $ show x
     asDoc p (RCase _ x xs) = text "TODO - RCase"
     asDoc p (RImplicit _) = text "_"
     asDoc p (RHole _) = text "?"
@@ -184,3 +185,5 @@ Pretty Module where
         -- the behavior of nest is kinda weird, I have to do the nest before/around the </>.
         doDecl (Data _ nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map doDecl xs))
         doDecl (DCheck _ x y) = text "#check" <+> pretty x <+> ":" <+> pretty y
+        doDecl (PType _ nm) = text "ptype" <+> text nm
+        doDecl (PFunc _ nm ty src) = "pfunc" <+> text nm <+> ":" <+> nest 2 (pretty ty <+> ":=" <+/> text (show src))

@@ -180,6 +180,7 @@ eval env mode (Pi fc x icit a b) = pure $ VPi fc x icit !(eval env mode a) (MkCl
 eval env mode (Bnd fc i) = case getAt i env of
   Just rval => pure rval
   Nothing => error' "Bad deBruin index \{show i}"
+eval env mode (Lit fc lit) =pure $ VLit fc lit
 
 -- We need a neutral and some code to run the case tree
 
@@ -207,6 +208,7 @@ quote l (VPi fc x icit a b) = pure $ Pi fc x icit !(quote l a) !(quote (S l) !(b
 quote l (VU fc) = pure (U fc)
 quote l (VRef fc n def sp) = quoteSp l (Ref fc n def) sp
 quote l (VCase fc sc alts) = pure $ Case fc !(quote l sc) alts
+quote l (VLit fc lit) = pure $ Lit fc lit
 
 -- Can we assume closed terms?
 -- ezoo only seems to use it at [], but essentially does this:

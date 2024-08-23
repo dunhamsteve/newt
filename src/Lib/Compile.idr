@@ -20,6 +20,7 @@ data JSExp : Type where
   LitArray : List JSExp -> JSExp
   LitObject : List (String, JSExp) -> JSExp
   LitString : String -> JSExp
+  LitInt : Int -> JSExp
   Apply : JSExp -> List JSExp -> JSExp
   Var : String -> JSExp
   JLam : List String -> JSStmt Return -> JSExp
@@ -88,6 +89,8 @@ termToJS env (CFun nms t) f =
   in f $ JLam nms' (termToJS env' t JReturn)
 termToJS env (CRef nm) f = f $ Var nm
 termToJS env (CMeta k) f = f $ LitString "META \{show k}"
+termToJS env (CLit (LString str)) f = f (LitString str)
+termToJS env (CLit (LInt i)) f = f (LitInt i)
 termToJS env (CApp t args) f = termToJS env t (\ t' => argsToJS args [<] (\ args' => f (Apply t' args')))
   where
     argsToJS : List CExp -> SnocList JSExp -> (List JSExp -> JSStmt e) -> JSStmt e
@@ -122,6 +125,11 @@ jsString str = text "\"\{str}\""
 
 stmtToDoc : JSStmt e -> Doc
 
+||| separate with space
+export
+commaSep : List Doc -> Doc
+commaSep = folddoc (\a, b => a ++ "," <+> b)
+
 expToDoc : JSExp -> Doc
 expToDoc (LitArray xs) = ?expToDoc_rhs_0
 expToDoc (LitObject xs) = text "{" <+> folddoc (\ a, e => a ++ ", " <+/> e) (map entry xs) <+> text "}"
@@ -131,7 +139,8 @@ expToDoc (LitObject xs) = text "{" <+> folddoc (\ a, e => a ++ ", " <+/> e) (map
     entry (nm, exp) = text nm ++ ":" <+> expToDoc exp
 
 expToDoc (LitString str) = jsString str
-expToDoc (Apply x xs) = expToDoc x ++ "(" ++ spread (map expToDoc xs) ++ ")"
+expToDoc (LitInt i) = text $ show i
+expToDoc (Apply x xs) = expToDoc x ++ "(" ++ commaSep (map expToDoc xs) ++ ")"
 expToDoc (Var nm) = text nm
 expToDoc (JLam nms (JReturn exp)) = text "(" <+> text (joinBy ", " nms) <+> ") =>" <+> expToDoc exp
 expToDoc (JLam nms body) = text "(" <+> text (joinBy ", " nms) <+> ") =>" <+> bracket "{" (stmtToDoc body) "}"
@@ -176,6 +185,8 @@ entryToDoc (MkEntry name ty (Fn tm)) = do
 entryToDoc (MkEntry name type Axiom) = pure ""
 entryToDoc (MkEntry name type (TCon strs)) = pure ""
 entryToDoc (MkEntry name type (DCon arity str)) = pure $ dcon name arity
+entryToDoc (MkEntry name _ PrimTCon) = pure $ text "/* PrimTCon \{name} */"
+entryToDoc (MkEntry name _ (PrimFn src)) = pure $ text "const" <+> text name <+> "=" <+> text src
 
 export
 compile : M Doc

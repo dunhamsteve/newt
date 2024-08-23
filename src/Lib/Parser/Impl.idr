@@ -138,7 +138,7 @@ Monad Parser where
 pred : (BTok -> Bool) -> String -> Parser String
 pred f msg = P $ \toks,com,col =>
   case toks of
-    (t :: ts) => if f t then OK (value t) ts com else Fail False (error toks "\{msg} vt:\{value t}") toks com
+    (t :: ts) => if f t then OK (value t) ts com else Fail False (error toks "\{msg} at \{show $ kind t}:\{value t}") toks com
     [] => Fail False (error toks "\{msg} at EOF") toks com
 
 export
