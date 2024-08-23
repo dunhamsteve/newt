@@ -1,0 +1,43 @@
+module TestPrim
+
+
+-- we need to be able to declare a primitive type
+-- distinct from inductive type. there are no constructors per-se but it is inhabited
+
+ptype String
+ptype Int
+
+pfunc strlen : String -> Int := "(x) => x.length()"
+
+-- why is there an eta in here?
+foo : String -> Int
+foo = \ x => strlen x
+
+bar : String -> String -> Int
+bar = \ x y => strlen x
+
+pfunc append : String -> String -> String := "(a,b) => a + b"
+
+blah : String
+blah = append "hello" "world"
+
+pfunc plus : Int -> Int -> Int := "(a,b) => a + b"
+
+answer : Int
+answer = plus 40 2
+
+-- I'd like to define prim operators too
+
+-- codegen test cases
+-- works, but two looks like () => (eta1) => (eta0) => one(eta1, eta0)
+pfunc one : Int -> Int -> Int := "(x,y) => x + y"
+
+two : Int -> Int -> Int
+two = one
+
+three : Int -> Int -> Int
+three = \ x => two x
+
+four : Int -> Int -> Int
+four = \x y => three x y
+

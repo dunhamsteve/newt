@@ -283,8 +283,8 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     let names = (toList $ map fst ctx.types)
     env <- for ctx.types $ \(n,ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)}"
     let msg = unlines (toList $ reverse env) ++ "  -----------\n" ++ "  goal \{pprint names ty'}"
-    debug "INFO at \{show fc}: "
-    debug msg
+    liftIO $ putStrLn "INFO at \{show fc}: "
+    liftIO $ putStrLn msg
     -- let context = unlines foo
     -- need to print 'warning' with position
     -- fixme - just put a name on it like idris and stuff it into top.

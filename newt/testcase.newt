@@ -1,5 +1,10 @@
 module Scratch
 
+-- I'm testing cases here, but using examples carefully design to be
+-- simple case trees. Patterns are a var or a constructor applied to vars.
+
+-- There are indexes below, but we're got pulling constraints out of them yet.
+
 data Nat : U where
   Z : Nat
   S : Nat -> Nat
