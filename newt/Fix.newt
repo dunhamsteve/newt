@@ -18,15 +18,17 @@ data D : (A : Type) -> Type where
 
 unV : { A : U} -> D A -> A
 unV = \ v => case v of
-  V y => ?  -- y
+  V y => y
  --  F f => TRUSTME
+
+
 
 -- And here we have D A:4 and D A:1
 unF : {A : Type} -> D A -> D A -> D A
 unF = \ {A} v x =>
   case v of
     F {A} f => ? -- f x
-    -- V y => TRUSTME
+    V y => TRUSTME
 
 -- fix : {A : U} -> (A -> A) -> A
 -- fix = \ {A} g =>

@@ -15,9 +15,9 @@ data RigCount = Rig0 | RigW
 public export
 data Pattern
   = PatVar Name
-  | PatCon Name (List (Pattern, RigCount))
+  | PatCon Name (List Pattern)
   | PatWild
-  | PatLit Literal
+  -- | PatLit Literal
 
 -- %runElab deriveShow `{Pattern}
 
@@ -112,11 +112,12 @@ Show RigCount where
   show Rig0 = "Rig0"
   show RigW = "RigW"
 
+export
 Show Pattern where
   show (PatVar str) = foo ["PatVar", show str]
   show (PatCon str xs) = foo ["PatCon", show str, assert_total $ show xs]
   show PatWild = "PatWild"
-  show (PatLit x) = foo ["PatLit" , show x]
+  -- show (PatLit x) = foo ["PatLit" , show x]
 
 covering
 Show RCaseAlt where

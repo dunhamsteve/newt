@@ -212,6 +212,16 @@ data Val : Type where
   VU : FC -> Val
   VLit : FC -> Literal -> Val
 
+public export
+getValFC : Val -> FC
+getValFC (VVar fc _ _) = fc
+getValFC (VRef fc _ _ _) = fc
+getValFC (VCase fc _ _) = fc
+getValFC (VMeta fc _ _) = fc
+getValFC (VLam fc _ _) = fc
+getValFC (VPi fc _ _ a b) = fc
+getValFC (VU fc) = fc
+getValFC (VLit fc _) = fc
 
 
 Show Closure
