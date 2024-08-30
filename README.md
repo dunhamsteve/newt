@@ -1,15 +1,6 @@
 
-"Unifiers as Equivalences" has unification with types.  Look into adapting some of that (or at least read/understand it).  Indexed types are mentioned here.
-
-"Elaborating Dependent (Co)pattern Matching" describes building case trees. Section 5.2 has the algorithm.
-
-"A prettier printer" was the basis of the pretty printer.
-
-"Elaboration Zoo" was a resource for typechecking and elaboration. In particular pattern unification and handling of implicits is based on that.
-
-
 - [x] Support primitives
-- Make DCon/TCon separate from Ref? (Or add flavor to VRef/Ref? If processing is often the same. I think I want arity though. I don't think a checked DCon can be overapplied, but it could be underapplied without special form. And special form is possibly difficult if not collecting a stack on the way down...
+- [ ] Make DCon/TCon separate from Ref? (Or add flavor to VRef/Ref? If processing is often the same. I think I want arity though. I don't think a checked DCon can be overapplied, but it could be underapplied without special form. And special form is possibly difficult if not collecting a stack on the way down...
 
 
 Need to typecheck case - learning stuff like `n = S k` is not happening and the final bit of the data constructor doesn't unify with the data type, because we're not handling `Bnd n =?= Val`. Cockx collects a list of constraints.  We might want flags on unification to enable that?
@@ -123,6 +114,7 @@ Code generation is partially done.
 We're stopping at zoo4 for now.
 
 
+
 ### Typecheck / Elaboration
 
 - [ ] think about whether there needs to be a desugar step separate from check/infer
@@ -133,6 +125,19 @@ We're stopping at zoo4 for now.
   - should the environment be lazy?
 - [ ] look into Lennart.newt issues
 - [ ] figure out how to add laziness (might have to be via the monad)
+
+
+### References
+
+"Unifiers as Equivalences" has unification with types.  Look into adapting some of that (or at least read/understand it).  Indexed types are mentioned here.
+
+"Elaborating Dependent (Co)pattern Matching" describes building case trees. Section 5.2 has the algorithm.
+
+"A prettier printer" was the basis of the pretty printer.
+
+"Elaboration Zoo" was a resource for typechecking and elaboration. In particular pattern unification and handling of implicits is based on that.
+
+### Misc Notes
 
 So smalltt has TopVar with a Level. typechecking binders end up as top too.
 
