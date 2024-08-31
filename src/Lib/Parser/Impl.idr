@@ -24,6 +24,10 @@ public export
 FC : Type
 FC = (Int,Int)
 
+public export
+interface HasFC a where
+  getFC : a -> FC
+
 %name FC fc
 
 export
@@ -159,8 +163,8 @@ mutual
 
 -- withIndentationBlock - sets the col
 export
-getFC : Parser FC
-getFC = P $ \toks,com, (l,c) => case toks of
+getPos : Parser FC
+getPos = P $ \toks,com, (l,c) => case toks of
   [] => OK emptyFC toks com
   (t :: ts) => OK (start t) toks com
 

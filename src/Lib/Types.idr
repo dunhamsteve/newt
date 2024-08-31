@@ -89,16 +89,16 @@ data Tm : Type where
 %name Tm t, u, v
 
 export
-getFC : Tm -> FC
-getFC (Bnd fc k) = fc
-getFC (Ref fc str x) = fc
-getFC (Meta fc k) = fc
-getFC (Lam fc str t) = fc
-getFC (App fc t u) = fc
-getFC (U fc) = fc
-getFC (Pi fc str icit t u) = fc
-getFC (Case fc t xs) = fc
-getFC (Lit fc _) = fc
+HasFC Tm where
+  getFC (Bnd fc k) = fc
+  getFC (Ref fc str x) = fc
+  getFC (Meta fc k) = fc
+  getFC (Lam fc str t) = fc
+  getFC (App fc t u) = fc
+  getFC (U fc) = fc
+  getFC (Pi fc str icit t u) = fc
+  getFC (Case fc t xs) = fc
+  getFC (Lit fc _) = fc
 
 covering
 Show Tm
@@ -365,7 +365,7 @@ record Context where
   -- We only need this here if we don't pass TopContext
   -- top : TopContext
   metas : IORef MetaContext
-
+  fc : FC
 
 export
 names : Context -> List String
@@ -379,7 +379,7 @@ M = (StateT TopContext (EitherT Impl.Error IO))
 -- around top
 export
 mkCtx : IORef MetaContext -> Context
-mkCtx metas = MkCtx 0 [] [] [] metas
+mkCtx metas = MkCtx 0 [] [] [] metas emptyFC
 
 ||| Force argument and print if verbose is true
 export

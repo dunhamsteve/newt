@@ -24,9 +24,9 @@ getArity _ = Z
 export
 collectDecl : List Decl -> List Decl
 collectDecl [] = []
-collectDecl ((Def nm cl) :: rest@(Def nm' cl' :: xs)) =
-  if nm == nm' then collectDecl (Def nm (cl ++ cl') :: xs)
-  else (Def nm cl :: collectDecl rest)
+collectDecl ((Def fc nm cl) :: rest@(Def _ nm' cl' :: xs)) =
+  if nm == nm' then collectDecl (Def fc nm (cl ++ cl') :: xs)
+  else (Def fc nm cl :: collectDecl rest)
 collectDecl (x :: xs) = x :: collectDecl xs
 
 export
@@ -52,9 +52,7 @@ processDecl (PFunc fc nm ty src) = do
   putStrLn "pfunc \{nm} : \{pprint [] ty'} := \{show src}"
   modify $ setDef nm ty' (PrimFn src)
 
-processDecl (Def nm clauses) = do
-  -- FIXME - I guess we need one on Def, too, or pull off of first clause
-  let fc = emptyFC
+processDecl (Def fc nm clauses) = do
   putStrLn "-----"
   putStrLn "def \{show nm}"
   ctx <- get
@@ -71,7 +69,7 @@ processDecl (Def nm clauses) = do
   vty <- eval empty CBN ty
   putStrLn "vty is \{show vty}"
 
-  tm <- buildTree (mkCtx ctx.metas) (MkProb clauses vty)
+  tm <- buildTree ({ fc := fc} $ mkCtx ctx.metas) (MkProb clauses vty)
   -- tm <- check (mkCtx ctx.metas) body vty
   putStrLn "Ok \{pprint [] tm}"
 

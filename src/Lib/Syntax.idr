@@ -16,11 +16,17 @@ data RigCount = Rig0 | RigW
 
 public export
 data Pattern
-  = PatVar Name
-  | PatCon Name (List Pattern)
-  | PatWild
+  = PatVar FC Name
+  | PatCon FC Name (List Pattern)
+  | PatWild FC
   -- Not handling this yet, but we need to be able to work with numbers and strings...
   -- | PatLit Literal
+
+export
+HasFC Pattern where
+  getFC (PatVar fc str) = fc
+  getFC (PatCon fc str xs) = fc
+  getFC (PatWild fc) = fc
 
 -- %runElab deriveShow `{Pattern}
 public export
@@ -65,19 +71,19 @@ data Raw : Type where
 %name Raw tm
 
 export
-getFC : Raw -> FC
-getFC (RVar fc nm) = fc
-getFC (RLam fc nm icit ty) = fc
-getFC (RApp fc t u icit) = fc
-getFC (RU fc) = fc
-getFC (RPi fc nm icit ty sc) = fc
-getFC (RLet fc nm ty v sc) = fc
-getFC (RAnn fc tm ty) = fc
-getFC (RLit fc y) = fc
-getFC (RCase fc scrut alts) = fc
-getFC (RImplicit fc) = fc
-getFC (RHole fc) = fc
-getFC (RParseError fc str) = fc
+HasFC Raw where
+  getFC (RVar fc nm) = fc
+  getFC (RLam fc nm icit ty) = fc
+  getFC (RApp fc t u icit) = fc
+  getFC (RU fc) = fc
+  getFC (RPi fc nm icit ty sc) = fc
+  getFC (RLet fc nm ty v sc) = fc
+  getFC (RAnn fc tm ty) = fc
+  getFC (RLit fc y) = fc
+  getFC (RCase fc scrut alts) = fc
+  getFC (RImplicit fc) = fc
+  getFC (RHole fc) = fc
+  getFC (RParseError fc str) = fc
 -- derive some stuff - I'd like json, eq, show, ...
 
 -- FIXME - I think I don't want "where" here, but the parser has an issue
@@ -86,7 +92,7 @@ data Decl : Type where
 
 data Decl
   = TypeSig FC Name Raw
-  | Def Name (List Clause)
+  | Def FC Name (List Clause)
   | DImport FC Name
   | DCheck FC Raw Raw
   | Data FC Name Raw (List Decl)
@@ -125,7 +131,7 @@ Show Clause where
 covering
 Show Decl where
   show (TypeSig _ str x) = foo ["TypeSig", show str, show x]
-  show (Def str clauses) = foo ["Def", show str, show clauses]
+  show (Def _ str clauses) = foo ["Def", show str, show clauses]
   show (Data _ str xs ys) = foo ["Data", show str, show xs, show ys]
   show (DImport _ str) = foo ["DImport", show str]
   show (DCheck _ x y) = foo ["DCheck", show x, show y]
@@ -142,9 +148,9 @@ Show RigCount where
 
 export
 Show Pattern where
-  show (PatVar str) = foo ["PatVar", show str]
-  show (PatCon str xs) = foo ["PatCon", show str, assert_total $ show xs]
-  show PatWild = "PatWild"
+  show (PatVar _ str) = foo ["PatVar", show str]
+  show (PatCon _ str xs) = foo ["PatCon", show str, assert_total $ show xs]
+  show (PatWild _) = "PatWild"
   -- show (PatLit x) = foo ["PatLit" , show x]
 
 covering
@@ -168,9 +174,11 @@ Show Raw where
 
 export
 Pretty Pattern where
-  pretty (PatVar nm) = text nm
-  pretty (PatCon nm args) = text nm <+> spread (map pretty args)
-  pretty PatWild = "_"
+  pretty (PatVar _ nm) = text nm
+  pretty (PatCon _ nm args) = text nm <+> spread (map pretty args)
+  pretty (PatWild _)= "_"
+
+
 
 export
 Pretty Raw where
@@ -215,7 +223,7 @@ Pretty Module where
       where
         doDecl : Decl -> Doc
         doDecl (TypeSig _ nm ty) = text nm <+> text ":" <+> nest 2 (pretty ty)
-        doDecl (Def nm clauses) = spread $ map doClause clauses
+        doDecl (Def _ nm clauses) = spread $ map doClause clauses
           where
             doClause : Clause -> Doc
             doClause (MkClause fc _ pats body) = text nm <+> spread (map pretty pats) <+> text "=" <+> nest 2 (pretty body)

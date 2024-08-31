@@ -15,56 +15,54 @@ max Z m = m
 max n Z = n
 max (S k) (S l) = S (max k l)
 
+data List : U -> U where
+  LN : {a : U} -> List a
+  LCons : {a : U} -> a -> List a -> List a
 
 data Vect : Nat -> U -> U where
   Nil : {a : U} -> Vect Z a
   Cons : {a : U} {n : Nat} -> a -> Vect n a -> Vect (S n) a
 
 -- NEXT Need to handle implicits
--- length : {a : U} {n : Nat} -> Vect n a -> Nat
--- length Nil = Z
--- length (Cons x xs) = S (length xs)
+-- I've hacked implicits, but need to figure out indices..
+length : {a : U} {n : Nat} -> Vect n a -> Nat
+length Nil = Z
+length (Cons x xs) = S (length xs)
 
--- data Unit : U where
---   MkUnit : Unit
+data Unit : U where
+  MkUnit : Unit
 
--- foo : Vect (S Z) Unit
--- foo = Cons MkUnit Nil
+-- This should fail (and does!)
+-- bar : Vect (S Z) Unit
+-- bar = (Cons MkUnit (Cons MkUnit Nil))
 
--- -- This should fail (and does!)
--- -- bar : Vect (S Z) Unit
--- -- bar = (Cons MkUnit (Cons MkUnit Nil))
+data Bool : U where
+  True : Bool
+  False : Bool
 
--- data Bool : U where
---   True : Bool
---   False : Bool
-
--- not : Bool -> Bool
--- not = \ v => case v of
---   True => False
---   False => True
+not : Bool -> Bool
+not True = False
+not False = True
 
 
--- not2 : Bool -> Bool
--- not2 = \ v => case v of
---   True => False
---   x => True
+not2 : Bool -> Bool
+not2 True = False
+not2 x = True
 
--- and : Bool -> Bool -> Bool
--- and = \ x y => case x of
---   True => y
---   False => False
+-- TEST CASE - remove second clause here and expect error
+and : Bool -> Bool -> Bool
+and True y = y
+and False _ = False
 
--- -- FIXME - a case is evaluated here, and I don't know why.
+nand : Bool -> Bool -> Bool
+nand x y = not (case x of
+    True => y
+    False => False)
 
--- nand : Bool -> Bool -> Bool
--- nand = \ x y => not (case x of
---     True => y
---     False => False)
 
--- -- -- this should be an error.
--- -- foo : Bool -> Bool
+-- for stuff like this, we should add Agda () and check for no constructors
+data Void : U where
 
--- data Void : U where
+
 
 

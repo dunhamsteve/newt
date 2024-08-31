@@ -53,13 +53,13 @@ optional pa = Just <$> pa <|> pure Nothing
 
 stringLit : Parser Raw
 stringLit = do
-  fc <- getFC
+  fc <- getPos
   t <- token StringKind
   pure $ RLit fc (LString (cast t))
 
 intLit : Parser Raw
 intLit = do
-  fc <- getFC
+  fc <- getPos
   t <- token Number
   pure $ RLit fc (LInt (cast t))
 
@@ -73,12 +73,12 @@ export term : (Parser Raw)
 
 -- the inside of Raw
 atom : Parser Raw
-atom = RU <$> getFC <* keyword "U"
-    <|> RVar <$> getFC <*> ident
-    <|> RVar <$> getFC <*> uident
+atom = RU <$> getPos <* keyword "U"
+    <|> RVar <$> getPos <*> ident
+    <|> RVar <$> getPos <*> uident
     <|> lit
-    <|> RImplicit <$> getFC <* keyword "_"
-    <|> RHole <$> getFC <* keyword "?"
+    <|> RImplicit <$> getPos <* keyword "_"
+    <|> RHole <$> getPos <* keyword "?"
     <|> parens typeExpr
 
 -- Argument to a Spine
@@ -100,7 +100,7 @@ parseApp : Parser Raw
 parseApp = do
   hd <- atom
   rest <- many pArg
-  fc <- getFC
+  fc <- getPos
   pure $ foldl (\a, (c,b) => RApp fc a b c) hd rest
 
 parseOp : Parser Raw
@@ -109,7 +109,7 @@ parseOp = parseApp >>= go 0
     go : Int -> Raw -> Parser Raw
     go prec left =
       do
-        fc <- getFC
+        fc <- getPos
         op <- token Oper
         let Just (p,fix) = lookup op operators
          | Nothing => fail "expected operator"
@@ -127,12 +127,12 @@ letExpr = do
   alts <- startBlock $ someSame $ letAssign
   keyword' "in"
   scope <- typeExpr
-  fc <- getFC
+  fc <- getPos
   pure $ foldl (\ acc, (n,fc,v) => RLet fc n (RImplicit fc) v acc) scope alts
   where
     letAssign : Parser (Name,FC,Raw)
     letAssign = do
-      fc <- getFC
+      fc <- getPos
       name <- ident
       -- TODO type assertion
       keyword "="
@@ -154,7 +154,7 @@ lamExpr = do
   args <- some pLetArg
   keyword "=>"
   scope <- typeExpr
-  fc <- getFC
+  fc <- getPos
   pure $ foldr (\(icit, name, ty), sc => RLam fc name icit sc) scope args
 
 
@@ -168,12 +168,12 @@ lamExpr = do
 pPattern' : Parser Pattern
 pPattern : Parser Pattern
 pPattern
-   = PatWild <$ keyword "_"
-  <|> PatVar <$> ident
-  <|> PatCon <$> uident <*> pure []
+   = PatWild <$ keyword "_" <*> getPos
+  <|> PatVar <$> getPos <*> ident
+  <|> PatCon <$> getPos <*> uident <*> pure []
   <|> parens pPattern'
 
-pPattern'  = PatCon <$> uident <*> many pPattern <|> pPattern
+pPattern'  = PatCon <$> getPos <*> uident <*> many pPattern <|> pPattern
 
 caseAlt : Parser RCaseAlt
 caseAlt = do
@@ -191,7 +191,7 @@ caseExpr = do
   sc <- term
   keyword "of"
   alts <- startBlock $ someSame $ caseAlt
-  pure $ RCase !(getFC) sc alts
+  pure $ RCase !(getPos) sc alts
 
 -- This hits an idris codegen bug if parseOp is last and Lazy
 term =  caseExpr
@@ -215,9 +215,9 @@ ibind = do
   mustWork $ do
     names <- some ident
     ty <- optional (sym ":" >> typeExpr)
-    pos <- getFC
+    pos <- getPos
     sym "}"
-    -- getFC is a hack here, I would like to position at the name...
+    -- getPos is a hack here, I would like to position at the name...
     pure $ map (\name => (name, Implicit, fromMaybe (RImplicit pos) ty)) names
 
 arrow : Parser Unit
@@ -230,7 +230,7 @@ binders = do
   arrow
   commit
   scope <- typeExpr
-  fc <- getFC
+  fc <- getPos
   pure $ foldr (mkBind fc) scope (join binds)
   where
     mkBind : FC -> (String, Icit, Raw) -> Raw -> Raw
@@ -243,7 +243,7 @@ typeExpr = binders
         case scope of
           Nothing      => pure exp
           -- consider Maybe String to represent missing
-          (Just scope) => pure $ RPi !(getFC) Nothing Explicit exp scope
+          (Just scope) => pure $ RPi !(getPos) Nothing Explicit exp scope
 
 
 -- And top level stuff
@@ -251,31 +251,31 @@ typeExpr = binders
 
 export
 parseSig : Parser Decl
-parseSig = TypeSig <$> getFC <*> (ident <|> uident) <* keyword ":" <*> mustWork typeExpr
+parseSig = TypeSig <$> getPos <*> (ident <|> uident) <* keyword ":" <*> mustWork typeExpr
 
 parseImport : Parser Decl
-parseImport = DImport <$> getFC <* keyword "import" <* commit <*> uident
+parseImport = DImport <$> getPos <* keyword "import" <* commit <*> uident
 
 -- Do we do pattern stuff now? or just name = lambda?
 
 export
 parseDef : Parser Decl
 parseDef = do
-  fc <- getFC
+  fc <- getPos
   nm <- ident
   pats <- many pPattern
   keyword "="
   body <- mustWork typeExpr
   -- these get collected later
-  pure $ Def nm [MkClause fc [] pats body]
+  pure $ Def fc nm [MkClause fc [] pats body]
 
 export
 parsePType : Parser Decl
-parsePType = PType <$> getFC <* keyword "ptype" <*> uident
+parsePType = PType <$> getPos <* keyword "ptype" <*> uident
 
 parsePFunc : Parser Decl
 parsePFunc = do
-  fc <- getFC
+  fc <- getPos
   keyword "pfunc"
   nm <- ident
   keyword ":"
@@ -287,7 +287,7 @@ parsePFunc = do
 export
 parseData : Parser Decl
 parseData = do
-  fc <- getFC
+  fc <- getPos
   keyword "data"
   name <- uident
   keyword ":"
@@ -301,7 +301,7 @@ parseData = do
 -- Not sure what I want here.
 -- I can't get a Tm without a type, and then we're covered by the other stuff
 parseNorm : Parser Decl
-parseNorm = DCheck <$> getFC <* keyword "#check" <*> typeExpr <* keyword ":" <*> typeExpr
+parseNorm = DCheck <$> getPos <* keyword "#check" <*> typeExpr <* keyword ":" <*> typeExpr
 
 export
 parseDecl : Parser Decl

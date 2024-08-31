@@ -6,6 +6,7 @@ import Data.IORef
 import Data.String
 import Data.Vect
 import Data.List
+import Debug.Trace
 import Lib.Types
 import Lib.TopContext
 -- Will be a circular reference if we have case in terms
@@ -61,6 +62,13 @@ import Lib.Syntax
 -- a function def can let intro happen, so we could have
 -- different lengths of args.
 
+-- We're pulling type from the context, but we'll have it here if we use
+-- Bind more widely
+data Bind = MkBind String Icit Val
+
+Show Bind where
+  show (MkBind str icit x) = "\{str} \{show icit}"
+
 public export
 record Problem where
   constructor MkProb
@@ -89,7 +97,7 @@ introClause nm (MkClause fc cons (pat :: pats) expr) = pure $ MkClause fc ((nm, 
 findSplit : List Constraint -> Maybe Constraint
 findSplit [] = Nothing
     -- FIXME look up type, ensure it's a constructor
-findSplit (x@(nm, PatCon cnm pats) :: xs) = Just x
+findSplit (x@(nm, PatCon _ cnm pats) :: xs) = Just x
 findSplit (_ :: xs) = findSplit xs
 
 
@@ -119,31 +127,53 @@ getConstructors ctx tm = error (getValFC tm) "Not a type constructor \{show tm}"
 
 -- Extend environment with fresh variables from a pi-type
 -- return context, remaining type, and list of names
-extendPi : Context -> Val -> SnocList Name -> M (Context, Val, List Name)
+extendPi : Context -> Val -> SnocList Bind -> M (Context, Val, List Bind)
+-- NEXT This doesn't work, unsound.
+-- We need all of these vars with icity _and_ to insert implicits in the pattern
+-- extendPi ctx (VPi x str Implicit a b) nms = do
+--     let nm = fresh "pat"
+--     let ctx' = extend ctx nm a
+--     let v = VVar emptyFC (length ctx.env) [<]
+--     tyb <- b $$ v
+--     extendPi ctx' tyb nms
 extendPi ctx (VPi x str icit a b) nms = do
     let nm = fresh "pat"
     let ctx' = extend ctx nm a
     let v = VVar emptyFC (length ctx.env) [<]
     tyb <- b $$ v
-    extendPi ctx' tyb (nms :< nm)
+    extendPi ctx' tyb (nms :< MkBind nm icit a)
 extendPi ctx ty nms = pure (ctx, ty, nms <>> [])
 
 -- filter clause
+
+-- FIXME - I don't think we're properly noticing
 
 
 -- ok, so this is a single constructor, CaseAlt
 -- since we've gotten here, we assume it's possible and we better have at least
 -- one valid clause
 buildCase : Context -> Problem -> String -> (String, Nat, Tm) -> M CaseAlt
-buildCase ctx prob scnm (dcName, arity, ty) = do
+buildCase ctx prob scnm (dcName, _, ty) = do
   vty <- eval [] CBN ty
   (ctx', ty', vars) <- extendPi ctx (vty) [<]
+
+  debug "clauses were \{show prob.clauses} (dcon \{show dcName}) (vars \{show vars})"
   let clauses = mapMaybe (rewriteClause vars) prob.clauses
-  debug "clauses were \{show prob.clauses} and now \{show clauses}"
-  when (length clauses == 0) $ error emptyFC "No valid clauses / missing case / FIXME FC and some details"
+  debug "    and now \{show clauses}"
+  -- So ideally we'd know which position we're splitting and the surrounding context
+  -- That might be a lot to carry forward (maybe a continuation?) but we could carry
+  -- backwards as a List Missing that we augment as we go up.
+  -- We could even stick a little "throw error" tree in here for the case.
+  -- even going backward, we don't really know where pat$n falls into the expression.
+  -- It would need to keep track of its position. Then fill in the slots (wild vs PCons), or
+  -- wrapping with PCons as we move back up.  E.g. _ (Cons _ (Cons _ _)) _ _ could be missing
+  when (length clauses == 0) $ error ctx.fc "Missing case for \{dcName} splitting \{scnm}"
   tm <- buildTree ctx' (MkProb clauses prob.ty)
-  pure $ CaseCons dcName vars tm
+  pure $ CaseCons dcName (map getName vars) tm
   where
+    getName : Bind -> String
+    getName (MkBind nm _ _) = nm
+
     -- for each clause in prob, find nm on LHS of some constraint, and
     -- "replace" with the constructor and vars.
     --
@@ -155,24 +185,31 @@ buildCase ctx prob scnm (dcName, arity, ty) = do
     -- If they all fail, we have a coverage issue. (Assuming the constructor is valid)
 
 
-    -- There is a zip here, etc, but are we just re-writing buildTree?
-    -- I suppose vars might be the difference?  There may be something to factor out here
-    -- essentially we're picking apart Pi, binding variables and constraining them to patterns.
-    -- everything we've bound is only used in the PatCon case below.
+    -- we'll want implicit patterns at some point, for now we wildcard implicits because
+    -- we don't have them
+    makeConst : List Bind -> List Pattern -> List (String, Pattern)
+    makeConst [] [] = []
+    -- need M in here to throw.
+    makeConst [] (pat :: pats) = ?extra_patterns
+    --
+    makeConst ((MkBind nm Implicit x) :: xs) [] = (nm, PatWild emptyFC) :: makeConst xs []
+    makeConst ((MkBind nm Explicit x) :: xs) [] = ?extra_binders_2
+    makeConst ((MkBind nm Implicit x) :: xs) (pat :: pats) = (nm, PatWild (getFC pat)) :: makeConst xs (pat :: pats)
+    makeConst ((MkBind nm Explicit x) :: xs) (pat :: pats) = (nm, pat) :: makeConst xs pats
 
-    rewriteCons : List Name -> List Constraint -> List Constraint -> Maybe (List Constraint)
+    rewriteCons : List Bind -> List Constraint -> List Constraint -> Maybe (List Constraint)
     rewriteCons vars [] acc = Just acc
     rewriteCons vars (c@(nm, y) :: xs) acc =
       if nm == scnm
         then case y of
-          PatVar s => Just $ c :: (xs ++ acc)
-          PatWild => Just $ c :: (xs ++ acc)
-          PatCon str ys => if str == dcName
-            then Just $ (zip vars ys) ++ acc
+          PatVar _ s => Just $ c :: (xs ++ acc)
+          PatWild _ => Just $ c :: (xs ++ acc)
+          PatCon _ str ys => if str == dcName
+            then Just $ (makeConst vars ys) ++ acc
             else Nothing
         else rewriteCons vars xs (c :: acc)
 
-    rewriteClause : List Name -> Clause -> Maybe Clause
+    rewriteClause : List Bind -> Clause -> Maybe Clause
     rewriteClause vars (MkClause fc cons pats expr) = pure $ MkClause fc !(rewriteCons vars cons []) pats expr
 
 
@@ -193,8 +230,8 @@ lookupName ctx name = go 0 ctx.types
 
 checkDone : Context -> List (String, Pattern) -> Raw -> Val -> M Tm
 checkDone ctx [] body ty = check ctx body ty
-checkDone ctx ((x, PatWild) :: xs) body ty = checkDone ctx xs body ty
-checkDone ctx ((nm, (PatVar nm')) :: xs) body ty = checkDone ({ types $= rename } ctx) xs body ty
+checkDone ctx ((x, PatWild _) :: xs) body ty = checkDone ctx xs body ty
+checkDone ctx ((nm, (PatVar _ nm')) :: xs) body ty = checkDone ({ types $= rename } ctx) xs body ty
   where
     rename : Vect n (String, Val) -> Vect n (String, Val)
     rename [] = []
@@ -208,6 +245,14 @@ checkDone ctx ((x, pat) :: xs) body ty = error emptyFC "stray constraint \{x} /?
 -- This process is similar to extendPi, but we need to stop
 -- if one clause is short on patterns.
 buildTree ctx (MkProb [] ty) = error emptyFC "no clauses"
+buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ str Implicit a b)) = do
+  let l = length ctx.env
+  let nm = fresh "pat"
+  let ctx' = extend ctx nm a
+  -- type of the rest
+  -- clauses <- traverse (introClause nm) prob.clauses
+  vb <- b $$ VVar fc l [<]
+  Lam fc nm <$> buildTree ctx' ({ ty := vb } prob)
 buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ str icit a b)) = do
   let l = length ctx.env
   let nm = fresh "pat"
