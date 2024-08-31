@@ -1,4 +1,4 @@
-package newt
+package newt-test
 version = 0.1.0
 authors = "Steve Dunham"
 -- maintainers =
@@ -13,28 +13,16 @@ authors = "Steve Dunham"
 -- langversion
 
 -- packages to add to search path
-depends = contrib, base
+depends = newt
 
 -- modules to install
-modules =
-  Lib.CaseTree,
-  Lib.Check,
-  Lib.Parser,
-  Lib.Parser.Impl,
-  Lib.Prettier,
-  Lib.ProcessDecl,
-  Lib.Syntax,
-  Lib.TT,
-  Lib.Token,
-  Lib.TopContext,
-  Lib.Types,
-  Lib.Util
+-- modules =
 
 -- main file (i.e. file to load at REPL)
 main = Main
 
 -- name of executable
-executable = "newt"
+executable = "newt-test"
 -- opts =
 sourcedir = "src"
 -- builddir =

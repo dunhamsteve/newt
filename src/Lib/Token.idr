@@ -7,6 +7,7 @@ import public Text.Lexer
 public export
 data Kind
   = Ident
+  | UIdent
   | Keyword
   | Oper
   | Number
@@ -24,6 +25,7 @@ data Kind
 export
 Show Kind where
   show Ident   = "Ident"
+  show UIdent   = "UIdent"
   show Keyword = "Keyword"
   show Oper    = "Oper"
   show Number  = "Number"
@@ -39,6 +41,7 @@ Show Kind where
 export
 Eq Kind where
   Ident   == Ident = True
+  UIdent  == UIdent = True
   Keyword == Keyword = True
   Oper    == Oper = True
   Number  == Number = True

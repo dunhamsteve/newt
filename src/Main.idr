@@ -49,7 +49,7 @@ processFile fn = do
     | Left y => putStrLn (showError src y)
   putStrLn $ render 80 $ pretty res
   printLn "process Decls"
-  Right _ <- tryError $ traverse_ processDecl res.decls
+  Right _ <- tryError $ traverse_ processDecl (collectDecl res.decls)
     | Left y => putStrLn (showError src y)
 
   dumpContext !get

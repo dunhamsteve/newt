@@ -1,0 +1,70 @@
+module Scratch
+
+data Nat : U where
+  Z : Nat
+  S : Nat -> Nat
+
+plus : Nat -> Nat -> Nat
+plus Z m = m
+-- if this is a capital K on LHS, it fails with a poor error message
+plus (S k) m = S (plus k m)
+
+-- -- Example from Jesper talk (translated to case tree)
+max : Nat -> Nat -> Nat
+max Z m = m
+max n Z = n
+max (S k) (S l) = S (max k l)
+
+
+data Vect : Nat -> U -> U where
+  Nil : {a : U} -> Vect Z a
+  Cons : {a : U} {n : Nat} -> a -> Vect n a -> Vect (S n) a
+
+-- NEXT Need to handle implicits
+-- length : {a : U} {n : Nat} -> Vect n a -> Nat
+-- length Nil = Z
+-- length (Cons x xs) = S (length xs)
+
+-- data Unit : U where
+--   MkUnit : Unit
+
+-- foo : Vect (S Z) Unit
+-- foo = Cons MkUnit Nil
+
+-- -- This should fail (and does!)
+-- -- bar : Vect (S Z) Unit
+-- -- bar = (Cons MkUnit (Cons MkUnit Nil))
+
+-- data Bool : U where
+--   True : Bool
+--   False : Bool
+
+-- not : Bool -> Bool
+-- not = \ v => case v of
+--   True => False
+--   False => True
+
+
+-- not2 : Bool -> Bool
+-- not2 = \ v => case v of
+--   True => False
+--   x => True
+
+-- and : Bool -> Bool -> Bool
+-- and = \ x y => case x of
+--   True => y
+--   False => False
+
+-- -- FIXME - a case is evaluated here, and I don't know why.
+
+-- nand : Bool -> Bool -> Bool
+-- nand = \ x y => not (case x of
+--     True => y
+--     False => False)
+
+-- -- -- this should be an error.
+-- -- foo : Bool -> Bool
+
+-- data Void : U where
+
+

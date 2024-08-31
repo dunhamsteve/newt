@@ -12,14 +12,36 @@ data Raw : Type where
 public export
 data RigCount = Rig0 | RigW
 
+
+
 public export
 data Pattern
   = PatVar Name
   | PatCon Name (List Pattern)
   | PatWild
+  -- Not handling this yet, but we need to be able to work with numbers and strings...
   -- | PatLit Literal
 
 -- %runElab deriveShow `{Pattern}
+public export
+Constraint : Type
+Constraint = (String, Pattern)
+
+public export
+record Clause where
+  constructor MkClause
+  fc : FC
+  -- I'm including the type of the left, so we can check pats and get the list of possibilities
+  -- But maybe rethink what happens on the left.
+  -- It's a VVar k or possibly a pattern.
+  -- a pattern either is zipped out, dropped (non-match) or is assigned to rhs
+  -- if we can do all three then we can have a VVar here.
+  cons : List Constraint
+  pats : List Pattern
+  -- We'll need some context to typecheck this
+  -- it has names from Pats, which will need types in the env
+  expr : Raw
+
 
 -- could be a pair, but I suspect stuff will be added?
 public export
@@ -64,7 +86,7 @@ data Decl : Type where
 
 data Decl
   = TypeSig FC Name Raw
-  | Def FC Name Raw
+  | Def Name (List Clause)
   | DImport FC Name
   | DCheck FC Raw Raw
   | Data FC Name Raw (List Decl)
@@ -94,10 +116,16 @@ implementation Show Raw
 export
 implementation Show Decl
 
+export Show Pattern
+
+export covering
+Show Clause where
+  show (MkClause fc cons pats expr) = show (fc, cons, pats, expr)
+
 covering
 Show Decl where
   show (TypeSig _ str x) = foo ["TypeSig", show str, show x]
-  show (Def _ str x) = foo ["Def", show str, show x]
+  show (Def str clauses) = foo ["Def", show str, show clauses]
   show (Data _ str xs ys) = foo ["Data", show str, show xs, show ys]
   show (DImport _ str) = foo ["DImport", show str]
   show (DCheck _ x y) = foo ["DCheck", show x, show y]
@@ -137,6 +165,12 @@ Show Raw where
   show (RCase _ x xs) = foo [ "Case", show x, show xs]
   show (RParseError _ str) = foo [ "ParseError", "str"]
   show (RU _) = "U"
+
+export
+Pretty Pattern where
+  pretty (PatVar nm) = text nm
+  pretty (PatCon nm args) = text nm <+> spread (map pretty args)
+  pretty PatWild = "_"
 
 export
 Pretty Raw where
@@ -181,7 +215,10 @@ Pretty Module where
       where
         doDecl : Decl -> Doc
         doDecl (TypeSig _ nm ty) = text nm <+> text ":" <+> nest 2 (pretty ty)
-        doDecl (Def _ nm tm) = text nm <+> text "=" <+> nest 2 (pretty tm)
+        doDecl (Def nm clauses) = spread $ map doClause clauses
+          where
+            doClause : Clause -> Doc
+            doClause (MkClause fc _ pats body) = text nm <+> spread (map pretty pats) <+> text "=" <+> nest 2 (pretty body)
         doDecl (DImport _ nm) = text "import" <+> text nm ++ line
         -- the behavior of nest is kinda weird, I have to do the nest before/around the </>.
         doDecl (Data _ nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map doDecl xs))

@@ -13,6 +13,9 @@ specialOps = ["->", ":", "=>", ":="]
 checkKW : String -> Token Kind
 checkKW s = if elem s keywords then Tok Keyword s else Tok Ident s
 
+checkUKW : String -> Token Kind
+checkUKW s = if elem s keywords then Tok Keyword s else Tok UIdent s
+
 isOpChar : Char -> Bool
 isOpChar c = c `elem` (unpack ":!#$%&*+./<=>?@\\^|-~")
 
@@ -42,7 +45,8 @@ unquote str = case unpack str of
 
 rawTokens : Tokenizer (Token Kind)
 rawTokens
-   =  match (alpha <+> many identMore) checkKW
+   =  match (lower <+> many identMore) checkKW
+  <|> match (upper <+> many identMore) checkUKW
   <|> match (some digit) (Tok Number)
   <|> match (is '#' <+> many alpha) (Tok Pragma)
   <|> match (quo <+> manyUntil quo ((esc any <+> any) <|> any) <+> opt quo) (Tok StringKind . unquote)

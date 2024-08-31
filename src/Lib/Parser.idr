@@ -28,7 +28,10 @@ import Data.Maybe
 -- exercises.  There is some fill in the parser stuff that may show
 -- the future.
 
+
 ident = token Ident
+
+uident = token UIdent
 
 parens : Parser a -> Parser a
 parens pa = do
@@ -72,6 +75,7 @@ export term : (Parser Raw)
 atom : Parser Raw
 atom = RU <$> getFC <* keyword "U"
     <|> RVar <$> getFC <*> ident
+    <|> RVar <$> getFC <*> uident
     <|> lit
     <|> RImplicit <$> getFC <* keyword "_"
     <|> RHole <$> getFC <* keyword "?"
@@ -153,11 +157,23 @@ lamExpr = do
   fc <- getFC
   pure $ foldr (\(icit, name, ty), sc => RLam fc name icit sc) scope args
 
+
+-- Idris just has a term on the LHS and sorts it out later..
+-- This allows some eval, like n + 2 -> S (S n), and expands to more complexity
+-- like dotting
+
+-- We may need to look up names at some point to see if they're constructors.
+
+-- so, we can do the capital letter thing here or push that bit down and collect single/double
+pPattern' : Parser Pattern
 pPattern : Parser Pattern
 pPattern
    = PatWild <$ keyword "_"
   <|> PatVar <$> ident
+  <|> PatCon <$> uident <*> pure []
+  <|> parens pPattern'
 
+pPattern'  = PatCon <$> uident <*> many pPattern <|> pPattern
 
 caseAlt : Parser RCaseAlt
 caseAlt = do
@@ -235,20 +251,27 @@ typeExpr = binders
 
 export
 parseSig : Parser Decl
-parseSig = TypeSig <$> getFC <*> ident <* keyword ":" <*> mustWork typeExpr
+parseSig = TypeSig <$> getFC <*> (ident <|> uident) <* keyword ":" <*> mustWork typeExpr
 
 parseImport : Parser Decl
-parseImport = DImport <$> getFC <* keyword "import" <* commit <*> ident
+parseImport = DImport <$> getFC <* keyword "import" <* commit <*> uident
 
 -- Do we do pattern stuff now? or just name = lambda?
 
 export
 parseDef : Parser Decl
-parseDef = Def <$> getFC <*> ident <* keyword "=" <*> mustWork typeExpr
+parseDef = do
+  fc <- getFC
+  nm <- ident
+  pats <- many pPattern
+  keyword "="
+  body <- mustWork typeExpr
+  -- these get collected later
+  pure $ Def nm [MkClause fc [] pats body]
 
 export
 parsePType : Parser Decl
-parsePType = PType <$> getFC <* keyword "ptype" <*> ident
+parsePType = PType <$> getFC <* keyword "ptype" <*> uident
 
 parsePFunc : Parser Decl
 parsePFunc = do
@@ -260,15 +283,13 @@ parsePFunc = do
   keyword ":="
   src <- mustWork (cast <$> token StringKind)
   pure $ PFunc fc nm ty src
-  -- PFunc <$> getFC <* keyword "pfunc" <*> mustWork ident <* keyword ":" <*> mustWork typeExpr <* keyword ":=" <*> (cast <$> token StringKind)
-
 
 export
 parseData : Parser Decl
 parseData = do
   fc <- getFC
   keyword "data"
-  name <- ident
+  name <- uident
   keyword ":"
   ty <- typeExpr
   keyword "where"
@@ -290,7 +311,7 @@ export
 parseMod : Parser Module
 parseMod = do
   keyword "module"
-  name <- ident
+  name <- uident
   -- probably should be manySame, and we want to start with col -1
   -- if we enforce blocks indent more than parent
   decls <- startBlock $ manySame $ parseDecl

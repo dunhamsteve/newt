@@ -1,0 +1,10 @@
+[custom.all.newt]
+type = "local"
+path = "."
+ipkg = "newt.ipkg"
+test = "test/test.ipkg"
+
+[custom.all.newt-test]
+type = "local"
+path = "test"
+ipkg = "test.ipkg"

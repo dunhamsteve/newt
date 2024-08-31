@@ -181,8 +181,8 @@ infer : Context -> Raw  -> M  (Tm, Val)
 export
 check : Context -> Raw -> Val  -> M  Tm
 
--- FIXME we need to switch to FC
 
+-- This is the old case checking that expected a user-supplied case tree
 checkAlt : Val -> Context -> Val -> RCaseAlt -> M CaseAlt
 checkAlt scty ctx ty (MkAlt ptm body) = do
   -- we have a pattern term and a body
@@ -270,7 +270,16 @@ checkAlt scty ctx ty (MkAlt ptm body) = do
 
 
 check ctx tm ty = case (tm, !(forceType ty)) of
+  -- previous code
+  -- (RCase fc rsc alts, ty) => do
+  --   (sc, scty) <- infer ctx rsc
+  --   let (VRef fc nm (TCon cnames) sp) = scty
+  --     | _ => error fc "expected TCon for scrutinee type, got: \{show scty}"
+  --   debug "constructor names \{show cnames}"
+  --   alts' <- for alts $ checkAlt scty ctx ty
+  --   pure $ Case emptyFC sc alts'
   (RCase fc rsc alts, ty) => do
+    -- scrutinee must infer.  We will probably want to `let` it too.
     (sc, scty) <- infer ctx rsc
     let (VRef fc nm (TCon cnames) sp) = scty
       | _ => error fc "expected TCon for scrutinee type, got: \{show scty}"

@@ -2,6 +2,7 @@ module Lib.ProcessDecl
 
 import Data.IORef
 
+import Lib.CaseTree
 import Lib.Check
 import Lib.Parser
 import Lib.Syntax
@@ -16,6 +17,17 @@ getArity (Pi x str icit t u) = S (getArity u)
 getArity _ = Z
 
 -- Can metas live in context for now?
+-- We'll have to be able to add them, which might put gamma in a ref
+
+-- collect Defs into List Decl, special type, or add Defs to Decl?
+
+export
+collectDecl : List Decl -> List Decl
+collectDecl [] = []
+collectDecl ((Def nm cl) :: rest@(Def nm' cl' :: xs)) =
+  if nm == nm' then collectDecl (Def nm (cl ++ cl') :: xs)
+  else (Def nm cl :: collectDecl rest)
+collectDecl (x :: xs) = x :: collectDecl xs
 
 export
 processDecl : Decl -> M ()
@@ -40,7 +52,9 @@ processDecl (PFunc fc nm ty src) = do
   putStrLn "pfunc \{nm} : \{pprint [] ty'} := \{show src}"
   modify $ setDef nm ty' (PrimFn src)
 
-processDecl (Def fc nm raw) = do
+processDecl (Def nm clauses) = do
+  -- FIXME - I guess we need one on Def, too, or pull off of first clause
+  let fc = emptyFC
   putStrLn "-----"
   putStrLn "def \{show nm}"
   ctx <- get
@@ -48,10 +62,17 @@ processDecl (Def fc nm raw) = do
     | Nothing => throwError $ E fc "skip def \{nm} without Decl"
   let (MkEntry name ty Axiom) := entry
     | _ => throwError $ E fc "\{nm} already defined"
-  putStrLn "check \{nm} = \{show raw} at \{pprint [] ty}"
+
+  -- and we pass to the case tree stuff now
+  -- maybe fix up the clauses to match?
+  -- Also we need to distinguish DCon/var
+
+  putStrLn "check \{nm} ... at \{pprint [] ty}"
   vty <- eval empty CBN ty
   putStrLn "vty is \{show vty}"
-  tm <- check (mkCtx ctx.metas) raw vty
+
+  tm <- buildTree (mkCtx ctx.metas) (MkProb clauses vty)
+  -- tm <- check (mkCtx ctx.metas) body vty
   putStrLn "Ok \{pprint [] tm}"
 
   mc <- readIORef ctx.metas
@@ -65,7 +86,6 @@ processDecl (Def fc nm raw) = do
   modify $ setDef nm ty (Fn tm)
 
 processDecl (DCheck fc tm ty) = do
-
   top <- get
   putStrLn "check \{show tm} at \{show ty}"
   ty' <- check (mkCtx top.metas) tm (VU fc)
@@ -114,6 +134,7 @@ processDecl (Data fc nm ty cons) = do
   -- Maybe a pi -> binders function
   -- TODO we're putting in axioms, we need constructors
   -- for each constructor, check and add
+  putStrLn "setDef \{nm}  TCon \{show cnames}"
   modify $ setDef nm tyty (TCon cnames)
   pure ()
   where

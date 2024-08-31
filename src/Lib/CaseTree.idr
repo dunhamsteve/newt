@@ -2,11 +2,13 @@
 ||| Follow §5.2 in Jesper Cockx paper Elaborating Dependent (co)pattern matching
 module Lib.CaseTree
 
+import Data.IORef
 import Data.String
 import Data.Vect
 import Data.List
 import Lib.Types
 import Lib.TopContext
+-- Will be a circular reference if we have case in terms
 import Lib.Check
 import Lib.TT
 import Lib.Syntax
@@ -42,23 +44,6 @@ import Lib.Syntax
 -- The pvars point to bound variables _or_ full expressions (Val) of a dcon applied to bound vars
 -- (e.g. S k). Perhaps something like `let` or a specific `pvar` binder?
 
-0 Constraint : Type
-Constraint = (String, Pattern)
-
-record Clause where
-  constructor MkClause
-  fc : FC
-  -- I'm including the type of the left, so we can check pats and get the list of possibilities
-  -- But maybe rethink what happens on the left.
-  -- It's a VVar k or possibly a pattern.
-  -- a pattern either is zipped out, dropped (non-match) or is assigned to rhs
-  -- if we can do all three then we can have a VVar here.
-  cons : List Constraint
-  pats : List Pattern
-  -- We'll need some context to typecheck this
-  -- it has names from Pats, which will need types in the env
-  expr : Raw
-
 -- when we INTRO, we pop a pat from pats and a type from ty
 -- add to gamma
 -- add a constraint to each clause binding the var t to the pat
@@ -69,8 +54,14 @@ record Clause where
 -- turn matches into subst
 -- see if we're good (no pats, no constraints)
 
--- Do I want Val or Tm here?
+-- a case statement doesn't have pats, intro has been done
+-- already, and we have a pile of clauses referencing a
+-- name in the context.
 
+-- a function def can let intro happen, so we could have
+-- different lengths of args.
+
+public export
 record Problem where
   constructor MkProb
   clauses : List Clause
@@ -84,6 +75,7 @@ fresh : {auto ctx : Context} -> String -> String
 fresh base = base ++ "$" ++ show (length ctx.env)
 
 -- The result is a casetree, but it's in Tm
+export
 buildTree : Context -> Problem -> M Tm
 
 introClause : String -> Clause -> M Clause
@@ -96,9 +88,8 @@ introClause nm (MkClause fc cons (pat :: pats) expr) = pure $ MkClause fc ((nm, 
 -- this may dot into a dependent.
 findSplit : List Constraint -> Maybe Constraint
 findSplit [] = Nothing
-findSplit (x@(nm, PatCon{}) :: xs) =
     -- FIXME look up type, ensure it's a constructor
-    Just x
+findSplit (x@(nm, PatCon cnm pats) :: xs) = Just x
 findSplit (_ :: xs) = findSplit xs
 
 
@@ -110,15 +101,21 @@ findSplit (_ :: xs) = findSplit xs
 
 -- TODO, we may need to filter these for the situation.
 getConstructors : Context -> Val -> M (List (String, Nat, Tm))
-getConstructors ctx (VRef fc nm (TCon names) sc) = traverse lookupDCon names
+getConstructors ctx (VRef fc nm _ sc) = do
+  names <- lookupTCon nm
+  traverse lookupDCon names
   where
+    lookupTCon : String -> M (List String)
+    lookupTCon str = case lookup nm !get of
+        (Just (MkEntry name type (TCon names))) => pure names
+        _ => error fc "Not a type constructor \{nm}"
     lookupDCon : String -> M (String, Nat, Tm)
     lookupDCon nm = do
       case lookup nm !get of
         (Just (MkEntry name type (DCon k str))) => pure (name, k, type)
         Just _ => error fc "Internal Error: \{nm} is not a DCon"
         Nothing => error fc "Internal Error: DCon \{nm} not found"
-getConstructors ctx tm = error (getValFC tm) "Not a type constructor"
+getConstructors ctx tm = error (getValFC tm) "Not a type constructor \{show tm}"
 
 -- Extend environment with fresh variables from a pi-type
 -- return context, remaining type, and list of names
@@ -142,8 +139,9 @@ buildCase ctx prob scnm (dcName, arity, ty) = do
   vty <- eval [] CBN ty
   (ctx', ty', vars) <- extendPi ctx (vty) [<]
   let clauses = mapMaybe (rewriteClause vars) prob.clauses
+  debug "clauses were \{show prob.clauses} and now \{show clauses}"
   when (length clauses == 0) $ error emptyFC "No valid clauses / missing case / FIXME FC and some details"
-  tm <- buildTree ctx' (MkProb clauses ty')
+  tm <- buildTree ctx' (MkProb clauses prob.ty)
   pure $ CaseCons dcName vars tm
   where
     -- for each clause in prob, find nm on LHS of some constraint, and
@@ -167,10 +165,10 @@ buildCase ctx prob scnm (dcName, arity, ty) = do
     rewriteCons vars (c@(nm, y) :: xs) acc =
       if nm == scnm
         then case y of
-          (PatVar s) => Just $ c :: (xs ++ acc)
+          PatVar s => Just $ c :: (xs ++ acc)
           PatWild => Just $ c :: (xs ++ acc)
-          (PatCon str ys) => if str == dcName
-            then Just $ acc ++ (zip vars ys)
+          PatCon str ys => if str == dcName
+            then Just $ (zip vars ys) ++ acc
             else Nothing
         else rewriteCons vars xs (c :: acc)
 
@@ -187,6 +185,28 @@ lookupName ctx name = go 0 ctx.types
     -- FIXME - we should stuff a Binder of some sort into "types"
     go ix ((nm, ty) :: xs) = if nm == name then Just (Bnd emptyFC ix, ty) else go (S ix) xs
 
+-- FIXME need to check done here...
+      -- If all of the constraints are assignments, fixup context and type check
+      -- else bail:
+
+      -- error fc "Stuck, no splits \{show constraints}"
+
+checkDone : Context -> List (String, Pattern) -> Raw -> Val -> M Tm
+checkDone ctx [] body ty = check ctx body ty
+checkDone ctx ((x, PatWild) :: xs) body ty = checkDone ctx xs body ty
+checkDone ctx ((nm, (PatVar nm')) :: xs) body ty = checkDone ({ types $= rename } ctx) xs body ty
+  where
+    rename : Vect n (String, Val) -> Vect n (String, Val)
+    rename [] = []
+    rename ((name, ty) :: xs) =
+      if name == nm
+        then (nm', ty) :: xs
+        else (name, ty) :: rename xs
+
+checkDone ctx ((x, pat) :: xs) body ty = error emptyFC "stray constraint \{x} /? \{show pat}"
+
+-- This process is similar to extendPi, but we need to stop
+-- if one clause is short on patterns.
 buildTree ctx (MkProb [] ty) = error emptyFC "no clauses"
 buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ str icit a b)) = do
   let l = length ctx.env
@@ -203,30 +223,16 @@ buildTree ctx prob@(MkProb ((MkClause fc [] [] expr) :: cs) ty) = check ctx expr
 -- need to find some name we can split in (x :: xs)
 -- so LHS of constraint is name (or VVar - if we do Val)
 -- then run the split
-buildTree ctx prob@(MkProb ((MkClause fc xs [] expr) :: cs) ty) = do
+buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
+  debug "buildTree \{show constraints} \{show expr}"
+  let Just (scnm, pat) := findSplit constraints
+    | _ => checkDone ctx constraints expr ty
 
-  -- REVIEW There is a extendPi here.
-
-  -- We don't need ty here if we're happy with Val...
-  let Just (scnm, _) := findSplit xs | _ => error fc "Stuck, no splits"
-
+  debug "split on \{scnm} because \{show pat}"
   let Just (sctm, ty') := lookupName ctx scnm
     | _ => error fc "Internal Error: can't find \{scnm} in environment"
 
-  -- get constructors, for each of them run the problem, build Case result
-  cons <- getConstructors ctx ty' -- probably need pi-types too for recursion
-  -- we have a case tree for each dcon, from a recursive call, collect into `Case`
+  cons <- getConstructors ctx ty'
   alts <- traverse (buildCase ctx prob scnm) cons
 
-  -- Maybe `scnm` should be something other than a name? Index is not stable,
-  -- we're working with term at the moment, so Val isn't great.
-  -- But this is elab and we do name -> Bnd in `infer`, so why not.
-
   pure $ Case fc sctm alts
-
-
-
-
-
--- A telescope is a list of binders, right? I've been leaving things as pi types to be explicit
-
