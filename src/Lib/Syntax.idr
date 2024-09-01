@@ -48,7 +48,6 @@ record Clause where
   -- it has names from Pats, which will need types in the env
   expr : Raw
 
-
 -- could be a pair, but I suspect stuff will be added?
 public export
 data RCaseAlt = MkAlt Raw Raw

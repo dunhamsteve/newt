@@ -37,7 +37,7 @@ processDecl (TypeSig fc nm tm) = do
     | _ => error fc "\{show nm} is already defined"
   putStrLn "-----"
   putStrLn "TypeSig \{nm} \{show tm}"
-  ty <- check (mkCtx top.metas) tm (VU fc)
+  ty <- check (mkCtx top.metas fc) tm (VU fc)
   ty' <- nf [] ty
   putStrLn "got \{pprint [] ty'}"
   modify $ setDef nm ty' Axiom
@@ -47,7 +47,7 @@ processDecl (PType fc nm) = do
   modify $ setDef nm (U fc) PrimTCon
 processDecl (PFunc fc nm ty src) = do
   top <- get
-  ty <- check (mkCtx top.metas) ty (VU fc)
+  ty <- check (mkCtx top.metas fc) ty (VU fc)
   ty' <- nf [] ty
   putStrLn "pfunc \{nm} : \{pprint [] ty'} := \{show src}"
   modify $ setDef nm ty' (PrimFn src)
@@ -69,8 +69,7 @@ processDecl (Def fc nm clauses) = do
   vty <- eval empty CBN ty
   putStrLn "vty is \{show vty}"
 
-  tm <- buildTree ({ fc := fc} $ mkCtx ctx.metas) (MkProb clauses vty)
-  -- tm <- check (mkCtx ctx.metas) body vty
+  tm <- buildTree (mkCtx ctx.metas fc) (MkProb clauses vty)
   putStrLn "Ok \{pprint [] tm}"
 
   mc <- readIORef ctx.metas
@@ -86,10 +85,10 @@ processDecl (Def fc nm clauses) = do
 processDecl (DCheck fc tm ty) = do
   top <- get
   putStrLn "check \{show tm} at \{show ty}"
-  ty' <- check (mkCtx top.metas) tm (VU fc)
+  ty' <- check (mkCtx top.metas fc) tm (VU fc)
   putStrLn "got type \{pprint [] ty'}"
   vty <- eval [] CBN ty'
-  res <- check (mkCtx top.metas) ty vty
+  res <- check (mkCtx top.metas fc) ty vty
   putStrLn "got \{pprint [] res}"
   norm <- nf [] res
   putStrLn "norm \{pprint [] norm}"
@@ -104,7 +103,7 @@ processDecl (DImport fc str) = throwError $ E fc "import not implemented"
 processDecl (Data fc nm ty cons) = do
   -- It seems like the FC for the errors are not here?
   ctx <- get
-  tyty <- check (mkCtx ctx.metas) ty (VU fc)
+  tyty <- check (mkCtx ctx.metas fc) ty (VU fc)
   -- FIXME we need this in scope, but need to update
   modify $ setDef nm tyty Axiom
   ctx <- get
@@ -112,7 +111,7 @@ processDecl (Data fc nm ty cons) = do
       -- expecting tm to be a Pi type
       (TypeSig fc nm' tm) => do
           ctx <- get
-          dty <- check (mkCtx ctx.metas) tm (VU fc)
+          dty <- check (mkCtx ctx.metas fc) tm (VU fc)
           debug "dty \{nm'} is \{pprint [] dty}"
 
           -- We only check that codomain uses the right type constructor

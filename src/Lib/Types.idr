@@ -378,8 +378,8 @@ M = (StateT TopContext (EitherT Impl.Error IO))
 -- we need more of topcontext later - Maybe switch it up so we're not passing
 -- around top
 export
-mkCtx : IORef MetaContext -> Context
-mkCtx metas = MkCtx 0 [] [] [] metas emptyFC
+mkCtx : IORef MetaContext -> FC -> Context
+mkCtx metas fc = MkCtx 0 [] [] [] metas fc
 
 ||| Force argument and print if verbose is true
 export

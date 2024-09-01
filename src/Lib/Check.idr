@@ -112,6 +112,9 @@ parameters (ctx: Context)
     debug "  =?= \{show u}"
     t' <- forceMeta t
     u' <- forceMeta u
+    debug "forced \{show t'}"
+    debug "  =?= \{show u'}"
+    debug "env \{show ctx.env}"
     case (t',u') of
       (VLam _ _ t,  VLam _ _ t') => unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
       (t,         VLam fc' _ t') => unify (l + 1) !(t `vapp` VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
@@ -121,9 +124,11 @@ parameters (ctx: Context)
         if k == k' then unifySpine l (k == k') sp sp'
         else error emptyFC "vvar mismatch \{show k} \{show k'}"
       (VRef fc k def sp,   VRef fc' k' def' sp'  ) =>
-        if k == k' then unifySpine l (k == k') sp sp'
+        if k == k' then do
+          debug "unify \{show l} spine at \{k} \{show sp} \{show sp'}"
+          unifySpine l (k == k') sp sp'
         -- REVIEW - consider forcing?
-        else error emptyFC "vref mismatch \{show k} \{show k'}"
+        else error emptyFC "vref mismatch \{show k} \{show k'} -- \{show sp} \{show sp'}"
       (VMeta fc k sp,  VMeta fc' k' sp' ) =>
         if k == k' then unifySpine l (k == k') sp sp'
         else solve l k sp (VMeta fc' k' sp')
@@ -136,13 +141,14 @@ parameters (ctx: Context)
         debug "expand \{show t} =?= %ref \{k'}"
         case lookup k' !(get) of
           Just (MkEntry name ty (Fn tm)) => unify l t !(vappSpine !(eval [] CBN tm) sp')
-          _ => error emptyFC "unify failed \{show t'} =?= \{show u'} [no Fn]\n  env is \{show ctx.env} \{show $ map fst ctx.types}"
+          _ => error ctx.fc "unify failed \{show t'} =?= \{show u'} [no Fn]\n  env is \{show ctx.env} \{show $ map fst ctx.types}"
       -- REVIEW I'd like to quote this back, but we have l that aren't in the environment.
-      _ => error emptyFC "unify failed \{show t'} =?= \{show u'} \n  env is \{show ctx.env} \{show $ map fst ctx.types}"
+      _ => error ctx.fc "unify failed \{show t'} =?= \{show u'} \n  env is \{show ctx.env} \{show $ map fst ctx.types}"
 
 unifyCatch : FC -> Context -> Val -> Val -> M ()
 unifyCatch fc ctx ty' ty = catchError (unify ctx ctx.lvl ty' ty) $ \(E x str) => do
     let names = toList $ map fst ctx.types
+    debug "fail \{show ty'} \{show ty}"
     a <- quote ctx.lvl ty'
     b <- quote ctx.lvl ty
     let msg = "\n  failed to unify \{pprint names a}\n    with \{pprint names b}\n  " <+> str

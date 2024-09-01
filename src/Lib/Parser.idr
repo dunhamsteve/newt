@@ -140,9 +140,9 @@ letExpr = do
       pure (name,fc,t)
 
 pLetArg : Parser (Icit, String, Maybe Raw)
-pLetArg = (Implicit,,) <$> braces ident <*> optional (sym ":" >> typeExpr)
-       <|> (Explicit,,) <$> parens ident <*> optional (sym ":" >> typeExpr)
-       <|> (Explicit,,Nothing) <$> ident
+pLetArg = (Implicit,,) <$> braces (ident <|> uident) <*> optional (sym ":" >> typeExpr)
+       <|> (Explicit,,) <$> parens (ident <|> uident) <*> optional (sym ":" >> typeExpr)
+       <|> (Explicit,,Nothing) <$> (ident <|> uident)
        <|> (Explicit,"_",Nothing) <$ keyword "_"
 
 -- lam: λ {A} {b : A} (c : Blah) d e f. something
@@ -203,7 +203,7 @@ term =  caseExpr
 ebind : Parser (List (String, Icit, Raw))
 ebind = do
   sym "("
-  names <- some ident
+  names <- some (ident <|> uident)
   sym ":"
   ty <- typeExpr
   sym ")"
@@ -213,7 +213,7 @@ ibind : Parser (List (String, Icit, Raw))
 ibind = do
   sym "{"
   mustWork $ do
-    names <- some ident
+    names <- some (ident <|> uident)
     ty <- optional (sym ":" >> typeExpr)
     pos <- getPos
     sym "}"
@@ -262,7 +262,7 @@ export
 parseDef : Parser Decl
 parseDef = do
   fc <- getPos
-  nm <- ident
+  nm <- ident <|> uident
   pats <- many pPattern
   keyword "="
   body <- mustWork typeExpr
@@ -289,14 +289,16 @@ parseData : Parser Decl
 parseData = do
   fc <- getPos
   keyword "data"
-  name <- uident
-  keyword ":"
-  ty <- typeExpr
-  keyword "where"
-  commit
-  decls <- startBlock $ manySame $ parseSig
-  -- TODO - turn decls into something more useful
-  pure $ Data fc name ty decls
+  -- FIXME - switch from mustWork / commit to checking if we've consumed tokens
+  mustWork $ do
+    name <- uident
+    keyword ":"
+    ty <- typeExpr
+    keyword "where"
+    commit
+    decls <- startBlock $ manySame $ parseSig
+    -- TODO - turn decls into something more useful
+    pure $ Data fc name ty decls
 
 -- Not sure what I want here.
 -- I can't get a Tm without a type, and then we're covered by the other stuff

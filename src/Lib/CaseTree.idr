@@ -128,14 +128,6 @@ getConstructors ctx tm = error (getValFC tm) "Not a type constructor \{show tm}"
 -- Extend environment with fresh variables from a pi-type
 -- return context, remaining type, and list of names
 extendPi : Context -> Val -> SnocList Bind -> M (Context, Val, List Bind)
--- NEXT This doesn't work, unsound.
--- We need all of these vars with icity _and_ to insert implicits in the pattern
--- extendPi ctx (VPi x str Implicit a b) nms = do
---     let nm = fresh "pat"
---     let ctx' = extend ctx nm a
---     let v = VVar emptyFC (length ctx.env) [<]
---     tyb <- b $$ v
---     extendPi ctx' tyb nms
 extendPi ctx (VPi x str icit a b) nms = do
     let nm = fresh "pat"
     let ctx' = extend ctx nm a
@@ -157,9 +149,11 @@ buildCase ctx prob scnm (dcName, _, ty) = do
   vty <- eval [] CBN ty
   (ctx', ty', vars) <- extendPi ctx (vty) [<]
 
-  debug "clauses were \{show prob.clauses} (dcon \{show dcName}) (vars \{show vars})"
+  debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
+  for_ prob.clauses $ (\x => debug "    \{show x}")
   let clauses = mapMaybe (rewriteClause vars) prob.clauses
-  debug "    and now \{show clauses}"
+  debug "and now:"
+  for_ clauses $ (\x => debug "    \{show x}")
   -- So ideally we'd know which position we're splitting and the surrounding context
   -- That might be a lot to carry forward (maybe a continuation?) but we could carry
   -- backwards as a List Missing that we augment as we go up.
@@ -205,7 +199,7 @@ buildCase ctx prob scnm (dcName, _, ty) = do
           PatVar _ s => Just $ c :: (xs ++ acc)
           PatWild _ => Just $ c :: (xs ++ acc)
           PatCon _ str ys => if str == dcName
-            then Just $ (makeConst vars ys) ++ acc
+            then Just $ (makeConst vars ys) ++ xs ++ acc
             else Nothing
         else rewriteCons vars xs (c :: acc)
 

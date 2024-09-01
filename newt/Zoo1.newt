@@ -1,0 +1,55 @@
+module Zoo1
+
+-- I'm starting to translate ezoo 01-eval-closures-debruijn as a test cases.
+
+ptype Int
+ptype String
+
+------- Prelude stuff
+
+data Nat : U where
+  Z : Nat
+  S : Nat -> Nat
+
+data Unit : U where
+  MkUnit : Unit
+
+data List : U -> U where
+  Nil : {a : U} -> List a
+  Cons : {a : U} -> a -> List a -> List a
+
+data Maybe : U -> U where
+  Just : {a : U} -> a -> Maybe a
+  Nothing : {a : U} -> Maybe a
+
+Val : U
+
+data Tm : U where
+  Var : Nat -> Tm
+  Lam : Tm -> Tm -- lam (x.t)
+  App : Tm -> Tm -> Tm
+  Let : Tm -> Tm -> Tm -- let t (x.u)
+
+data Env : U where
+  ENil : Env
+  Define : Env -> Val -> Env
+
+data Closure : U where
+  MkClosure : Env -> Tm -> Closure
+
+data Val : U where
+  VVar : Nat -> Val
+  VApp : Val -> Val -> Val
+  VLam : Closure -> Val
+
+length : Env -> Nat
+length ENil = Z
+length (Define env _) = S (length env)
+
+lookup : Env -> Nat -> Maybe Val
+lookup (Define env v) Z = Just v
+lookup (Define env _) (S k) = Just (lookup env k)
+-- bug in unify? are the meta args backwards? It seems to quote back right..
+-- we're getting `Maybe Val` as meta3, and comparing:
+-- Maybe ?m3  =?= Maybe Val
+lookup (ENil) x = Nothing
