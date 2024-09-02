@@ -48,8 +48,26 @@ length (Define env _) = S (length env)
 
 lookup : Env -> Nat -> Maybe Val
 lookup (Define env v) Z = Just v
-lookup (Define env _) (S k) = Just (lookup env k)
--- bug in unify? are the meta args backwards? It seems to quote back right..
--- we're getting `Maybe Val` as meta3, and comparing:
--- Maybe ?m3  =?= Maybe Val
+-- If I write "Just (lookup env k)" on RHS, it's wrong, but the error message is unusable (mainly due to FC)
+-- The FC is fine if I write lookup {Val} env k
+lookup (Define env _) (S k) = lookup env k
 lookup (ENil) x = Nothing
+
+eval : Env -> Tm -> Val
+
+cApp : Closure -> Val -> Val
+-- If I put Closure instead of MkClosure, it reports missing case, fix that (should be bad constructor or something)
+cApp (MkClosure env t) u = eval (Define env u) t
+
+eval env (Var x) =
+  case lookup env x of
+    -- case doesn't use the new code.  We've got a wildcard here that
+    -- is forced to {Val}, but we don't have forcing/dotting
+    -- I guess we see what Jesper says about dotting
+    Just x => x
+
+eval env (App t u) =
+  let tv = eval env t
+      tu = eval env u
+  in ?
+

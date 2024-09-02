@@ -1,0 +1,25 @@
+module Scratch2
+
+data Nat : U where
+  Z : Nat
+  S : Nat -> Nat
+
+data Maybe : U -> U where
+  Just : {a : U} -> a -> Maybe a
+  Nothing : {a : U} -> Maybe a
+
+
+-- failed to unify _:1 with Val
+-- Legit on RHS, IMO. On LHS, we should be dotting?
+-- I either need to unify and collect constraints or figure out how
+-- other systems manage this.
+
+-- Note that an unused
+-- variable may stand for either a wildcard or a forced pattern. In the latter case our algorithm
+-- treats it as a let-bound variable in the right-hand side of the clause.
+
+-- we need let-bound in environment but we do have define.
+
+fromMaybe : Maybe Nat -> Nat
+fromMaybe (Just x) = x
+fromMaybe Nothing = Z

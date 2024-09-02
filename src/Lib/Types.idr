@@ -367,6 +367,9 @@ record Context where
   metas : IORef MetaContext
   fc : FC
 
+export withPos : Context -> FC -> Context
+withPos ctx fc = { fc := fc } ctx
+
 export
 names : Context -> List String
 names ctx = toList $ map fst ctx.types

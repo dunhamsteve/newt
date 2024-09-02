@@ -14,6 +14,31 @@ import Lib.Check
 import Lib.TT
 import Lib.Syntax
 
+
+-- ok, so new idea:
+
+-- we make a meta for each patvar
+-- then "solve" the meta when we match stuff up.
+-- a meta is something we can change
+
+-- but the solutions vary per branch. n is S k in one branch and Z in another.
+-- and metas are essentially global.
+
+-- NEXT So on LHS, I think we need to collect constraints pat$0 = Val and change
+-- the entry in the environment to a let?
+
+-- Except I think the let might reference something not bound yet? For RHS (a raw), we
+-- can shadow. For expected type, we might have to mess with the Val?
+
+-- On RHS I don't think unification can assign a value to a name.
+
+-- exempli gratia
+-- fromMaybe : Maybe Nat -> Nat
+-- fromMaybe (Just x) = x
+--                      ^- currently
+-- fromMaybe Nothing = Z
+
+
 -- LHSProblem
 -- List of [ E ] qbar --> rhs
 -- E is bag of constraints:
@@ -86,9 +111,11 @@ fresh base = base ++ "$" ++ show (length ctx.env)
 export
 buildTree : Context -> Problem -> M Tm
 
-introClause : String -> Clause -> M Clause
-introClause nm (MkClause fc cons [] expr) = error fc "Clause size doesn't match"
-introClause nm (MkClause fc cons (pat :: pats) expr) = pure $ MkClause fc ((nm, pat) :: cons) pats expr
+introClause : String -> Icit -> Clause -> M Clause
+-- I don't think this makes a difference?
+introClause nm Implicit (MkClause fc cons pats expr) = pure $ MkClause fc ((nm, PatWild fc) :: cons) pats expr
+introClause nm icit (MkClause fc cons [] expr) = error fc "Clause size doesn't match"
+introClause nm icit (MkClause fc cons (pat :: pats) expr) = pure $ MkClause fc ((nm, pat) :: cons) pats expr
 
 -- A split candidate looks like x /? Con ...
 -- we need a type here. I pulled if off of the
@@ -109,7 +136,7 @@ findSplit (_ :: xs) = findSplit xs
 
 -- TODO, we may need to filter these for the situation.
 getConstructors : Context -> Val -> M (List (String, Nat, Tm))
-getConstructors ctx (VRef fc nm _ sc) = do
+getConstructors ctx (VRef fc nm _ _) = do
   names <- lookupTCon nm
   traverse lookupDCon names
   where
@@ -140,15 +167,61 @@ extendPi ctx ty nms = pure (ctx, ty, nms <>> [])
 
 -- FIXME - I don't think we're properly noticing
 
+updateContext : Context -> List (Nat, Val) -> M Context
+updateContext ctx [] = pure ctx
+updateContext ctx ((k, val) :: cs) = let ix = (length ctx.env `minus` k) `minus` 1 in
+  pure $ {env $= makeLet ix} ctx
+  where
+    makeLet : Nat -> Env -> Env
+    makeLet _ [] = ?nothing_to_update
+    makeLet 0 ((VVar fc j [<]) :: xs) = val :: xs
+    makeLet 0 (_ :: xs) = ?not_a_var
+    makeLet (S k) (x :: xs) = x :: makeLet k xs
 
 -- ok, so this is a single constructor, CaseAlt
 -- since we've gotten here, we assume it's possible and we better have at least
 -- one valid clause
-buildCase : Context -> Problem -> String -> (String, Nat, Tm) -> M CaseAlt
-buildCase ctx prob scnm (dcName, _, ty) = do
+buildCase : Context -> Problem -> String -> Val -> (String, Nat, Tm) -> M CaseAlt
+buildCase ctx prob scnm scty (dcName, _, ty) = do
+  debug "CASE \{scnm} \{dcName} \{pprint (names ctx) ty}"
   vty <- eval [] CBN ty
   (ctx', ty', vars) <- extendPi ctx (vty) [<]
 
+  -- what is the goal?
+  -- we have something here that informs what happens in the casealt, possibly tweaking
+  -- context or goal
+  -- e.g. we get to end of Just {a} x  and goal is Maybe Val, we want `let a = Val` in context.
+  -- likewise if the constructor says `Foo String` and goal is `Foo x` we know x is String in this branch.
+
+  -- we need unify to hand constraints back...
+  -- we may need to walk through the case alt constraint and discharge or drop things?
+
+  -- should I somehow make those holes? It would be nice to not make the user dot it.
+  -- And we don't _need_ a solution, just if it's unified against
+
+  -- I think I'm going down a different road than Idris..
+
+
+  -- do this or see how other people manage?
+  -- this puts the failure on the LHS
+  -- unifying these should say say VVar 1 is Nat.
+  -- ERROR at (23, 0): unify failed (%var 1 [< ]) =?= (%ref Nat [< ]) [no Fn]
+  res <- unify ctx' (length ctx.env) ty' scty
+  debug "scty \{show scty}"
+  debug "UNIFY results \{show res.constraints}"
+  debug "before types: \{show ctx'.types}"
+  debug "before env: \{show ctx'.env}"
+
+  -- So we go and stuff stuff into the environment, which I guess gets it into the RHS,
+  -- but doesn't touch goal...
+  ctx' <- updateContext ctx' res.constraints
+  debug "context types: \{show ctx'.types}"
+  debug "context env: \{show ctx'.env}"
+  -- This doesn't really update existing val... including types in the context.
+
+  -- What if all of the pattern vars are defined to meta
+
+  debug "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
   debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
   for_ prob.clauses $ (\x => debug "    \{show x}")
   let clauses = mapMaybe (rewriteClause vars) prob.clauses
@@ -223,7 +296,13 @@ lookupName ctx name = go 0 ctx.types
       -- error fc "Stuck, no splits \{show constraints}"
 
 checkDone : Context -> List (String, Pattern) -> Raw -> Val -> M Tm
-checkDone ctx [] body ty = check ctx body ty
+checkDone ctx [] body ty = do
+  debug "DONE-> check body \{show body} at \{show ty}"
+  debug "\{show ctx.env}"
+  debug "\{show ctx.types}"
+  got <- check ctx body ty
+  debug "DONE<- got \{pprint (names ctx) got}"
+  pure got
 checkDone ctx ((x, PatWild _) :: xs) body ty = checkDone ctx xs body ty
 checkDone ctx ((nm, (PatVar _ nm')) :: xs) body ty = checkDone ({ types $= rename } ctx) xs body ty
   where
@@ -239,26 +318,18 @@ checkDone ctx ((x, pat) :: xs) body ty = error emptyFC "stray constraint \{x} /?
 -- This process is similar to extendPi, but we need to stop
 -- if one clause is short on patterns.
 buildTree ctx (MkProb [] ty) = error emptyFC "no clauses"
-buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ str Implicit a b)) = do
-  let l = length ctx.env
-  let nm = fresh "pat"
-  let ctx' = extend ctx nm a
-  -- type of the rest
-  -- clauses <- traverse (introClause nm) prob.clauses
-  vb <- b $$ VVar fc l [<]
-  Lam fc nm <$> buildTree ctx' ({ ty := vb } prob)
 buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ str icit a b)) = do
   let l = length ctx.env
   let nm = fresh "pat"
   let ctx' = extend ctx nm a
   -- type of the rest
-  clauses <- traverse (introClause nm) prob.clauses
+  clauses <- traverse (introClause nm icit) prob.clauses
   -- REVIEW fc from a pat?
   vb <- b $$ VVar fc l [<]
   Lam fc nm <$> buildTree ctx' ({ clauses := clauses, ty := vb } prob)
 buildTree ctx prob@(MkProb ((MkClause fc cons pats@(x :: xs) expr) :: cs) ty) =
   error fc "Extra pattern variables \{show pats}"
-buildTree ctx prob@(MkProb ((MkClause fc [] [] expr) :: cs) ty) = check ctx expr ty
+buildTree ctx prob@(MkProb ((MkClause fc [] [] expr) :: cs) ty) = check (withPos ctx fc) expr ty
 -- need to find some name we can split in (x :: xs)
 -- so LHS of constraint is name (or VVar - if we do Val)
 -- then run the split
@@ -267,11 +338,11 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
   let Just (scnm, pat) := findSplit constraints
     | _ => checkDone ctx constraints expr ty
 
-  debug "split on \{scnm} because \{show pat}"
-  let Just (sctm, ty') := lookupName ctx scnm
+  debug "SPLIT on \{scnm} because \{show pat}"
+  let Just (sctm, scty) := lookupName ctx scnm
     | _ => error fc "Internal Error: can't find \{scnm} in environment"
 
-  cons <- getConstructors ctx ty'
-  alts <- traverse (buildCase ctx prob scnm) cons
+  cons <- getConstructors ctx scty
+  alts <- traverse (buildCase ctx prob scnm scty) cons
 
   pure $ Case fc sctm alts

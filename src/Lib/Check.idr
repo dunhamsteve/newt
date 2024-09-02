@@ -38,6 +38,18 @@ forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
 forceType x = pure x
 
 
+public export
+record UnifyResult where
+  constructor MkResult
+  -- wild guess here - lhs is a VVar
+  constraints : List (Nat, Val)
+
+Semigroup UnifyResult where
+  (MkResult cs) <+> (MkResult cs') = MkResult (cs ++ cs')
+
+Monoid UnifyResult where
+  neutral = MkResult []
+
 parameters (ctx: Context)
   -- return renaming, the position is the new VVar
   invert : Nat -> SnocList Val -> M (List Nat)
@@ -98,12 +110,13 @@ parameters (ctx: Context)
     solveMeta top m soln
     pure ()
 
-  unify : (l : Nat) -> Val -> Val  -> M  ()
+  export
+  unify : (l : Nat) -> Val -> Val  -> M UnifyResult
 
-  unifySpine : Nat -> Bool -> SnocList Val -> SnocList Val  -> M  ()
+  unifySpine : Nat -> Bool -> SnocList Val -> SnocList Val  -> M UnifyResult
   unifySpine l False _ _ = error emptyFC "unify failed at head" -- unreachable now
-  unifySpine l True [<] [<] = pure ()
-  unifySpine l True (xs :< x) (ys :< y) = unify l x y >> unifySpine l True xs ys
+  unifySpine l True [<] [<] = pure (MkResult [])
+  unifySpine l True (xs :< x) (ys :< y) = [| unify l x y <+> (unifySpine l True xs ys) |]
   unifySpine l True _ _ = error emptyFC "meta spine length mismatch"
 
   unify l t u = do
@@ -115,26 +128,36 @@ parameters (ctx: Context)
     debug "forced \{show t'}"
     debug "  =?= \{show u'}"
     debug "env \{show ctx.env}"
+    debug "types \{show $ ctx.types}"
     case (t',u') of
       (VLam _ _ t,  VLam _ _ t') => unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
       (t,         VLam fc' _ t') => unify (l + 1) !(t `vapp` VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
       (VLam fc _ t,  t'       ) => unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' `vapp` VVar emptyFC l [<])
-      (VPi fc _ _ a b, VPi fc' _ _ a' b') => unify l a a' >> unify (S l) !(b $$ VVar emptyFC l [<]) !(b' $$ VVar emptyFC l [<])
+      (VPi fc _ _ a b, VPi fc' _ _ a' b') => [| unify l a a' <+> unify (S l) !(b $$ VVar emptyFC l [<]) !(b' $$ VVar emptyFC l [<]) |]
       (VVar fc k sp,   VVar fc' k' sp'  ) =>
         if k == k' then unifySpine l (k == k') sp sp'
         else error emptyFC "vvar mismatch \{show k} \{show k'}"
+
+      -- attempt at building constraints
+      -- and using them
+      (VVar fc k sp, u) => case lookupVar k of
+        Just v => unify l v u
+        Nothing => pure $ MkResult[(k, u)]
+      (t, VVar fc k sp) => pure $ MkResult[(k, t)]
+
       (VRef fc k def sp,   VRef fc' k' def' sp'  ) =>
         if k == k' then do
           debug "unify \{show l} spine at \{k} \{show sp} \{show sp'}"
           unifySpine l (k == k') sp sp'
         -- REVIEW - consider forcing?
         else error emptyFC "vref mismatch \{show k} \{show k'} -- \{show sp} \{show sp'}"
+
       (VMeta fc k sp,  VMeta fc' k' sp' ) =>
         if k == k' then unifySpine l (k == k') sp sp'
-        else solve l k sp (VMeta fc' k' sp')
-      (t,           VMeta fc' i' sp') => solve l i' sp' t
-      (VMeta fc i sp, t'           ) => solve l i sp t'
-      (VU _, VU _) => pure ()
+        else solve l k sp (VMeta fc' k' sp') >> pure neutral
+      (t,           VMeta fc' i' sp') => solve l i' sp' t >> pure neutral
+      (VMeta fc i sp, t'           ) => solve l i sp t' >> pure neutral
+      (VU _, VU _) => pure neutral
       -- Lennart.newt cursed type references itself
       -- We _could_ look up the ref, eval against [] and vappSpine...
       (t,         VRef fc' k' def sp') => do
@@ -144,15 +167,29 @@ parameters (ctx: Context)
           _ => error ctx.fc "unify failed \{show t'} =?= \{show u'} [no Fn]\n  env is \{show ctx.env} \{show $ map fst ctx.types}"
       -- REVIEW I'd like to quote this back, but we have l that aren't in the environment.
       _ => error ctx.fc "unify failed \{show t'} =?= \{show u'} \n  env is \{show ctx.env} \{show $ map fst ctx.types}"
+    where
+      lookupVar : Nat -> Maybe Val
+      lookupVar k = let l = length ctx.env in
+        if k > l
+          then Nothing
+          else case getAt ((l `minus` k) `minus` 1) ctx.env of
+            Just (VVar{}) => Nothing
+            Just v => Just v
+            Nothing => Nothing
+
 
 unifyCatch : FC -> Context -> Val -> Val -> M ()
-unifyCatch fc ctx ty' ty = catchError (unify ctx ctx.lvl ty' ty) $ \(E x str) => do
-    let names = toList $ map fst ctx.types
-    debug "fail \{show ty'} \{show ty}"
-    a <- quote ctx.lvl ty'
-    b <- quote ctx.lvl ty
-    let msg = "\n  failed to unify \{pprint names a}\n    with \{pprint names b}\n  " <+> str
-    throwError (E fc msg)
+unifyCatch fc ctx ty' ty = do
+    res <- catchError (unify ctx ctx.lvl ty' ty) $ \(E x str) => do
+      let names = toList $ map fst ctx.types
+      debug "fail \{show ty'} \{show ty}"
+      a <- quote ctx.lvl ty'
+      b <- quote ctx.lvl ty
+      let msg = "\n  failed to unify \{pprint names a}\n    with \{pprint names b}\n  " <+> str
+      throwError (E fc msg)
+    case res of
+      MkResult [] => pure ()
+      cs => error fc "Unification yields constraints \{show cs.constraints}"
 
 insert : (ctx : Context) -> Tm -> Val -> M (Tm, Val)
 insert ctx tm ty = do
@@ -379,7 +416,7 @@ infer ctx (RApp fc t u icit) = do
       debug "unify PI for \{show tty}"
       a <- eval ctx.env CBN !(freshMeta ctx fc)
       b <- MkClosure ctx.env <$> freshMeta (extend ctx ":ins" a) fc
-      unify ctx 0 tty (VPi fc ":ins" icit a b)
+      unifyCatch fc ctx tty (VPi fc ":ins" icit a b)
       pure (a,b)
 
   u <- check ctx u a
