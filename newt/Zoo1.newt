@@ -59,15 +59,13 @@ cApp : Closure -> Val -> Val
 -- If I put Closure instead of MkClosure, it reports missing case, fix that (should be bad constructor or something)
 cApp (MkClosure env t) u = eval (Define env u) t
 
+hole : Val
+
 eval env (Var x) =
   case lookup env x of
     -- case doesn't use the new code.  We've got a wildcard here that
     -- is forced to {Val}, but we don't have forcing/dotting
     -- I guess we see what Jesper says about dotting
     Just x => x
-
-eval env (App t u) =
-  let tv = eval env t
-      tu = eval env u
-  in ?
-
+    Nothing => VVar x
+eval env _ = hole

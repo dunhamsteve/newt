@@ -17,7 +17,6 @@ depends = contrib, base
 
 -- modules to install
 modules =
-  Lib.CaseTree,
   Lib.Check,
   Lib.Parser,
   Lib.Parser.Impl,

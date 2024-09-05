@@ -50,7 +50,7 @@ record Clause where
 
 -- could be a pair, but I suspect stuff will be added?
 public export
-data RCaseAlt = MkAlt Raw Raw
+data RCaseAlt = MkAlt Pattern Raw
 
 data Raw : Type where
   RVar : FC -> (nm : Name) -> Raw

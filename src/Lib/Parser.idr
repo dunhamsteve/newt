@@ -177,7 +177,8 @@ pPattern'  = PatCon <$> getPos <*> uident <*> many pPattern <|> pPattern
 
 caseAlt : Parser RCaseAlt
 caseAlt = do
-  pat <- parseOp -- pPattern -- term and sort it out later?
+  -- pat <- parseOp -- pPattern -- term and sort it out later?
+  pat <- pPattern'
   keyword "=>"
   commit
   t <- term

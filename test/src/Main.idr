@@ -6,7 +6,6 @@ import Lib.Types
 import Lib.ProcessDecl
 import Lib.TopContext
 import Lib.Syntax
-import Lib.CaseTree
 
 testCase : M ()
 testCase = do

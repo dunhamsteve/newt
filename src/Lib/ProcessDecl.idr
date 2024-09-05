@@ -2,7 +2,6 @@ module Lib.ProcessDecl
 
 import Data.IORef
 
-import Lib.CaseTree
 import Lib.Check
 import Lib.Parser
 import Lib.Syntax
