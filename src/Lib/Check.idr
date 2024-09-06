@@ -93,6 +93,7 @@ parameters (ctx: Context)
           -- we don't allow solutions with Case in them
           -- pure (Case fc !(go ren lvl sc) alts)
       go ren lvl (VLit fc lit) = pure (Lit fc lit)
+      go ren lvl (VLet fc {}) = error fc "rename Let not implemented"
 
   lams : Nat -> Tm -> Tm
   lams 0 tm = tm
@@ -498,8 +499,11 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     let ctx' = extend ctx scnm scty
     cons <- getConstructors ctx' scty
     alts <- traverse (buildCase ctx' (MkProb clauses ty) scnm scty) cons
+    -- BROKEN, need scnm in scope for real. ctx' promises it, but we don't have a binder here
 
-    pure $ Case fc sc alts
+
+    pure $ Let fc scnm sc $ Case fc (Bnd fc 0) alts
+
 
     -- buildTree ctx (MkProb{})
     -- ?hole

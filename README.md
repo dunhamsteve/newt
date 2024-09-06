@@ -1,5 +1,6 @@
-- [ ] case tree building favors the right size, reverse the list
-- [ ] see note in Zoo1.newt - fix the FC in that situation
+- [ ] when it fails/crashes, we don't see it in the editor.
+- [ ] case tree building favors the right side, reverse the list
+- [ ] see notes in Zoo1.newt - fix the FC in those situations
 - [x] Support primitives
 - [ ] Make DCon/TCon separate from Ref? (Or add flavor to VRef/Ref? If processing is often the same. I think I want arity though. I don't think a checked DCon can be overapplied, but it could be underapplied without special form. And special form is possibly difficult if not collecting a stack on the way down...
 

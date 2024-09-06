@@ -84,6 +84,8 @@ data Tm : Type where
   Pi  : FC -> Name -> Icit -> Tm -> Tm -> Tm
   -- REVIEW - do we want to just push it up like idris?
   Case : FC -> Tm -> List CaseAlt -> Tm
+  -- need type?
+  Let : FC -> Name -> Tm -> Tm -> Tm
   Lit : FC -> Literal -> Tm
 
 %name Tm t, u, v
@@ -99,6 +101,7 @@ HasFC Tm where
   getFC (Pi fc str icit t u) = fc
   getFC (Case fc t xs) = fc
   getFC (Lit fc _) = fc
+  getFC (Let fc _ _ _) = fc
 
 covering
 Show Tm
@@ -121,6 +124,7 @@ Show Tm where
   show (Pi _ str Explicit t u) = "(Pi (\{str} : \{show t}) => \{show u})"
   show (Pi _ str Implicit t u) = "(Pi {\{str} : \{show t}} => \{show u})"
   show (Case _ sc alts) = "(Case \{show sc} \{show alts})"
+  show (Let _ nm t u) = "(Let \{nm} \{show t} \{show u})"
 
 -- I can't really show val because it's HOAS...
 
@@ -150,8 +154,13 @@ pprint : List String -> Tm -> String
 pprint names tm = render 80 $ go names tm
   where
     go : List String -> Tm -> Doc
+    goAlt : List String -> CaseAlt -> Doc
+
+    goAlt names (CaseDefault t) = "_" <+> "=>" <+> go ("_" :: names) t
+    goAlt names (CaseCons name args t) = text name <+> spread (map text args) <+> "=>" <+> go (args ++ names) t
+
     go names (Bnd _ k) = case getAt k names of
-      Nothing => text "BND \{show k}"
+      Nothing => text "BND:\{show k}"
       Just nm => text "\{nm}:\{show k}"
     go names (Ref _ str mt) = text str
     go names (Meta _ k) = text "?m:\{show k}"
@@ -162,8 +171,10 @@ pprint names tm = render 80 $ go names tm
       text "({" <+> text nm <+> ":" <+> go names t <+> "}" <+> "=>" <+> go (nm :: names) u <+> ")"
     go names (Pi _ nm Explicit t u) =
       text "((" <+> text nm <+> ":" <+> go names t <+> ")" <+> "=>" <+> go (nm :: names) u <+> ")"
-    go names (Case _ _ _) = "FIXME CASE"
+    -- FIXME - probably way wrong on the names here.  There is implicit binding going on
+    go names (Case _ sc alts) = text "case" <+> go names sc <+> text "of" </> (nest 2 (line ++ stack (map (goAlt names) alts)))
     go names (Lit _ lit) = text "\{show lit}"
+    go names (Let _ nm t u) = text "let" <+> text nm <+> ":=" <+> go names t </> (nest 2 $ go names u)
 
 public export
 Pretty Tm where
@@ -176,6 +187,7 @@ Pretty Tm where
   pretty (Pi _ str icit t u) = text "(" <+> text str <+> ":" <+> pretty t <+> ")" <+> "=>" <+> pretty u <+> ")"
   pretty (Case _ _ _) = text "FIXME PRETTY CASE"
   pretty (Lit _ lit) = text (show lit)
+  pretty (Let _ _ _ _) = text "LET"
 
 -- public export
 -- data Closure : Nat -> Type
@@ -209,6 +221,7 @@ data Val : Type where
   VMeta : FC -> (ix : Nat) -> (sp : SnocList Val) -> Val
   VLam : FC -> Name -> Closure -> Val
   VPi : FC -> Name -> Icit -> (a : Lazy Val) -> (b : Closure) -> Val
+  VLet : FC -> Name -> Val -> (b : Closure) -> Val
   VU : FC -> Val
   VLit : FC -> Literal -> Val
 

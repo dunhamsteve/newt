@@ -3,6 +3,8 @@
 -- then the stuff happens. We'd need to know more about the callback for that.
 -- TODO And then get primitives and a way to declare extern functions.  That may get us
 -- to utility
+
+-- Audit how much "outside" stuff could pile up in the continuation.
 module Lib.Compile
 
 import Lib.Types
@@ -36,7 +38,8 @@ data JSStmt : Kind -> Type where
   JPlain : JSExp -> JSStmt Plain
   JConst : (nm : String) -> JSExp -> JSStmt Plain
   JReturn : JSExp -> JSStmt Return
-  -- JAssign : (nm : String) -> JSExp -> JSStmt (Assign nm)
+  JLet : (nm : String) -> JSStmt (Assign nm) -> JSStmt Plain  -- need somebody to assign
+  JAssign : (nm : String) -> JSExp -> JSStmt (Assign nm)
   -- TODO - switch to Nat tags
   -- FIXME add e to JAlt (or just drop it?)
   JCase : JSExp -> List JAlt -> JSStmt a
@@ -93,6 +96,11 @@ termToJS env (CRef nm) f = f $ Var nm
 termToJS env (CMeta k) f = f $ LitString "META \{show k}"
 termToJS env (CLit (LString str)) f = f (LitString str)
 termToJS env (CLit (LInt i)) f = f (LitInt i)
+termToJS env (CLet nm t u) f =
+  let nm' = fresh nm env
+      env' = (Var nm' :: env)
+  in JSnoc (JLet nm' $ termToJS env t (JAssign nm')) (termToJS env' u f)
+
 termToJS env (CApp t args) f = termToJS env t (\ t' => argsToJS args [<] (\ args' => f (Apply t' args')))
   where
     argsToJS : List CExp -> SnocList JSExp -> (List JSExp -> JSStmt e) -> JSStmt e
@@ -144,7 +152,7 @@ expToDoc (LitString str) = jsString str
 expToDoc (LitInt i) = text $ show i
 expToDoc (Apply x xs) = expToDoc x ++ "(" ++ commaSep (map expToDoc xs) ++ ")"
 expToDoc (Var nm) = text nm
-expToDoc (JLam nms (JReturn exp)) = text "(" <+> text (joinBy ", " nms) <+> ") =>" <+> expToDoc exp
+expToDoc (JLam nms (JReturn exp)) = text "(" <+> text (joinBy ", " nms) <+> ") =>" <+> "(" ++ expToDoc exp ++ ")"
 expToDoc (JLam nms body) = text "(" <+> text (joinBy ", " nms) <+> ") =>" <+> bracket "{" (stmtToDoc body) "}"
 expToDoc JUndefined = text "undefined"
 expToDoc (Index obj ix) = expToDoc obj ++ "[" ++ expToDoc ix ++ "]"
@@ -160,6 +168,9 @@ altToDoc (JDefAlt stmt) = text "default" ++ ":" ++ caseBody stmt
 
 stmtToDoc (JSnoc x y) = stmtToDoc x </> stmtToDoc y
 stmtToDoc (JPlain x) = expToDoc x ++ ";"
+-- I might not need these split yet.
+stmtToDoc (JLet nm body) = "let" <+> text nm ++ ";" </> stmtToDoc body
+stmtToDoc (JAssign nm expr) = text nm <+> "=" <+> expToDoc expr ++ ";"
 stmtToDoc (JConst nm x) = text "const" <+> text nm <+> "=" <+/> expToDoc x ++ ";"
 stmtToDoc (JReturn x) = text "return" <+> expToDoc x ++ ";"
 stmtToDoc (JError str) = text "throw new Error(" ++ text str ++ ");"
@@ -181,7 +192,9 @@ entryToDoc : TopEntry -> M Doc
 entryToDoc (MkEntry name ty (Fn tm)) = do
   -- so this has a bunch of lambdas on it now, which we want to consolidate
   -- and we might need betas? It seems like a mirror of what happens in CExp
+  debug "compileFun \{pprint [] tm}"
   ct <- compileFun tm
+  -- now show for ct...
   let body = stmtToDoc $ termToJS [] ct JPlain
   pure (text "const" <+> text name <+> text "=" <+/> body)
 entryToDoc (MkEntry name type Axiom) = pure ""

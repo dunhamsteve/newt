@@ -101,12 +101,8 @@ lookup ctx nm = go ctx.types
 -- if it's top / ctx / IORef, I also need IO...
 -- if I want errors, I need m anyway.  I've already got an error down there.
 
-
-
 export
 eval : Env -> Mode -> Tm -> M Val
-
-
 
 -- REVIEW everything is evalutated whether it's needed or not
 -- It would be nice if the environment were lazy.
@@ -174,13 +170,14 @@ eval env mode (Meta fc i) =
         (Solved k t) => pure $ t
 eval env mode (Lam fc x t) = pure $ VLam fc x (MkClosure env t)
 eval env mode (Pi fc x icit a b) = pure $ VPi fc x icit !(eval env mode a) (MkClosure env b)
+eval env mode (Let fc nm t u) = pure $ VLet fc nm !(eval env mode t) (MkClosure env u)
 -- Here, we assume env has everything. We push levels onto it during type checking.
 -- I think we could pass in an l and assume everything outside env is free and
 -- translate to a level
 eval env mode (Bnd fc i) = case getAt i env of
   Just rval => pure rval
   Nothing => error' "Bad deBruin index \{show i}"
-eval env mode (Lit fc lit) =pure $ VLit fc lit
+eval env mode (Lit fc lit) = pure $ VLit fc lit
 
 -- We need a neutral and some code to run the case tree
 
@@ -205,6 +202,7 @@ quote l (VVar fc k sp) = if k < l
 quote l (VMeta fc i sp) = quoteSp l (Meta fc i) sp
 quote l (VLam fc x t) = pure $ Lam fc x !(quote (S l) !(t $$ VVar emptyFC l [<]))
 quote l (VPi fc x icit a b) = pure $ Pi fc x icit !(quote l a) !(quote (S l) !(b $$ VVar emptyFC l [<]))
+quote l (VLet fc nm t u) = pure $ Let fc nm !(quote l t) !(quote (S l) !(u $$ VVar emptyFC l [<]))
 quote l (VU fc) = pure (U fc)
 quote l (VRef fc n def sp) = quoteSp l (Ref fc n def) sp
 quote l (VCase fc sc alts) = pure $ Case fc !(quote l sc) alts

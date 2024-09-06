@@ -18,8 +18,7 @@ getArity _ = Z
 -- Can metas live in context for now?
 -- We'll have to be able to add them, which might put gamma in a ref
 
--- collect Defs into List Decl, special type, or add Defs to Decl?
-
+||| collectDecl collects multiple Def for one function into one
 export
 collectDecl : List Decl -> List Decl
 collectDecl [] = []

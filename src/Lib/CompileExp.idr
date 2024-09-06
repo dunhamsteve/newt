@@ -32,6 +32,7 @@ data CExp : Type where
   CRef : Name -> CExp
   CMeta : Nat -> CExp
   CLit : Literal -> CExp
+  CLet : Name -> CExp -> CExp -> CExp
 
 ||| I'm counting Lam in the term for arity.  This matches what I need in
 ||| code gen.
@@ -110,7 +111,7 @@ compileTerm (Case _ t alts) = do
     CaseCons nm args tm => pure $ CConAlt nm args !(compileTerm tm)) alts
   pure $ CCase t' alts'
 compileTerm (Lit _ lit) = pure $ CLit lit
-
+compileTerm (Let _ nm t u) = pure $ CLet nm !(compileTerm t) !(compileTerm u)
 
 export
 compileFun : Tm -> M CExp

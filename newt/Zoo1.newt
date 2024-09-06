@@ -22,6 +22,10 @@ data Maybe : U -> U where
   Just : {a : U} -> a -> Maybe a
   Nothing : {a : U} -> Maybe a
 
+
+----------------------------------
+
+-- forward declaration
 Val : U
 
 data Tm : U where
@@ -61,11 +65,38 @@ cApp (MkClosure env t) u = eval (Define env u) t
 
 hole : Val
 
-eval env (Var x) =
-  case lookup env x of
+-- TODO need to inline solved metas somewhere, as error messages are unreadable
+-- NEXT fix FC for missing case if we remove _
+
+eval env tm = case tm of
+  (Var x) =>
+    case lookup env x of
     -- case doesn't use the new code.  We've got a wildcard here that
     -- is forced to {Val}, but we don't have forcing/dotting
     -- I guess we see what Jesper says about dotting
     Just x => x
     Nothing => VVar x
-eval env _ = hole
+  -- TODO no tupls yet
+  App t u => case eval env t of
+    VLam t => cApp t (eval env u)
+    t      => VApp t (eval env u)
+  Lam t => VLam (MkClosure env t)
+  Let t u => eval (Define env (eval env t)) u
+  -- NEXT this is unreachable, find out how to warn about it
+  -- _ => hole
+
+lvl2ix : Nat -> Nat -> Nat
+lvl2ix (S k) (S j) = lvl2ix k j
+lvl2ix Z (S j) = j
+lvl2ix _ Z = Z -- shouldn't happen
+
+quote : Nat -> Val -> Tm
+quote l v = case v of
+  VVar x => Var (lvl2ix l x)
+  VApp t u => App (quote l t) (quote l u)
+  VLam t => Lam (quote (S l) (cApp t (VVar l)))
+
+nf : Env -> Tm -> Tm
+nf env t = quote (length env) (eval env t)
+
+-- and then a parser / example
