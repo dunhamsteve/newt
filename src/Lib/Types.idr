@@ -147,8 +147,8 @@ Eq (Tm) where
   (Pi _ n icit t u) == (Pi _ n' icit' t' u') = icit == icit' && t == t' && u == u'
   _ == _ = False
 
--- FIXME prec
 
+||| Pretty printer for Tm.
 export
 pprint : List String -> Tm -> String
 pprint names tm = render 80 $ go names tm
@@ -175,19 +175,6 @@ pprint names tm = render 80 $ go names tm
     go names (Case _ sc alts) = text "case" <+> go names sc <+> text "of" </> (nest 2 (line ++ stack (map (goAlt names) alts)))
     go names (Lit _ lit) = text "\{show lit}"
     go names (Let _ nm t u) = text "let" <+> text nm <+> ":=" <+> go names t </> (nest 2 $ go names u)
-
-public export
-Pretty Tm where
-  pretty (Bnd _ k) = ?rhs_0
-  pretty (Ref _ str mt) = text str
-  pretty (Meta _ k) = text "?m\{show k}"
-  pretty (Lam _ str t) = text "(\\ \{str} => " <+> pretty t <+> ")"
-  pretty (App _ t u) = text "(" <+> pretty t <+> pretty u <+> ")"
-  pretty (U _) = "U"
-  pretty (Pi _ str icit t u) = text "(" <+> text str <+> ":" <+> pretty t <+> ")" <+> "=>" <+> pretty u <+> ")"
-  pretty (Case _ _ _) = text "FIXME PRETTY CASE"
-  pretty (Lit _ lit) = text (show lit)
-  pretty (Let _ _ _ _) = text "LET"
 
 -- public export
 -- data Closure : Nat -> Type

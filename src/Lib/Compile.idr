@@ -60,8 +60,6 @@ mkEnv nm k env (x :: xs) = mkEnv nm (S k) (Dot (Var nm) "h\{show k}" :: env) xs
 
 envNames : Env -> List String
 
--- If I was golfing, I'd be tempted to stick with deBruijn
-
 ||| given a name, find a similar one that doesn't shadow in Env
 fresh : String -> JSEnv -> String
 fresh nm env = if free env nm then nm else go nm 1

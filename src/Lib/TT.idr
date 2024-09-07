@@ -67,7 +67,6 @@ lookupMeta ix = do
     go (meta@(Unsolved _ k ys) :: xs) = if k == ix then pure meta else go xs
     go (meta@(Solved k x) :: xs) = if k == ix then pure meta else go xs
 
-
 export partial
 Show Context where
   show ctx = "Context \{show $ map fst $ ctx.types}"

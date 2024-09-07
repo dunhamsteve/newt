@@ -23,7 +23,7 @@ data Pden = PR Nat Nat (List Nat)
 forceMeta : Val -> M Val
 forceMeta (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Unsolved pos k xs) => pure (VMeta fc ix sp)
-  (Solved k t) => vappSpine t sp
+  (Solved k t) => vappSpine t sp >>= forceMeta
 forceMeta x = pure x
 
 -- Lennart needed more forcing for recursive nat,
@@ -57,9 +57,12 @@ parameters (ctx: Context)
     where
       go : SnocList Val -> List Nat -> M (List Nat)
       go [<] acc = pure $ reverse acc
-      go (xs :< VVar emptyFC k [<]) acc = do
+      go (xs :< VVar fc k [<]) acc = do
         if elem k acc
-          then error emptyFC "non-linear pattern"
+          then do
+            debug "\{show k} \{show acc}"
+
+            error fc "non-linear pattern"
           else go xs (k :: acc)
       go _ _ = error emptyFC "non-variable in pattern"
 
@@ -87,11 +90,8 @@ parameters (ctx: Context)
       go ren lvl (VLam fc n t) = pure (Lam fc n !(go (lvl :: ren) (S lvl) !(t $$ VVar emptyFC lvl [<])))
       go ren lvl (VPi fc n icit ty tm) = pure (Pi fc n icit !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar emptyFC lvl [<])))
       go ren lvl (VU fc) = pure (U fc)
+      -- for now, we don't do solutions with case in them.
       go ren lvl (VCase fc sc alts) = error fc "Case in solution"
-          -- This seems dicey, for VLam we eval and then process the levels.
-          -- Here we have raw Tm so we haven't even done occurs check. I'm thinking
-          -- we don't allow solutions with Case in them
-          -- pure (Case fc !(go ren lvl sc) alts)
       go ren lvl (VLit fc lit) = pure (Lit fc lit)
       go ren lvl (VLet fc {}) = error fc "rename Let not implemented"
 
@@ -134,16 +134,23 @@ parameters (ctx: Context)
       (VLam _ _ t,  VLam _ _ t') => unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
       (t,         VLam fc' _ t') => unify (l + 1) !(t `vapp` VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
       (VLam fc _ t,  t'       ) => unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' `vapp` VVar emptyFC l [<])
-      (VPi fc _ _ a b, VPi fc' _ _ a' b') => [| unify l a a' <+> unify (S l) !(b $$ VVar emptyFC l [<]) !(b' $$ VVar emptyFC l [<]) |]
-      (VVar fc k sp,   VVar fc' k' sp'  ) =>
+      (VMeta fc k sp,  VMeta fc' k' sp' ) =>
         if k == k' then unifySpine l (k == k') sp sp'
-        else error emptyFC "vvar mismatch \{show k} \{show k'}"
+        else solve l k sp (VMeta fc' k' sp') >> pure neutral
+      (t,           VMeta fc' i' sp') => solve l i' sp' t >> pure neutral
+      (VMeta fc i sp, t'           ) => solve l i sp t' >> pure neutral
+      (VPi fc _ _ a b, VPi fc' _ _ a' b') => [| unify l a a' <+> unify (S l) !(b $$ VVar emptyFC l [<]) !(b' $$ VVar emptyFC l [<]) |]
+      (VVar fc k sp,   (VVar fc' k' sp')  ) =>
+        if k == k' then unifySpine l (k == k') sp sp'
+        else if k < k' then pure $ MkResult [(k,u')] else pure $ MkResult [(k',t')]
+        -- else error ctx.fc "unify error: vvar mismatch \{show k} \{show k'} \{show ctx.env}"
 
       -- attempt at building constraints
       -- and using them
       (VVar fc k sp, u) => case lookupVar k of
         Just v => unify l v u
         Nothing => pure $ MkResult[(k, u)]
+
       (t, VVar fc k sp) => pure $ MkResult[(k, t)]
 
       (VRef fc k def sp,   VRef fc' k' def' sp'  ) =>
@@ -153,11 +160,6 @@ parameters (ctx: Context)
         -- REVIEW - consider forcing?
         else error emptyFC "vref mismatch \{show k} \{show k'} -- \{show sp} \{show sp'}"
 
-      (VMeta fc k sp,  VMeta fc' k' sp' ) =>
-        if k == k' then unifySpine l (k == k') sp sp'
-        else solve l k sp (VMeta fc' k' sp') >> pure neutral
-      (t,           VMeta fc' i' sp') => solve l i' sp' t >> pure neutral
-      (VMeta fc i sp, t'           ) => solve l i sp t' >> pure neutral
       (VU _, VU _) => pure neutral
       -- Lennart.newt cursed type references itself
       -- We _could_ look up the ref, eval against [] and vappSpine...
@@ -201,32 +203,16 @@ insert ctx tm ty = do
       insert ctx (App emptyFC tm m) !(b $$ mv)
     va => pure (tm, va)
 
--- lookupName : Context -> Raw -> M (Maybe (Tm, Val))
--- lookupName ctx (RVar fc nm) = go 0 ctx.types
---   where
---     go : Nat -> Vect n (String, Val)  -> M  (Maybe (Tm, Val))
---     go i [] = case lookup nm !(get) of
---       Just (MkEntry name ty def) => pure $ Just (Ref fc nm def, !(eval [] CBN ty))
---       Nothing => pure Nothing
---     go i ((x, ty) :: xs) = if x == nm then pure $ Just (Bnd fc i, ty)
---       else go (i + 1) xs
--- lookupName ctx _ = pure Nothing
-
-
 primType : FC -> String -> M Val
 primType fc nm = case lookup nm !(get) of
       Just (MkEntry name ty PrimTCon) => pure $ VRef fc name PrimTCon [<]
       _ => error fc "Primitive type \{show nm} not in scope"
-
 
 export
 infer : Context -> Raw  -> M  (Tm, Val)
 
 export
 check : Context -> Raw -> Val  -> M  Tm
-
-
-
 
 data Bind = MkBind String Icit Val
 
@@ -309,13 +295,13 @@ extendPi ctx ty nms = pure (ctx, ty, nms <>> [])
 updateContext : Context -> List (Nat, Val) -> M Context
 updateContext ctx [] = pure ctx
 updateContext ctx ((k, val) :: cs) = let ix = (length ctx.env `minus` k) `minus` 1 in
-  pure $ {env $= makeLet ix} ctx
+  pure $ {env $= replace ix val, bds $= replace ix Defined } ctx
   where
-    makeLet : Nat -> Env -> Env
-    makeLet _ [] = ?nothing_to_update
-    makeLet 0 ((VVar fc j [<]) :: xs) = val :: xs
-    makeLet 0 (_ :: xs) = ?not_a_var
-    makeLet (S k) (x :: xs) = x :: makeLet k xs
+    replace : Nat -> a -> List a -> List a
+    replace k x [] = []
+    replace 0 x (y :: xs) = x :: xs
+    replace (S k) x (y :: xs) = y :: replace k x xs
+
 
 -- ok, so this is a single constructor, CaseAlt
 -- since we've gotten here, we assume it's possible and we better have at least
@@ -345,7 +331,9 @@ buildCase ctx prob scnm scty (dcName, _, ty) = do
   -- this puts the failure on the LHS
   -- unifying these should say say VVar 1 is Nat.
   -- ERROR at (23, 0): unify failed (%var 1 [< ]) =?= (%ref Nat [< ]) [no Fn]
-  res <- unify ctx' (length ctx.env) ty' scty
+  debug "unify dcon dom with scrut"
+  res <- unify ctx' (length ctx'.env) ty' scty
+  --res <- unify ctx' (length ctx.env) ty' scty
   debug "scty \{show scty}"
   debug "UNIFY results \{show res.constraints}"
   debug "before types: \{show ctx'.types}"
@@ -496,14 +484,14 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     let scnm = fresh "sc"
     -- FIXME FC
     let clauses = map (\(MkAlt pat rawRHS) =>MkClause fc [(scnm, pat)] [] rawRHS ) alts
+
+    -- buildCase expects scrutinee to be a name in the context because
+    -- it's compared against the first part of Constraint.  We could switch
+    -- to a level and only let if the scrutinee is not a var.
     let ctx' = extend ctx scnm scty
     cons <- getConstructors ctx' scty
     alts <- traverse (buildCase ctx' (MkProb clauses ty) scnm scty) cons
-    -- BROKEN, need scnm in scope for real. ctx' promises it, but we don't have a binder here
-
-
     pure $ Let fc scnm sc $ Case fc (Bnd fc 0) alts
-
 
     -- buildTree ctx (MkProb{})
     -- ?hole
@@ -519,7 +507,10 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     -- need to print 'warning' with position
     -- fixme - just put a name on it like idris and stuff it into top.
     -- error [DS "hole:\n\{msg}"]
-    pure $ Ref emptyFC "?" Axiom  -- TODO - probably want hole opt on Def
+    -- TODO mark this meta as a user hole
+    -- freshMeta ctx fc
+    pure $ Ref fc "?" Axiom
+
   (t@(RLam fc nm icit tm), ty@(VPi fc' nm' icit' a b)) => do
           debug "icits \{nm} \{show icit} \{nm'} \{show icit'}"
           if icit == icit' then do
