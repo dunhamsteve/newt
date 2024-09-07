@@ -20,7 +20,7 @@ plus = \ n m => case n of
   Z => m
   S k => S (plus k m)
 
--- Example from Jesper talk (translated to case tree)
+-- Example from Jesper talk (translated to explicit case tree)
 max : Nat -> Nat -> Nat
 max = \ n m => case n of
   Z => m
@@ -28,15 +28,6 @@ max = \ n m => case n of
     Z => S k
     S l => S (max k l)
 
--- So this isn't working at the moment, I think I need
--- to replace the n with S k
---
--- this is working kinda, but `length {a}` xs doesn't, so we
--- don't know the a's are the same
---
--- I think "unify" scty with the end of the constructor type
--- But it's going to be something like
---   Vect (S k) a' =?= Vect n a
 length : {a : U} {n : Nat} -> Vect n a -> Nat
 length = \ v => case v of
   Nil => Z
