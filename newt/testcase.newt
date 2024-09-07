@@ -5,6 +5,8 @@ module Scratch
 
 -- There are indexes below, but we're got pulling constraints out of them yet.
 
+ptype Int
+
 data Nat : U where
   Z : Nat
   S : Nat -> Nat
@@ -79,4 +81,5 @@ nand = \ x y => not (case x of
 
 data Void : U where
 
-
+foo : Int
+foo = 42

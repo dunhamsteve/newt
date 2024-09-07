@@ -187,6 +187,7 @@ mkArgs Z acc = acc
 mkArgs (S k) acc = mkArgs k ("h\{show k}" :: acc)
 
 dcon : String -> Nat -> Doc
+dcon nm Z = stmtToDoc $ JConst nm $ LitObject [("tag", LitString nm)]
 dcon nm arity =
   let args := mkArgs arity []
       obj := ("tag", LitString nm) :: map (\x => (x, Var x)) args

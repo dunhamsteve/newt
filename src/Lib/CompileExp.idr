@@ -69,6 +69,7 @@ apply t (x :: xs) acc (S k) = apply t xs (acc :< x) k
 apply t ts acc 0 = go (CApp t (acc <>> [])) ts
   where
     go : CExp -> List CExp -> M CExp
+    go (CApp t []) [] = pure t
     go t [] = pure t
     go t (arg :: args) = go (CApp t [arg]) args
 
@@ -119,6 +120,7 @@ compileFun tm = go tm []
   where
     go : Tm -> List String -> M CExp
     go (Lam _ nm t) acc = go t (nm :: acc)
+    go tm [] = compileTerm tm
     go tm args = pure $ CFun (reverse args) !(compileTerm tm)
 
 
