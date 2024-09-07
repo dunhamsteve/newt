@@ -94,10 +94,17 @@ termToJS env (CRef nm) f = f $ Var nm
 termToJS env (CMeta k) f = f $ LitString "META \{show k}"
 termToJS env (CLit (LString str)) f = f (LitString str)
 termToJS env (CLit (LInt i)) f = f (LitInt i)
+-- if it's a var, just use the original
+termToJS env (CLet nm (CBnd k) u) f = case getAt k env of
+  Just e  => termToJS (e :: env) u f
+  Nothing => ?bad_bounds2
 termToJS env (CLet nm t u) f =
   let nm' = fresh nm env
       env' = (Var nm' :: env)
-  in JSnoc (JLet nm' $ termToJS env t (JAssign nm')) (termToJS env' u f)
+  -- If it's a simple term, use const
+  in case termToJS env t (JAssign nm') of
+    (JAssign _ exp) => JSnoc (JConst nm' exp) (termToJS env' u f)
+    t' => JSnoc (JLet nm' t') (termToJS env' u f)
 
 termToJS env (CApp t args) f = termToJS env t (\ t' => argsToJS args [<] (\ args' => f (Apply t' args')))
   where
@@ -120,7 +127,7 @@ termToJS env (CCase t alts) f =
   where
     termToJSAlt : String -> CAlt -> JAlt
     termToJSAlt nm (CConAlt name args u) = JConAlt name (termToJS (mkEnv nm 0 env args) u f)
-    -- intentially reusing scrutinee name here
+    -- intentionally reusing scrutinee name here
     termToJSAlt nm (CDefAlt u) = JDefAlt (termToJS (Var nm :: env) u f)
     label : JSExp -> (String -> JSStmt e) -> JSStmt e
     label (Var nm) f = f nm

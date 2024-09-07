@@ -43,9 +43,6 @@ length = \ v => case v of
 data Unit : U where
   MkUnit : Unit
 
-foo : Vect (S Z) Unit
-foo = Cons MkUnit Nil
-
 -- This should fail (and does!)
 -- bar : Vect (S Z) Unit
 -- bar = (Cons MkUnit (Cons MkUnit Nil))
