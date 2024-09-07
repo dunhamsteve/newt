@@ -17,9 +17,8 @@ data D : (A : Type) -> Type where
 -- We do need to sort this out
 
 unV : { A : U} -> D A -> A
-unV = \ v => case v of
-  V y => y
- --  F f => TRUSTME
+unV (V y) = y
+unV (F f) = ?  -- was TRUSTME
 
 
 
@@ -27,8 +26,8 @@ unV = \ v => case v of
 unF : {A : Type} -> D A -> D A -> D A
 unF = \ {A} v x =>
   case v of
-    F {A} f => ? -- f x
-    V y => TRUSTME
+    F f => f x
+    V y => ? -- was TRUSTME
 
 -- fix : {A : U} -> (A -> A) -> A
 -- fix = \ {A} g =>

@@ -168,6 +168,13 @@ parameters (ctx: Context)
         case lookup k' !(get) of
           Just (MkEntry name ty (Fn tm)) => unify l t !(vappSpine !(eval [] CBN tm) sp')
           _ => error ctx.fc "unify failed \{show t'} =?= \{show u'} [no Fn]\n  env is \{show ctx.env} \{show $ map fst ctx.types}"
+
+      (VRef fc k def sp, u) => do
+        debug "expand %ref \{k} =?= \{show u}"
+        case lookup k !(get) of
+          Just (MkEntry name ty (Fn tm)) => unify l !(vappSpine !(eval [] CBN tm) sp) u
+          _ => error ctx.fc "unify failed \{show t'} [no Fn] =?= \{show u'}\n  env is \{show ctx.env} \{show $ map fst ctx.types}"
+
       -- REVIEW I'd like to quote this back, but we have l that aren't in the environment.
       _ => error ctx.fc "unify failed \{show t'} =?= \{show u'} \n  env is \{show ctx.env} \{show $ map fst ctx.types}"
     where

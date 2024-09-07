@@ -24,6 +24,9 @@ import System
 import System.Directory
 import System.File
 
+fail : String -> M ()
+fail msg = putStrLn msg >> exitFailure
+
 dumpContext : TopContext -> M ()
 dumpContext top = do
     putStrLn "Context:"
@@ -46,11 +49,11 @@ processFile fn = do
     | Left err => printLn err
   let toks = tokenise src
   let Right res = parse parseMod toks
-    | Left y => putStrLn (showError src y)
+    | Left y => fail (showError src y)
   putStrLn $ render 80 $ pretty res
   printLn "process Decls"
   Right _ <- tryError $ traverse_ processDecl (collectDecl res.decls)
-    | Left y => putStrLn (showError src y)
+    | Left y => fail (showError src y)
 
   dumpContext !get
   dumpSource
@@ -61,8 +64,6 @@ main' = do
   putStrLn "Args: \{show args}"
   let (_ :: files) = args
     | _ => putStrLn "Usage: newt foo.newt"
-  -- Right files <- listDir "eg"
-  --   | Left err => printLn err
   when ("-v" `elem` files) $ modify { verbose := True }
   traverse_ processFile (filter (".newt" `isSuffixOf`) files)
 
@@ -71,5 +72,7 @@ main = do
   -- we'll need to reset for each file, etc.
   ctx <- empty
   Right _  <- runEitherT $ runStateT ctx $ main'
-    | Left (E (c, r) str) => putStrLn "ERROR at (\{show c}, \{show r}): \{show str}"
+    | Left (E (c, r) str) => do
+        putStrLn "ERROR at (\{show c}, \{show r}): \{show str}"
+        exitFailure
   putStrLn "done"

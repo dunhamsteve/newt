@@ -9,7 +9,7 @@ build/exec/newt.js: ${SRCS}
 	idris2 --cg node -o newt.js -p contrib -c src/Main.idr
 
 test: build/exec/newt
-	build/exec/newt newt/*.newt
+	scripts/test
 
 vscode:
 	cd newt-vscode && vsce package && code --install-extension *.vsix

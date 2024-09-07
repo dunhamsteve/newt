@@ -1,0 +1,11 @@
+#!/bin/sh
+
+for i in tests/black/*.newt; do
+  ./build/exec/newt $i
+  if [ $? != "0" ]; then
+    echo FAIL $i
+    exit -1
+  fi
+  echo $?
+done
+
