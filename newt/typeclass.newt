@@ -1,0 +1,29 @@
+module TypeClass
+
+-- experiment on one option for typeclass (we don't have record yet)
+
+-- we need a bit more than this, but
+data Monad : (U -> U) -> U where
+  MkMonad : { M : U -> U } ->
+            (bind : {A B : U} -> (M A) -> (A -> M B) -> M B) ->
+            Monad M
+
+data Maybe : U -> U where
+  Just    : {A : U} -> A -> Maybe A
+  Nothing : {A : U} -> Maybe A
+
+
+-- NEXT trying to get this to work. An equivalence is not found in pattern
+-- matching
+
+-- [instance]
+MaybeMonad : Monad Maybe
+-- Agda case lambda might be nice..
+-- The {Maybe} isn't solved in type for the case
+MaybeMonad = MkMonad {Maybe} (\ {A} ma amb =>
+  case ma of
+      Nothing => Nothing
+      -- It doesn't discover pat$5 is A during pattern matching
+      -- oh, but var 0 value is var5
+      Just a => amb a)
+

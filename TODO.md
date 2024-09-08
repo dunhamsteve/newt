@@ -15,3 +15,8 @@
 - [ ] type at point
 - [ ] repl
 - [ ] LSP
+- [ ] don't match forced constructors
+  - maybe do this in codegen if there is only one case.
+- [ ] magic nat (codegen as number with appropriate pattern matching)
+- [ ] magic tuple? (codegen as array)
+- [ ] magic newtype? (drop in codegen)

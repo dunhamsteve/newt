@@ -120,12 +120,33 @@ parameters (ctx: Context)
   unifySpine l True (xs :< x) (ys :< y) = [| unify l x y <+> (unifySpine l True xs ys) |]
   unifySpine l True _ _ = error emptyFC "meta spine length mismatch"
 
+  lookupVar : Nat -> Maybe Val
+  lookupVar k = let l = length ctx.env in
+    if k > l
+      then Nothing
+      else case getAt ((l `minus` k) `minus` 1) ctx.env of
+        Just v@(VVar fc k' sp) => if k == k' then Nothing else Just v
+        Just v => Just v
+        Nothing => Nothing
+
+  -- hoping to apply what we got via pattern matching
+  unlet : Val -> M Val
+  unlet t@(VVar fc k sp) = case lookupVar k of
+        Just tt@(VVar fc' k' sp') => do
+          debug "lookup \{show k} is \{show tt}"
+          if k' == k then pure t else vappSpine (VVar fc' k' sp') sp
+        Just t => vappSpine t sp
+        Nothing => do
+          debug "lookup \{show k} is Nothing in env \{show ctx.env}"
+          pure t
+  unlet x = pure x
+
   unify l t u = do
     debug "Unify \{show ctx.lvl}"
     debug "  \{show l} \{show t}"
     debug "  =?= \{show u}"
-    t' <- forceMeta t
-    u' <- forceMeta u
+    t' <- forceMeta t >>= unlet
+    u' <- forceMeta u >>= unlet
     debug "forced \{show t'}"
     debug "  =?= \{show u'}"
     debug "env \{show ctx.env}"
@@ -146,11 +167,7 @@ parameters (ctx: Context)
         -- else error ctx.fc "unify error: vvar mismatch \{show k} \{show k'} \{show ctx.env}"
 
       -- attempt at building constraints
-      -- and using them
-      (VVar fc k sp, u) => case lookupVar k of
-        Just v => unify l v u
-        Nothing => pure $ MkResult[(k, u)]
-
+      (VVar fc k sp, u) => pure $ MkResult[(k, u)]
       (t, VVar fc k sp) => pure $ MkResult[(k, t)]
 
       (VRef fc k def sp,   VRef fc' k' def' sp'  ) =>
@@ -487,6 +504,8 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     -- We've got a beta redex or need to do something...
     -- Maybe we can let the scrutinee and jump into the middle?
     (sc, scty) <- infer ctx rsc
+    scty <- forceMeta scty
+    debug "SCTM/TY \{pprint (names ctx) sc} \{show scty}"
 
     let scnm = fresh "sc"
     -- FIXME FC

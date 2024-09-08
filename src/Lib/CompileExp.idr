@@ -48,7 +48,8 @@ piArity _ = Z
 
 arityForName : FC -> Name -> M Nat
 arityForName fc nm = case lookup nm !get of
-  Nothing => error fc "Name \{show nm} not in scope"
+  -- let the magic hole through for now (will generate bad JS)
+  Nothing => if nm == "?" then pure 0 else error fc "Name \{show nm} not in scope"
   (Just (MkEntry name type Axiom)) => pure 0
   (Just (MkEntry name type (TCon strs))) => pure 0 -- FIXME
   (Just (MkEntry name type (DCon k str))) => pure k
