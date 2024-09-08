@@ -241,3 +241,57 @@ solveMeta ctx ix tm = do
       then error' "Meta \{show ix} already solved!"
       else go xs (lhs :< meta)
 
+
+-- REVIEW - might be easier if we inserted the meta without a bunch of explicit App
+
+-- we need to walk the whole thing
+-- meta in Tm have a bunch of args, which should be the relevant
+-- parts of the scope. So, meta has a bunch of lambdas, we've got a bunch of
+-- args and we need to beta reduce, which seems like a lot of work for nothing
+-- Could we put the "good bits" of the Meta in there and write it to Bnd directly
+-- off of scope? I guess this might get dicey when a meta is another meta applied
+-- to something.
+
+-- ok, so we're doing something that looks lot like eval, having to collect args,
+-- pull the def, and apply spine. Eval is trying for WHNF, so it doesn't walk the
+-- whole thing. (We'd like to insert metas inside lambdas.)
+export
+zonk : TopContext -> Nat -> Env -> Tm -> M Tm
+
+zonkBind : TopContext -> Nat -> Env -> Tm -> M Tm
+zonkBind top l env tm = zonk top (S l) (VVar (getFC tm) l [<] :: env) tm
+
+-- I don't know if app needs an FC...
+
+appSpine : Tm -> List Tm -> Tm
+appSpine t [] = t
+appSpine t (x :: xs) = appSpine (App (getFC t) t x) xs
+
+zonkApp : TopContext -> Nat -> Env -> Tm -> List Tm -> M Tm
+zonkApp top l env (App fc t u) sp = zonkApp top l env t (!(zonk top l env u) :: sp)
+zonkApp top l env t@(Meta fc k) sp = case !(lookupMeta k) of
+  (Solved j v) => do
+    sp' <- traverse (eval env CBN) sp
+    debug "zonk \{show k} -> \{show v} spine \{show sp'}"
+    foo <- vappSpine v ([<] <>< sp')
+    debug "-> result is \{show foo}"
+    quote l foo
+  (Unsolved x j xs) => pure $ appSpine t sp
+zonkApp top l env t sp = pure $ appSpine !(zonk top l env t) sp
+
+zonkAlt : TopContext -> Nat -> Env -> CaseAlt -> M CaseAlt
+zonkAlt top l env (CaseDefault t) = CaseDefault <$> zonkBind top l env t
+zonkAlt top l env (CaseCons name args t) = CaseCons name args <$> go l env args t
+  where
+    go : Nat -> Env -> List String -> Tm -> M Tm
+    go l env [] tm = zonk top l env t
+    go l env (x :: xs) tm = go (S l) (VVar (getFC tm) l [<] :: env) xs tm
+
+zonk top l env t = case t of
+  (Meta fc k) => zonkApp top l env t []
+  (Lam fc nm u) => Lam fc nm <$> (zonk top (S l) (VVar fc l [<] :: env) u)
+  (App fc t u) => zonkApp top l env t [!(zonk top l env u)]
+  (Pi fc nm icit a b) => Pi fc nm icit <$> zonk top l env a <*> zonkBind top l env b
+  (Let fc nm t u) => Let fc nm <$> zonk top l env t <*> zonkBind top l env u
+  (Case fc sc alts) => Case fc <$> zonk top l env sc <*> traverse (zonkAlt top l env) alts
+  _ => pure t

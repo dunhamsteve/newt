@@ -27,3 +27,4 @@ MaybeMonad = MkMonad {Maybe} (\ {A} ma amb =>
       -- oh, but var 0 value is var5
       Just a => amb a)
 
+-- so if we added {{ }} and search...

@@ -16,6 +16,10 @@ data Doc = Empty | Line | Text String | Nest Nat Doc | Seq Doc Doc | Alt Doc Doc
 ||| The capitalization is the opposite of the paper.
 data DOC = EMPTY | TEXT String DOC | LINE Nat DOC
 
+export
+empty : Doc
+empty = Empty
+
 flatten : Doc -> Doc
 flatten Empty = Empty
 flatten (Seq x y) = Seq (flatten x) (flatten y)

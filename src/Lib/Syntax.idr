@@ -95,7 +95,7 @@ data Decl
   | DImport FC Name
   | DCheck FC Raw Raw
   | Data FC Name Raw (List Decl)
-  | PType FC Name
+  | PType FC Name (Maybe Raw)
   | PFunc FC Name Raw String
 
 
@@ -134,7 +134,7 @@ Show Decl where
   show (Data _ str xs ys) = foo ["Data", show str, show xs, show ys]
   show (DImport _ str) = foo ["DImport", show str]
   show (DCheck _ x y) = foo ["DCheck", show x, show y]
-  show (PType _ name) = foo ["PType", name]
+  show (PType _ name ty) = foo ["PType", name, show ty]
   show (PFunc _ nm ty src) = foo ["PFunc", nm, show ty, show src]
 
 export covering
@@ -230,5 +230,5 @@ Pretty Module where
         -- the behavior of nest is kinda weird, I have to do the nest before/around the </>.
         doDecl (Data _ nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map doDecl xs))
         doDecl (DCheck _ x y) = text "#check" <+> pretty x <+> ":" <+> pretty y
-        doDecl (PType _ nm) = text "ptype" <+> text nm
+        doDecl (PType _ nm ty) = text "ptype" <+> text nm <+> (maybe empty (\ty => ":" <+> pretty ty) ty)
         doDecl (PFunc _ nm ty src) = "pfunc" <+> text nm <+> ":" <+> nest 2 (pretty ty <+> ":=" <+/> text (show src))

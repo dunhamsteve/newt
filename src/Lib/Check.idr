@@ -283,7 +283,7 @@ findSplit (_ :: xs) = findSplit xs
 
 -- we could pass into build case and use it for   (x /? y)
 
--- TODO, we may need to filter these for the situation.
+-- TODO, we may need to filter these for the type
 getConstructors : Context -> Val -> M (List (String, Nat, Tm))
 getConstructors ctx (VRef fc nm _ _) = do
   names <- lookupTCon nm
@@ -312,10 +312,8 @@ extendPi ctx (VPi x str icit a b) nms = do
     extendPi ctx' tyb (nms :< MkBind nm icit a)
 extendPi ctx ty nms = pure (ctx, ty, nms <>> [])
 
--- filter clause
-
--- FIXME - I don't think we're properly noticing
-
+-- turn vars into lets for forced values.
+-- Maybe we need to do more? revist the paper.
 updateContext : Context -> List (Nat, Val) -> M Context
 updateContext ctx [] = pure ctx
 updateContext ctx ((k, val) :: cs) = let ix = (length ctx.env `minus` k) `minus` 1 in
@@ -349,7 +347,6 @@ buildCase ctx prob scnm scty (dcName, _, ty) = do
   -- And we don't _need_ a solution, just if it's unified against
 
   -- I think I'm going down a different road than Idris..
-
 
   -- do this or see how other people manage?
   -- this puts the failure on the LHS

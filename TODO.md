@@ -1,11 +1,13 @@
 
 ## TODO
 
+- [x] inline metas.  Maybe zonk after TC/elab
 - [ ] implicit patterns
 - [ ] pair syntax
 - [ ] list syntax
 - [ ] operators
 - [ ] import
+- [ ] add {{ }} and solving
 - [ ] some solution for + (classes? ambiguity?)
 - [ ] surface execution failure in the editor
 - [ ] write js files in out

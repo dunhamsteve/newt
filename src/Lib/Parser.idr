@@ -272,7 +272,14 @@ parseDef = do
 
 export
 parsePType : Parser Decl
-parsePType = PType <$> getPos <* keyword "ptype" <*> uident
+parsePType = do
+  fc <- getPos
+  keyword "ptype"
+  id <- uident
+  ty <- optional $ do
+    keyword ":"
+    mustWork typeExpr
+  pure $ PType fc id ty
 
 parsePFunc : Parser Decl
 parsePFunc = do

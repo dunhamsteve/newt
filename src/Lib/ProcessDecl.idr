@@ -36,13 +36,16 @@ processDecl (TypeSig fc nm tm) = do
   putStrLn "-----"
   putStrLn "TypeSig \{nm} \{show tm}"
   ty <- check (mkCtx top.metas fc) tm (VU fc)
+  putStrLn "got \{pprint [] ty}"
   ty' <- nf [] ty
-  putStrLn "got \{pprint [] ty'}"
+  putStrLn "nf \{pprint [] ty'}"
   modify $ setDef nm ty' Axiom
 
-processDecl (PType fc nm) = do
+processDecl (PType fc nm ty) = do
   ctx <- get
-  modify $ setDef nm (U fc) PrimTCon
+  ty' <- check (mkCtx ctx.metas fc) (maybe (RU fc) id ty) (VU fc)
+  modify $ setDef nm ty' PrimTCon
+
 processDecl (PFunc fc nm ty src) = do
   top <- get
   ty <- check (mkCtx top.metas fc) ty (VU fc)
@@ -69,7 +72,8 @@ processDecl (Def fc nm clauses) = do
 
   tm <- buildTree (mkCtx ctx.metas fc) (MkProb clauses vty)
   putStrLn "Ok \{pprint [] tm}"
-
+  tm' <- zonk ctx 0 [] tm
+  putStrLn "NF \{pprint[] tm'}"
   mc <- readIORef ctx.metas
   for_ mc.metas $ \case
     (Solved k x) => pure ()
@@ -77,8 +81,8 @@ processDecl (Def fc nm clauses) = do
       -- should just print, but it's too subtle in the sea of messages
       -- putStrLn "ERROR at (\{show l}, \{show c}): Unsolved meta \{show k}"
       throwError $ E (l,c) "Unsolved meta \{show k}"
-  debug "Add def \{nm} \{pprint [] tm} : \{pprint [] ty}"
-  modify $ setDef nm ty (Fn tm)
+  debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
+  modify $ setDef nm ty (Fn tm')
 
 processDecl (DCheck fc tm ty) = do
   top <- get

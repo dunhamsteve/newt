@@ -35,7 +35,7 @@ dumpContext top = do
   where
     go : List TopEntry -> M ()
     go [] = pure ()
-    go (x :: xs) = go xs >> putStrLn "    \{show x}"
+    go (x :: xs) = putStrLn "    \{show x}" >> go xs
 
 dumpSource : M ()
 dumpSource = do
