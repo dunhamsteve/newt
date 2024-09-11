@@ -5,7 +5,7 @@ Newt is a dependently typed programming language that compiles to javascript. It
 my first attempt to write a dependent typed language. It is inspired by Idris,
 Elaboration Zoo, pi-forall, and various tutorials.
 
-The goal is to have inductive types, pattern matching, compile to javascript, and be self hosted. At the very least though, I'd like to be able to build a little browser toy to compile and run code.
+The goal is to have inductive types, pattern matching, compile to javascript, and be self hosted. At the very least though, I'd like to be able to build a little browser "playground" to compile and run code.
 
 ## Building
 
@@ -32,6 +32,13 @@ I have `Let` in the core language. Partly because I'd like this to make it into 
 ## Case Tree
 
 I've got no idea what I'm doing here. I worked off of Jesper Cockx "Elaborating Dependent (Co)pattern Matching", leaving out codata for now.
+
+## Issues
+
+- I need to do some erasure of values unused at runtime
+- I'm a little fuzzy on the "right way" to deal with constraints from unification
+- I'm a little fuzzy on how much to evaluate and when
+- I'm not postponing anything, and I suspect I will need to
 
 ## References
 

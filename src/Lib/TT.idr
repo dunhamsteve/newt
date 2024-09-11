@@ -1,12 +1,5 @@
--- I'm not sure this is related, or just a note to self (Presheaves on Porpoise)
-
--- maybe watch https://www.youtube.com/watch?v=3gef0_NFz8Q
--- or drop the indices for now.
-
--- ***
--- Kovacs has icity on App, and passes it around, but I'm not sure where it is needed since the insertion happens based on Raw.
-
 module Lib.TT
+
 -- For FC
 import Lib.Parser.Impl
 import Lib.Prettier
@@ -243,6 +236,7 @@ solveMeta ctx ix tm = do
 
 
 -- REVIEW - might be easier if we inserted the meta without a bunch of explicit App
+-- I believe Kovacs is doing that.
 
 -- we need to walk the whole thing
 -- meta in Tm have a bunch of args, which should be the relevant
