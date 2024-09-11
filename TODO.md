@@ -8,6 +8,7 @@
 - [ ] operators
 - [ ] import
 - [ ] add {{ }} and solving autos
+- [ ] do blocks
 - [ ] some solution for + (classes? ambiguity?)
 - [ ] show compiler failure in the editor (exit code != 0)
 - [ ] write js files into `out` directory
@@ -17,8 +18,8 @@
 - [ ] type at point in vscode
 - [ ] repl
 - [ ] LSP
-- [ ] don't match forced constructors at runtime
-  - maybe do this in codegen if there is only one case.
+- [x] don't match forced constructors at runtime
+  - I think we got this by not switching for single cases
 - [ ] magic nat (codegen as number with appropriate pattern matching)
 - [ ] magic tuple? (codegen as array)
 - [ ] magic newtype? (drop in codegen)

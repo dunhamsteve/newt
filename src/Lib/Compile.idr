@@ -119,19 +119,21 @@ termToJS env (CCase t alts) f =
   -- TODO default case, let's drop the extra field.
 
   termToJS env t $ \case
-    (Var nm) => (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts))
+    (Var nm) => maybeCaseStmt nm alts
     t' =>
       let nm = fresh "sc" env in
-        JSnoc (JConst nm t')
-          (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts))
+        JSnoc (JConst nm t') (maybeCaseStmt nm alts)
+
   where
     termToJSAlt : String -> CAlt -> JAlt
     termToJSAlt nm (CConAlt name args u) = JConAlt name (termToJS (mkEnv nm 0 env args) u f)
     -- intentionally reusing scrutinee name here
     termToJSAlt nm (CDefAlt u) = JDefAlt (termToJS (Var nm :: env) u f)
-    label : JSExp -> (String -> JSStmt e) -> JSStmt e
-    label (Var nm) f = f nm
-    label t f = ?label_rhs
+
+    maybeCaseStmt : String -> List CAlt -> JSStmt e
+    -- If there is a single alt, assume it matched
+    maybeCaseStmt nm [(CConAlt _ args u)] = (termToJS (mkEnv nm 0 env args) u f)
+    maybeCaseStmt nm alts = (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts))
 
 
 -- FIXME escape
