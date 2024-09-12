@@ -1,15 +1,18 @@
 
 ## TODO
 
+- [ ] there is some zero argument application in generated code
+  - possibly the fancy "apply arity then curry the rest" bit
 - [x] inline metas.  Maybe zonk after TC/elab
-- [ ] implicit patterns
+- [x] implicit patterns
 - [ ] pair syntax
 - [ ] list syntax
 - [ ] operators
 - [ ] import
 - [ ] add {{ }} and solving autos
+  - considering various solutions.  Perhaps marking the data type as solvable, if we had types on metas.
 - [ ] do blocks
-- [ ] some solution for + (classes? ambiguity?)
+- [ ] some solution for `+` (classes? ambiguity?)
 - [ ] show compiler failure in the editor (exit code != 0)
 - [ ] write js files into `out` directory
 - [ ] detect extra clauses in case statements

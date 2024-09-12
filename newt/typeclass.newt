@@ -28,3 +28,12 @@ MaybeMonad = MkMonad {Maybe} (\ {A} ma amb =>
       Just a => amb a)
 
 -- so if we added {{ }} and search...
+-- second arg will be {{}}
+-- add implicit patterns first
+
+-- I need a way to tag `x : Monad m` as auto.  I could do {{}}, but maybe I should tag the `data` for search?
+-- It should be a record, but I don't have records yet
+
+bind : {m : U -> U} -> {x : Monad m} -> {a b : U} -> (m a) -> (a -> m b) -> m b
+bind {m} {MkMonad bind'} = bind'
+

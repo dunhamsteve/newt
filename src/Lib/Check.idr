@@ -261,10 +261,13 @@ export
 buildTree : Context -> Problem -> M Tm
 
 introClause : String -> Icit -> Clause -> M Clause
--- I don't think this makes a difference?
-introClause nm Implicit (MkClause fc cons pats expr) = pure $ MkClause fc ((nm, PatWild fc) :: cons) pats expr
+introClause nm icit (MkClause fc cons (pat :: pats) expr) =
+  if icit == getIcit pat then pure $ MkClause fc ((nm, pat) :: cons) pats expr
+  else if icit == Implicit then pure $ MkClause fc ((nm, PatWild fc Implicit) :: cons) (pat :: pats) expr
+  else error fc "Explicit arg and implicit pattern \{show nm} \{show icit} \{show pat}"
+-- handle implicts at end?
+introClause nm Implicit (MkClause fc cons [] expr) = pure $ MkClause fc ((nm, PatWild fc Implicit) :: cons) [] expr
 introClause nm icit (MkClause fc cons [] expr) = error fc "Clause size doesn't match"
-introClause nm icit (MkClause fc cons (pat :: pats) expr) = pure $ MkClause fc ((nm, pat) :: cons) pats expr
 
 -- A split candidate looks like x /? Con ...
 -- we need a type here. I pulled if off of the
@@ -273,7 +276,7 @@ introClause nm icit (MkClause fc cons (pat :: pats) expr) = pure $ MkClause fc (
 findSplit : List Constraint -> Maybe Constraint
 findSplit [] = Nothing
     -- FIXME look up type, ensure it's a constructor
-findSplit (x@(nm, PatCon _ cnm pats) :: xs) = Just x
+findSplit (x@(nm, PatCon _ _ cnm pats) :: xs) = Just x
 findSplit (_ :: xs) = findSplit xs
 
 
@@ -399,17 +402,16 @@ buildCase ctx prob scnm scty (dcName, _, ty) = do
     -- We get a list of clauses back (a Problem) and then solve that
     -- If they all fail, we have a coverage issue. (Assuming the constructor is valid)
 
-
-    -- we'll want implicit patterns at some point, for now we wildcard implicits because
-    -- we don't have them
     makeConst : List Bind -> List Pattern -> List (String, Pattern)
     makeConst [] [] = []
-    -- need M in here to throw.
+    -- would need M in here to throw, and I'm building stuff as I go, I suppose I could <$>
     makeConst [] (pat :: pats) = ?extra_patterns
-    --
-    makeConst ((MkBind nm Implicit x) :: xs) [] = (nm, PatWild emptyFC) :: makeConst xs []
+    makeConst ((MkBind nm Implicit x) :: xs) [] = (nm, PatWild emptyFC Implicit) :: makeConst xs []
     makeConst ((MkBind nm Explicit x) :: xs) [] = ?extra_binders_2
-    makeConst ((MkBind nm Implicit x) :: xs) (pat :: pats) = (nm, PatWild (getFC pat)) :: makeConst xs (pat :: pats)
+    makeConst ((MkBind nm Implicit x) :: xs) (pat :: pats) =
+      if getIcit pat == Explicit
+        then (nm, PatWild (getFC pat) Implicit) :: makeConst xs (pat :: pats)
+        else (nm, pat) :: makeConst xs pats
     makeConst ((MkBind nm Explicit x) :: xs) (pat :: pats) = (nm, pat) :: makeConst xs pats
 
     rewriteCons : List Bind -> List Constraint -> List Constraint -> Maybe (List Constraint)
@@ -417,9 +419,9 @@ buildCase ctx prob scnm scty (dcName, _, ty) = do
     rewriteCons vars (c@(nm, y) :: xs) acc =
       if nm == scnm
         then case y of
-          PatVar _ s => Just $ c :: (xs ++ acc)
-          PatWild _ => Just $ c :: (xs ++ acc)
-          PatCon _ str ys => if str == dcName
+          PatVar _ _ s => Just $ c :: (xs ++ acc)
+          PatWild _ _ => Just $ c :: (xs ++ acc)
+          PatCon _ _ str ys => if str == dcName
             then Just $ (makeConst vars ys) ++ xs ++ acc
             else Nothing
         else rewriteCons vars xs (c :: acc)
@@ -451,8 +453,8 @@ checkDone ctx [] body ty = do
   got <- check ctx body ty
   debug "DONE<- got \{pprint (names ctx) got}"
   pure got
-checkDone ctx ((x, PatWild _) :: xs) body ty = checkDone ctx xs body ty
-checkDone ctx ((nm, (PatVar _ nm')) :: xs) body ty = checkDone ({ types $= rename } ctx) xs body ty
+checkDone ctx ((x, PatWild _ _) :: xs) body ty = checkDone ctx xs body ty
+checkDone ctx ((nm, (PatVar _ _ nm')) :: xs) body ty = checkDone ({ types $= rename } ctx) xs body ty
   where
     rename : Vect n (String, Val) -> Vect n (String, Val)
     rename [] = []

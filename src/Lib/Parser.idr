@@ -165,20 +165,23 @@ lamExpr = do
 -- We may need to look up names at some point to see if they're constructors.
 
 -- so, we can do the capital letter thing here or push that bit down and collect single/double
-pPattern' : Parser Pattern
 pPattern : Parser Pattern
-pPattern
-   = PatWild <$ keyword "_" <*> getPos
-  <|> PatVar <$> getPos <*> ident
-  <|> PatCon <$> getPos <*> uident <*> pure []
-  <|> parens pPattern'
+patAtom : Parser Pattern
+patAtom = do
+  fc <- getPos
+  PatWild fc Explicit <$ keyword "_"
+    <|> PatVar fc Explicit <$> ident
+    <|> PatCon fc Explicit <$> uident <*> pure []
+    <|> braces (PatVar fc Implicit <$> ident)
+    <|> braces (PatWild fc Implicit <$ keyword "_")
+    <|> braces (PatCon fc Implicit <$> uident <*> many patAtom)
+    <|> parens pPattern
 
-pPattern'  = PatCon <$> getPos <*> uident <*> many pPattern <|> pPattern
+pPattern = PatCon (!getPos) Explicit <$> uident <*> many patAtom <|> patAtom
 
 caseAlt : Parser RCaseAlt
 caseAlt = do
-  -- pat <- parseOp -- pPattern -- term and sort it out later?
-  pat <- pPattern'
+  pat <- pPattern
   keyword "=>"
   commit
   t <- term
@@ -264,7 +267,7 @@ parseDef : Parser Decl
 parseDef = do
   fc <- getPos
   nm <- ident <|> uident
-  pats <- many pPattern
+  pats <- many patAtom
   keyword "="
   body <- mustWork typeExpr
   -- these get collected later

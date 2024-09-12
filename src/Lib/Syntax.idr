@@ -16,17 +16,24 @@ data RigCount = Rig0 | RigW
 
 public export
 data Pattern
-  = PatVar FC Name
-  | PatCon FC Name (List Pattern)
-  | PatWild FC
+  = PatVar FC Icit Name
+  | PatCon FC Icit Name (List Pattern)
+  | PatWild FC Icit
   -- Not handling this yet, but we need to be able to work with numbers and strings...
   -- | PatLit Literal
 
 export
+getIcit : Pattern -> Icit
+getIcit (PatVar x icit str) = icit
+getIcit (PatCon x icit str xs) = icit
+getIcit (PatWild x icit) = icit
+
+
+export
 HasFC Pattern where
-  getFC (PatVar fc str) = fc
-  getFC (PatCon fc str xs) = fc
-  getFC (PatWild fc) = fc
+  getFC (PatVar fc _ _) = fc
+  getFC (PatCon fc _ _ _) = fc
+  getFC (PatWild fc _) = fc
 
 -- %runElab deriveShow `{Pattern}
 public export
@@ -147,10 +154,9 @@ Show RigCount where
 
 export
 Show Pattern where
-  show (PatVar _ str) = foo ["PatVar", show str]
-  show (PatCon _ str xs) = foo ["PatCon", show str, assert_total $ show xs]
-  show (PatWild _) = "PatWild"
-  -- show (PatLit x) = foo ["PatLit" , show x]
+  show (PatVar _ icit str) = foo ["PatVar", show icit, show str]
+  show (PatCon _ icit str xs) = foo ["PatCon", show icit, show str, assert_total $ show xs]
+  show (PatWild _ icit) = foo ["PatWild", show icit]
 
 covering
 Show RCaseAlt where
@@ -173,9 +179,10 @@ Show Raw where
 
 export
 Pretty Pattern where
-  pretty (PatVar _ nm) = text nm
-  pretty (PatCon _ nm args) = text nm <+> spread (map pretty args)
-  pretty (PatWild _)= "_"
+  -- FIXME - wrap Implicit with {}
+  pretty (PatVar _ icit nm) = text nm
+  pretty (PatCon _ icit nm args) = text nm <+> spread (map pretty args)
+  pretty (PatWild _icit)= "_"
 
 
 
