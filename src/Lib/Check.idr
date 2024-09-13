@@ -222,7 +222,7 @@ insert : (ctx : Context) -> Tm -> Val -> M (Tm, Val)
 insert ctx tm ty = do
   case !(forceMeta ty) of
     VPi fc x Implicit a b => do
-      m <- freshMeta ctx fc
+      m <- freshMeta ctx (getFC tm)
       mv <- eval ctx.env CBN m
       insert ctx (App emptyFC tm m) !(b $$ mv)
     va => pure (tm, va)
