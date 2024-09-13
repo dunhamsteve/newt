@@ -1,0 +1,12 @@
+module Equality
+
+data Eq : {A : U} -> A -> A -> U where
+  Refl : {A : U} {a : A} -> Eq a a
+
+-- Some magic is not happening here.
+
+sym : {A : U} {x y : A} -> Eq x y -> Eq y x
+sym Refl = Refl
+
+trans : {A : U} {x y z : A} -> Eq x y -> Eq y z -> Eq x z
+trans Refl Refl = Refl

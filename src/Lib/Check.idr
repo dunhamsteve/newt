@@ -80,7 +80,7 @@ parameters (ctx: Context)
         goSpine ren lvl (App emptyFC tm xtm) xs
 
       go ren lvl (VVar fc k sp) = case findIndex (== k) ren of
-        Nothing => error emptyFC "scope/skolem thinger"
+        Nothing => error fc "scope/skolem thinger"
         Just x => goSpine ren lvl (Bnd fc $ cast x) sp
       go ren lvl (VRef fc nm def sp) = goSpine ren lvl (Ref fc nm def) sp
       go ren lvl (VMeta fc ix sp) = if ix == meta
@@ -134,7 +134,7 @@ parameters (ctx: Context)
   unlet t@(VVar fc k sp) = case lookupVar k of
         Just tt@(VVar fc' k' sp') => do
           debug "lookup \{show k} is \{show tt}"
-          if k' == k then pure t else vappSpine (VVar fc' k' sp') sp
+          if k' == k then pure t else (vappSpine (VVar fc' k' sp') sp >>= unlet)
         Just t => vappSpine t sp
         Nothing => do
           debug "lookup \{show k} is Nothing in env \{show ctx.env}"
@@ -252,7 +252,7 @@ record Problem where
   ty : Val
 
 -- Might have to move this if Check reaches back in...
-
+-- this is kinda sketchy, we can't use it twice at the same depth with the same name.
 fresh : {auto ctx : Context} -> String -> String
 fresh base = base ++ "$" ++ show (length ctx.env)
 
@@ -308,7 +308,7 @@ getConstructors ctx tm = error (getValFC tm) "Not a type constructor \{show tm}"
 -- return context, remaining type, and list of names
 extendPi : Context -> Val -> SnocList Bind -> M (Context, Val, List Bind)
 extendPi ctx (VPi x str icit a b) nms = do
-    let nm = fresh "pat"
+    let nm = fresh str -- "pat"
     let ctx' = extend ctx nm a
     let v = VVar emptyFC (length ctx.env) [<]
     tyb <- b $$ v
@@ -320,7 +320,7 @@ extendPi ctx ty nms = pure (ctx, ty, nms <>> [])
 updateContext : Context -> List (Nat, Val) -> M Context
 updateContext ctx [] = pure ctx
 updateContext ctx ((k, val) :: cs) = let ix = (length ctx.env `minus` k) `minus` 1 in
-  pure $ {env $= replace ix val, bds $= replace ix Defined } ctx
+  updateContext ({env $= replace ix val, bds $= replace ix Defined } ctx) cs
   where
     replace : Nat -> a -> List a -> List a
     replace k x [] = []
@@ -470,7 +470,7 @@ checkDone ctx ((x, pat) :: xs) body ty = error emptyFC "stray constraint \{x} /?
 buildTree ctx (MkProb [] ty) = error emptyFC "no clauses"
 buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ str icit a b)) = do
   let l = length ctx.env
-  let nm = fresh "pat"
+  let nm = fresh str -- "pat"
   let ctx' = extend ctx nm a
   -- type of the rest
   clauses <- traverse (introClause nm icit) prob.clauses
@@ -524,7 +524,8 @@ check ctx tm ty = case (tm, !(forceType ty)) of
   (RHole fc, ty) => do
     ty' <- quote ctx.lvl ty
     let names = (toList $ map fst ctx.types)
-    env <- for ctx.types $ \(n,ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)}"
+
+    env <- for (zip ctx.env (toList ctx.types)) $ \(v, n, ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)} = \{pprint names !(quote ctx.lvl v)}"
     let msg = unlines (toList $ reverse env) ++ "  -----------\n" ++ "  goal \{pprint names ty'}"
     liftIO $ putStrLn "INFO at \{show fc}: "
     liftIO $ putStrLn msg

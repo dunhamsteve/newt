@@ -3,6 +3,7 @@
 
 - [ ] there is some zero argument application in generated code
   - possibly the fancy "apply arity then curry the rest" bit
+- [x] get equality.newt to work
 - [x] inline metas.  Maybe zonk after TC/elab
 - [x] implicit patterns
 - [ ] pair syntax
