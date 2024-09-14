@@ -1,22 +1,27 @@
 
 ## TODO
 
+I may be done with `U` - I keep typing `Type`.
+
+- [ ] type constructors are no longer generated?  And seem to have 0 arity.
 - [x] there is some zero argument application in generated code
 - [x] get equality.newt to work
   - [x] broken again because I added J, probably need to constrain scrutinee to value
 - [x] inline metas.  Maybe zonk after TC/elab
 - [x] implicit patterns
-- [ ] pair syntax (should this be a comma operator)
-- [ ] list syntax
-- [ ] operators
+- [x] operators
+- [x] pair syntax (via comma operator)
+- [ ] matching on operators
+- [x] SKIP list syntax
+  - Agda doesn't have it, clashes with pair syntax
 - [ ] import
-- [ ] add {{ }} and solving autos (or maybe just `auto` keyword)
-  - considering various solutions.  Perhaps marking the data type as solvable, if we had types on metas.
+- [ ] autos / typeclass resolution
+  - keep as implicit and do auto if the type constructor is flagged auto
   - keep as implicit and mark auto, behavior overlaps a lot with implicit
-  - but we might want to solve right away when creating the implicit
-  - later we might need postpone
+  - have separate type of implict with `{{}}`
+  - Can we solve right away when creating the implicit, or do we need postpone?
 - [ ] do blocks
-- [ ] some solution for `+` (classes? ambiguity?)
+- [ ] some solution for `+` problem (classes? ambiguity?)
 - [ ] show compiler failure in the editor (exit code != 0)
 - [ ] write js files into `out` directory
 - [ ] detect extra clauses in case statements
@@ -30,3 +35,4 @@
 - [ ] magic nat (codegen as number with appropriate pattern matching)
 - [ ] magic tuple? (codegen as array)
 - [ ] magic newtype? (drop in codegen)
+- [ ] records / copatterns

@@ -10,6 +10,7 @@ data Kind
   | UIdent
   | Keyword
   | Oper
+  | MixFix
   | Number
   | StringKind
   | Symbol
@@ -28,6 +29,7 @@ Show Kind where
   show UIdent   = "UIdent"
   show Keyword = "Keyword"
   show Oper    = "Oper"
+  show MixFix = "MixFix"
   show Number  = "Number"
   show Symbol  = "Symbol"
   show Space  = "Space"
@@ -44,6 +46,7 @@ Eq Kind where
   UIdent  == UIdent = True
   Keyword == Keyword = True
   Oper    == Oper = True
+  MixFix  == MixFix = True
   Number  == Number = True
   Symbol  == Symbol = True
   Space   == Space = True

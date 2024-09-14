@@ -42,17 +42,17 @@ and I need this information for the typechecking.
 
 ## Issues
 
-- I need to do some erasure of values unused at runtime
+- I should do some erasure of values unused at runtime
 - I'm a little fuzzy on the "right way" to deal with constraints from unification
 - I'm a little fuzzy on how much to evaluate and when
 - I'm not postponing anything, and I suspect I will need to
 
 ## References
 
-"Unifiers as Equivalences" has unification with types.  Look into adapting some of that (or at least read/understand it).  Indexed types are mentioned here.
-
 "Elaborating Dependent (Co)pattern Matching" describes building case trees. Section 5.2 has the algorithm.
 
 "A prettier printer" was the basis of the pretty printer.
 
 "Elaboration Zoo" was a resource for typechecking and elaboration. In particular pattern unification and handling of implicits is based on that.
+
+"Unifiers as Equivalences" has unification with types.  Look into adapting some of that (or at least read/understand it).  Indexed types are mentioned here.

@@ -2,6 +2,8 @@ module TypeClass
 
 -- experiment on one option for typeclass (we don't have record yet)
 
+-- this would be nicer with records and copatterns
+
 -- we need a bit more than this, but
 data Monad : (U -> U) -> U where
   MkMonad : { M : U -> U } ->

@@ -104,6 +104,7 @@ data Decl
   | Data FC Name Raw (List Decl)
   | PType FC Name (Maybe Raw)
   | PFunc FC Name Raw String
+  | PMixFix FC Name Nat Fixity
 
 
 public export
@@ -143,6 +144,7 @@ Show Decl where
   show (DCheck _ x y) = foo ["DCheck", show x, show y]
   show (PType _ name ty) = foo ["PType", name, show ty]
   show (PFunc _ nm ty src) = foo ["PFunc", nm, show ty, show src]
+  show (PMixFix _ nm prec fix) = foo ["PMixFix", nm, show prec, show fix]
 
 export covering
 Show Module where
@@ -239,3 +241,4 @@ Pretty Module where
         doDecl (DCheck _ x y) = text "#check" <+> pretty x <+> ":" <+> pretty y
         doDecl (PType _ nm ty) = text "ptype" <+> text nm <+> (maybe empty (\ty => ":" <+> pretty ty) ty)
         doDecl (PFunc _ nm ty src) = "pfunc" <+> text nm <+> ":" <+> nest 2 (pretty ty <+> ":=" <+/> text (show src))
+        doDecl (PMixFix _ _ _ fix) = text (show fix)

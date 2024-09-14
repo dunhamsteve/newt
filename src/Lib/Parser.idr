@@ -1,5 +1,6 @@
 module Lib.Parser
 import Lib.Types
+import Debug.Trace
 
 -- The FC stuff is awkward later on. We might want bounds on productions
 -- But we might want to consider something more generic and closer to lean?
@@ -29,7 +30,7 @@ import Data.Maybe
 -- the future.
 
 
-ident = token Ident
+ident = token Ident <|> token MixFix
 
 uident = token UIdent
 
@@ -87,14 +88,14 @@ pArg = (Explicit,) <$> atom <|> (Implicit,) <$> braces typeExpr
 
 
 -- starter pack, but we'll move some to prelude
-operators : List (String, Int, Fixity)
-operators = [
-  ("=",2,Infix),
-  ("+",4,InfixL),
-  ("-",4,InfixL),
-  ("*",5,InfixL),
-  ("/",5,InfixL)
-]
+-- operators : List (String, Int, Fixity)
+-- operators = [
+--   ("=",2,Infix),
+--   ("+",4,InfixL),
+--   ("-",4,InfixL),
+--   ("*",5,InfixL),
+--   ("/",5,InfixL)
+-- ]
 
 parseApp : Parser Raw
 parseApp = do
@@ -111,12 +112,18 @@ parseOp = parseApp >>= go 0
       do
         fc <- getPos
         op <- token Oper
-        let Just (p,fix) = lookup op operators
-         | Nothing => fail "expected operator"
+        ops <- getOps
+        let op' = "_" ++ op ++ "_"
+        let Just (p,fix) = lookup op' ops
+          -- this is eaten, but we need `->` and `:=` to not be an operator to have fatal here
+         | Nothing => case op of
+          "->" => fail "no infix decl for \{op}"
+          ":=" => fail "no infix decl for \{op}"
+          op => fatal "no infix decl for \{op}"
         if p >= prec then pure () else fail ""
         let pr = case fix of InfixR => p; _ => p + 1
         right <- go pr !(parseApp)
-        go prec (RApp fc (RApp fc (RVar fc op) left Explicit) right Explicit)
+        go prec (RApp fc (RApp fc (RVar fc op') left Explicit) right Explicit)
       <|> pure left
 
 export
@@ -262,6 +269,18 @@ parseImport = DImport <$> getPos <* keyword "import" <* commit <*> uident
 
 -- Do we do pattern stuff now? or just name = lambda?
 
+parseMixfix : Parser Decl
+parseMixfix = do
+  fc <- getPos
+  fix <- InfixL <$ keyword "infixl"
+     <|> InfixR <$ keyword "infixr"
+     <|> Infix <$ keyword "infix"
+  mustWork $ do
+    prec <- token Number
+    op <- token MixFix
+    addOp op (cast prec) fix
+    pure $ PMixFix fc op (cast prec) fix
+
 export
 parseDef : Parser Decl
 parseDef = do
@@ -318,7 +337,7 @@ parseNorm = DCheck <$> getPos <* keyword "#check" <*> typeExpr <* keyword ":" <*
 
 export
 parseDecl : Parser Decl
-parseDecl = parsePType <|> parsePFunc <|> parseImport <|> parseNorm <|> parseData <|> parseSig <|> parseDef
+parseDecl = parseMixfix <|> parsePType <|> parsePFunc <|> parseImport <|> parseNorm <|> parseData <|> parseSig <|> parseDef
 
 export
 parseMod : Parser Module

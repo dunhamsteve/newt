@@ -1,0 +1,41 @@
+module Oper
+
+-- These are hard-coded at the moment
+-- For now they must be of the form _op_, we'll circle back
+-- with a different parser, but that works today.
+
+-- this will be parsed as a top level decl, collected in TopContext, and
+-- injected into the Parser. It'll need to be passed around or available
+-- for read in the monad.
+
+-- long term, I might want TopContext in the parser, and parse a top-level
+-- declaration at a time (for incremental updates), but much longer term.
+
+infixl 4 _+_
+infixl 4 _-_
+infixl 5 _*_
+infixl 5 _/_
+
+ptype Int
+ptype String
+ptype JVoid
+
+-- If we had a different quote here, we could tell vscode it's javascript.
+-- or actually just switch modes inside pfunc
+pfunc log : String -> JVoid := "(x) => console.log(x)"
+pfunc plus : Int -> Int -> Int := "(x,y) => x + y"
+pfunc _*_ : Int -> Int -> Int := "(x,y) => x * y"
+
+-- We now have to clean JS identifiers
+_+_ : Int -> Int -> Int
+_+_ x y = plus x y
+
+test : Int -> Int
+test x = 42 + x * 3 + 2
+
+infixr 2 _,_
+data Pair : U -> U -> U where
+  _,_ : {A B : U} -> A -> B -> Pair A B
+
+blah : Int -> Int -> Int -> Pair Int (Pair Int Int)
+blah x y z = (x , y, z)

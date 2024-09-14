@@ -5,7 +5,8 @@ import Text.Lexer.Tokenizer
 import Lib.Token
 
 keywords : List String
-keywords = ["let", "in", "where", "case", "of", "data", "U", "ptype", "pfunc", "module"]
+keywords = ["let", "in", "where", "case", "of", "data", "U",
+            "ptype", "pfunc", "module", "infixl", "infixr", "infix"]
 
 specialOps : List String
 specialOps = ["->", ":", "=>", ":="]
@@ -49,9 +50,11 @@ rawTokens
   <|> match (upper <+> many identMore) checkUKW
   <|> match (some digit) (Tok Number)
   <|> match (is '#' <+> many alpha) (Tok Pragma)
+  <|> match (exact "_" <+> (some opChar <|> exact ",") <+> exact "_") (Tok MixFix)
   <|> match (quo <+> manyUntil quo ((esc any <+> any) <|> any) <+> opt quo) (Tok StringKind . unquote)
   <|> match (lineComment (exact "--")) (Tok Space)
   <|> match (blockComment (exact "/-") (exact "-/")) (Tok Space)
+  <|> match (exact ",") (\s => Tok Oper s)
   <|> match (some opChar) (\s => Tok Oper s)
   <|> match symbol (Tok Symbol)
   <|> match spaces (Tok Space)

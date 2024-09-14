@@ -29,6 +29,9 @@ collectDecl (x :: xs) = x :: collectDecl xs
 
 export
 processDecl : Decl -> M ()
+
+processDecl (PMixFix{})  = pure ()
+
 processDecl (TypeSig fc nm tm) = do
   top <- get
   let Nothing := lookup nm top
