@@ -2,8 +2,6 @@ module Lib.Parser
 import Lib.Types
 import Debug.Trace
 
--- The FC stuff is awkward later on. We might want bounds on productions
--- But we might want to consider something more generic and closer to lean?
 
 -- app: foo {a} a b
 -- lam: λ {A} {b : A} (c : Blah) d e f => something
@@ -16,19 +14,6 @@ import Lib.Parser.Impl
 import Lib.Syntax
 import Data.List
 import Data.Maybe
-
--- There is the whole core vs surface thing here.
--- might be best to do core first/ Technically don't
--- _need_ a parser, but would be useful for testing.
-
--- look to pi-forall / ezoo, but I think we start with a
--- TTImpl level grammar, then add a more sugared layer above
--- so holes and all that
-
--- After the parser runs, see below, take a break and finish pi-forall
--- exercises.  There is some fill in the parser stuff that may show
--- the future.
-
 
 ident = token Ident <|> token MixFix
 

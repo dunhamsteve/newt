@@ -65,10 +65,6 @@ processDecl (Def fc nm clauses) = do
   let (MkEntry name ty Axiom) := entry
     | _ => throwError $ E fc "\{nm} already defined"
 
-  -- and we pass to the case tree stuff now
-  -- maybe fix up the clauses to match?
-  -- Also we need to distinguish DCon/var
-
   putStrLn "check \{nm} ... at \{pprint [] ty}"
   vty <- eval empty CBN ty
   putStrLn "vty is \{show vty}"
@@ -82,6 +78,7 @@ processDecl (Def fc nm clauses) = do
     (Solved k x) => pure ()
     (Unsolved (l,c) k xs) => do
       -- should just print, but it's too subtle in the sea of messages
+      -- we'd also need the ability to mark the whole top context as failure if we continue
       -- putStrLn "ERROR at (\{show l}, \{show c}): Unsolved meta \{show k}"
       throwError $ E (l,c) "Unsolved meta \{show k}"
   debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
@@ -97,19 +94,13 @@ processDecl (DCheck fc tm ty) = do
   putStrLn "got \{pprint [] res}"
   norm <- nf [] res
   putStrLn "norm \{pprint [] norm}"
-  -- top <- get
-  -- ctx <- mkCtx top.metas
-  -- I need a type to check against
-  -- norm <- nf [] x
   putStrLn "NF "
 
 processDecl (DImport fc str) = throwError $ E fc "import not implemented"
 
 processDecl (Data fc nm ty cons) = do
-  -- It seems like the FC for the errors are not here?
   ctx <- get
   tyty <- check (mkCtx ctx.metas fc) ty (VU fc)
-  -- FIXME we need this in scope, but need to update
   modify $ setDef nm tyty Axiom
   ctx <- get
   cnames <- for cons $ \x => case x of

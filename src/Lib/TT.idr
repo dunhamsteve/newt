@@ -174,9 +174,6 @@ eval env mode (Lit fc lit) = pure $ VLit fc lit
 -- We need a neutral and some code to run the case tree
 
 eval env mode tm@(Case fc sc alts) = pure $ VCase fc !(eval env mode sc) alts
-  -- case !(evalAlt env mode !(eval env mode sc) alts) of
-  --   Just foo => ?goodAlt
-  --   Nothing => ?stuckAlt
 
 export
 quote : (lvl : Nat) -> Val -> M Tm

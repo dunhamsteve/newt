@@ -51,10 +51,10 @@ arityForName fc nm = case lookup nm !get of
   -- let the magic hole through for now (will generate bad JS)
   Nothing => if nm == "?" then pure 0 else error fc "Name \{show nm} not in scope"
   (Just (MkEntry name type Axiom)) => pure 0
-  (Just (MkEntry name type (TCon strs))) => pure 0 -- FIXME
+  (Just (MkEntry name type (TCon strs))) => pure $ piArity type
   (Just (MkEntry name type (DCon k str))) => pure k
   (Just (MkEntry name type (Fn t))) => pure $ getArity t
-  (Just (MkEntry name type (PrimTCon))) => pure 0
+  (Just (MkEntry name type (PrimTCon))) => pure $ piArity type
   -- Assuming a primitive can't return a function
   (Just (MkEntry name type (PrimFn t))) => pure $ piArity type
 

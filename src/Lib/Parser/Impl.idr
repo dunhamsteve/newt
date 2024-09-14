@@ -1,10 +1,10 @@
 module Lib.Parser.Impl
 
--- For some reason I'm doing Idris' commit / mustWork dance here, even though it
--- seems to be painful
+-- This follows Idris, not sure why I did that because commit / mustWork is messy
+-- and painful to work with. I _think_ a commit on consumption of anything, like parsec
+-- would work better.
 
--- Probably would like to do "did consume anything" on the input, but we might need
--- something other than a token list
+-- Perhaps we can set the commit flag on consumption and get that with minor changes.
 
 -- TODO see what Kovacs' flatparse does for error handling / <|>
 
@@ -75,11 +75,11 @@ Functor Result where
 -- FC is a line and column for indents. The idea being that we check
 -- either the col < tokCol or line == tokLine, enabling sameLevel.
 
--- This is a Reader in FC
-
--- we need State for operators (or postpone that to elaboration)
+-- We need State for operators (or postpone that to elaboration)
 -- Since I've already built out the pratt stuff, I guess I'll
 -- leave it in the parser for now
+
+-- This is a Reader in FC, a State in Operators, Commit flag, TokenList
 
 export
 data Parser a = P (TokenList -> Bool -> List (String, Int, Fixity) -> (lc : FC) -> Result a)
@@ -140,7 +140,7 @@ Applicative Parser where
           (OK x toks com ops) => OK (f x) toks com ops
           (Fail fatal err toks com ops) => Fail fatal err toks com ops
 
--- REVIEW it would be nice if the second argument was lazy...
+-- Second argument lazy so we don't have circular refs when defining parsers.
 export
 (<|>) : Parser a -> Lazy (Parser a) -> Parser a
 (P pa) <|> (P pb) = P $ \toks,com,ops,col =>
@@ -158,7 +158,6 @@ Monad Parser where
       (Fail fatal err xs x ops) => Fail fatal err xs x ops
 
 
--- do we need this?
 pred : (BTok -> Bool) -> String -> Parser String
 pred f msg = P $ \toks,com,ops,col =>
   case toks of
@@ -176,12 +175,6 @@ mutual
   export many : Parser a -> Parser (List a)
   many p = some p <|> pure []
 
--- sixty let has some weird CPS stuff, but essentially:
-
--- case token_ of
---   Lexer.LLet -> PLet <$> blockOfMany let_ <* token Lexer.In <*> term
-
--- withIndentationBlock - sets the col
 export
 getPos : Parser FC
 getPos = P $ \toks,com, ops, (l,c) => case toks of
@@ -218,7 +211,7 @@ export
 manySame : Parser a -> Parser (List a)
 manySame pa = many $ sameLevel pa
 
-||| requires a token to be indented?
+||| check indent on next token and run parser
 export
 indented : Parser a -> Parser a
 indented (P p) = P $ \toks,com,ops,(l,c) => case toks of
@@ -228,6 +221,7 @@ indented (P p) = P $ \toks,com,ops,(l,c) => case toks of
     in if tc > c || tl == l then p toks com ops (l,c)
     else Fail False (error toks "unexpected outdent") toks com ops
 
+||| expect token of given kind
 export
 token' : Kind -> Parser String
 token' k = pred (\t => t.val.kind == k) "Expected a \{show k} token"
@@ -236,6 +230,7 @@ export
 keyword' : String -> Parser ()
 keyword' kw = ignore $ pred (\t => t.val.text == kw) "Expected \{kw}"
 
+||| expect indented token of given kind
 export
 token : Kind -> Parser String
 token = indented . token'

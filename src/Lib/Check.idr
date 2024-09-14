@@ -37,7 +37,6 @@ forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Solved k t) => vappSpine t sp >>= forceType
 forceType x = pure x
 
-
 public export
 record UnifyResult where
   constructor MkResult
@@ -287,7 +286,8 @@ findSplit (_ :: xs) = findSplit xs
 
 -- we could pass into build case and use it for   (x /? y)
 
--- TODO, we may need to filter these for the type
+-- TODO, we may need to filter these against the type to rule out
+-- impossible cases
 getConstructors : Context -> Val -> M (List (String, Nat, Tm))
 getConstructors ctx (VRef fc nm _ _) = do
   names <- lookupTCon nm
@@ -339,28 +339,20 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   vty <- eval [] CBN ty
   (ctx', ty', vars, sc) <- extendPi ctx (vty) [<] [<]
 
-  -- what is the goal?
-  -- we have something here that informs what happens in the casealt, possibly tweaking
-  -- context or goal
-  -- e.g. we get to end of Just {a} x  and goal is Maybe Val, we want `let a = Val` in context.
-  -- likewise if the constructor says `Foo String` and goal is `Foo x` we know x is String in this branch.
+  -- TODO I think we need to figure out what is dotted, maybe
+  -- the environment manipulation below is sufficient bookkeeping
+  -- or maybe it's a bad approach.
 
-  -- we need unify to hand constraints back...
-  -- we may need to walk through the case alt constraint and discharge or drop things?
+  -- At some point, I'll take a break and review more papers and code,
+  -- now that I know some of the questions I'm trying to answer.
 
-  -- should I somehow make those holes? It would be nice to not make the user dot it.
-  -- And we don't _need_ a solution, just if it's unified against
-
-  -- I think I'm going down a different road than Idris..
-
-  -- do this or see how other people manage?
-  -- this puts the failure on the LHS
-  -- unifying these should say say VVar 1 is Nat.
-  -- ERROR at (23, 0): unify failed (%var 1 [< ]) =?= (%ref Nat [< ]) [no Fn]
+  -- We get unification constraints from matching the data constructors
+  -- codomain with the scrutinee type
   debug "unify dcon dom with scrut"
   res <- unify ctx' (length ctx'.env) ty' scty
-  --res <- unify ctx' (length ctx.env) ty' scty
 
+  -- Additionally, we constrain the scrutinee's variable to be
+  -- dcon applied to args
   let Just x = findIndex ((==scnm) . fst) ctx'.types
     | Nothing => error ctx.fc "\{scnm} not is scope?"
   let lvl = ((length ctx'.env) `minus` (cast x)) `minus` 1
@@ -372,12 +364,12 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   debug "before env: \{show ctx'.env}"
   debug "SC CONSTRAINT: \{show scon}"
 
-  -- So we go and stuff stuff into the environment, which I guess gets it into the RHS,
-  -- but doesn't touch goal...
+  -- push the constraints into the environment by turning bind into define
+  -- Is this kosher?  It might be a problem if we've already got metas over
+  -- this stuff, because it intends to ignore defines.
   ctx' <- updateContext ctx' (scon :: res.constraints)
   debug "context types: \{show ctx'.types}"
   debug "context env: \{show ctx'.env}"
-  -- This doesn't really update existing val... including types in the context.
 
   -- What if all of the pattern vars are defined to meta
 
@@ -387,13 +379,12 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   let clauses = mapMaybe (rewriteClause vars) prob.clauses
   debug "and now:"
   for_ clauses $ (\x => debug "    \{show x}")
-  -- So ideally we'd know which position we're splitting and the surrounding context
-  -- That might be a lot to carry forward (maybe a continuation?) but we could carry
-  -- backwards as a List Missing that we augment as we go up.
-  -- We could even stick a little "throw error" tree in here for the case.
-  -- even going backward, we don't really know where pat$n falls into the expression.
-  -- It would need to keep track of its position. Then fill in the slots (wild vs PCons), or
-  -- wrapping with PCons as we move back up.  E.g. _ (Cons _ (Cons _ _)) _ _ could be missing
+
+  -- TODO it would be nice to know which position we're splitting and the splits that
+  -- we've already done, so we have a good picture of what is missing for error reporting.
+  -- This could be carried forward as a continuation or data, or we could decorate the
+  -- error on the way back.
+
   when (length clauses == 0) $ error ctx.fc "Missing case for \{dcName} splitting \{scnm}"
   tm <- buildTree ctx' (MkProb clauses prob.ty)
   pure $ CaseCons dcName (map getName vars) tm
@@ -448,12 +439,6 @@ lookupName ctx name = go 0 ctx.types
     -- FIXME - we should stuff a Binder of some sort into "types"
     go ix ((nm, ty) :: xs) = if nm == name then Just (Bnd emptyFC ix, ty) else go (S ix) xs
 
--- FIXME need to check done here...
-      -- If all of the constraints are assignments, fixup context and type check
-      -- else bail:
-
-      -- error fc "Stuck, no splits \{show constraints}"
-
 checkDone : Context -> List (String, Pattern) -> Raw -> Val -> M Tm
 checkDone ctx [] body ty = do
   debug "DONE-> check body \{show body} at \{show ty}"
@@ -507,6 +492,10 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
   pure $ Case fc sctm alts
 
 
+showDef : Context -> List String -> Nat -> Val -> M String
+showDef ctx names n v@(VVar _ n' [<]) =  if n == n' then pure "" else pure "= \{pprint names !(quote ctx.lvl v)}"
+showDef ctx names n v = pure "= \{pprint names !(quote ctx.lvl v)}"
+
 check ctx tm ty = case (tm, !(forceType ty)) of
   (RCase fc rsc alts, ty) => do
     -- We've got a beta redex or need to do something...
@@ -527,17 +516,15 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     alts <- traverse (buildCase ctx' (MkProb clauses ty) scnm scty) cons
     pure $ Let fc scnm sc $ Case fc (Bnd fc 0) alts
 
-    -- buildTree ctx (MkProb{})
-    -- ?hole
   -- Document a hole, pretend it's implemented
   (RHole fc, ty) => do
     ty' <- quote ctx.lvl ty
     let names = (toList $ map fst ctx.types)
-
+    -- I want to know which ones are defines. I should skip the `=` bit if they match
     env <- for (zip ctx.env (toList ctx.types)) $ \(v, n, ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)} = \{pprint names !(quote ctx.lvl v)}"
     let msg = unlines (toList $ reverse env) ++ "  -----------\n" ++ "  goal \{pprint names ty'}"
-    liftIO $ putStrLn "INFO at \{show fc}: "
-    liftIO $ putStrLn msg
+    putStrLn "INFO at \{show fc}: "
+    putStrLn msg
     -- let context = unlines foo
     -- need to print 'warning' with position
     -- fixme - just put a name on it like idris and stuff it into top.

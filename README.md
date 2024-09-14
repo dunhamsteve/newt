@@ -5,7 +5,12 @@ Newt is a dependently typed programming language that compiles to javascript. It
 my first attempt to write a dependent typed language. It is inspired by Idris,
 Elaboration Zoo, pi-forall, and various tutorials.
 
-The goal is to have inductive types, pattern matching, compile to javascript, and be self hosted. At the very least though, I'd like to be able to build a little browser "playground" to compile and run code.
+I'm still learning how this stuff is done, so it's a bit of a mess. But I'm going to
+work with the garage door up.
+
+The goal is to have inductive types, pattern matching, compile to javascript, and be
+self hosted. Ideally I could build a little browser "playground" to compile, view
+output, and run code.
 
 ## Building
 

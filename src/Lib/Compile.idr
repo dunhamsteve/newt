@@ -206,9 +206,9 @@ entryToDoc (MkEntry name ty (Fn tm)) = do
   let body = stmtToDoc $ termToJS [] ct JPlain
   pure (text "const" <+> text name <+> text "=" <+/> body)
 entryToDoc (MkEntry name type Axiom) = pure ""
-entryToDoc (MkEntry name type (TCon strs)) = pure ""
+entryToDoc (MkEntry name type (TCon strs)) = pure $ dcon name (piArity type)
 entryToDoc (MkEntry name type (DCon arity str)) = pure $ dcon name arity
-entryToDoc (MkEntry name _ PrimTCon) = pure $ text "/* PrimTCon \{name} */"
+entryToDoc (MkEntry name type PrimTCon) = pure $ dcon name (piArity type)
 entryToDoc (MkEntry name _ (PrimFn src)) = pure $ text "const" <+> text name <+> "=" <+> text src
 
 export

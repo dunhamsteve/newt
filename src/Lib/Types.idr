@@ -1,8 +1,4 @@
 module Lib.Types
--- I'm not sure this is related, or just a note to self (Presheaves on Porpoise)
-
--- maybe watch https://www.youtube.com/watch?v=3gef0_NFz8Q
--- or drop the indices for now.
 
 -- For FC, Error
 import public Lib.Parser.Impl

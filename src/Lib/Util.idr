@@ -30,7 +30,3 @@ splitTele = go []
     go : List Binder -> Tm -> (Tm, List Binder)
     go ts (Pi fc nm icit t u) = go (MkBind fc nm icit t :: ts) u
     go ts tm = (tm, reverse ts)
-
-
--- splitTele (Pi x str icit t u) = ?splitTele_rhs_6
--- splitTele tm =
