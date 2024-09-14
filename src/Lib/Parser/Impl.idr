@@ -1,13 +1,5 @@
 module Lib.Parser.Impl
 
--- This follows Idris, not sure why I did that because commit / mustWork is messy
--- and painful to work with. I _think_ a commit on consumption of anything, like parsec
--- would work better.
-
--- Perhaps we can set the commit flag on consumption and get that with minor changes.
-
--- TODO see what Kovacs' flatparse does for error handling / <|>
-
 import Lib.Token
 import Data.String
 import Data.Nat
@@ -102,19 +94,18 @@ parse pa toks = case runP pa toks False [] (-1,-1) of
 -- I think I want to drop the typeclasses for v1
 
 export
+try : Parser a -> Parser a
+try (P pa) = P $ \toks,com,ops,col => case pa toks com ops col of
+  (Fail x err toks com ops) => Fail x err toks False ops
+  res => res
+
+export
 fail : String -> Parser a
 fail msg = P $ \toks,com,ops,col => Fail False (error toks msg) toks com ops
 
 export
 fatal : String -> Parser a
 fatal msg = P $ \toks,com,ops,col => Fail True (error toks msg) toks com ops
-
--- mustWork / commit copied from Idris, but I may switch to the parsec consumption thing.
-export
-mustWork : Parser a -> Parser a
-mustWork (P pa) = P $ \ toks, com, ops, col => case (pa toks com ops col) of
-    Fail x err xs y ops => Fail True err xs y ops
-    res => res
 
 export
 getOps : Parser (List (String, Int, Fixity))
@@ -147,7 +138,7 @@ export
   case pa toks False ops col of
     OK a toks' _ ops => OK a toks' com ops
     Fail True  err toks' com ops  => Fail True err toks' com ops
-    Fail fatal err toks' True ops => Fail fatal err toks' com ops
+    Fail fatal err toks' True ops => Fail fatal err toks' True ops
     Fail fatal err toks' False ops => pb toks com ops col
 
 export
@@ -161,7 +152,7 @@ Monad Parser where
 pred : (BTok -> Bool) -> String -> Parser String
 pred f msg = P $ \toks,com,ops,col =>
   case toks of
-    (t :: ts) => if f t then OK (value t) ts com ops else Fail False (error toks "\{msg} at \{show $ kind t}:\{value t}") toks com ops
+    (t :: ts) => if f t then OK (value t) ts True ops else Fail False (error toks "\{msg} at \{show $ kind t}:\{value t}") toks com ops
     [] => Fail False (error toks "\{msg} at EOF") toks com ops
 
 export

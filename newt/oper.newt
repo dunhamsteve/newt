@@ -38,4 +38,8 @@ data Pair : U -> U -> U where
   _,_ : {A B : U} -> A -> B -> Pair A B
 
 blah : Int -> Int -> Int -> Pair Int (Pair Int Int)
-blah x y z = (x , y, z)
+blah x y z = (x, y, z)
+
+curryPlus : Pair Int Int -> Int
+curryPlus (_,_ a b) = a + b
+-- curryPlus (a , b) = a + b

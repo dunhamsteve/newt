@@ -17,6 +17,9 @@ checkKW s = if elem s keywords then Tok Keyword s else Tok Ident s
 checkUKW : String -> Token Kind
 checkUKW s = if elem s keywords then Tok Keyword s else Tok UIdent s
 
+checkOp : String -> Token Kind
+checkOp s = if elem s specialOps then Tok Keyword s else Tok Oper s
+
 isOpChar : Char -> Bool
 isOpChar c = c `elem` (unpack ":!#$%&*+./<=>?@\\^|-~")
 
@@ -54,8 +57,8 @@ rawTokens
   <|> match (quo <+> manyUntil quo ((esc any <+> any) <|> any) <+> opt quo) (Tok StringKind . unquote)
   <|> match (lineComment (exact "--")) (Tok Space)
   <|> match (blockComment (exact "/-") (exact "-/")) (Tok Space)
-  <|> match (exact ",") (\s => Tok Oper s)
-  <|> match (some opChar) (\s => Tok Oper s)
+  <|> match (exact ",") (Tok Oper)
+  <|> match (some opChar) checkOp
   <|> match symbol (Tok Symbol)
   <|> match spaces (Tok Space)
 

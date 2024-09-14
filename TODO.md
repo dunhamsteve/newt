@@ -3,7 +3,8 @@
 
 I may be done with `U` - I keep typing `Type`.
 
-- [ ] type constructors are no longer generated?  And seem to have 0 arity.
+- [x] switch from commit/mustWork to checking progress
+- [x] type constructors are no longer generated?  And seem to have 0 arity.
 - [ ] raw let is not yet implemented (although define used by case tree building)
 - [x] there is some zero argument application in generated code
 - [x] get equality.newt to work

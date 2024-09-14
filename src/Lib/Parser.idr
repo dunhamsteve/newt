@@ -94,9 +94,9 @@ parseOp = parseApp >>= go 0
   where
     go : Int -> Raw -> Parser Raw
     go prec left =
-      do
-        fc <- getPos
+      try (do
         op <- token Oper
+        fc <- getPos
         ops <- getOps
         let op' = "_" ++ op ++ "_"
         let Just (p,fix) = lookup op' ops
@@ -108,14 +108,13 @@ parseOp = parseApp >>= go 0
         if p >= prec then pure () else fail ""
         let pr = case fix of InfixR => p; _ => p + 1
         right <- go pr !(parseApp)
-        go prec (RApp fc (RApp fc (RVar fc op') left Explicit) right Explicit)
+        go prec (RApp fc (RApp fc (RVar fc op') left Explicit) right Explicit))
       <|> pure left
 
 export
 letExpr : Parser Raw
 letExpr = do
   keyword "let"
-  commit
   alts <- startBlock $ someSame $ letAssign
   keyword' "in"
   scope <- typeExpr
@@ -142,7 +141,6 @@ export
 lamExpr : Parser Raw
 lamExpr = do
   keyword "\\" <|> keyword "λ"
-  commit
   args <- some pLetArg
   keyword "=>"
   scope <- typeExpr
@@ -163,19 +161,18 @@ patAtom = do
   fc <- getPos
   PatWild fc Explicit <$ keyword "_"
     <|> PatVar fc Explicit <$> ident
-    <|> PatCon fc Explicit <$> uident <*> pure []
+    <|> PatCon fc Explicit <$> (uident <|> token MixFix) <*> pure []
     <|> braces (PatVar fc Implicit <$> ident)
     <|> braces (PatWild fc Implicit <$ keyword "_")
-    <|> braces (PatCon fc Implicit <$> uident <*> many patAtom)
+    <|> braces (PatCon fc Implicit <$> (uident <|> token MixFix) <*> many patAtom)
     <|> parens pPattern
 
-pPattern = PatCon (!getPos) Explicit <$> uident <*> many patAtom <|> patAtom
+pPattern = PatCon (!getPos) Explicit <$> (uident <|> token MixFix) <*> many patAtom <|> patAtom
 
 caseAlt : Parser RCaseAlt
 caseAlt = do
   pat <- pPattern
   keyword "=>"
-  commit
   t <- term
   pure $ MkAlt pat t
 
@@ -183,7 +180,6 @@ export
 caseExpr : Parser Raw
 caseExpr = do
   keyword "case"
-  commit
   sc <- term
   keyword "of"
   alts <- startBlock $ someSame $ caseAlt
@@ -208,13 +204,11 @@ ebind = do
 ibind : Parser (List (String, Icit, Raw))
 ibind = do
   sym "{"
-  mustWork $ do
-    names <- some (ident <|> uident)
-    ty <- optional (sym ":" >> typeExpr)
-    pos <- getPos
-    sym "}"
-    -- getPos is a hack here, I would like to position at the name...
-    pure $ map (\name => (name, Implicit, fromMaybe (RImplicit pos) ty)) names
+  names <- some (ident <|> uident)
+  ty <- optional (sym ":" >> typeExpr)
+  pos <- getPos
+  sym "}"
+  pure $ map (\name => (name, Implicit, fromMaybe (RImplicit pos) ty)) names
 
 arrow : Parser Unit
 arrow = sym "->" <|> sym "→"
@@ -222,9 +216,8 @@ arrow = sym "->" <|> sym "→"
 -- Collect a bunch of binders (A : U) {y : A} -> ...
 binders : Parser Raw
 binders = do
-  binds <- many (ibind <|> ebind)
+  binds <- many (ibind <|> try ebind)
   arrow
-  commit
   scope <- typeExpr
   fc <- getPos
   pure $ foldr (mkBind fc) scope (join binds)
@@ -235,7 +228,7 @@ binders = do
 typeExpr = binders
   <|> do
         exp <- term
-        scope <- optional (arrow *> mustWork typeExpr)
+        scope <- optional (arrow *> typeExpr)
         case scope of
           Nothing      => pure exp
           -- consider Maybe String to represent missing
@@ -247,10 +240,10 @@ typeExpr = binders
 
 export
 parseSig : Parser Decl
-parseSig = TypeSig <$> getPos <*> (ident <|> uident) <* keyword ":" <*> mustWork typeExpr
+parseSig = TypeSig <$> getPos <*> (ident <|> uident) <* keyword ":" <*> typeExpr
 
 parseImport : Parser Decl
-parseImport = DImport <$> getPos <* keyword "import" <* commit <*> uident
+parseImport = DImport <$> getPos <* keyword "import" <*> uident
 
 -- Do we do pattern stuff now? or just name = lambda?
 
@@ -260,11 +253,10 @@ parseMixfix = do
   fix <- InfixL <$ keyword "infixl"
      <|> InfixR <$ keyword "infixr"
      <|> Infix <$ keyword "infix"
-  mustWork $ do
-    prec <- token Number
-    op <- token MixFix
-    addOp op (cast prec) fix
-    pure $ PMixFix fc op (cast prec) fix
+  prec <- token Number
+  op <- token MixFix
+  addOp op (cast prec) fix
+  pure $ PMixFix fc op (cast prec) fix
 
 export
 parseDef : Parser Decl
@@ -273,7 +265,7 @@ parseDef = do
   nm <- ident <|> uident
   pats <- many patAtom
   keyword "="
-  body <- mustWork typeExpr
+  body <- typeExpr
   -- these get collected later
   pure $ Def fc nm [MkClause fc [] pats body]
 
@@ -285,7 +277,7 @@ parsePType = do
   id <- uident
   ty <- optional $ do
     keyword ":"
-    mustWork typeExpr
+    typeExpr
   pure $ PType fc id ty
 
 parsePFunc : Parser Decl
@@ -296,7 +288,7 @@ parsePFunc = do
   keyword ":"
   ty <- typeExpr
   keyword ":="
-  src <- mustWork (cast <$> token StringKind)
+  src <- cast <$> token StringKind
   pure $ PFunc fc nm ty src
 
 export
@@ -304,16 +296,12 @@ parseData : Parser Decl
 parseData = do
   fc <- getPos
   keyword "data"
-  -- FIXME - switch from mustWork / commit to checking if we've consumed tokens
-  mustWork $ do
-    name <- uident
-    keyword ":"
-    ty <- typeExpr
-    keyword "where"
-    commit
-    decls <- startBlock $ manySame $ parseSig
-    -- TODO - turn decls into something more useful
-    pure $ Data fc name ty decls
+  name <- uident
+  keyword ":"
+  ty <- typeExpr
+  keyword "where"
+  decls <- startBlock $ manySame $ parseSig
+  pure $ Data fc name ty decls
 
 -- Not sure what I want here.
 -- I can't get a Tm without a type, and then we're covered by the other stuff
@@ -322,7 +310,7 @@ parseNorm = DCheck <$> getPos <* keyword "#check" <*> typeExpr <* keyword ":" <*
 
 export
 parseDecl : Parser Decl
-parseDecl = parseMixfix <|> parsePType <|> parsePFunc <|> parseImport <|> parseNorm <|> parseData <|> parseSig <|> parseDef
+parseDecl = parseMixfix <|> parsePType <|> parsePFunc <|> parseImport <|> parseNorm <|> parseData <|> (try $ parseSig) <|> parseDef
 
 export
 parseMod : Parser Module
