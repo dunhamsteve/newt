@@ -260,6 +260,7 @@ fresh base = base ++ "$" ++ show (length ctx.env)
 export
 buildTree : Context -> Problem -> M Tm
 
+-- Updates a clause for INTRO
 introClause : String -> Icit -> Clause -> M Clause
 introClause nm icit (MkClause fc cons (pat :: pats) expr) =
   if icit == getIcit pat then pure $ MkClause fc ((nm, pat) :: cons) pats expr
@@ -305,15 +306,16 @@ getConstructors ctx (VRef fc nm _ _) = do
 getConstructors ctx tm = error (getValFC tm) "Not a type constructor \{show tm}"
 
 -- Extend environment with fresh variables from a pi-type
+-- the pi-type here is the telescope of a constructor
 -- return context, remaining type, and list of names
-extendPi : Context -> Val -> SnocList Bind -> M (Context, Val, List Bind)
-extendPi ctx (VPi x str icit a b) nms = do
+extendPi : Context -> Val -> SnocList Bind -> SnocList Val -> M (Context, Val, List Bind, SnocList Val)
+extendPi ctx (VPi x str icit a b) nms sc = do
     let nm = fresh str -- "pat"
     let ctx' = extend ctx nm a
     let v = VVar emptyFC (length ctx.env) [<]
     tyb <- b $$ v
-    extendPi ctx' tyb (nms :< MkBind nm icit a)
-extendPi ctx ty nms = pure (ctx, ty, nms <>> [])
+    extendPi ctx' tyb (nms :< MkBind nm icit a) (sc :< VVar x (length ctx.env) [<])
+extendPi ctx ty nms sc = pure (ctx, ty, nms <>> [], sc)
 
 -- turn vars into lets for forced values.
 -- Maybe we need to do more? revist the paper.
@@ -332,10 +334,10 @@ updateContext ctx ((k, val) :: cs) = let ix = (length ctx.env `minus` k) `minus`
 -- since we've gotten here, we assume it's possible and we better have at least
 -- one valid clause
 buildCase : Context -> Problem -> String -> Val -> (String, Nat, Tm) -> M CaseAlt
-buildCase ctx prob scnm scty (dcName, _, ty) = do
+buildCase ctx prob scnm scty (dcName, arity, ty) = do
   debug "CASE \{scnm} \{dcName} \{pprint (names ctx) ty}"
   vty <- eval [] CBN ty
-  (ctx', ty', vars) <- extendPi ctx (vty) [<]
+  (ctx', ty', vars, sc) <- extendPi ctx (vty) [<] [<]
 
   -- what is the goal?
   -- we have something here that informs what happens in the casealt, possibly tweaking
@@ -358,14 +360,21 @@ buildCase ctx prob scnm scty (dcName, _, ty) = do
   debug "unify dcon dom with scrut"
   res <- unify ctx' (length ctx'.env) ty' scty
   --res <- unify ctx' (length ctx.env) ty' scty
+
+  let Just x = findIndex ((==scnm) . fst) ctx'.types
+    | Nothing => error ctx.fc "\{scnm} not is scope?"
+  let lvl = ((length ctx'.env) `minus` (cast x)) `minus` 1
+  let scon : (Nat, Val) = (lvl, VRef ctx.fc dcName (DCon arity dcName) sc)
+
   debug "scty \{show scty}"
   debug "UNIFY results \{show res.constraints}"
   debug "before types: \{show ctx'.types}"
   debug "before env: \{show ctx'.env}"
+  debug "SC CONSTRAINT: \{show scon}"
 
   -- So we go and stuff stuff into the environment, which I guess gets it into the RHS,
   -- but doesn't touch goal...
-  ctx' <- updateContext ctx' res.constraints
+  ctx' <- updateContext ctx' (scon :: res.constraints)
   debug "context types: \{show ctx'.types}"
   debug "context env: \{show ctx'.env}"
   -- This doesn't really update existing val... including types in the context.

@@ -70,7 +70,8 @@ apply t (x :: xs) acc (S k) = apply t xs (acc :< x) k
 apply t ts acc 0 = go (CApp t (acc <>> [])) ts
   where
     go : CExp -> List CExp -> M CExp
-    go (CApp t []) [] = pure t
+    -- drop zero arg call
+    go (CApp t []) args = go t args
     go t [] = pure t
     go t (arg :: args) = go (CApp t [arg]) args
 
@@ -117,12 +118,12 @@ compileTerm (Let _ nm t u) = pure $ CLet nm !(compileTerm t) !(compileTerm u)
 
 export
 compileFun : Tm -> M CExp
-compileFun tm = go tm []
+compileFun tm = go tm [<]
   where
-    go : Tm -> List String -> M CExp
-    go (Lam _ nm t) acc = go t (nm :: acc)
-    go tm [] = compileTerm tm
-    go tm args = pure $ CFun (reverse args) !(compileTerm tm)
+    go : Tm -> SnocList String -> M CExp
+    go (Lam _ nm t) acc = go t (acc :< nm)
+    go tm [<] = compileTerm tm
+    go tm args = pure $ CFun (args <>> []) !(compileTerm tm)
 
 
 

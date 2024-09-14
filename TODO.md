@@ -1,17 +1,20 @@
 
 ## TODO
 
-- [ ] there is some zero argument application in generated code
-  - possibly the fancy "apply arity then curry the rest" bit
+- [x] there is some zero argument application in generated code
 - [x] get equality.newt to work
+  - [x] broken again because I added J, probably need to constrain scrutinee to value
 - [x] inline metas.  Maybe zonk after TC/elab
 - [x] implicit patterns
-- [ ] pair syntax
+- [ ] pair syntax (should this be a comma operator)
 - [ ] list syntax
 - [ ] operators
 - [ ] import
-- [ ] add {{ }} and solving autos
+- [ ] add {{ }} and solving autos (or maybe just `auto` keyword)
   - considering various solutions.  Perhaps marking the data type as solvable, if we had types on metas.
+  - keep as implicit and mark auto, behavior overlaps a lot with implicit
+  - but we might want to solve right away when creating the implicit
+  - later we might need postpone
 - [ ] do blocks
 - [ ] some solution for `+` (classes? ambiguity?)
 - [ ] show compiler failure in the editor (exit code != 0)

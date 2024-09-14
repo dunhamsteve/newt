@@ -33,6 +33,13 @@ I have `Let` in the core language. Partly because I'd like this to make it into 
 
 I've got no idea what I'm doing here. I worked off of Jesper Cockx "Elaborating Dependent (Co)pattern Matching", leaving out codata for now.
 
+For the dependent thing, I've change unify to return `VVar` constraints. I think this is an error typechecking on
+RHS (meta solutions are handled separately). On the LHS, I'm rewriting the environment to turn the var from a bind
+to a define. Unification has been tweaked to look up `VVar` in environment. Bind will hand back the same `VVar`.
+
+Some of this I could probably do with subst, but the RHS is `Raw`, it takes typechecking to turn it into a clean `Tm`,
+and I need this information for the typechecking.
+
 ## Issues
 
 - I need to do some erasure of values unused at runtime
