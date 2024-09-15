@@ -13,9 +13,9 @@ I may be done with `U` - I keep typing `Type`.
 - [x] implicit patterns
 - [x] operators
 - [x] pair syntax (via comma operator)
-- [ ] matching on operators
+- [x] matching on operators
   - [x] top level
-  - [ ] case statements   ********
+  - [x] case statements
 - [x] SKIP list syntax
   - Agda doesn't have it, clashes with pair syntax
 - [ ] import

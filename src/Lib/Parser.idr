@@ -171,7 +171,7 @@ pPattern = PatCon (!getPos) Explicit <$> (uident <|> token MixFix) <*> many patA
 
 caseAlt : Parser RCaseAlt
 caseAlt = do
-  pat <- pPattern
+  pat <- typeExpr
   keyword "=>"
   t <- term
   pure $ MkAlt pat t

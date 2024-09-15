@@ -39,3 +39,11 @@ data Pair : U -> U -> U where
 
 blah : Int -> Int -> Int -> Pair Int (Pair Int Int)
 blah x y z = (x , y, z)
+
+curryPlus : Pair Int Int -> Int
+curryPlus (a, b) = a + b
+
+-- case is different path, so separate test
+caseCurry : Pair Int Int -> Int
+caseCurry x = case x of
+  (a, b) => a + b

@@ -42,3 +42,7 @@ blah x y z = (x, y, z)
 
 curryPlus : Pair Int Int -> Int
 curryPlus (a, b) = a + b
+
+caseCurry : Pair Int Int -> Int
+caseCurry x = case x of
+  (a,b) => a + b

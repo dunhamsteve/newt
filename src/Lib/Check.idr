@@ -430,6 +430,35 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
     rewriteClause vars (MkClause fc cons pats expr) = pure $ MkClause fc !(rewriteCons vars cons []) pats expr
 
 
+splitArgs : Raw -> List (Raw, Icit) -> (Raw, List (Raw, Icit))
+splitArgs (RApp fc t u icit) args = splitArgs t ((u, icit) :: args)
+splitArgs tm args = (tm, args)
+
+
+mkPat : TopContext -> (Raw, Icit) -> M Pattern
+mkPat top (tm, icit) = do
+  case splitArgs tm [] of
+    ((RVar fc nm), b) => case lookup nm top of
+                (Just (MkEntry name type (DCon k str))) =>
+                  -- TODO check arity, also figure out why we need reverse
+                  pure $ PatCon fc icit nm !(traverse (mkPat top) b)
+                Just _ => error (getFC tm) "not a data constructor"
+                Nothing => case b of
+                                [] => pure $ PatVar fc icit nm
+                                _ => error (getFC tm) "patvar applied to args"
+    ((RImplicit fc), []) => pure $ PatWild fc icit
+    ((RImplicit fc), _) => error fc "implicit pat can't be applied"
+    -- ((RLit x y), b) => ?rhs_19
+    (a,b) => error (getFC a) "expected pat var or constructor"
+
+
+export
+makeClause : TopContext -> (Raw, Raw) -> M Clause
+makeClause top (lhs, rhs) = do
+  let (nm, args) = splitArgs lhs []
+  pats <- traverse (mkPat top) args
+  pure $ MkClause (getFC lhs) [] pats rhs
+
 
 lookupName : Context -> String  -> Maybe (Tm, Val)
 lookupName ctx name = go 0 ctx.types
@@ -505,8 +534,9 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     debug "SCTM/TY \{pprint (names ctx) sc} \{show scty}"
 
     let scnm = fresh "sc"
+    top <- get
     -- FIXME FC
-    let clauses = map (\(MkAlt pat rawRHS) =>MkClause fc [(scnm, pat)] [] rawRHS ) alts
+    clauses <- traverse (\(MkAlt pat rawRHS) => pure $ MkClause fc [(scnm, !(mkPat top (pat, Explicit)))] [] rawRHS ) alts
 
     -- buildCase expects scrutinee to be a name in the context because
     -- it's compared against the first part of Constraint.  We could switch
