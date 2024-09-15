@@ -27,6 +27,33 @@ collectDecl ((Def fc nm cl) :: rest@(Def _ nm' cl' :: xs)) =
   else (Def fc nm cl :: collectDecl rest)
 collectDecl (x :: xs) = x :: collectDecl xs
 
+makeClause : TopContext -> (Raw, Raw) -> M Clause
+makeClause top (lhs, rhs) = do
+  let (nm, args) = splitArgs lhs []
+  pats <- traverse mkPat args
+  pure $ MkClause (getFC lhs) [] pats rhs
+  where
+
+    splitArgs : Raw -> List (Raw, Icit) -> (Raw, List (Raw, Icit))
+    splitArgs (RApp fc t u icit) args = splitArgs t ((u, icit) :: args)
+    splitArgs tm args = (tm, args)
+
+    mkPat : (Raw, Icit) -> M Pattern
+    mkPat (tm, icit) = do
+      case splitArgs tm [] of
+        ((RVar fc nm), b) => case lookup nm top of
+                    (Just (MkEntry name type (DCon k str))) =>
+                      -- TODO check arity, also figure out why we need reverse
+                      pure $ PatCon fc icit nm !(traverse mkPat b)
+                    Just _ => error (getFC tm) "not a data constructor"
+                    Nothing => case b of
+                                    [] => pure $ PatVar fc icit nm
+                                    _ => error (getFC tm) "patvar applied to args"
+        ((RImplicit fc), []) => pure $ PatWild fc icit
+        ((RImplicit fc), _) => error fc "implicit pat can't be applied"
+        -- ((RLit x y), b) => ?rhs_19
+        (a,b) => error (getFC a) "expected pat var or constructor"
+
 export
 processDecl : Decl -> M ()
 
@@ -69,7 +96,9 @@ processDecl (Def fc nm clauses) = do
   vty <- eval empty CBN ty
   putStrLn "vty is \{show vty}"
 
-  tm <- buildTree (mkCtx ctx.metas fc) (MkProb clauses vty)
+  -- I can take LHS apart syntactically or elaborate it with an infer
+  clauses' <- traverse (makeClause ctx) clauses
+  tm <- buildTree (mkCtx ctx.metas fc) (MkProb clauses' vty)
   putStrLn "Ok \{pprint [] tm}"
   tm' <- zonk ctx 0 [] tm
   putStrLn "NF \{pprint[] tm'}"

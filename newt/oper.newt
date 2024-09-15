@@ -41,5 +41,4 @@ blah : Int -> Int -> Int -> Pair Int (Pair Int Int)
 blah x y z = (x, y, z)
 
 curryPlus : Pair Int Int -> Int
-curryPlus (_,_ a b) = a + b
--- curryPlus (a , b) = a + b
+curryPlus (a, b) = a + b

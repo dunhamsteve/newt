@@ -258,16 +258,41 @@ parseMixfix = do
   addOp op (cast prec) fix
   pure $ PMixFix fc op (cast prec) fix
 
+-- We can be much more precise with a context
+raw2pat : Raw -> SnocList Pattern -> M Pattern
+raw2pat (RVar x nm) sp = ?rhs_1
+raw2pat (RApp x t u icit) sp = ?rhs_3
+raw2pat (RHole x) sp = ?rhs_11
+raw2pat (RU x) sp = ?rhs_4
+raw2pat (RLit x y) sp = ?rhs_8
+
+raw2pat (RLam x nm icit ty) sp = ?rhs_2
+raw2pat (RPi x nm icit ty sc) sp = ?rhs_5
+raw2pat (RLet x nm ty v sc) sp = ?rhs_6
+raw2pat (RAnn x tm ty) sp = ?rhs_7
+raw2pat (RCase x scrut alts) sp = ?rhs_9
+raw2pat (RImplicit x) sp = ?rhs_10
+raw2pat (RParseError x str) sp = ?rhs_12
+
+
+getName : Raw -> Parser String
+getName (RVar x nm) = pure nm
+getName (RApp x t u icit) = getName t
+getName tm = fail "bad LHS"
+
+
 export
 parseDef : Parser Decl
 parseDef = do
   fc <- getPos
-  nm <- ident <|> uident
+  t <- typeExpr
+  nm <- getName t
+  -- nm <- ident <|> uident
   pats <- many patAtom
   keyword "="
   body <- typeExpr
   -- these get collected later
-  pure $ Def fc nm [MkClause fc [] pats body]
+  pure $ Def fc nm [(t, body)] -- [MkClause fc [] t body]
 
 export
 parsePType : Parser Decl

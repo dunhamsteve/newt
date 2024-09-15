@@ -98,7 +98,7 @@ data Decl : Type where
 
 data Decl
   = TypeSig FC Name Raw
-  | Def FC Name (List Clause)
+  | Def FC Name (List (Raw,Raw)) -- (List Clause)
   | DImport FC Name
   | DCheck FC Raw Raw
   | Data FC Name Raw (List Decl)
@@ -231,10 +231,7 @@ Pretty Module where
       where
         doDecl : Decl -> Doc
         doDecl (TypeSig _ nm ty) = text nm <+> text ":" <+> nest 2 (pretty ty)
-        doDecl (Def _ nm clauses) = spread $ map doClause clauses
-          where
-            doClause : Clause -> Doc
-            doClause (MkClause fc _ pats body) = text nm <+> spread (map pretty pats) <+> text "=" <+> nest 2 (pretty body)
+        doDecl (Def _ nm clauses) = stack $ map (\(a,b) => pretty a <+> "=" <+> pretty b) clauses
         doDecl (DImport _ nm) = text "import" <+> text nm ++ line
         -- the behavior of nest is kinda weird, I have to do the nest before/around the </>.
         doDecl (Data _ nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map doDecl xs))

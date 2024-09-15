@@ -520,7 +520,7 @@ check ctx tm ty = case (tm, !(forceType ty)) of
   (RHole fc, ty) => do
     ty' <- quote ctx.lvl ty
     let names = (toList $ map fst ctx.types)
-    -- I want to know which ones are defines. I should skip the `=` bit if they match
+    -- I want to know which ones are defines. I should skip the `=` bit if they match, I'll need indices in here too.
     env <- for (zip ctx.env (toList ctx.types)) $ \(v, n, ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)} = \{pprint names !(quote ctx.lvl v)}"
     let msg = unlines (toList $ reverse env) ++ "  -----------\n" ++ "  goal \{pprint names ty'}"
     putStrLn "INFO at \{show fc}: "

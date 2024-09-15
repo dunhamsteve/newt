@@ -14,14 +14,17 @@ I may be done with `U` - I keep typing `Type`.
 - [x] operators
 - [x] pair syntax (via comma operator)
 - [ ] matching on operators
+  - [x] top level
+  - [ ] case statements   ********
 - [x] SKIP list syntax
   - Agda doesn't have it, clashes with pair syntax
 - [ ] import
 - [ ] autos / typeclass resolution
-  - keep as implicit and do auto if the type constructor is flagged auto
-  - keep as implicit and mark auto, behavior overlaps a lot with implicit
-  - have separate type of implict with `{{}}`
   - Can we solve right away when creating the implicit, or do we need postpone?
+  - options
+    - keep as implicit and do auto if the type constructor is flagged auto
+    - keep as implicit and mark auto, behavior overlaps a lot with implicit
+    - have separate type of implict with `{{}}`
 - [ ] do blocks
 - [ ] some solution for `+` problem (classes? ambiguity?)
 - [ ] show compiler failure in the editor (exit code != 0)
@@ -38,3 +41,5 @@ I may be done with `U` - I keep typing `Type`.
 - [ ] magic tuple? (codegen as array)
 - [ ] magic newtype? (drop in codegen)
 - [ ] records / copatterns
+
+- [ ] Read Ulf Norell thesis
