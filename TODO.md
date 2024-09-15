@@ -27,7 +27,7 @@ I may be done with `U` - I keep typing `Type`.
     - have separate type of implict with `{{}}`
 - [ ] do blocks
 - [ ] some solution for `+` problem (classes? ambiguity?)
-- [ ] show compiler failure in the editor (exit code != 0)
+- [x] show compiler failure in the editor (exit code != 0)
 - [ ] write js files into `out` directory
 - [ ] detect extra clauses in case statements
 - [ ] add test framework

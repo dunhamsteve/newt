@@ -16,7 +16,7 @@
     },
     {
       "name": "keyword.newt",
-      "match": "\\b(data|where|case|of|let|in|U|module|ptype|pfunc)\\b"
+      "match": "\\b(data|where|case|of|let|in|U|module|ptype|pfunc|infix|infixl|infixr)\\b"
     }
   ]
 }

@@ -17,6 +17,7 @@ export function activate(context: vscode.ExtensionContext) {
     const cmd = config.get<string>("path", "build/exec/newt");
     const command = `${cmd} ${fileName}`;
     exec(command, { cwd }, (err, stdout, _stderr) => {
+      // I think I ignored 1 here because I wanted failure to launch
       if (err && err.code !== 1) {
         vscode.window.showErrorMessage(`newt error: ${err}`);
       }
@@ -24,6 +25,14 @@ export function activate(context: vscode.ExtensionContext) {
       // extract errors and messages from stdout
       const lines = stdout.split("\n");
       const diagnostics: vscode.Diagnostic[] = [];
+
+      if (err) {
+        let start = new vscode.Position(0,0)
+        let end = new vscode.Position(0,1)
+        let range = document.getWordRangeAtPosition(start) ?? new vscode.Range(start,end)
+        const diag = new vscode.Diagnostic(range, "newt execution failed", vscode.DiagnosticSeverity.Error)
+        diagnostics.push(diag)
+      }
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
