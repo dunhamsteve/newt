@@ -650,7 +650,15 @@ infer ctx (RPi fc nm icit ty ty2) = do
   let nm := fromMaybe "_" nm
   ty2' <- check (extend ctx nm vty') ty2 (VU fc)
   pure (Pi fc nm icit ty' ty2', (VU fc))
-infer ctx (RLet fc nm ty v sc) = error fc "implement RLet"
+infer ctx (RLet fc nm ty v sc) = do
+  ty' <- check ctx ty (VU emptyFC)
+  vty <- eval ctx.env CBN ty'
+  v' <- check ctx v vty
+  vv <- eval ctx.env CBN v'
+  let ctx' = define ctx nm vv vty
+  (sc',scty) <- infer ctx' sc
+  pure $ (Let fc nm v' sc', scty)
+
 infer ctx (RAnn fc tm rty) = do
   ty <- check ctx rty (VU fc)
   vty <- eval ctx.env CBN ty
