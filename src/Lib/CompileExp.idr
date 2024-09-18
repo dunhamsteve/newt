@@ -79,7 +79,6 @@ compileTerm (Bnd _ k) = pure $ CBnd k
 -- need to eta expand to arity
 compileTerm t@(Ref fc nm _) = apply (CRef nm) [] [<] !(arityForName fc nm)
 
--- need to zonk
 compileTerm (Meta _ k) = pure $ CRef "meta$\{show k}" -- FIXME
 compileTerm (Lam _ nm t) = pure $ CLam nm !(compileTerm t)
 compileTerm tm@(App _ _ _) with (funArgs tm)
@@ -93,7 +92,7 @@ compileTerm tm@(App _ _ _) with (funArgs tm)
         -- apply (CRef "Meta\{show k}") args' [<] 0
         arity <- case meta of
                 -- maybe throw
-                (Unsolved x j xs) => pure 0
+                (Unsolved x j ctx _) => pure 0 -- FIXME # of Bound in ctx.bds
                 (Solved j tm) => pure $ getArity !(quote 0 tm)
         apply (CRef "Meta\{show k}") args' [<] arity
   _ | (t@(Ref fc nm _), args) = do

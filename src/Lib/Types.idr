@@ -164,9 +164,9 @@ pprint names tm = render 80 $ go names tm
     go names (App _ t u) = text "(" <+> go names t <+> go names u <+> ")"
     go names (U _) = "U"
     go names (Pi _ nm Implicit t u) =
-      text "({" <+> text nm <+> ":" <+> go names t <+> "}" <+> "=>" <+> go (nm :: names) u <+> ")"
+      text "({" <+> text nm <+> ":" <+> go names t <+> "}" <+> "->" <+> go (nm :: names) u <+> ")"
     go names (Pi _ nm Explicit t u) =
-      text "((" <+> text nm <+> ":" <+> go names t <+> ")" <+> "=>" <+> go (nm :: names) u <+> ")"
+      text "((" <+> text nm <+> ":" <+> go names t <+> ")" <+> "->" <+> go (nm :: names) u <+> ")"
     -- FIXME - probably way wrong on the names here.  There is implicit binding going on
     go names (Case _ sc alts) = text "case" <+> go names sc <+> text "of" </> (nest 2 (line ++ stack (map (goAlt names) alts)))
     go names (Lit _ lit) = text "\{show lit}"
@@ -237,6 +237,8 @@ Show Val where
 -- Not used - I was going to change context to have a List Binder
 -- instead of env, types, bds
 -- But when we get down into eval, we don't have types to put into the env
+-- It looks like Idris has a separate LocalEnv in eval, Kovacs peels off
+-- env from context and extends it.
 data Binder : Type where
   Bind : (nm : String) -> (bd : BD) -> (val : Val) -> (ty : Val) -> Binder
 
@@ -285,13 +287,15 @@ Can I get val back? Do we need to quote? What happens if we don't?
 
 -}
 
+record Context
+
 public export
-data MetaEntry = Unsolved FC Nat (List BD) | Solved Nat Val
+data MetaEntry = Unsolved FC Nat Context Val | Solved Nat Val
 
 export
 covering
 Show MetaEntry where
-  show (Unsolved pos k xs) = "Unsolved \{show pos} \{show k}"
+  show (Unsolved pos k xs ty) = "Unsolved \{show pos} \{show k} : \{show ty}"
   show (Solved k x) = "Solved \{show k} \{show x}"
 
 public export
@@ -356,7 +360,7 @@ record Context where
   env : Env                  -- Values in scope
   types : Vect lvl (String, Val) -- types and names in scope
   -- so we'll try "bds" determines length of local context
-  bds  : List BD          -- bound or defined
+  bds : Vect lvl BD          -- bound or defined
 
   -- We only need this here if we don't pass TopContext
   -- top : TopContext

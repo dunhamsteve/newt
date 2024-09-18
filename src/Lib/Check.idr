@@ -22,7 +22,7 @@ data Pden = PR Nat Nat (List Nat)
 
 forceMeta : Val -> M Val
 forceMeta (VMeta fc ix sp) = case !(lookupMeta ix) of
-  (Unsolved pos k xs) => pure (VMeta fc ix sp)
+  (Unsolved pos k xs _) => pure (VMeta fc ix sp)
   (Solved k t) => vappSpine t sp >>= forceMeta
 forceMeta x = pure x
 
@@ -33,7 +33,7 @@ forceType (VRef fc nm def sp) =
       (Just (MkEntry name type (Fn t))) => vappSpine !(eval [] CBN t) sp
       _ => pure (VRef fc nm def sp)
 forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
-  (Unsolved x k xs) => pure (VMeta fc ix sp)
+  (Unsolved x k xs _) => pure (VMeta fc ix sp)
   (Solved k t) => vappSpine t sp >>= forceType
 forceType x = pure x
 
@@ -63,7 +63,7 @@ parameters (ctx: Context)
 
             error fc "non-linear pattern"
           else go xs (k :: acc)
-      go _ _ = error emptyFC "non-variable in pattern"
+      go (xs :< v) _ = error emptyFC "non-variable in pattern \{show v}"
 
   -- we have to "lift" the renaming when we go under a lambda
   -- I think that essentially means our domain ix are one bigger, since we're looking at lvl
@@ -221,7 +221,8 @@ insert : (ctx : Context) -> Tm -> Val -> M (Tm, Val)
 insert ctx tm ty = do
   case !(forceMeta ty) of
     VPi fc x Implicit a b => do
-      m <- freshMeta ctx (getFC tm)
+      m <- freshMeta ctx (getFC tm) a
+      debug "INSERT \{pprint (names ctx) m} : \{show a}"
       mv <- eval ctx.env CBN m
       insert ctx (App emptyFC tm m) !(b $$ mv)
     va => pure (tm, va)
@@ -322,13 +323,17 @@ extendPi ctx ty nms sc = pure (ctx, ty, nms <>> [], sc)
 updateContext : Context -> List (Nat, Val) -> M Context
 updateContext ctx [] = pure ctx
 updateContext ctx ((k, val) :: cs) = let ix = (length ctx.env `minus` k) `minus` 1 in
-  updateContext ({env $= replace ix val, bds $= replace ix Defined } ctx) cs
+  updateContext ({env $= replace ix val, bds $= replaceV ix Defined } ctx) cs
   where
     replace : Nat -> a -> List a -> List a
     replace k x [] = []
     replace 0 x (y :: xs) = x :: xs
     replace (S k) x (y :: xs) = y :: replace k x xs
 
+    replaceV : Nat -> a -> Vect n a -> Vect n a
+    replaceV k x [] = []
+    replaceV 0 x (y :: xs) = x :: xs
+    replaceV (S k) x (y :: xs) = y :: replaceV k x xs
 
 -- ok, so this is a single constructor, CaseAlt
 -- since we've gotten here, we assume it's possible and we better have at least
@@ -635,8 +640,8 @@ infer ctx (RApp fc t u icit) = do
     -- TODO test case to cover this.
     tty => do
       debug "unify PI for \{show tty}"
-      a <- eval ctx.env CBN !(freshMeta ctx fc)
-      b <- MkClosure ctx.env <$> freshMeta (extend ctx ":ins" a) fc
+      a <- eval ctx.env CBN !(freshMeta ctx fc (VU emptyFC))
+      b <- MkClosure ctx.env <$> freshMeta (extend ctx ":ins" a) fc (VU emptyFC)
       unifyCatch fc ctx tty (VPi fc ":ins" icit a b)
       pure (a,b)
 
@@ -666,7 +671,7 @@ infer ctx (RAnn fc tm rty) = do
   pure (tm, vty)
 
 infer ctx (RLam fc nm icit tm) = do
-  a <- freshMeta ctx fc >>= eval ctx.env CBN
+  a <- freshMeta ctx fc (VU emptyFC) >>= eval ctx.env CBN
   let ctx' = extend ctx nm a
   (tm', b) <- infer ctx' tm
   debug "make lam for \{show nm} scope \{pprint (names ctx) tm'} : \{show b}"
@@ -674,9 +679,9 @@ infer ctx (RLam fc nm icit tm) = do
   -- error {ctx} [DS "can't infer lambda"]
 
 infer ctx (RImplicit fc) = do
-  ty <- freshMeta ctx fc
+  ty <- freshMeta ctx fc (VU emptyFC)
   vty <- eval ctx.env CBN ty
-  tm <- freshMeta ctx fc
+  tm <- freshMeta ctx fc vty
   pure (tm, vty)
 
 infer ctx (RLit fc (LString str)) = pure (Lit fc (LString str), !(primType fc "String"))

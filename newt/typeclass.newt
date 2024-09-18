@@ -39,3 +39,19 @@ MaybeMonad = MkMonad {Maybe} (\ {A} ma amb =>
 bind : {m : U -> U} -> {x : Monad m} -> {a b : U} -> (m a) -> (a -> m b) -> m b
 bind {m} {MkMonad bind'} = bind'
 
+ptype Int
+
+-- For now, we may try to solve this at creation time, but it's possible postpone is needed
+
+/-
+
+So I think we need to solve meta 7 first, and then if we're lucky, it's var 0 and we're
+good to go.
+
+failed to unify ( Maybe ( ?m:9 x:0 ) )
+    with ( ( ?m:4 x:0 ) ( ?m:7 x:0 ) )
+  non-variable in pattern (%meta 7 [< (%var 0 [< ])])
+-/
+
+foo : Int -> Maybe Int
+foo x = bind {_} {_} (Just x) (\ x => Just x)
