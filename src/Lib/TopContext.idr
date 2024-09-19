@@ -19,11 +19,11 @@ lookup nm top = go top.defs
 export
 covering
 Show TopContext where
-  show (MkTop defs metas _) = "\nContext:\n [\{ joinBy "\n" $ map show defs}]"
+  show (MkTop defs metas _ _) = "\nContext:\n [\{ joinBy "\n" $ map show defs}]"
 
 public export
 empty : HasIO m => m TopContext
-empty = pure $ MkTop [] !(newIORef (MC [] 0)) False
+empty = pure $ MkTop [] !(newIORef (MC [] 0)) False !(newIORef [])
 
 ||| set or replace def. probably need to check types and Axiom on replace
 public export
@@ -35,3 +35,7 @@ setDef name ty def = { defs $= go }
     go (x@(MkEntry nm ty' def') :: defs) = if nm == name
       then MkEntry name ty def :: defs
       else x :: go defs
+
+public export
+addError : HasIO io => {auto top : TopContext} -> Error -> io ()
+addError err = modifyIORef top.errors (err ::)

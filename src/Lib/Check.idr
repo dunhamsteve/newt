@@ -223,8 +223,9 @@ insert ctx tm ty = do
     VPi fc x Implicit a b => do
       m <- freshMeta ctx (getFC tm) a
       debug "INSERT \{pprint (names ctx) m} : \{show a}"
+      debug "TM \{pprint (names ctx) tm}"
       mv <- eval ctx.env CBN m
-      insert ctx (App emptyFC tm m) !(b $$ mv)
+      insert ctx (App (getFC tm) tm m) !(b $$ mv)
     va => pure (tm, va)
 
 primType : FC -> String -> M Val
@@ -574,7 +575,7 @@ check ctx tm ty = case (tm, !(forceType ty)) of
               let var = VVar fc (length ctx.env) [<]
               let ctx' = extend ctx nm a
               tm' <- check ctx' tm !(b $$ var)
-              pure $ Lam emptyFC nm tm'
+              pure $ Lam fc nm tm'
             else if icit' == Implicit then do
               let var = VVar fc (length ctx.env) [<]
               ty' <- b $$ var

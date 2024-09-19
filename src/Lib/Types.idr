@@ -346,8 +346,7 @@ record TopContext where
   defs : List TopEntry
   metas : IORef MetaContext
   verbose : Bool
-  -- metas : TODO
-
+  errors : IORef (List Error)
 
 
 -- we'll use this for typechecking, but need to keep a TopContext around too.

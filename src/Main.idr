@@ -55,8 +55,16 @@ processFile fn = do
   Right _ <- tryError $ traverse_ processDecl (collectDecl res.decls)
     | Left y => fail (showError src y)
 
-  dumpContext !get
+  top <- get
+  dumpContext top
   dumpSource
+
+  [] <- readIORef top.errors
+    | errors => do
+      for_ errors $ \err =>
+        putStrLn (showError src err)
+      exitFailure
+  pure ()
 
 main' : M ()
 main' = do

@@ -48,10 +48,24 @@ ptype Int
 So I think we need to solve meta 7 first, and then if we're lucky, it's var 0 and we're
 good to go.
 
-failed to unify ( Maybe ( ?m:9 x:0 ) )
-    with ( ( ?m:4 x:0 ) ( ?m:7 x:0 ) )
-  non-variable in pattern (%meta 7 [< (%var 0 [< ])])
+  foo x = bind {_} {_} {_} (Just x) (\ x => Just x)
+  failed to unify ( Maybe ( ?m:10 x:0 ) )
+    with ( ( ?m:4 x:0 ) ( ?m:8 x:0 ) )
+  non-variable in pattern (%meta 8 [< (%var 0 [< ])])
+
+  If I stick Int in third slot:
+  foo x = bind {_} {_} {Int} (Just x) (\ x => Just x)
+                                    ^
+  failed to unify ( Maybe ( ?m:8 x:0 ) )
+    with ( ( ?m:4 x:0 ) Int )
+  non-variable in pattern (%ref Int [< ])
+
+  -- If I slot in MaybeMonad, all is happy.
+  foo x = bind {_} {MaybeMonad} {_} (Just x) (\ x => Just x)
+
+  -- And a maybe up front has only the auto unsolved.
+
 -/
 
 foo : Int -> Maybe Int
-foo x = bind {_} {_} (Just x) (\ x => Just x)
+foo x = bind {Maybe} {_} {_} (Just x) (\ x => Just x)

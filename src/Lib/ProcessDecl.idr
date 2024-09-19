@@ -85,8 +85,10 @@ processDecl (Def fc nm clauses) = do
     (Unsolved (l,c) k xs ty) => do
       -- should just print, but it's too subtle in the sea of messages
       -- we'd also need the ability to mark the whole top context as failure if we continue
-      -- putStrLn "ERROR at (\{show l}, \{show c}): Unsolved meta \{show k}"
-      throwError $ E (l,c) "Unsolved meta \{show k}"
+      -- put a list of errors in TopContext
+      putStrLn $ showError "" $ E (l,c) "Unsolved meta \{show k}"
+      addError $ E (l,c) "Unsolved meta \{show k}"
+      -- throwError $ E (l,c) "Unsolved meta \{show k}"
   debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
   modify $ setDef nm ty (Fn tm')
 
