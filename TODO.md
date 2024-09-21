@@ -20,7 +20,7 @@ I may be done with `U` - I keep typing `Type`.
   - Agda doesn't have it, clashes with pair syntax
 - [ ] import
 - [ ] autos / typeclass resolution
-  - Can we solve right away when creating the implicit, or do we need postpone?
+  - We need special handling in unification to make this possible
   - options
     - keep as implicit and do auto if the type constructor is flagged auto
     - keep as implicit and mark auto, behavior overlaps a lot with implicit

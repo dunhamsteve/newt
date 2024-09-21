@@ -102,6 +102,9 @@ parameters (ctx: Context)
 
   solve : Nat -> Nat -> SnocList Val -> Val  -> M  ()
   solve l m sp t = do
+    debug "solve \{show l} \{show m} \{show sp} \{show t}"
+    meta <- lookupMeta m
+    debug "meta \{show meta}"
     ren <- invert l sp
     tm <- rename m ren l t
     let tm = lams (length sp) tm
@@ -156,6 +159,7 @@ parameters (ctx: Context)
       (VLam fc _ t,  t'       ) => unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' `vapp` VVar emptyFC l [<])
       (VMeta fc k sp,  VMeta fc' k' sp' ) =>
         if k == k' then unifySpine l (k == k') sp sp'
+        -- TODO, might want to try the other way, too.
         else solve l k sp (VMeta fc' k' sp') >> pure neutral
       (t,           VMeta fc' i' sp') => solve l i' sp' t >> pure neutral
       (VMeta fc i sp, t'           ) => solve l i sp t' >> pure neutral

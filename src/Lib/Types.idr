@@ -292,11 +292,6 @@ record Context
 public export
 data MetaEntry = Unsolved FC Nat Context Val | Solved Nat Val
 
-export
-covering
-Show MetaEntry where
-  show (Unsolved pos k xs ty) = "Unsolved \{show pos} \{show k} : \{show ty}"
-  show (Solved k x) = "Solved \{show k} \{show x}"
 
 public export
 record MetaContext where
@@ -365,6 +360,12 @@ record Context where
   -- top : TopContext
   metas : IORef MetaContext
   fc : FC
+
+export
+covering
+Show MetaEntry where
+  show (Unsolved pos k ctx ty) = "Unsolved \{show pos} \{show k} : \{show ty} \{show ctx.bds}"
+  show (Solved k x) = "Solved \{show k} \{show x}"
 
 export withPos : Context -> FC -> Context
 withPos ctx fc = { fc := fc } ctx

@@ -15,9 +15,6 @@ data Maybe : U -> U where
   Nothing : {A : U} -> Maybe A
 
 
--- NEXT trying to get this to work. An equivalence is not found in pattern
--- matching
-
 -- [instance]
 MaybeMonad : Monad Maybe
 -- Agda case lambda might be nice..
@@ -29,43 +26,23 @@ MaybeMonad = MkMonad {Maybe} (\ {A} ma amb =>
       -- oh, but var 0 value is var5
       Just a => amb a)
 
--- so if we added {{ }} and search...
--- second arg will be {{}}
--- add implicit patterns first
+-- So the idea here is to have some implicits that are solved by search
 
--- I need a way to tag `x : Monad m` as auto.  I could do {{}}, but maybe I should tag the `data` for search?
--- It should be a record, but I don't have records yet
+_>>=_ : {a b : U} -> {m : U -> U} -> {x : Monad m} -> (m a) -> (a -> m b) -> m b
+_>>=_ {a} {b} {m} {MkMonad bind'}  ma amb = bind' {a} {b} ma amb
 
-bind : {m : U -> U} -> {x : Monad m} -> {a b : U} -> (m a) -> (a -> m b) -> m b
-bind {m} {MkMonad bind'} = bind'
+infixl 1 _>>=_
 
 ptype Int
 
 -- For now, we may try to solve this at creation time, but it's possible postpone is needed
 
-/-
+-- *SOLVE meta 6 sp [< (%var 0 [< ]), (%meta 4 [< (%var 0 [< ])])] val (%ref Maybe [< (%meta 9 [< (%var 0 [< ]), (%var 1 [< ])])])
 
-So I think we need to solve meta 7 first, and then if we're lucky, it's var 0 and we're
-good to go.
+-- Essentially   (m6 v0) (m4 ...) == Maybe Int and (m6 v0) (m2 v0) == Maybe Int
 
-  foo x = bind {_} {_} {_} (Just x) (\ x => Just x)
-  failed to unify ( Maybe ( ?m:10 x:0 ) )
-    with ( ( ?m:4 x:0 ) ( ?m:8 x:0 ) )
-  non-variable in pattern (%meta 8 [< (%var 0 [< ])])
-
-  If I stick Int in third slot:
-  foo x = bind {_} {_} {Int} (Just x) (\ x => Just x)
-                                    ^
-  failed to unify ( Maybe ( ?m:8 x:0 ) )
-    with ( ( ?m:4 x:0 ) Int )
-  non-variable in pattern (%ref Int [< ])
-
-  -- If I slot in MaybeMonad, all is happy.
-  foo x = bind {_} {MaybeMonad} {_} (Just x) (\ x => Just x)
-
-  -- And a maybe up front has only the auto unsolved.
-
--/
+-- Idris gets this by specially treating determining arguments of an auto as "invertible". It then unifies
+-- the last arg on each side and tries the rest, which is now in the pattern fragment.
 
 foo : Int -> Maybe Int
-foo x = bind {Maybe} {_} {_} (Just x) (\ x => Just x)
+foo x = _>>=_ (Just x) (\ x  => Just 10)

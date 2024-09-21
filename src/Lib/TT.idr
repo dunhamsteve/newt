@@ -37,7 +37,7 @@ export
 freshMeta : Context -> FC -> Val -> M Tm
 freshMeta ctx fc ty = do
   mc <- readIORef ctx.metas
-  putStrLn "INFO at \{show fc}: fresh meta \{show mc.next}"
+  putStrLn "INFO at \{show fc}: fresh meta \{show mc.next} : \{show ty}"
   writeIORef ctx.metas $ { next $= S, metas $= (Unsolved fc mc.next ctx ty ::) } mc
   pure $ applyBDs 0 (Meta emptyFC mc.next) ctx.bds
   where
