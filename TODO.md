@@ -3,6 +3,9 @@
 
 I may be done with `U` - I keep typing `Type`.
 
+- [ ] eval for case (see order.newt)
+- [ ] fix `ite.newt`
+- [ ] dynamic pattern unification (add test case first)
 - [x] switch from commit/mustWork to checking progress
 - [x] type constructors are no longer generated?  And seem to have 0 arity.
 - [x] raw let is not yet implemented (although define used by case tree building)

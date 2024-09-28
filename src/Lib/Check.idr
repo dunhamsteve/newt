@@ -19,7 +19,7 @@ import Lib.Syntax
 data Pden = PR Nat Nat (List Nat)
 
 -- IORef for metas needs IO
-
+export
 forceMeta : Val -> M Val
 forceMeta (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Unsolved pos k xs _) => pure (VMeta fc ix sp)
@@ -102,7 +102,7 @@ parameters (ctx: Context)
 
   solve : Nat -> Nat -> SnocList Val -> Val  -> M  ()
   solve l m sp t = do
-    debug "solve \{show l} \{show m} \{show sp} \{show t}"
+    debug "solve \{show m} lvl \{show l} sp \{show sp} is \{show t}"
     meta <- lookupMeta m
     debug "meta \{show meta}"
     ren <- invert l sp
@@ -112,6 +112,13 @@ parameters (ctx: Context)
     soln <- eval [] CBN tm
     solveMeta top m soln
     pure ()
+
+  trySolve : Nat -> Nat -> SnocList Val -> Val -> M ()
+  trySolve l m sp t = do
+    catchError {e=Error} (solve l m sp t) $ (\err => do
+      debug $ showError "" err
+      pure ())
+
 
   export
   unify : (l : Nat) -> Val -> Val  -> M UnifyResult
@@ -160,9 +167,9 @@ parameters (ctx: Context)
       (VMeta fc k sp,  VMeta fc' k' sp' ) =>
         if k == k' then unifySpine l (k == k') sp sp'
         -- TODO, might want to try the other way, too.
-        else solve l k sp (VMeta fc' k' sp') >> pure neutral
-      (t,           VMeta fc' i' sp') => solve l i' sp' t >> pure neutral
-      (VMeta fc i sp, t'           ) => solve l i sp t' >> pure neutral
+        else trySolve l k sp (VMeta fc' k' sp') >> pure neutral
+      (t,           VMeta fc' i' sp') => trySolve l i' sp' t >> pure neutral
+      (VMeta fc i sp, t'           ) => trySolve l i sp t' >> pure neutral
       (VPi fc _ _ a b, VPi fc' _ _ a' b') => [| unify l a a' <+> unify (S l) !(b $$ VVar emptyFC l [<]) !(b' $$ VVar emptyFC l [<]) |]
       (VVar fc k sp,   (VVar fc' k' sp')  ) =>
         if k == k' then unifySpine l (k == k') sp sp'
@@ -177,8 +184,7 @@ parameters (ctx: Context)
         if k == k' then do
           debug "unify \{show l} spine at \{k} \{show sp} \{show sp'}"
           unifySpine l (k == k') sp sp'
-        -- REVIEW - consider forcing?
-        else error emptyFC "vref mismatch \{show k} \{show k'} -- \{show sp} \{show sp'}"
+        else error fc "vref mismatch \{show k} \{show k'} -- \{show sp} \{show sp'}"
 
       (VU _, VU _) => pure neutral
       -- Lennart.newt cursed type references itself
@@ -343,7 +349,8 @@ updateContext ctx ((k, val) :: cs) = let ix = (length ctx.env `minus` k) `minus`
 -- ok, so this is a single constructor, CaseAlt
 -- since we've gotten here, we assume it's possible and we better have at least
 -- one valid clause
-buildCase : Context -> Problem -> String -> Val -> (String, Nat, Tm) -> M CaseAlt
+-- return Nothing if dcon doesn't unify with scrut
+buildCase : Context -> Problem -> String -> Val -> (String, Nat, Tm) -> M (Maybe CaseAlt)
 buildCase ctx prob scnm scty (dcName, arity, ty) = do
   debug "CASE \{scnm} \{dcName} \{pprint (names ctx) ty}"
   vty <- eval [] CBN ty
@@ -359,7 +366,8 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   -- We get unification constraints from matching the data constructors
   -- codomain with the scrutinee type
   debug "unify dcon dom with scrut"
-  res <- unify ctx' (length ctx'.env) ty' scty
+  Just res <- catchError {e = Error} (Just <$> unify ctx' (length ctx'.env) ty' scty) (\_ => pure Nothing)
+    | _ => pure Nothing
 
   -- Additionally, we constrain the scrutinee's variable to be
   -- dcon applied to args
@@ -397,7 +405,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
 
   when (length clauses == 0) $ error ctx.fc "Missing case for \{dcName} splitting \{scnm}"
   tm <- buildTree ctx' (MkProb clauses prob.ty)
-  pure $ CaseCons dcName (map getName vars) tm
+  pure $ Just $ CaseCons dcName (map getName vars) tm
   where
     getName : Bind -> String
     getName (MkBind nm _ _) = nm
@@ -528,7 +536,8 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
   cons <- getConstructors ctx scty
   alts <- traverse (buildCase ctx prob scnm scty) cons
 
-  pure $ Case fc sctm alts
+  -- TODO check for empty somewhere?
+  pure $ Case fc sctm (catMaybes alts)
 
 
 showDef : Context -> List String -> Nat -> Val -> M String
@@ -554,7 +563,7 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     let ctx' = extend ctx scnm scty
     cons <- getConstructors ctx' scty
     alts <- traverse (buildCase ctx' (MkProb clauses ty) scnm scty) cons
-    pure $ Let fc scnm sc $ Case fc (Bnd fc 0) alts
+    pure $ Let fc scnm sc $ Case fc (Bnd fc 0) (catMaybes alts)
 
   -- Document a hole, pretend it's implemented
   (RHole fc, ty) => do

@@ -1,0 +1,18 @@
+module Case3
+
+data Nat : U where
+  Z : Nat
+  S : Nat -> Nat
+
+data Vect : Nat -> U -> U where
+  Nil : {a : U} -> Vect Z a
+  _::_ : {a : U} -> {k : Nat} -> a -> Vect k a -> Vect (S k) a
+
+infixr 5 _::_
+
+head : {a : U} {k : Nat} -> Vect (S k) a -> a
+head (x :: xs) = x
+
+zapp : {s t: U} {k : Nat} -> Vect k (s -> t) -> Vect k s -> Vect k t
+zapp (f :: fs) (t :: ts) = f t :: zapp fs ts
+zapp Nil Nil = Nil

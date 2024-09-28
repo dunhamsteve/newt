@@ -82,12 +82,15 @@ processDecl (Def fc nm clauses) = do
 
   for_ mc.metas $ \case
     (Solved k x) => pure ()
-    (Unsolved (l,c) k xs ty) => do
+    (Unsolved (l,c) k ctx ty) => do
       -- should just print, but it's too subtle in the sea of messages
       -- we'd also need the ability to mark the whole top context as failure if we continue
       -- put a list of errors in TopContext
-      putStrLn $ showError "" $ E (l,c) "Unsolved meta \{show k}"
-      addError $ E (l,c) "Unsolved meta \{show k}"
+
+      -- Something wrong here - bad VVar
+      tm <- quote ctx.lvl !(forceMeta ty)
+      -- putStrLn $ showError "" $ E (l,c) "Unsolved meta \{show k} type \{show ty}"
+      addError $ E (l,c) "Unsolved meta \{show k} type \{pprint (names ctx) tm}"
       -- throwError $ E (l,c) "Unsolved meta \{show k}"
   debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
   modify $ setDef nm ty (Fn tm')

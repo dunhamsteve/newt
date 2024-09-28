@@ -95,8 +95,8 @@ parseOp = parseApp >>= go 0
     go : Int -> Raw -> Parser Raw
     go prec left =
       try (do
-        op <- token Oper
         fc <- getPos
+        op <- token Oper
         ops <- getOps
         let op' = "_" ++ op ++ "_"
         let Just (p,fix) = lookup op' ops

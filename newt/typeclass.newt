@@ -4,6 +4,13 @@ module TypeClass
 
 -- this would be nicer with records and copatterns
 
+-- At this point, for Agda style, I'll probably need to postpone, or collect constraints
+-- at lesat. Idris style, I might get away without short term.
+
+-- So I can read mcbride paper and maybe agda source.
+
+
+
 -- we need a bit more than this, but
 data Monad : (U -> U) -> U where
   MkMonad : { M : U -> U } ->
@@ -14,6 +21,17 @@ data Maybe : U -> U where
   Just    : {A : U} -> A -> Maybe A
   Nothing : {A : U} -> Maybe A
 
+
+data Either : U -> U -> U where
+  Left : {A B : U} -> A -> Either A B
+  Right : {A B : U} -> B -> Either A B
+
+EitherMonad : {A : U} -> Monad (Either A)
+EitherMonad = MkMonad {Either A} (\ ma amb =>
+--                     ^ Need this for scrut type to be non-meta
+  case ma of
+    Left a => Left a
+    Right b => amb b)
 
 -- [instance]
 MaybeMonad : Monad Maybe
@@ -44,5 +62,29 @@ ptype Int
 -- Idris gets this by specially treating determining arguments of an auto as "invertible". It then unifies
 -- the last arg on each side and tries the rest, which is now in the pattern fragment.
 
+-- Agda may do this slightly differently from Idris:
+--    https://agda.readthedocs.io/en/v2.6.0.1/language/instance-arguments.html#instance-resolution
+
+-- I think it searches, pulls in all possibilities and tries to unify them into place.
+-- We'll want to extend our example to what I have in Foo2.agda to test that it finds the right
+-- one. Maybe look at the source to see if there is any invertible trickery going on?
+
+-- I know that here, if I fill in the instance, everything works out, so finding the instance that works
+-- out might be sufficient.  That might mean that a instance constraint is a pile of options that get
+-- winnowed down?
+
+-- Putting MaybeMonad in there helps the unification
+-- of Maybe Int =?= ?m6 ?m2 (as Monad Maybe (the type) gives ?m6 is Maybe)
+-- and MaybeEither would fail after a couple of steps. But it seems expensive/complex
+-- to have to run the process down for each candidate.
+
+-- Agda seems complicated, minting fresh metas for bits of potential solutions (which
+-- may be tossed if the solution is ruled out.)
+
 foo : Int -> Maybe Int
-foo x = _>>=_ (Just x) (\ x  => Just 10)
+foo x = _>>=_ {_} {_} {_} {_} (Just x) (\ x  => Just 10)
+--                         ^
+/-
+So, agda style we'd guess ?m8 is MonadMaybe or MonadEither - agda's "maybe" case
+
+-/

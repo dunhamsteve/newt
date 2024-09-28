@@ -1,0 +1,29 @@
+module Order
+
+data Nat : U where
+  Z : Nat
+  S : Nat -> Nat
+
+plus : Nat -> Nat -> Nat
+plus Z y = y
+plus (S x) y = S (plus x y)
+
+data Pair : U -> U -> U where
+  _,_ : {A B : U} -> A -> B -> Pair A B
+
+infix 1 _,_
+
+foo : Pair Nat Nat
+foo = (Z , S Z)
+
+-- So I was going to force a (a + b, a) =?= (3,0) unification problem
+-- as an example of needing _dynamic_ pattern unification
+data Eq : {A : U} -> A -> A -> U where
+  Refl : {A : U} -> {x : A} -> Eq x x
+
+-- but hold up here.  This doesn't solve either.
+-- Oh, because I can't reduce case.
+-- And the FC is useless.
+two : Eq (plus Z (S (S Z))) (S (S Z))
+two = Refl {Nat} {S (S Z)}
+
