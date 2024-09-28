@@ -3,8 +3,12 @@
 
 I may be done with `U` - I keep typing `Type`.
 
+TT.idr should be Eval.idr, utilities up front belong elsewhere
+
+- [ ] consider making meta application implicit in term, so its more readable when printed
+  - Currently we have explicit `App` surrounding `Meta` when inserting metas. Some people
+    leave that implicit for efficiency. I think it would also make printing more readable.
 - [ ] eval for case (see order.newt)
-- [ ] fix `ite.newt`
 - [ ] dynamic pattern unification (add test case first)
 - [x] switch from commit/mustWork to checking progress
 - [x] type constructors are no longer generated?  And seem to have 0 arity.

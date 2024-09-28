@@ -194,7 +194,10 @@ quoteSp lvl t (xs :< x) =
 quote l (VVar fc k sp) = if k < l
   then quoteSp l (Bnd emptyFC ((l `minus` k) `minus` 1)) sp -- level to index
   else ?borken
-quote l (VMeta fc i sp) = quoteSp l (Meta fc i) sp
+quote l (VMeta fc i sp) =
+  case !(lookupMeta i) of
+        (Unsolved _ k xs _) => quoteSp l (Meta fc i) sp
+        (Solved k t) => quote l !(vappSpine t sp)
 quote l (VLam fc x t) = pure $ Lam fc x !(quote (S l) !(t $$ VVar emptyFC l [<]))
 quote l (VPi fc x icit a b) = pure $ Pi fc x icit !(quote l a) !(quote (S l) !(b $$ VVar emptyFC l [<]))
 quote l (VLet fc nm t u) = pure $ Let fc nm !(quote l t) !(quote (S l) !(u $$ VVar emptyFC l [<]))

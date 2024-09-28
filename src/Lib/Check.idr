@@ -18,6 +18,18 @@ import Lib.Syntax
 -- dom gamma ren
 data Pden = PR Nat Nat (List Nat)
 
+pprint : Context -> Val -> M String
+pprint ctx v = pure $ pprint (names ctx) !(quote (length ctx.env) v)
+
+export
+lookupName : Context -> String  -> Maybe (Tm, Val)
+lookupName ctx name = go 0 ctx.types
+  where
+    go : Nat -> Vect n (String, Val) -> Maybe (Tm, Val)
+    go ix [] = Nothing
+    -- FIXME - we should stuff a Binder of some sort into "types"
+    go ix ((nm, ty) :: xs) = if nm == name then Just (Bnd emptyFC ix, ty) else go (S ix) xs
+
 -- IORef for metas needs IO
 export
 forceMeta : Val -> M Val
@@ -167,9 +179,9 @@ parameters (ctx: Context)
       (VMeta fc k sp,  VMeta fc' k' sp' ) =>
         if k == k' then unifySpine l (k == k') sp sp'
         -- TODO, might want to try the other way, too.
-        else trySolve l k sp (VMeta fc' k' sp') >> pure neutral
-      (t,           VMeta fc' i' sp') => trySolve l i' sp' t >> pure neutral
-      (VMeta fc i sp, t'           ) => trySolve l i sp t' >> pure neutral
+        else solve l k sp (VMeta fc' k' sp') >> pure neutral
+      (t,           VMeta fc' i' sp') => solve l i' sp' t >> pure neutral
+      (VMeta fc i sp, t'           ) => solve l i sp t' >> pure neutral
       (VPi fc _ _ a b, VPi fc' _ _ a' b') => [| unify l a a' <+> unify (S l) !(b $$ VVar emptyFC l [<]) !(b' $$ VVar emptyFC l [<]) |]
       (VVar fc k sp,   (VVar fc' k' sp')  ) =>
         if k == k' then unifySpine l (k == k') sp sp'
@@ -225,7 +237,16 @@ unifyCatch fc ctx ty' ty = do
       throwError (E fc msg)
     case res of
       MkResult [] => pure ()
-      cs => error fc "Unification yields constraints \{show cs.constraints}"
+      cs => do
+        -- probably want a unification mode that throws instead of returning constraints
+        -- TODO need a normalizeHoles, maybe on quote?
+        debug "fail with constraints \{show cs.constraints}"
+        a <- quote ctx.lvl ty'
+        b <- quote ctx.lvl ty
+        let names = toList $ map fst ctx.types
+        let msg = "\n  failed to unify \{pprint names a}\n    with \{pprint names b}"
+        throwError (E fc msg)
+        -- error fc "Unification yields constraints \{show cs.constraints}"
 
 insert : (ctx : Context) -> Tm -> Val -> M (Tm, Val)
 insert ctx tm ty = do
@@ -300,22 +321,22 @@ findSplit (_ :: xs) = findSplit xs
 
 -- TODO, we may need to filter these against the type to rule out
 -- impossible cases
-getConstructors : Context -> Val -> M (List (String, Nat, Tm))
-getConstructors ctx (VRef fc nm _ _) = do
+getConstructors : Context -> FC -> Val -> M (List (String, Nat, Tm))
+getConstructors ctx scfc (VRef fc nm _ _) = do
   names <- lookupTCon nm
   traverse lookupDCon names
   where
     lookupTCon : String -> M (List String)
     lookupTCon str = case lookup nm !get of
         (Just (MkEntry name type (TCon names))) => pure names
-        _ => error fc "Not a type constructor \{nm}"
+        _ => error scfc "Not a type constructor \{nm}"
     lookupDCon : String -> M (String, Nat, Tm)
     lookupDCon nm = do
       case lookup nm !get of
         (Just (MkEntry name type (DCon k str))) => pure (name, k, type)
         Just _ => error fc "Internal Error: \{nm} is not a DCon"
         Nothing => error fc "Internal Error: DCon \{nm} not found"
-getConstructors ctx tm = error (getValFC tm) "Not a type constructor \{show tm}"
+getConstructors ctx scfc tm = error scfc "Can't split on type: \{!(pprint ctx tm)}"
 
 -- Extend environment with fresh variables from a pi-type
 -- the pi-type here is the telescope of a constructor
@@ -346,9 +367,15 @@ updateContext ctx ((k, val) :: cs) = let ix = (length ctx.env `minus` k) `minus`
     replaceV 0 x (y :: xs) = x :: xs
     replaceV (S k) x (y :: xs) = y :: replaceV k x xs
 
+forcedName : Context -> String -> Maybe Name
+forcedName ctx nm = case lookupName ctx nm of
+  Just (Bnd fc ix, ty) => case getAt ix ctx.env of
+    (Just (VRef x nm y sp)) => -- TODO verify is constructor?
+      Just nm
+    _ => Nothing
+  _ => Nothing
+
 -- ok, so this is a single constructor, CaseAlt
--- since we've gotten here, we assume it's possible and we better have at least
--- one valid clause
 -- return Nothing if dcon doesn't unify with scrut
 buildCase : Context -> Problem -> String -> Val -> (String, Nat, Tm) -> M (Maybe CaseAlt)
 buildCase ctx prob scnm scty (dcName, arity, ty) = do
@@ -365,8 +392,15 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
 
   -- We get unification constraints from matching the data constructors
   -- codomain with the scrutinee type
-  debug "unify dcon dom with scrut"
+  debug "unify dcon dom with scrut\n  \{show ty'}\n  \{show scty}"
   Just res <- catchError {e = Error} (Just <$> unify ctx' (length ctx'.env) ty' scty) (\_ => pure Nothing)
+    | _ => pure Nothing
+
+  -- if the value is already constrained to a different constructor, return Nothing
+  debug "scrut \{scnm} constrained to \{show $ forcedName ctx scnm}"
+  let True = (case forcedName ctx scnm of
+                Just nm => nm == scnm
+                _ => True)
     | _ => pure Nothing
 
   -- Additionally, we constrain the scrutinee's variable to be
@@ -477,15 +511,6 @@ makeClause top (lhs, rhs) = do
   pats <- traverse (mkPat top) args
   pure $ MkClause (getFC lhs) [] pats rhs
 
-
-lookupName : Context -> String  -> Maybe (Tm, Val)
-lookupName ctx name = go 0 ctx.types
-  where
-    go : Nat -> Vect n (String, Val) -> Maybe (Tm, Val)
-    go ix [] = Nothing
-    -- FIXME - we should stuff a Binder of some sort into "types"
-    go ix ((nm, ty) :: xs) = if nm == name then Just (Bnd emptyFC ix, ty) else go (S ix) xs
-
 checkDone : Context -> List (String, Pattern) -> Raw -> Val -> M Tm
 checkDone ctx [] body ty = do
   debug "DONE-> check body \{show body} at \{show ty}"
@@ -529,11 +554,11 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
   let Just (scnm, pat) := findSplit constraints
     | _ => checkDone ctx constraints expr ty
 
-  debug "SPLIT on \{scnm} because \{show pat}"
+  debug "SPLIT on \{scnm} because \{show pat} \{show $ getFC pat}"
   let Just (sctm, scty) := lookupName ctx scnm
     | _ => error fc "Internal Error: can't find \{scnm} in environment"
 
-  cons <- getConstructors ctx scty
+  cons <- getConstructors ctx (getFC pat) scty
   alts <- traverse (buildCase ctx prob scnm scty) cons
 
   -- TODO check for empty somewhere?
@@ -561,7 +586,7 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     -- it's compared against the first part of Constraint.  We could switch
     -- to a level and only let if the scrutinee is not a var.
     let ctx' = extend ctx scnm scty
-    cons <- getConstructors ctx' scty
+    cons <- getConstructors ctx' fc scty
     alts <- traverse (buildCase ctx' (MkProb clauses ty) scnm scty) cons
     pure $ Let fc scnm sc $ Case fc (Bnd fc 0) (catMaybes alts)
 
@@ -605,9 +630,18 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     debug "XXX edge add implicit lambda to \{show tm}"
     let var = VVar fc (length ctx.env) [<]
     ty' <- b $$ var
-    debug "XXX ty' is \{!(prvalCtx {ctx=(extend ctx nm' a)} ty')}"
+    debugM $ pure "XXX ty' is \{!(prvalCtx {ctx=(extend ctx nm' a)} ty')}"
     sc <- check (extend ctx nm' a) tm ty'
     pure $ Lam (getFC tm) nm' sc
+
+  (RLet fc nm ty v sc, rty) => do
+    ty' <- check ctx ty (VU emptyFC)
+    vty <- eval ctx.env CBN ty'
+    v' <- check ctx v vty
+    vv <- eval ctx.env CBN v'
+    let ctx' = define ctx nm vv vty
+    sc' <- check ctx' sc rty
+    pure $ Let fc nm v' sc'
 
   (tm,ty) => do
     -- We need to insert if tm is not an Implicit Lam
