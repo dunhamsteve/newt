@@ -2,11 +2,11 @@ module Lib.ProcessDecl
 
 import Data.IORef
 
-import Lib.Check
+import Lib.Elab
 import Lib.Parser
 import Lib.Syntax
 import Lib.TopContext
-import Lib.TT
+import Lib.Eval
 import Lib.Types
 import Lib.Util
 

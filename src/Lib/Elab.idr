@@ -1,4 +1,4 @@
-module Lib.Check
+module Lib.Elab
 
 import Control.Monad.Error.Either
 import Control.Monad.Error.Interface
@@ -10,7 +10,7 @@ import Data.List
 import Data.Vect
 import Data.String
 import Lib.Types
-import Lib.TT
+import Lib.Eval
 import Lib.TopContext
 import Lib.Syntax
 

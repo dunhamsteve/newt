@@ -8,7 +8,7 @@ import Data.List
 import Data.String
 import Data.Vect
 import Data.IORef
--- import Lib.Check
+-- import Lib.Elab
 import Lib.Compile
 import Lib.Parser
 -- import Lib.Parser.Impl

@@ -3,8 +3,6 @@
 
 I may be done with `U` - I keep typing `Type`.
 
-TT.idr should be Eval.idr, utilities up front belong elsewhere
-
 - [ ] consider making meta application implicit in term, so its more readable when printed
   - Currently we have explicit `App` surrounding `Meta` when inserting metas. Some people
     leave that implicit for efficiency. I think it would also make printing more readable.

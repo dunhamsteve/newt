@@ -361,6 +361,20 @@ record Context where
   metas : IORef MetaContext
   fc : FC
 
+
+||| add a binding to environment
+export
+extend : Context -> String -> Val -> Context
+extend ctx name ty =
+    { lvl $= S, env $= (VVar emptyFC ctx.lvl [<] ::), types $= ((name, ty) ::), bds $= (Bound ::) } ctx
+
+-- I guess we define things as values?
+export
+define : Context -> String -> Val -> Val -> Context
+define ctx name val ty =
+  { lvl $= S, env $= (val ::), types $= ((name,ty) ::), bds $= (Defined ::) } ctx
+
+
 export
 covering
 Show MetaEntry where
@@ -377,6 +391,50 @@ names ctx = toList $ map fst ctx.types
 public export
 M : Type -> Type
 M = (StateT TopContext (EitherT Impl.Error IO))
+
+export partial
+Show Context where
+  show ctx = "Context \{show $ map fst $ ctx.types}"
+
+export
+error : FC -> String -> M a
+error fc msg = throwError $ E fc msg
+
+export
+error' : String -> M a
+error' msg = throwError $ E (0,0) msg
+
+export
+freshMeta : Context -> FC -> Val -> M Tm
+freshMeta ctx fc ty = do
+  mc <- readIORef ctx.metas
+  putStrLn "INFO at \{show fc}: fresh meta \{show mc.next} : \{show ty}"
+  writeIORef ctx.metas $ { next $= S, metas $= (Unsolved fc mc.next ctx ty ::) } mc
+  pure $ applyBDs 0 (Meta emptyFC mc.next) ctx.bds
+  where
+    -- hope I got the right order here :)
+    applyBDs : Nat -> Tm -> Vect k BD -> Tm
+    applyBDs k t [] = t
+    -- review the order here
+    applyBDs k t (Bound :: xs) = App emptyFC (applyBDs (S k) t xs) (Bnd emptyFC k)
+    applyBDs k t (Defined :: xs) = applyBDs (S k) t xs
+
+    -- makeType : Vect k (String, Val) -> Vect k BD -> Val
+    -- makeType [] [] = ?makeType_rhs_2
+    -- makeType ((nm, ty) :: types) (Defined :: bds) = makeType types bds
+    -- makeType ((nm, ty) :: types) (Bound :: bds) = VPi emptyFC nm Explicit ty
+
+export
+lookupMeta : Nat -> M MetaEntry
+lookupMeta ix = do
+  ctx <- get
+  mc <- readIORef ctx.metas
+  go mc.metas
+  where
+    go : List MetaEntry -> M MetaEntry
+    go [] = error' "Meta \{show ix} not found"
+    go (meta@(Unsolved _ k ys _) :: xs) = if k == ix then pure meta else go xs
+    go (meta@(Solved k x) :: xs) = if k == ix then pure meta else go xs
 
 -- we need more of topcontext later - Maybe switch it up so we're not passing
 -- around top

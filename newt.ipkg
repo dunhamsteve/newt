@@ -17,13 +17,13 @@ depends = contrib, base
 
 -- modules to install
 modules =
-  Lib.Check,
+  Lib.Elab,
   Lib.Parser,
   Lib.Parser.Impl,
   Lib.Prettier,
   Lib.ProcessDecl,
   Lib.Syntax,
-  Lib.TT,
+  Lib.Eval,
   Lib.Token,
   Lib.TopContext,
   Lib.Types,
