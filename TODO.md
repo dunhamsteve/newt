@@ -34,7 +34,8 @@ I may be done with `U` - I keep typing `Type`.
 - [ ] do blocks
 - [ ] some solution for `+` problem (classes? ambiguity?)
 - [x] show compiler failure in the editor (exit code != 0)
-- [ ] write js files into `out` directory
+- [x] write output to file
+  - uses `-o` option
 - [ ] detect extra clauses in case statements
 - [ ] add test framework
 - [ ] decide what to do for erasure

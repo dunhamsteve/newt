@@ -342,6 +342,8 @@ record TopContext where
   metas : IORef MetaContext
   verbose : Bool
   errors : IORef (List Error)
+  ||| loaded modules
+  loaded : List String
 
 
 -- we'll use this for typechecking, but need to keep a TopContext around too.

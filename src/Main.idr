@@ -25,21 +25,6 @@ import System.Directory
 import System.File
 import System.Path
 
-{-
-
-import
-
-need to find the file.
-- get base directory
-- . to /
-- add .newt
-
-
-
-loop back to processFile
-
--}
-
 fail : String -> M a
 fail msg = putStrLn msg >> exitFailure
 
@@ -58,6 +43,13 @@ dumpSource = do
   doc <- compile
   putStrLn $ render 90 doc
 
+writeSource : String -> M ()
+writeSource fn = do
+  doc <- compile
+  Right _ <- writeFile fn $ render 90 doc
+    | Left err => fail (show err)
+  pure ()
+
 parseFile : String -> M (String,Module)
 parseFile fn = do
   Right src <- readFile $ fn
@@ -67,15 +59,22 @@ parseFile fn = do
     | Left y => fail (showError src y)
   pure (src, res)
 
-loadModule : String -> String -> M ()
-loadModule base name = do
+loadModule : String -> List String -> String -> M ()
+loadModule base stk name = do
+  top <- get
+  -- already loaded?
+  let False := elem name top.loaded | _ => pure ()
+  modify { loaded $= (name::) }
   let fn = base ++ "/" ++ name ++ ".newt"
   (src, res) <- parseFile fn
   putStrLn "module \{res.name}"
   let True = name == res.name
     | _ => fail "module name \{show res.name} doesn't match file name \{show fn}"
   -- TODO separate imports and detect loops / redundant
-  for_ res.imports $ \ (MkImport fc name) => loadModule base name
+  for_ res.imports $ \ (MkImport fc name') => do
+    -- we could use `fc` if it had a filename in it
+    when (name' `elem` stk) $ error emptyFC "import loop \{show name} -> \{show name'}"
+    loadModule base (name :: stk) name'
 
   -- TODO Lift the error exit, so import errors can get a FC in current file
   putStrLn "process Decls"
@@ -92,12 +91,11 @@ processFile fn = do
   let parts = splitPath fn
   let file = fromMaybe "" $ last' parts
   let dir = fromMaybe "./" $ parent fn
-  let (base,ext) = splitFileName (fromMaybe "" $ last' parts)
-  putStrLn "\{show dir} \{show base} \{show ext}"
-  loadModule dir base
+  let (name,ext) = splitFileName (fromMaybe "" $ last' parts)
+  putStrLn "\{show dir} \{show name} \{show ext}"
+  loadModule dir [] name
   top <- get
-  dumpContext top
-  dumpSource
+  -- dumpContext top
 
   [] <- readIORef top.errors
     | errors => do
@@ -106,14 +104,31 @@ processFile fn = do
       exitFailure
   pure ()
 
+cmdLine : List String -> M (Maybe String, List String)
+cmdLine [] = pure (Nothing, [])
+cmdLine ("-v" :: args) = do
+  modify { verbose := True }
+  cmdLine args
+cmdLine ("-o" :: fn :: args) = do
+  (out, files) <- cmdLine args
+  pure (out <|> Just fn, files)
+
+cmdLine (fn :: args) = do
+  let True := ".newt" `isSuffixOf` fn
+    | _ => error emptyFC "Bad argument \{show fn}"
+  (out, files) <- cmdLine args
+  pure $ (out, fn :: files)
+
 main' : M ()
 main' = do
-  args <- getArgs
-  putStrLn "Args: \{show args}"
-  let (_ :: files) = args
-    | _ => putStrLn "Usage: newt foo.newt"
-  when ("-v" `elem` files) $ modify { verbose := True }
-  traverse_ processFile (filter (".newt" `isSuffixOf`) files)
+  (arg0 :: args) <- getArgs
+    | _ => error emptyFC "error reading args"
+  (out, files) <- cmdLine args
+  traverse_ processFile files
+  case out of
+    Nothing => pure ()
+    Just name => writeSource name
+  -- traverse_ processFile (filter (".newt" `isSuffixOf`) files) out
 
 main : IO ()
 main = do

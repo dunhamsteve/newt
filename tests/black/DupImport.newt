@@ -1,0 +1,5 @@
+module DupImport
+
+import Prelude
+import Prelude
+
