@@ -192,11 +192,22 @@ parameters (ctx: Context)
       (VVar fc k sp, u) => pure $ MkResult[(k, u)]
       (t, VVar fc k sp) => pure $ MkResult[(k, t)]
 
+      -- REVIEW - consider separate value for DCon/TCon
       (VRef fc k def sp,   VRef fc' k' def' sp'  ) =>
         if k == k' then do
           debug "unify \{show l} spine at \{k} \{show sp} \{show sp'}"
           unifySpine l (k == k') sp sp'
-        else error fc "vref mismatch \{show k} \{show k'} -- \{show sp} \{show sp'}"
+        else case lookup k !(get) of
+          Just (MkEntry name ty (Fn tm)) => do
+            vtm <- eval [] CBN tm
+            v <- vappSpine vtm sp
+            unify l v u'
+          _ => case lookup k' !(get) of
+            Just (MkEntry name ty (Fn tm)) => do
+              vtm <- eval [] CBN tm
+              v <- vappSpine vtm sp'
+              unify l t' v
+            _ => error fc "vref mismatch \{show k} \{show k'} -- \{show sp} \{show sp'}"
 
       (VU _, VU _) => pure neutral
       -- Lennart.newt cursed type references itself

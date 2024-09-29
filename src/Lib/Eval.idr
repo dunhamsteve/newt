@@ -9,6 +9,7 @@ import Control.Monad.Error.Interface
 import Data.IORef
 import Data.Fin
 import Data.List
+import Data.SnocList
 import Data.Vect
 import Data.SortedMap
 
@@ -43,23 +44,19 @@ vappSpine : Val -> SnocList Val -> M Val
 vappSpine t [<] = pure t
 vappSpine t (xs :< x) = vapp !(vappSpine t xs) x
 
--- So we need:
--- - a Neutral case statement
--- - split out data / type constructors from VRef application
--- - should we sort out what the case tree really looks like first?
-
--- Technically I don't need this now, as a neutral would be fine.
-
-evalAlt : Env -> Mode -> Val -> List CaseAlt -> M (Maybe Val)
--- FIXME spine length? Should this be VRef or do we specialize?
-evalAlt env mode (VRef _ nm y sp) ((CaseCons name args t) :: xs) =
+evalCase : Env -> Mode -> Val -> List CaseAlt -> M (Maybe Val)
+evalCase env mode sc@(VRef _ nm y sp) (cc@(CaseCons name nms t) :: xs) =
   if nm == name
-    -- Here we bind the args and push on. Do we have enough? Too many?
-    then ?evalAlt_success
-    -- here we need to know if we've got a mismatched constructor or some function app
-    else ?evalAlt_what
-evalAlt env mode sc (CaseDefault u :: xs) = pure $ Just !(eval (sc :: env) mode u)
-evalAlt env mode sc _ = pure Nothing -- stuck
+    then go env sp nms
+    else evalCase env mode sc xs
+  where
+    go : Env -> SnocList Val -> List String -> M (Maybe Val)
+    go env (args :< arg) (nm :: nms) = go (arg :: env) args nms
+    go env args [] = Just <$> vappSpine !(eval env mode t) args
+    go env [<] rest = pure Nothing
+
+evalCase env mode sc (CaseDefault u :: xs) = pure $ Just !(eval (sc :: env) mode u)
+evalCase env mode sc _ = pure Nothing
 
 bind : Val -> Env -> Env
 bind v env = v :: env
@@ -71,9 +68,6 @@ bind v env = v :: env
 --   - Applications headed by top-level variables are lazy.
 --   - Any other function application is call-by-value during evaluation.
 
--- Do we want a def in here instead?  We'll need DCon/TCon eventually
--- I need to be aggressive about reduction, I guess. I'll figure it out
--- later, maybe need lazy glued values.
 -- TODO - probably want to figure out gluing and handle constructors
 eval env mode (Ref _ x (Fn tm)) = eval env mode tm
 eval env mode (Ref fc x def) = pure $ VRef fc x def [<]
@@ -94,9 +88,11 @@ eval env mode (Bnd fc i) = case getAt i env of
   Nothing => error' "Bad deBruin index \{show i}"
 eval env mode (Lit fc lit) = pure $ VLit fc lit
 
--- We need a neutral and some code to run the case tree
-
-eval env mode tm@(Case fc sc alts) = pure $ VCase fc !(eval env mode sc) alts
+eval env mode tm@(Case fc sc alts) =
+  case !(evalCase env mode !(eval env mode sc) alts) of
+    Just v => pure v
+    Nothing => pure $ fromMaybe (VCase fc !(eval env mode sc) alts)
+                                !(evalCase env mode !(eval env mode sc) alts)
 
 export
 quote : (lvl : Nat) -> Val -> M Tm

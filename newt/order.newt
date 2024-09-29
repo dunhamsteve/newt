@@ -14,6 +14,7 @@ data Pair : U -> U -> U where
 infix 1 _,_
 
 foo : Pair Nat Nat
+-- vscode plugin issue: Without the space the info is rendered on Z...
 foo = (Z , S Z)
 
 -- So I was going to force a (a + b, a) =?= (3,0) unification problem
@@ -24,6 +25,12 @@ data Eq : {A : U} -> A -> A -> U where
 -- but hold up here.  This doesn't solve either.
 -- Oh, because I can't reduce case.
 -- And the FC is useless.
+-- these go into caseeval.newt test
 two : Eq (plus Z (S (S Z))) (S (S Z))
-two = Refl {Nat} {S (S Z)}
+two = Refl
 
+two' : Eq (plus (S Z) (S Z)) (S (S Z))
+two' = Refl {Nat} {S (S Z)}
+
+three : Eq (plus (S Z) (S (S Z))) (plus (S (S Z)) (S Z))
+three = Refl {Nat} {S (S (S Z))}
