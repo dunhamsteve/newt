@@ -27,11 +27,11 @@ export function activate(context: vscode.ExtensionContext) {
       const diagnostics: vscode.Diagnostic[] = [];
 
       if (err) {
-        let start = new vscode.Position(0,0)
-        let end = new vscode.Position(0,1)
-        let range = document.getWordRangeAtPosition(start) ?? new vscode.Range(start,end)
-        const diag = new vscode.Diagnostic(range, "newt execution failed", vscode.DiagnosticSeverity.Error)
-        diagnostics.push(diag)
+        let start = new vscode.Position(0,0);
+        let end = new vscode.Position(0,1);
+        let range = document.getWordRangeAtPosition(start) ?? new vscode.Range(start,end);
+        const diag = new vscode.Diagnostic(range, "newt execution failed", vscode.DiagnosticSeverity.Error);
+        diagnostics.push(diag);
       }
 
       for (let i = 0; i < lines.length; i++) {

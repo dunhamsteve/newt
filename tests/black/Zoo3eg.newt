@@ -1,4 +1,4 @@
-module Zoo3
+module Zoo3eg
 
 id : (A : _) -> A -> A
 id = \ A x => x

@@ -1,4 +1,4 @@
-module Equality
+module Equality1
 
 -- Leibniz equality
 Eq : {A : U} -> A -> A -> U

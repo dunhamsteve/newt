@@ -1,0 +1,14 @@
+module Prelude
+
+data Nat : U where
+  Z : Nat
+  S : Nat -> Nat
+
+data Maybe : U -> U where
+  Just : {a : U} -> a -> Maybe a
+  Nothing : {a : U} -> Maybe a
+
+data Either : U -> U -> U where
+  Left : {a b : U} -> a -> Either a b
+  Right : {a b : U} -> b -> Either a b
+

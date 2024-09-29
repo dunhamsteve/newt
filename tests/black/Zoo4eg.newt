@@ -1,4 +1,4 @@
-module Zoo4
+module Zoo4eg
 
 id : {A : U} -> A -> A
 id = \x => x   -- elaborated to \{A} x. x

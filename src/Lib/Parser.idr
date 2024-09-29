@@ -342,8 +342,6 @@ parseMod : Parser Module
 parseMod = do
   keyword "module"
   name <- uident
-  -- probably should be manySame, and we want to start with col -1
-  -- if we enforce blocks indent more than parent
   decls <- startBlock $ manySame $ parseDecl
   pure $ MkModule name decls
 

@@ -1,4 +1,4 @@
-module Scratch
+module TestCase2
 
 data Nat : U where
   Z : Nat

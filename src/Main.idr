@@ -23,8 +23,24 @@ import Lib.Syntax
 import System
 import System.Directory
 import System.File
+import System.Path
 
-fail : String -> M ()
+{-
+
+import
+
+need to find the file.
+- get base directory
+- . to /
+- add .newt
+
+
+
+loop back to processFile
+
+-}
+
+fail : String -> M a
 fail msg = putStrLn msg >> exitFailure
 
 dumpContext : TopContext -> M ()
@@ -42,19 +58,45 @@ dumpSource = do
   doc <- compile
   putStrLn $ render 90 doc
 
-processFile : String -> M ()
-processFile fn = do
-  putStrLn "*** Process \{fn}"
+parseFile : String -> M (String,Module)
+parseFile fn = do
   Right src <- readFile $ fn
-    | Left err => printLn err
+    | Left err => fail (show err)
   let toks = tokenise src
   let Right res = parse parseMod toks
     | Left y => fail (showError src y)
-  putStrLn $ render 80 $ pretty res
-  printLn "process Decls"
+  pure (src, res)
+
+loadModule : String -> String -> M ()
+loadModule base name = do
+  let fn = base ++ "/" ++ name ++ ".newt"
+  (src, res) <- parseFile fn
+  putStrLn "module \{res.name}"
+  let True = name == res.name
+    | _ => fail "module name \{show res.name} doesn't match file name \{show fn}"
+  -- TODO separate imports and detect loops / redundant 
+  for_ res.decls $ \ decl => case decl of
+    (DImport x str) => loadModule base str
+    _ => pure ()
+
+
+  putStrLn "process Decls"
   Right _ <- tryError $ traverse_ processDecl (collectDecl res.decls)
     | Left y => fail (showError src y)
 
+  pure ()
+
+processFile : String -> M ()
+processFile fn = do
+  putStrLn "*** Process \{fn}"
+  (src, res) <- parseFile fn
+  putStrLn "module \{res.name}"
+  let parts = splitPath fn
+  let file = fromMaybe "" $ last' parts
+  let dir = fromMaybe "./" $ parent fn
+  let (base,ext) = splitFileName (fromMaybe "" $ last' parts)
+  putStrLn "\{show dir} \{show base} \{show ext}"
+  loadModule dir base
   top <- get
   dumpContext top
   dumpSource

@@ -107,7 +107,7 @@ processDecl (DCheck fc tm ty) = do
   putStrLn "norm \{pprint [] norm}"
   putStrLn "NF "
 
-processDecl (DImport fc str) = throwError $ E fc "import not implemented"
+processDecl (DImport fc str) = pure ()
 
 processDecl (Data fc nm ty cons) = do
   ctx <- get

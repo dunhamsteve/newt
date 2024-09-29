@@ -1,4 +1,4 @@
-module Scratch
+module TestCase
 
 -- I'm testing cases here, but using examples carefully design to be
 -- simple case trees. Patterns are a var or a constructor applied to vars.

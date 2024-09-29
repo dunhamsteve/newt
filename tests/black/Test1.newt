@@ -1,4 +1,4 @@
-module Scratch
+module Test1
 
 nat : U
 nat = {C : U} -> C -> (nat -> C) -> C

@@ -1,0 +1,7 @@
+module TestImport
+
+import Prelude
+
+one : Nat
+one = S Z
+

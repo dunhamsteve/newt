@@ -3,6 +3,8 @@
 
 I may be done with `U` - I keep typing `Type`.
 
+- [ ] Generate some programs that do stuff
+- [ ] import
 - [ ] consider making meta application implicit in term, so its more readable when printed
   - Currently we have explicit `App` surrounding `Meta` when inserting metas. Some people
     leave that implicit for efficiency. I think it would also make printing more readable.
@@ -23,7 +25,6 @@ I may be done with `U` - I keep typing `Type`.
   - [x] case statements
 - [x] SKIP list syntax
   - Agda doesn't have it, clashes with pair syntax
-- [ ] import
 - [ ] autos / typeclass resolution
   - We need special handling in unification to make this possible
   - options
