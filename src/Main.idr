@@ -74,12 +74,10 @@ loadModule base name = do
   putStrLn "module \{res.name}"
   let True = name == res.name
     | _ => fail "module name \{show res.name} doesn't match file name \{show fn}"
-  -- TODO separate imports and detect loops / redundant 
-  for_ res.decls $ \ decl => case decl of
-    (DImport x str) => loadModule base str
-    _ => pure ()
+  -- TODO separate imports and detect loops / redundant
+  for_ res.imports $ \ (MkImport fc name) => loadModule base name
 
-
+  -- TODO Lift the error exit, so import errors can get a FC in current file
   putStrLn "process Decls"
   Right _ <- tryError $ traverse_ processDecl (collectDecl res.decls)
     | Left y => fail (showError src y)

@@ -4,7 +4,7 @@
 I may be done with `U` - I keep typing `Type`.
 
 - [ ] Generate some programs that do stuff
-- [ ] import
+- [x] import
 - [ ] consider making meta application implicit in term, so its more readable when printed
   - Currently we have explicit `App` surrounding `Meta` when inserting metas. Some people
     leave that implicit for efficiency. I think it would also make printing more readable.
@@ -49,3 +49,5 @@ I may be done with `U` - I keep typing `Type`.
 - [ ] records / copatterns
 
 - [ ] Read Ulf Norell thesis
+
+

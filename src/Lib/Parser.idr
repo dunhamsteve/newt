@@ -242,8 +242,8 @@ export
 parseSig : Parser Decl
 parseSig = TypeSig <$> getPos <*> (ident <|> uident) <* keyword ":" <*> typeExpr
 
-parseImport : Parser Decl
-parseImport = DImport <$> getPos <* keyword "import" <*> uident
+parseImport : Parser Import
+parseImport = MkImport <$> getPos <* keyword "import" <*> uident
 
 -- Do we do pattern stuff now? or just name = lambda?
 
@@ -335,15 +335,17 @@ parseNorm = DCheck <$> getPos <* keyword "#check" <*> typeExpr <* keyword ":" <*
 
 export
 parseDecl : Parser Decl
-parseDecl = parseMixfix <|> parsePType <|> parsePFunc <|> parseImport <|> parseNorm <|> parseData <|> (try $ parseSig) <|> parseDef
+parseDecl = parseMixfix <|> parsePType <|> parsePFunc <|> parseNorm <|> parseData <|> (try $ parseSig) <|> parseDef
 
 export
 parseMod : Parser Module
 parseMod = do
   keyword "module"
   name <- uident
-  decls <- startBlock $ manySame $ parseDecl
-  pure $ MkModule name decls
+  startBlock $ do
+    imports <- manySame $ parseImport
+    decls <- manySame $ parseDecl
+    pure $ MkModule name imports decls
 
 public export
 data ReplCmd =

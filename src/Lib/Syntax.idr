@@ -12,8 +12,6 @@ data Raw : Type where
 public export
 data RigCount = Rig0 | RigW
 
-
-
 public export
 data Pattern
   = PatVar FC Icit Name
@@ -92,14 +90,16 @@ HasFC Raw where
   getFC (RParseError fc str) = fc
 -- derive some stuff - I'd like json, eq, show, ...
 
+
+
+public export
+data Import = MkImport FC Name
+
 -- FIXME - I think I don't want "where" here, but the parser has an issue
 public export
-data Decl : Type where
-
 data Decl
   = TypeSig FC Name Raw
   | Def FC Name (List (Raw,Raw)) -- (List Clause)
-  | DImport FC Name
   | DCheck FC Raw Raw
   | Data FC Name Raw (List Decl)
   | PType FC Name (Maybe Raw)
@@ -111,16 +111,15 @@ public export
 record Module where
   constructor MkModule
   name : Name
+  imports : List Import
   decls : List Decl
 
 foo : List String -> String
 foo ts = "(" ++ unwords ts ++ ")"
 
-
 Show Literal where
   show (LString str) = foo [ "LString", show str]
   show (LInt i) = foo [ "LInt", show i]
-
 
 export
 covering
@@ -135,12 +134,14 @@ export covering
 Show Clause where
   show (MkClause fc cons pats expr) = show (fc, cons, pats, expr)
 
+Show Import where
+  show (MkImport _ str) = foo ["MkImport", show str]
+
 covering
 Show Decl where
   show (TypeSig _ str x) = foo ["TypeSig", show str, show x]
   show (Def _ str clauses) = foo ["Def", show str, show clauses]
   show (Data _ str xs ys) = foo ["Data", show str, show xs, show ys]
-  show (DImport _ str) = foo ["DImport", show str]
   show (DCheck _ x y) = foo ["DCheck", show x, show y]
   show (PType _ name ty) = foo ["PType", name, show ty]
   show (PFunc _ nm ty src) = foo ["PFunc", nm, show ty, show src]
@@ -148,7 +149,7 @@ Show Decl where
 
 export covering
 Show Module where
-  show (MkModule name decls) = foo ["MkModule", show name, show decls]
+  show (MkModule name imports decls) = foo ["MkModule", show name, show imports, show decls]
 
 Show RigCount where
   show Rig0 = "Rig0"
@@ -226,13 +227,17 @@ Pretty Raw where
 
 export
 Pretty Module where
-  pretty (MkModule name decls) =
-    text "module" <+> text name </> stack (map doDecl decls)
+  pretty (MkModule name imports decls) =
+    text "module" <+> text name
+      </> stack (map doImport imports)
+      </> stack (map doDecl decls)
       where
+        doImport : Import -> Doc
+        doImport (MkImport _ nm) = text "import" <+> text nm ++ line
+
         doDecl : Decl -> Doc
         doDecl (TypeSig _ nm ty) = text nm <+> text ":" <+> nest 2 (pretty ty)
         doDecl (Def _ nm clauses) = stack $ map (\(a,b) => pretty a <+> "=" <+> pretty b) clauses
-        doDecl (DImport _ nm) = text "import" <+> text nm ++ line
         -- the behavior of nest is kinda weird, I have to do the nest before/around the </>.
         doDecl (Data _ nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map doDecl xs))
         doDecl (DCheck _ x y) = text "#check" <+> pretty x <+> ":" <+> pretty y

@@ -107,8 +107,6 @@ processDecl (DCheck fc tm ty) = do
   putStrLn "norm \{pprint [] norm}"
   putStrLn "NF "
 
-processDecl (DImport fc str) = pure ()
-
 processDecl (Data fc nm ty cons) = do
   ctx <- get
   tyty <- check (mkCtx ctx.metas fc) ty (VU fc)
