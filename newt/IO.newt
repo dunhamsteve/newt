@@ -1,0 +1,30 @@
+module IO
+
+import Prelude
+
+data Foo : U where
+  MkFoo : Nat -> Nat -> Foo
+
+data World : U where
+
+data IORes : U -> U where
+  MkIORes : {a : U} -> a -> World -> IORes a
+
+IO : U -> U
+IO a = World -> IORes a
+
+iobind : {a b : U} -> IO a -> (a -> IO b) -> IO b
+iobind ma mab w = case ma w of
+  (MkIORes a w) => mab a w
+
+_>>=_ : {a b : U} -> IO a -> (a -> IO b) -> IO b
+_>>=_ = iobind
+
+infixr 2 _>>=_
+infixr 2 _>>_
+
+-- FIXME - bad parse error for lambda without the parens
+
+_>>_ :  {a b : U} -> IO a -> IO b -> IO b
+_>>_ ma mb = ma >>= (\ _ => mb)
+

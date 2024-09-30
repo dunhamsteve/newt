@@ -3,6 +3,7 @@
 
 I may be done with `U` - I keep typing `Type`.
 
+- [ ] Sanitize JS idents, e.g. `_+_`
 - [ ] Generate some programs that do stuff
 - [x] import
 - [ ] consider making meta application implicit in term, so its more readable when printed
@@ -48,6 +49,7 @@ I may be done with `U` - I keep typing `Type`.
 - [ ] magic tuple? (codegen as array)
 - [ ] magic newtype? (drop in codegen)
 - [ ] records / copatterns
+- [ ] vscode: syntax highlighting for String
 
 - [ ] Read Ulf Norell thesis
 

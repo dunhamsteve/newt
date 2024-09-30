@@ -68,8 +68,10 @@ atom = RU <$> getPos <* keyword "U"
     <|> parens typeExpr
 
 -- Argument to a Spine
-pArg : Parser (Icit,Raw)
-pArg = (Explicit,) <$> atom <|> (Implicit,) <$> braces typeExpr
+pArg : Parser (Icit,FC,Raw)
+pArg = do
+  fc <- getPos
+  (Explicit,fc,) <$> atom <|> (Implicit,fc,) <$> braces typeExpr
 
 
 -- starter pack, but we'll move some to prelude
@@ -84,10 +86,10 @@ pArg = (Explicit,) <$> atom <|> (Implicit,) <$> braces typeExpr
 
 parseApp : Parser Raw
 parseApp = do
+  fc <- getPos
   hd <- atom
   rest <- many pArg
-  fc <- getPos
-  pure $ foldl (\a, (c,b) => RApp fc a b c) hd rest
+  pure $ foldl (\a, (icit,fc,b) => RApp fc a b icit) hd rest
 
 parseOp : Parser Raw
 parseOp = parseApp >>= go 0

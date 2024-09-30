@@ -11,6 +11,8 @@ import Lib.Types
 import Lib.Prettier
 import Lib.CompileExp
 import Data.String
+import Data.Maybe
+import Data.Nat
 
 data Kind = Plain | Return | Assign String
 
@@ -136,9 +138,30 @@ termToJS env (CCase t alts) f =
     maybeCaseStmt nm alts = (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts))
 
 
--- FIXME escape
+-- REVIEW the escaping in show might not match JS
 jsString : String -> Doc
-jsString str = text "\"\{str}\""
+jsString str = text (show str)
+
+||| escape identifiers for js
+jsIdent : String -> Doc
+jsIdent id = text $ pack $ fix (unpack id)
+  where
+    chars : List Char
+    chars = unpack "0123456789ABCDEF"
+
+    toHex : Nat -> List Char
+    toHex 0 = []
+    toHex v = snoc (toHex (div v 16)) (fromMaybe ' ' (getAt (mod v 16) chars))
+
+    fix : List Char -> List Char
+    fix [] = []
+    fix (x :: xs) =
+      if isAlphaNum x || x == '_' then
+        x :: fix xs
+      else if x == '$' then
+        '$' :: '$' :: fix xs
+      else
+        '$' :: (toHex (cast x)) ++ fix xs
 
 stmtToDoc : JSStmt e -> Doc
 
@@ -153,17 +176,17 @@ expToDoc (LitObject xs) = text "{" <+> folddoc (\ a, e => a ++ ", " <+/> e) (map
   where
     entry : (String, JSExp) -> Doc
     -- TODO quote if needed
-    entry (nm, exp) = text nm ++ ":" <+> expToDoc exp
+    entry (nm, exp) = jsIdent nm ++ ":" <+> expToDoc exp
 
 expToDoc (LitString str) = jsString str
 expToDoc (LitInt i) = text $ show i
 expToDoc (Apply x xs) = expToDoc x ++ "(" ++ commaSep (map expToDoc xs) ++ ")"
-expToDoc (Var nm) = text nm
-expToDoc (JLam nms (JReturn exp)) = text "(" <+> text (joinBy ", " nms) <+> ") =>" <+> "(" ++ expToDoc exp ++ ")"
-expToDoc (JLam nms body) = text "(" <+> text (joinBy ", " nms) <+> ") =>" <+> bracket "{" (stmtToDoc body) "}"
+expToDoc (Var nm) = jsIdent nm
+expToDoc (JLam nms (JReturn exp)) = text "(" <+> commaSep (map jsIdent nms) <+> ") =>" <+> "(" ++ expToDoc exp ++ ")"
+expToDoc (JLam nms body) = text "(" <+> commaSep (map jsIdent nms) <+> ") =>" <+> bracket "{" (stmtToDoc body) "}"
 expToDoc JUndefined = text "undefined"
 expToDoc (Index obj ix) = expToDoc obj ++ "[" ++ expToDoc ix ++ "]"
-expToDoc (Dot obj nm) = expToDoc obj ++ "." ++ text nm
+expToDoc (Dot obj nm) = expToDoc obj ++ "." ++ jsIdent nm
 
 caseBody : JSStmt e -> Doc
 caseBody stmt@(JReturn x) = nest 2 (line ++ stmtToDoc stmt)
@@ -176,11 +199,11 @@ altToDoc (JDefAlt stmt) = text "default" ++ ":" ++ caseBody stmt
 stmtToDoc (JSnoc x y) = stmtToDoc x </> stmtToDoc y
 stmtToDoc (JPlain x) = expToDoc x ++ ";"
 -- I might not need these split yet.
-stmtToDoc (JLet nm body) = "let" <+> text nm ++ ";" </> stmtToDoc body
-stmtToDoc (JAssign nm expr) = text nm <+> "=" <+> expToDoc expr ++ ";"
-stmtToDoc (JConst nm x) = text "const" <+> text nm <+> "=" <+/> expToDoc x ++ ";"
+stmtToDoc (JLet nm body) = "let" <+> jsIdent nm ++ ";" </> stmtToDoc body
+stmtToDoc (JAssign nm expr) = jsIdent nm <+> "=" <+> expToDoc expr ++ ";"
+stmtToDoc (JConst nm x) = text "const" <+> jsIdent nm <+> "=" <+/> expToDoc x ++ ";"
 stmtToDoc (JReturn x) = text "return" <+> expToDoc x ++ ";"
-stmtToDoc (JError str) = text "throw new Error(" ++ text str ++ ");"
+stmtToDoc (JError str) = text "throw new Error(" ++ jsString str ++ ");"
 stmtToDoc (JCase sc alts) =
   text "switch (" ++ expToDoc sc ++ ")" <+> bracket "{" (stack $ map altToDoc alts) "}"
 
@@ -204,12 +227,12 @@ entryToDoc (MkEntry name ty (Fn tm)) = do
   ct <- compileFun tm
   -- now show for ct...
   let body = stmtToDoc $ termToJS [] ct JPlain
-  pure (text "const" <+> text name <+> text "=" <+/> body)
+  pure (text "const" <+> jsIdent name <+> text "=" <+/> body)
 entryToDoc (MkEntry name type Axiom) = pure ""
 entryToDoc (MkEntry name type (TCon strs)) = pure $ dcon name (piArity type)
 entryToDoc (MkEntry name type (DCon arity str)) = pure $ dcon name arity
 entryToDoc (MkEntry name type PrimTCon) = pure $ dcon name (piArity type)
-entryToDoc (MkEntry name _ (PrimFn src)) = pure $ text "const" <+> text name <+> "=" <+> text src
+entryToDoc (MkEntry name _ (PrimFn src)) = pure $ text "const" <+> jsIdent name <+> "=" <+> text src
 
 export
 compile : M Doc

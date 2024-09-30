@@ -1,0 +1,22 @@
+module Prelude
+
+data Nat : U where
+  Z : Nat
+  S : Nat -> Nat
+
+data Maybe : U -> U where
+  Just : {a : U} -> a -> Maybe a
+  Nothing : {a : U} -> Maybe a
+
+data Either : U -> U -> U where
+  Left : {a b : U} -> a -> Either a b
+  Right : {a b : U} -> b -> Either a b
+
+-- TODO this is special cased in some languages, maybe for easier
+-- inference? Figure out why.
+
+infixr 0 _$_
+
+_$_ : {a b : U} -> (a -> b) -> a -> b
+f $ a = f a
+

@@ -1,0 +1,17 @@
+module JSLib
+
+ptype Int
+ptype String
+
+infixl 4 _+_
+infixl 5 _*_
+
+pfunc _+_ : Int -> Int -> Int := "(x,y) => x + y"
+pfunc _*_ : Int -> Int -> Int := "(x,y) => x * y"
+
+ptype JVoid
+
+-- REVIEW - maybe we only have body, use names from the pi-type and generate
+-- the arrow (or inline?) ourselves
+pfunc log : String -> JVoid := "x => console.log(x)"
+pfunc debug : {a : U} -> String -> a -> JVoid := "(_,x,a) => console.log(x,a)"

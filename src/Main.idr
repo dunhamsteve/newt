@@ -46,8 +46,10 @@ dumpSource = do
 writeSource : String -> M ()
 writeSource fn = do
   doc <- compile
-  Right _ <- writeFile fn $ render 90 doc
+  let src = "#!/usr/bin/env node\n" ++ render 90 doc ++ "\nmain();"
+  Right _ <- writeFile fn src
     | Left err => fail (show err)
+  Right _ <- chmodRaw fn 493 | Left err => fail (show err)
   pure ()
 
 parseFile : String -> M (String,Module)
