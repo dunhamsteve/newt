@@ -1,9 +1,7 @@
 
 ## TODO
 
-I may be done with `U` - I keep typing `Type`.
-
-- [ ] Sanitize JS idents, e.g. `_+_`
+- [x] Sanitize JS idents, e.g. `_+_`
 - [ ] Generate some programs that do stuff
 - [x] import
 - [ ] consider making meta application implicit in term, so its more readable when printed
@@ -50,6 +48,13 @@ I may be done with `U` - I keep typing `Type`.
 - [ ] magic newtype? (drop in codegen)
 - [ ] records / copatterns
 - [ ] vscode: syntax highlighting for String
+
+### Parsing
+
+- [ ] consider allowing σ etc in identifiers
+  - Probably need to merge oper / ident first and sort out mixfix in parsing.
+
+### Background
 
 - [ ] Read Ulf Norell thesis
 

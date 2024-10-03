@@ -36,7 +36,7 @@ export function activate(context: vscode.ExtensionContext) {
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        const match = line.match(/(INFO|ERROR) at \((\d+), (\d+)\): (.*)/);
+        const match = line.match(/(INFO|ERROR) at \((\d+), (\d+)\):\s*(.*)/);
         if (match) {
           let [_full, kind, line, column, message] = match;
           let lnum = Number(line);

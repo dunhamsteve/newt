@@ -77,6 +77,7 @@ parameters (ctx: Context)
           else go xs (k :: acc)
       go (xs :< v) _ = error emptyFC "non-variable in pattern \{show v}"
 
+  -- REVIEW why am I converting to Tm?
   -- we have to "lift" the renaming when we go under a lambda
   -- I think that essentially means our domain ix are one bigger, since we're looking at lvl
   -- in the codomain, so maybe we can just keep that value
@@ -88,7 +89,7 @@ parameters (ctx: Context)
       goSpine ren lvl tm [<] = pure tm
       goSpine ren lvl tm (xs :< x) = do
         xtm <- go ren lvl x
-        goSpine ren lvl (App emptyFC tm xtm) xs
+        pure $ App emptyFC !(goSpine ren lvl tm xs) xtm
 
       go ren lvl (VVar fc k sp) = case findIndex (== k) ren of
         Nothing => error fc "scope/skolem thinger"
@@ -244,7 +245,7 @@ unifyCatch fc ctx ty' ty = do
       debug "fail \{show ty'} \{show ty}"
       a <- quote ctx.lvl ty'
       b <- quote ctx.lvl ty
-      let msg = "\n  failed to unify \{pprint names a}\n    with \{pprint names b}\n  " <+> str
+      let msg = "unification failure\n  failed to unify \{pprint names a}\n    with \{pprint names b}\n  " <+> str
       throwError (E fc msg)
     case res of
       MkResult [] => pure ()
@@ -255,7 +256,7 @@ unifyCatch fc ctx ty' ty = do
         a <- quote ctx.lvl ty'
         b <- quote ctx.lvl ty
         let names = toList $ map fst ctx.types
-        let msg = "\n  failed to unify \{pprint names a}\n    with \{pprint names b}"
+        let msg = "unification failure\n  failed to unify \{pprint names a}\n    with \{pprint names b}"
         throwError (E fc msg)
         -- error fc "Unification yields constraints \{show cs.constraints}"
 
@@ -404,15 +405,20 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   -- We get unification constraints from matching the data constructors
   -- codomain with the scrutinee type
   debug "unify dcon dom with scrut\n  \{show ty'}\n  \{show scty}"
-  Just res <- catchError {e = Error} (Just <$> unify ctx' (length ctx'.env) ty' scty) (\_ => pure Nothing)
+  Just res <- catchError {e = Error} (Just <$> unify ctx' (length ctx'.env) ty' scty)
+              (\(E _ msg) => do
+                  debug "SKIP \{dcName} because unify error \{msg}"
+                  pure Nothing)
     | _ => pure Nothing
 
   -- if the value is already constrained to a different constructor, return Nothing
   debug "scrut \{scnm} constrained to \{show $ forcedName ctx scnm}"
   let True = (case forcedName ctx scnm of
-                Just nm => nm == scnm
+                Just nm => nm == dcName
                 _ => True)
-    | _ => pure Nothing
+    | _ => do
+      debug "SKIP \{dcName} because \{show scnm} forced to \{show $ forcedName ctx scnm}"
+      pure Nothing
 
   -- Additionally, we constrain the scrutinee's variable to be
   -- dcon applied to args
@@ -571,7 +577,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
 
   cons <- getConstructors ctx (getFC pat) scty
   alts <- traverse (buildCase ctx prob scnm scty) cons
-
+  when (length (catMaybes alts) == 0) $ error (ctx.fc) "no alts"
   -- TODO check for empty somewhere?
   pure $ Case fc sctm (catMaybes alts)
 

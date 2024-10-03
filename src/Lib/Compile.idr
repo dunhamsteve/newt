@@ -1,10 +1,4 @@
--- TODO I think I'm missing the bit where a case might need to be assigned to a variable.
--- E.g. case statement whose result is passed to complex expression should assign a variable
--- then the stuff happens. We'd need to know more about the callback for that.
--- TODO And then get primitives and a way to declare extern functions.  That may get us
--- to utility
-
--- Audit how much "outside" stuff could pile up in the continuation.
+-- TODO Audit how much "outside" stuff could pile up in the continuation.
 module Lib.Compile
 
 import Lib.Types

@@ -102,7 +102,6 @@ quoteSp : (lvl : Nat) -> Tm -> SnocList Val -> M Tm
 quoteSp lvl t [<] = pure t
 quoteSp lvl t (xs :< x) =
   pure $ App emptyFC !(quoteSp lvl t xs) !(quote lvl x)
-  -- quoteSp lvl (App t !(quote lvl x)) xs  -- snoc says previous is right
 
 quote l (VVar fc k sp) = if k < l
   then quoteSp l (Bnd emptyFC ((l `minus` k) `minus` 1)) sp -- level to index

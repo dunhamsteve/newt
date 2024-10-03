@@ -1,4 +1,4 @@
-module Case3
+module TestCase4
 
 data Nat : U where
   Z : Nat
@@ -47,7 +47,31 @@ zipWith : {a b c : U} {m : Nat} -> (a -> b -> c) -> Vect m a -> Vect m b -> Vect
 zipWith f Nil Nil = Nil
 zipWith f (x :: xs) (y :: ys) = f x y :: zipWith f xs ys
 
+-- NOW cases very broken here - empty switches
 transpose : {a : U} {m n : Nat} -> Vect m (Vect n a) -> Vect n (Vect m a)
--- TODO Doesn't work without the (forced) Z, investigate
-transpose {a} {Z} {n} Nil = vec n Nil
-transpose {a} {S k} {n} (x :: xs) = zipWith (_::_) x (transpose xs)
+transpose {a} {m} {n} Nil = vec n Nil
+-- TODO If I put S k in here for m we get a unification error on the RHS
+transpose {a} {m} {n} (x :: xs) = zipWith (_::_) x (transpose xs)
+
+ptype Int
+
+myArr : Vect (S (S (S Z))) (Vect (S (S Z)) Int)
+myArr = (1 :: 2 :: Nil) :: (3 :: 4 :: Nil) :: (5 :: 6 :: Nil) :: Nil
+
+
+/-
+
+-- this possibly needs dynamic pattern unification
+-- It's complaining about a meta in a pattern
+data Ix : U where
+
+infixr 2 _:-:_
+data Path : (Sig : Ix -> Ix -> U) (i j : Ix) -> U where
+  Stop : {Sig : Ix -> Ix -> U} {i : Ix} -> Path Sig i i
+  _:-:_ : {Sig : Ix -> Ix -> U} {i j k : Ix} -> Sig i j -> Path Sig j k -> Path Sig i k
+
+
+pmap : {s t : Ix -> Ix -> U} -> (f : {i j : Ix} -> s i j -> t i j) -> {i j : Ix} -> Path s i j -> Path t i j
+pmap f Stop = Stop
+pmap f (s :-: ss) = f s :-: pmap f ss
+-/

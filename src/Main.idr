@@ -71,7 +71,7 @@ loadModule base stk name = do
   (src, res) <- parseFile fn
   putStrLn "module \{res.name}"
   let True = name == res.name
-    | _ => fail "module name \{show res.name} doesn't match file name \{show fn}"
+    | _ => fail "ERROR at (0, 0): module name \{show res.name} doesn't match file name \{show fn}"
   -- TODO separate imports and detect loops / redundant
   for_ res.imports $ \ (MkImport fc name') => do
     -- we could use `fc` if it had a filename in it

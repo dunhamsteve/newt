@@ -73,17 +73,6 @@ pArg = do
   fc <- getPos
   (Explicit,fc,) <$> atom <|> (Implicit,fc,) <$> braces typeExpr
 
-
--- starter pack, but we'll move some to prelude
--- operators : List (String, Int, Fixity)
--- operators = [
---   ("=",2,Infix),
---   ("+",4,InfixL),
---   ("-",4,InfixL),
---   ("*",5,InfixL),
---   ("/",5,InfixL)
--- ]
-
 parseApp : Parser Raw
 parseApp = do
   fc <- getPos
