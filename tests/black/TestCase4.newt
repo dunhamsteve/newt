@@ -49,9 +49,9 @@ zipWith f (x :: xs) (y :: ys) = f x y :: zipWith f xs ys
 
 -- NOW cases very broken here - empty switches
 transpose : {a : U} {m n : Nat} -> Vect m (Vect n a) -> Vect n (Vect m a)
-transpose {a} {m} {n} Nil = vec n Nil
--- TODO If I put S k in here for m we get a unification error on the RHS
-transpose {a} {m} {n} (x :: xs) = zipWith (_::_) x (transpose xs)
+transpose {a} {Z} {n} Nil = vec n Nil
+transpose {a} {S z} {n} (_::_ {a'} {j} x xs) = zipWith (_::_) x (transpose xs)
+-- transpose {a} {m} {n} (_::_ {a'} {j} x xs) = zipWith (_::_) x (transpose xs)
 
 ptype Int
 

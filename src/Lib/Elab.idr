@@ -21,6 +21,7 @@ data Pden = PR Nat Nat (List Nat)
 pprint : Context -> Val -> M String
 pprint ctx v = pure $ pprint (names ctx) !(quote (length ctx.env) v)
 
+||| return Bnd and type for name
 export
 lookupName : Context -> String  -> Maybe (Tm, Val)
 lookupName ctx name = go 0 ctx.types
@@ -29,6 +30,15 @@ lookupName ctx name = go 0 ctx.types
     go ix [] = Nothing
     -- FIXME - we should stuff a Binder of some sort into "types"
     go ix ((nm, ty) :: xs) = if nm == name then Just (Bnd emptyFC ix, ty) else go (S ix) xs
+
+export
+lookupDef : Context -> String  -> Maybe Val
+lookupDef ctx name = go 0 ctx.types ctx.env
+  where
+    go : Nat -> Vect n (String, Val) -> List Val -> Maybe Val
+    go ix ((nm, ty) :: xs) (v :: vs) = if nm == name then Just v else go (S ix) xs vs
+    go ix _ _ = Nothing
+
 
 -- IORef for metas needs IO
 export
@@ -257,6 +267,7 @@ unifyCatch fc ctx ty' ty = do
         b <- quote ctx.lvl ty
         let names = toList $ map fst ctx.types
         let msg = "unification failure\n  failed to unify \{pprint names a}\n    with \{pprint names b}"
+        let msg = msg ++ "\nconstraints \{show cs.constraints}"
         throwError (E fc msg)
         -- error fc "Unification yields constraints \{show cs.constraints}"
 
@@ -412,51 +423,69 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
     | _ => pure Nothing
 
   -- if the value is already constrained to a different constructor, return Nothing
-  debug "scrut \{scnm} constrained to \{show $ forcedName ctx scnm}"
-  let True = (case forcedName ctx scnm of
-                Just nm => nm == dcName
-                _ => True)
-    | _ => do
-      debug "SKIP \{dcName} because \{show scnm} forced to \{show $ forcedName ctx scnm}"
-      pure Nothing
+  debug "scrut \{scnm} constrained to \{show $ lookupDef ctx scnm}"
 
-  -- Additionally, we constrain the scrutinee's variable to be
-  -- dcon applied to args
-  let Just x = findIndex ((==scnm) . fst) ctx'.types
-    | Nothing => error ctx.fc "\{scnm} not is scope?"
-  let lvl = ((length ctx'.env) `minus` (cast x)) `minus` 1
-  let scon : (Nat, Val) = (lvl, VRef ctx.fc dcName (DCon arity dcName) sc)
+  let scdef = lookupDef ctx scnm
 
-  debug "scty \{show scty}"
-  debug "UNIFY results \{show res.constraints}"
-  debug "before types: \{show ctx'.types}"
-  debug "before env: \{show ctx'.env}"
-  debug "SC CONSTRAINT: \{show scon}"
+  -- let forced = lookupDef ctx scnm
+  case lookupDef ctx scnm of
+    Just val@(VRef fc nm y sp) =>
+      if nm /= dcName
+      then do
+        debug "SKIP \{dcName} because \{scnm} forced to \{show val}"
+        pure Nothing
+      else do
+        debug "DOTTED \{dcName} \{show val}"
 
-  -- push the constraints into the environment by turning bind into define
-  -- Is this kosher?  It might be a problem if we've already got metas over
-  -- this stuff, because it intends to ignore defines.
-  ctx' <- updateContext ctx' (scon :: res.constraints)
-  debug "context types: \{show ctx'.types}"
-  debug "context env: \{show ctx'.env}"
+        -- TODO - I think we need to define the context vars to sp via updateContext
 
-  -- What if all of the pattern vars are defined to meta
+        debug "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
+        debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
+        for_ prob.clauses $ (\x => debug "    \{show x}")
+        let clauses = mapMaybe (rewriteClause vars) prob.clauses
+        debug "and now:"
+        for_ clauses $ (\x => debug "    \{show x}")
+        when (length clauses == 0) $ error ctx.fc "Missing case for \{dcName} splitting \{scnm}"
+        tm <- buildTree ctx' (MkProb clauses prob.ty)
+        pure $ Just $ CaseCons dcName (map getName vars) tm
 
-  debug "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
-  debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
-  for_ prob.clauses $ (\x => debug "    \{show x}")
-  let clauses = mapMaybe (rewriteClause vars) prob.clauses
-  debug "and now:"
-  for_ clauses $ (\x => debug "    \{show x}")
+    _ => do
+        Right res <- tryError {e = Error} (unify ctx' (length ctx'.env) ty' scty)
+          | Left (E _ msg) => do
+            debug "SKIP \{dcName} because unify error \{msg}"
+            pure Nothing
 
-  -- TODO it would be nice to know which position we're splitting and the splits that
-  -- we've already done, so we have a good picture of what is missing for error reporting.
-  -- This could be carried forward as a continuation or data, or we could decorate the
-  -- error on the way back.
+        -- Constrain the scrutinee's variable to be dcon applied to args
+        let Just x = findIndex ((==scnm) . fst) ctx'.types
+          | Nothing => error ctx.fc "\{scnm} not is scope?"
+        let lvl = ((length ctx'.env) `minus` (cast x)) `minus` 1
+        let scon : (Nat, Val) = (lvl, VRef ctx.fc dcName (DCon arity dcName) sc)
 
-  when (length clauses == 0) $ error ctx.fc "Missing case for \{dcName} splitting \{scnm}"
-  tm <- buildTree ctx' (MkProb clauses prob.ty)
-  pure $ Just $ CaseCons dcName (map getName vars) tm
+        debug "scty \{show scty}"
+        debug "UNIFY results \{show res.constraints}"
+        debug "before types: \{show ctx'.types}"
+        debug "before env: \{show ctx'.env}"
+        debug "SC CONSTRAINT: \{show scon}"
+
+        -- push the constraints into the environment by turning bind into define
+        -- Is this kosher?  It might be a problem if we've already got metas over
+        -- this stuff, because it intends to ignore defines.
+        ctx' <- updateContext ctx' (scon :: res.constraints)
+
+        debug "context types: \{show ctx'.types}"
+        debug "context env: \{show ctx'.env}"
+
+        -- What if all of the pattern vars are defined to meta
+
+        debug "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
+        debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
+        for_ prob.clauses $ (\x => debug "    \{show x}")
+        let clauses = mapMaybe (rewriteClause vars) prob.clauses
+        debug "and now:"
+        for_ clauses $ (\x => debug "    \{show x}")
+        when (length clauses == 0) $ error ctx.fc "Missing case for \{dcName} splitting \{scnm}"
+        tm <- buildTree ctx' (MkProb clauses prob.ty)
+        pure $ Just $ CaseCons dcName (map getName vars) tm
   where
     getName : Bind -> String
     getName (MkBind nm _ _) = nm
@@ -528,11 +557,22 @@ makeClause top (lhs, rhs) = do
   pats <- traverse (mkPat top) args
   pure $ MkClause (getFC lhs) [] pats rhs
 
+
+dumpCtx : Context -> M String
+dumpCtx ctx = do
+  let names = (toList $ map fst ctx.types)
+  -- I want to know which ones are defines. I should skip the `=` bit if they match, I'll need indices in here too.
+  env <- for (zip ctx.env (toList ctx.types)) $ \(v, n, ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)} = \{pprint names !(quote ctx.lvl v)}"
+  let msg = unlines (toList $ reverse env) -- ++ "  -----------\n" ++ "  goal \{pprint names ty'}"
+  pure msg
+
 checkDone : Context -> List (String, Pattern) -> Raw -> Val -> M Tm
 checkDone ctx [] body ty = do
   debug "DONE-> check body \{show body} at \{show ty}"
-  debug "\{show ctx.env}"
-  debug "\{show ctx.types}"
+  -- TODO dump context function
+  debugM $ dumpCtx ctx
+  debug "ENV \{show ctx.env}"
+  debug "TY \{show ctx.types}"
   got <- check ctx body ty
   debug "DONE<- got \{pprint (names ctx) got}"
   pure got
