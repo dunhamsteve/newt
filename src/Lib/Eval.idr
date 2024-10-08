@@ -56,7 +56,11 @@ evalCase env mode sc@(VRef _ nm y sp) (cc@(CaseCons name nms t) :: xs) =
     go env [<] rest = pure Nothing
 
 evalCase env mode sc (CaseDefault u :: xs) = pure $ Just !(eval (sc :: env) mode u)
-evalCase env mode sc _ = pure Nothing
+evalCase env mode sc cc = do
+  debug "CASE BAIL sc \{show sc} vs \{show cc}"
+  debug "env is \{show env}"
+  pure Nothing
+
 
 bind : Val -> Env -> Env
 bind v env = v :: env

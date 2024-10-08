@@ -30,6 +30,7 @@
     - keep as implicit and do auto if the type constructor is flagged auto
     - keep as implicit and mark auto, behavior overlaps a lot with implicit
     - have separate type of implict with `{{}}`
+    - `TypeClass.newt` is the exercise for this
 - [ ] do blocks
 - [ ] some solution for `+` problem (classes? ambiguity?)
 - [x] show compiler failure in the editor (exit code != 0)

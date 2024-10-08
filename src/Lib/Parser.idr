@@ -93,6 +93,7 @@ parseOp = parseApp >>= go 0
         let Just (p,fix) = lookup op' ops
           -- this is eaten, but we need `->` and `:=` to not be an operator to have fatal here
          | Nothing => case op of
+         -- Location is poor on these because we pull off of the remaining token list...
           "->" => fail "no infix decl for \{op}"
           ":=" => fail "no infix decl for \{op}"
           op => fatal "no infix decl for \{op}"
@@ -312,7 +313,7 @@ parseData : Parser Decl
 parseData = do
   fc <- getPos
   keyword "data"
-  name <- uident
+  name <- uident <|> token MixFix
   keyword ":"
   ty <- typeExpr
   keyword "where"

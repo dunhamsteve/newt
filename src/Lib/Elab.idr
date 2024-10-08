@@ -255,7 +255,7 @@ unifyCatch fc ctx ty' ty = do
       debug "fail \{show ty'} \{show ty}"
       a <- quote ctx.lvl ty'
       b <- quote ctx.lvl ty
-      let msg = "unification failure\n  failed to unify \{pprint names a}\n    with \{pprint names b}\n  " <+> str
+      let msg = "unification failure: \{str}\n  failed to unify \{pprint names a}\n    with \{pprint names b}\n  "
       throwError (E fc msg)
     case res of
       MkResult [] => pure ()
@@ -402,7 +402,7 @@ forcedName ctx nm = case lookupName ctx nm of
 -- return Nothing if dcon doesn't unify with scrut
 buildCase : Context -> Problem -> String -> Val -> (String, Nat, Tm) -> M (Maybe CaseAlt)
 buildCase ctx prob scnm scty (dcName, arity, ty) = do
-  debug "CASE \{scnm} \{dcName} \{pprint (names ctx) ty}"
+  debug "CASE \{scnm} match \{dcName} ty \{pprint (names ctx) ty}"
   vty <- eval [] CBN ty
   (ctx', ty', vars, sc) <- extendPi ctx (vty) [<] [<]
 
@@ -573,6 +573,15 @@ checkDone ctx [] body ty = do
   debugM $ dumpCtx ctx
   debug "ENV \{show ctx.env}"
   debug "TY \{show ctx.types}"
+  -- I'm running an eval here to run case statements that are
+  -- unblocked by lets in the env. (Tree.newt:cmp)
+  -- The case eval code only works in the Tm -> Val case at the moment.
+  -- we don't have anything like `vapp`
+  -- NOW In Tree.newt we have a case/case unification that might
+  -- have succeeded if it was left as a functino call.
+  ty <- quote (length ctx.env) ty
+  ty <- eval ctx.env CBV ty
+  debug "check at \{show ty}"
   got <- check ctx body ty
   debug "DONE<- got \{pprint (names ctx) got}"
   pure got
@@ -602,7 +611,6 @@ buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ str 
   Lam fc nm <$> buildTree ctx' ({ clauses := clauses, ty := vb } prob)
 buildTree ctx prob@(MkProb ((MkClause fc cons pats@(x :: xs) expr) :: cs) ty) =
   error fc "Extra pattern variables \{show pats}"
-buildTree ctx prob@(MkProb ((MkClause fc [] [] expr) :: cs) ty) = check (withPos ctx fc) expr ty
 -- need to find some name we can split in (x :: xs)
 -- so LHS of constraint is name (or VVar - if we do Val)
 -- then run the split

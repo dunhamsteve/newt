@@ -102,13 +102,12 @@ HasFC Tm where
 covering
 Show Tm
 
-covering
+public export covering
 Show CaseAlt where
   show (CaseDefault tm) = "_ => \{show tm}"
   show (CaseCons nm args tm) = "\{nm} \{unwords args} => \{show tm}"
 
--- public export
-covering
+public export covering
 Show Tm where
   show (Bnd _ k) = "(Bnd \{show k})"
   show (Ref _ str _) = "(Ref \{show str})"

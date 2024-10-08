@@ -38,12 +38,15 @@ I have `Let` in the core language. Partly because I'd like this to make it into 
 
 I've got no idea what I'm doing here. I worked off of Jesper Cockx "Elaborating Dependent (Co)pattern Matching", leaving out codata for now.
 
-For the dependent thing, I've change unify to return `VVar` constraints. I think this is an error typechecking on
-RHS (meta solutions are handled separately). On the LHS, I'm rewriting the environment to turn the var from a bind
-to a define. Unification has been tweaked to look up `VVar` in environment. Bind will hand back the same `VVar`.
+For the dependent thing, I've change unify to return `VVar` constraints. I think such constraints would be an error while typechecking on RHS (meta solutions are handled separately). On the LHS, I'm rewriting the environment to turn the var from a bind to a define. Unification has been tweaked to look up `VVar` in environment. Bind will hand back the same `VVar`.
 
-Some of this I could probably do with subst, but the RHS is `Raw`, it takes typechecking to turn it into a clean `Tm`,
-and I need this information for the typechecking.
+Some of this I could probably do with subst, but the RHS is `Raw`, it takes typechecking to turn it into a clean `Tm`, and I need this information for the typechecking.  To substitute into the goal type for the RHS, I am now
+doing a quote and eval to get case to expand. This is a bit of a stopgap because case is only eval'd when going
+from `Tm` to `Val`. I think I'll need a way to eval a VCase during unification, as we do with function applications.
+
+## Evaluation
+
+Following kovacs, I'm putting `VVar` into context env when I go under binders. This avoids substitution.
 
 ## Issues
 
