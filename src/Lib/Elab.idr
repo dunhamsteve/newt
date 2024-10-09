@@ -48,12 +48,22 @@ forceMeta (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Solved k t) => vappSpine t sp >>= forceMeta
 forceMeta x = pure x
 
+tryEval : String -> SnocList Val -> M (Maybe Val)
+tryEval k sp =
+  case lookup k !(get) of
+      Just (MkEntry name ty (Fn tm)) => do
+          vtm <- eval [] CBN tm
+          case !(vappSpine vtm sp) of
+            VCase{} => pure Nothing
+            v => pure $ Just v
+      _ => pure Nothing
+
 -- Lennart needed more forcing for recursive nat,
 forceType : Val -> M Val
-forceType (VRef fc nm def sp) =
-    case lookup nm !(get) of
-      (Just (MkEntry name type (Fn t))) => vappSpine !(eval [] CBN t) sp
-      _ => pure (VRef fc nm def sp)
+forceType tm@(VRef fc nm def sp) =
+  case !(tryEval nm sp) of
+    Just tm => pure tm
+    _ => pure tm
 forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Unsolved x k xs _) => pure (VMeta fc ix sp)
   (Solved k t) => vappSpine t sp >>= forceType
@@ -208,17 +218,12 @@ parameters (ctx: Context)
         if k == k' then do
           debug "unify \{show l} spine at \{k} \{show sp} \{show sp'}"
           unifySpine l (k == k') sp sp'
-        else case lookup k !(get) of
-          Just (MkEntry name ty (Fn tm)) => do
-            vtm <- eval [] CBN tm
-            v <- vappSpine vtm sp
-            unify l v u'
-          _ => case lookup k' !(get) of
-            Just (MkEntry name ty (Fn tm)) => do
-              vtm <- eval [] CBN tm
-              v <- vappSpine vtm sp'
-              unify l t' v
-            _ => error fc "vref mismatch \{show k} \{show k'} -- \{show sp} \{show sp'}"
+        else do
+          Nothing <- tryEval k sp
+            | Just v => unify l v u'
+          Nothing <- tryEval k' sp'
+            | Just v => unify l t' v
+          error fc "vref mismatch \{show k} \{show k'} -- \{show sp} \{show sp'}"
 
       (VU _, VU _) => pure neutral
       -- Lennart.newt cursed type references itself
