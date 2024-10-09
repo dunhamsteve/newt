@@ -72,10 +72,25 @@ bind v env = v :: env
 --   - Applications headed by top-level variables are lazy.
 --   - Any other function application is call-by-value during evaluation.
 
--- TODO - probably want to figure out gluing and handle constructors
+-- TODO maybe add glueing
+
+-- So this is a tricky bit - I don't want to expand top level functions
+-- if I can't get past the case tree.  Kovacs' eval doesn't have the spine
+-- when it starts applying. So I'll collect a spine as soon as I see an App
+-- Try to apply the Ref, and fall back to vappSpine.
+evalSpine : Env -> Mode -> Tm -> List Val -> M Val
+evalSpine env mode (App _ t u) sp = evalSpine env mode t (!(eval env mode u) :: sp)
+evalSpine env mode (Ref fc nm (Fn tm)) sp = do
+  v <- eval env mode tm
+  let sp' = [<] <>< sp
+  case !(vappSpine v sp') of
+    (VCase x sc xs) => pure $ VRef fc nm (Fn tm) sp'
+    v => pure v
+evalSpine env mode tm sp = vappSpine !(eval env mode tm) ([<] <>< sp)
+
 eval env mode (Ref _ x (Fn tm)) = eval env mode tm
 eval env mode (Ref fc x def) = pure $ VRef fc x def [<]
-eval env mode (App _ t u) = vapp !(eval env mode t) !(eval env mode u)
+eval env mode (App _ t u) = evalSpine env mode t [!(eval env mode u)]
 eval env mode (U fc) = pure (VU fc)
 eval env mode (Meta fc i) =
   case !(lookupMeta i) of

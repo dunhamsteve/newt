@@ -230,7 +230,7 @@ parameters (ctx: Context)
           _ => error ctx.fc "unify failed \{show t'} =?= \{show u'} [no Fn]\n  env is \{show ctx.env} \{show $ map fst ctx.types}"
 
       (VRef fc k def sp, u) => do
-        debug "expand %ref \{k} =?= \{show u}"
+        debug "expand %ref \{k} \{show sp} =?= \{show u}"
         case lookup k !(get) of
           Just (MkEntry name ty (Fn tm)) => unify l !(vappSpine !(eval [] CBN tm) sp) u
           _ => error ctx.fc "unify failed \{show t'} [no Fn] =?= \{show u'}\n  env is \{show ctx.env} \{show $ map fst ctx.types}"
@@ -690,9 +690,10 @@ check ctx tm ty = case (tm, !(forceType ty)) of
   (t@(RLam fc nm icit tm), ty) =>
             error fc "Expected pi type, got \{!(prvalCtx ty)}"
 
+  -- NOW Test1.newt passes with Explicit, TestCase4.newt passes with Implicit
   (tm, ty@(VPi fc nm' Implicit a b)) => do
     let names = toList $ map fst ctx.types
-    debug "XXX edge add implicit lambda to \{show tm}"
+    debug "XXX edge add implicit lambda {\{nm'} : \{show a}} to \{show tm} "
     let var = VVar fc (length ctx.env) [<]
     ty' <- b $$ var
     debugM $ pure "XXX ty' is \{!(prvalCtx {ctx=(extend ctx nm' a)} ty')}"

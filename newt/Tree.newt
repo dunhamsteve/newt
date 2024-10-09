@@ -56,7 +56,7 @@ data T23 : Bnd -> Bnd -> Nat -> U where
     (tlx : T23 l (N x) h) (txy : T23 (N x) (N y) h) (tyu : T23 (N y) u h) ->
     T23 l u (S h)
 
--- -- 56:
+-- 56:
 
 infixl 5 _*_
 infixl 1 _,_
