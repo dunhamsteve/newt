@@ -364,7 +364,7 @@ getConstructors ctx scfc (VRef fc nm _ _) = do
         (Just (MkEntry name type (DCon k str))) => pure (name, k, type)
         Just _ => error fc "Internal Error: \{nm} is not a DCon"
         Nothing => error fc "Internal Error: DCon \{nm} not found"
-getConstructors ctx scfc tm = error scfc "Can't split on type: \{!(pprint ctx tm)}"
+getConstructors ctx scfc tm = error scfc "Can't split - not VRef: \{!(pprint ctx tm)}"
 
 -- Extend environment with fresh variables from a pi-type
 -- the pi-type here is the telescope of a constructor
@@ -420,7 +420,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
 
   -- We get unification constraints from matching the data constructors
   -- codomain with the scrutinee type
-  debug "unify dcon dom with scrut\n  \{show ty'}\n  \{show scty}"
+  debug "unify dcon cod with scrut\n  \{show ty'}\n  \{show scty}"
   Just res <- catchError {e = Error} (Just <$> unify ctx' (length ctx'.env) ty' scty)
               (\(E _ msg) => do
                   debug "SKIP \{dcName} because unify error \{msg}"
@@ -430,9 +430,6 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   -- if the value is already constrained to a different constructor, return Nothing
   debug "scrut \{scnm} constrained to \{show $ lookupDef ctx scnm}"
 
-  let scdef = lookupDef ctx scnm
-
-  -- let forced = lookupDef ctx scnm
   case lookupDef ctx scnm of
     Just val@(VRef fc nm y sp) =>
       if nm /= dcName
@@ -628,9 +625,14 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
   let Just (sctm, scty) := lookupName ctx scnm
     | _ => error fc "Internal Error: can't find \{scnm} in environment"
 
-  cons <- getConstructors ctx (getFC pat) scty
+  -- expand vars that may be solved
+  scty' <- unlet ctx scty
+  debug "EXP \{show scty} -> \{show scty'}"
+  cons <- getConstructors ctx (getFC pat) scty'
+  debug "CONS \{show $ map fst cons}"
   alts <- traverse (buildCase ctx prob scnm scty) cons
-  when (length (catMaybes alts) == 0) $ error (ctx.fc) "no alts"
+  debug "GOTALTS \{show alts}"
+  when (length (catMaybes alts) == 0) $ error (fc) "no alts for \{show scty'}"
   -- TODO check for empty somewhere?
   pure $ Case fc sctm (catMaybes alts)
 
