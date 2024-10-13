@@ -45,7 +45,7 @@ _ <<= Top = Unit
 _ <<= _ = Void
 
 data Intv : Bnd -> Bnd -> U where
-  MkInt : {l u : Bnd} (x : Nat) (lx : l <<= N x) (xu : N x <<= u) -> Intv l u
+  MkI : {l u : Bnd} (x : Nat) (lx : l <<= N x) (xu : N x <<= u) -> Intv l u
 
 data T23 : Bnd -> Bnd -> Nat -> U where
   leaf : {l u : Bnd} {h : Nat} (lu : l <<= u) -> T23 l u Z
@@ -68,3 +68,16 @@ data _*_ : (A B : U) -> U where
 
 TooBig : Bnd -> Bnd -> Nat -> U
 TooBig l u h = Sg Nat (\ x => T23 l (N x) h * T23 (N x) u h)
+
+insert : {h : Nat} {l u : Bnd} -> Intv l u -> T23 l u h -> TooBig l u h + T23 l u h
+insert (MkI x lx xu) (leaf lu) = ?
+insert (MkI x lx xu) (node2 x1 t t1) = ?
+-- TODO - unify error the typ
+insert (MkI x lx xu) (node3 y z tly tyz tzu) = case cmp x y of
+  -- u := N y is not solved at this time
+  inl xy => case insert (MkI {_} {N y} x lx xy) tly of
+    -- It's having trouble with Foo because of a spine length issue
+    -- Idris says this isn't covering, even with just `inl a` , `inr a`
+    inl (v , (Foo tlv tvy)) => inl (y, node2 v tlv tvy, node2 z tyz tzy)
+    inr x1 => ?
+  inr x1 => ?
