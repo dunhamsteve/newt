@@ -57,6 +57,10 @@ lit = intLit <|> stringLit
 export typeExpr : Parser Raw
 export term : (Parser Raw)
 
+-- helpful when we've got some / many and need FC for each
+withPos : Parser a -> Parser (FC, a)
+withPos pa = (,) <$> getPos <*> pa
+
 -- the inside of Raw
 atom : Parser Raw
 atom = RU <$> getPos <* keyword "U"
@@ -110,7 +114,6 @@ letExpr = do
   alts <- startBlock $ someSame $ letAssign
   keyword' "in"
   scope <- typeExpr
-  fc <- getPos
   pure $ foldl (\ acc, (n,fc,v) => RLet fc n (RImplicit fc) v acc) scope alts
   where
     letAssign : Parser (Name,FC,Raw)
@@ -133,11 +136,10 @@ export
 lamExpr : Parser Raw
 lamExpr = do
   keyword "\\" <|> keyword "λ"
-  args <- some pLetArg
+  args <- some $ withPos pLetArg
   keyword "=>"
   scope <- typeExpr
-  fc <- getPos
-  pure $ foldr (\(icit, name, ty), sc => RLam fc name icit sc) scope args
+  pure $ foldr (\(fc, icit, name, ty), sc => RLam fc name icit sc) scope args
 
 
 -- Idris just has a term on the LHS and sorts it out later..
@@ -171,11 +173,12 @@ caseAlt = do
 export
 caseExpr : Parser Raw
 caseExpr = do
+  fc <- getPos
   keyword "case"
   sc <- term
   keyword "of"
   alts <- startBlock $ someSame $ caseAlt
-  pure $ RCase !(getPos) sc alts
+  pure $ RCase fc sc alts
 
 -- This hits an idris codegen bug if parseOp is last and Lazy
 term =  caseExpr
@@ -184,23 +187,22 @@ term =  caseExpr
     <|> parseOp
 
 
-ebind : Parser (List (String, Icit, Raw))
+ebind : Parser (List (FC, String, Icit, Raw))
 ebind = do
   sym "("
-  names <- some (ident <|> uident)
+  names <- some $ withPos (ident <|> uident)
   sym ":"
   ty <- typeExpr
   sym ")"
-  pure $ map (\name => (name, Explicit, ty)) names
+  pure $ map (\(pos, name) => (pos, name, Explicit, ty)) names
 
-ibind : Parser (List (String, Icit, Raw))
+ibind : Parser (List (FC, String, Icit, Raw))
 ibind = do
   sym "{"
-  names <- some (ident <|> uident)
+  names <- some $ withPos (ident <|> uident)
   ty <- optional (sym ":" >> typeExpr)
-  pos <- getPos
   sym "}"
-  pure $ map (\name => (name, Implicit, fromMaybe (RImplicit pos) ty)) names
+  pure $ map (\(pos,name) => (pos, name, Implicit, fromMaybe (RImplicit pos) ty)) names
 
 arrow : Parser Unit
 arrow = sym "->" <|> sym "→"
@@ -211,20 +213,20 @@ binders = do
   binds <- many (ibind <|> try ebind)
   arrow
   scope <- typeExpr
-  fc <- getPos
-  pure $ foldr (mkBind fc) scope (join binds)
+  pure $ foldr (uncurry mkBind) scope (join binds)
   where
     mkBind : FC -> (String, Icit, Raw) -> Raw -> Raw
     mkBind fc (name, icit, ty) scope = RPi fc (Just name) icit ty scope
 
 typeExpr = binders
   <|> do
+        fc <- getPos
         exp <- term
         scope <- optional (arrow *> typeExpr)
         case scope of
           Nothing      => pure exp
           -- consider Maybe String to represent missing
-          (Just scope) => pure $ RPi !(getPos) Nothing Explicit exp scope
+          (Just scope) => pure $ RPi fc Nothing Explicit exp scope
 
 
 -- And top level stuff
@@ -249,23 +251,6 @@ parseMixfix = do
   op <- token MixFix
   addOp op (cast prec) fix
   pure $ PMixFix fc op (cast prec) fix
-
--- We can be much more precise with a context
-raw2pat : Raw -> SnocList Pattern -> M Pattern
-raw2pat (RVar x nm) sp = ?rhs_1
-raw2pat (RApp x t u icit) sp = ?rhs_3
-raw2pat (RHole x) sp = ?rhs_11
-raw2pat (RU x) sp = ?rhs_4
-raw2pat (RLit x y) sp = ?rhs_8
-
-raw2pat (RLam x nm icit ty) sp = ?rhs_2
-raw2pat (RPi x nm icit ty sc) sp = ?rhs_5
-raw2pat (RLet x nm ty v sc) sp = ?rhs_6
-raw2pat (RAnn x tm ty) sp = ?rhs_7
-raw2pat (RCase x scrut alts) sp = ?rhs_9
-raw2pat (RImplicit x) sp = ?rhs_10
-raw2pat (RParseError x str) sp = ?rhs_12
-
 
 getName : Raw -> Parser String
 getName (RVar x nm) = pure nm
