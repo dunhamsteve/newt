@@ -7,8 +7,10 @@
 - [ ] consider making meta application implicit in term, so its more readable when printed
   - Currently we have explicit `App` surrounding `Meta` when inserting metas. Some people
     leave that implicit for efficiency. I think it would also make printing more readable.
+  - When printing `Value`, I now print the spine size instead of spine.
 - [x] eval for case (see order.newt)
 - [ ] dynamic pattern unification (add test case first)
+  - Possibly the cause of issue in code commented out in `TestCase4.newt`
 - [x] switch from commit/mustWork to checking progress
 - [x] type constructors are no longer generated?  And seem to have 0 arity.
 - [x] raw let is not yet implemented (although define used by case tree building)

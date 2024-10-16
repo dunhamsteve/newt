@@ -93,7 +93,7 @@ parameters (ctx: Context)
           then do
             debug "\{show k} \{show acc}"
 
-            error fc "non-linear pattern"
+            error fc "non-linear pattern: \{show sp}"
           else go xs (k :: acc)
       go (xs :< v) _ = error emptyFC "non-variable in pattern \{show v}"
 
@@ -194,9 +194,6 @@ parameters (ctx: Context)
     debug "env \{show ctx.env}"
     debug "types \{show $ ctx.types}"
     case (t',u') of
-      (VLam _ _ t,  VLam _ _ t') => unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
-      (t,         VLam fc' _ t') => unify (l + 1) !(t `vapp` VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
-      (VLam fc _ t,  t'       ) => unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' `vapp` VVar emptyFC l [<])
       (VMeta fc k sp,  VMeta fc' k' sp' ) =>
         if k == k' then unifySpine l (k == k') sp sp'
         -- TODO, might want to try the other way, too.
@@ -207,11 +204,14 @@ parameters (ctx: Context)
       (VVar fc k sp,   (VVar fc' k' sp')  ) =>
         if k == k' then unifySpine l (k == k') sp sp'
         else if k < k' then pure $ MkResult [(k,u')] else pure $ MkResult [(k',t')]
-        -- else error ctx.fc "unify error: vvar mismatch \{show k} \{show k'} \{show ctx.env}"
 
       -- attempt at building constraints
-      (VVar fc k sp, u) => pure $ MkResult[(k, u)]
-      (t, VVar fc k sp) => pure $ MkResult[(k, t)]
+      (VVar fc k [<], u) => pure $ MkResult[(k, u)]
+      (t, VVar fc k [<]) => pure $ MkResult[(k, t)]
+
+      (VLam _ _ t,  VLam _ _ t') => unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
+      (t,         VLam fc' _ t') => unify (l + 1) !(t `vapp` VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
+      (VLam fc _ t,  t'       ) => unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' `vapp` VVar emptyFC l [<])
 
       -- REVIEW - consider separate value for DCon/TCon
       (VRef fc k def sp,   VRef fc' k' def' sp'  ) =>
@@ -578,9 +578,7 @@ checkDone ctx [] body ty = do
   -- I'm running an eval here to run case statements that are
   -- unblocked by lets in the env. (Tree.newt:cmp)
   -- The case eval code only works in the Tm -> Val case at the moment.
-  -- we don't have anything like `vapp`
-  -- NOW In Tree.newt we have a case/case unification that might
-  -- have succeeded if it was left as a functino call.
+  -- we don't have anything like `vapp` for case
   ty <- quote (length ctx.env) ty
   ty <- eval ctx.env CBV ty
   debug "check at \{show ty}"
@@ -647,7 +645,8 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     -- Maybe we can let the scrutinee and jump into the middle?
     (sc, scty) <- infer ctx rsc
     scty <- forceMeta scty
-    debug "SCTM/TY \{pprint (names ctx) sc} \{show scty}"
+    debug "SCTM \{pprint (names ctx) sc}"
+    debug "SCTY \{show scty}"
 
     let scnm = fresh "sc"
     top <- get
@@ -697,7 +696,6 @@ check ctx tm ty = case (tm, !(forceType ty)) of
   (t@(RLam fc nm icit tm), ty) =>
             error fc "Expected pi type, got \{!(prvalCtx ty)}"
 
-  -- NOW Test1.newt passes with Explicit, TestCase4.newt passes with Implicit
   (tm, ty@(VPi fc nm' Implicit a b)) => do
     let names = toList $ map fst ctx.types
     debug "XXX edge add implicit lambda {\{nm'} : \{show a}} to \{show tm} "

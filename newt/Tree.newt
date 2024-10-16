@@ -59,12 +59,13 @@ data T23 : Bnd -> Bnd -> Nat -> U where
 -- 56:
 
 infixl 5 _*_
-infixl 1 _,_
+infixr 1 _,_
+infixr 1 _**_
 data Sg : (A : U) -> (A -> U) -> U where
-  _,_ : {A : U} {B : A -> U} -> (a : A) -> B a -> Sg A B
+  _**_ : {A : U} {B : A -> U} -> (a : A) -> B a -> Sg A B
 
 data _*_ : (A B : U) -> U where
-   Foo : {A B : U} -> A -> B -> A * B
+   _,_ : {A B : U} -> A -> B -> A * B
 
 TooBig : Bnd -> Bnd -> Nat -> U
 TooBig l u h = Sg Nat (\ x => T23 l (N x) h * T23 (N x) u h)
@@ -72,12 +73,11 @@ TooBig l u h = Sg Nat (\ x => T23 l (N x) h * T23 (N x) u h)
 insert : {h : Nat} {l u : Bnd} -> Intv l u -> T23 l u h -> TooBig l u h + T23 l u h
 insert (MkI x lx xu) (leaf lu) = ?
 insert (MkI x lx xu) (node2 x1 t t1) = ?
--- TODO - unify error the typ
 insert (MkI x lx xu) (node3 y z tly tyz tzu) = case cmp x y of
   -- u := N y is not solved at this time
   inl xy => case insert (MkI {_} {N y} x lx xy) tly of
-    -- It's having trouble with Foo because of a spine length issue
-    -- Idris says this isn't covering, even with just `inl a` , `inr a`
-    inl (v , (Foo tlv tvy)) => inl (y, node2 v tlv tvy, node2 z tyz tzy)
+    -- NOW down to a non-linear issue now.
+    -- Possibly due to the meta being applied to an extra argument
+    inl (v ** (tlv , tvy)) => inl (y ** (node2 v tlv tvy, node2 z tyz tzu))
     inr x1 => ?
   inr x1 => ?

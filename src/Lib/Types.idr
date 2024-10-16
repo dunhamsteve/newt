@@ -225,7 +225,7 @@ covering export
 Show Val where
   show (VVar _ k sp) = "(%var \{show k} \{show sp})"
   show (VRef _ nm _ sp) = "(%ref \{nm} \{show sp})"
-  show (VMeta _ ix sp) = "(%meta \{show ix} \{show sp})"
+  show (VMeta _ ix sp) = "(%meta \{show ix} \{show $ length sp})"
   show (VLam _ str x) = "(%lam \{str} \{show x})"
   show (VPi fc str Implicit x y) = "(%pi {\{str} : \{show  x}}. \{show  y})"
   show (VPi fc str Explicit x y) = "(%pi (\{str} : \{show  x}). \{show  y})"
