@@ -18,6 +18,15 @@ import Lib.Syntax
 -- dom gamma ren
 data Pden = PR Nat Nat (List Nat)
 
+dumpCtx : Context -> M String
+dumpCtx ctx = do
+  let names = (toList $ map fst ctx.types)
+  -- I want to know which ones are defines. I should skip the `=` bit if they match, I'll need indices in here too.
+  env <- for (zip ctx.env (toList ctx.types)) $ \(v, n, ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)} = \{pprint names !(quote ctx.lvl v)}"
+  let msg = unlines (toList $ reverse env) -- ++ "  -----------\n" ++ "  goal \{pprint names ty'}"
+  pure msg
+
+
 pprint : Context -> Val -> M String
 pprint ctx v = pure $ pprint (names ctx) !(quote (length ctx.env) v)
 
@@ -392,11 +401,29 @@ extendPi ctx (VPi x str icit a b) nms sc = do
 extendPi ctx ty nms sc = pure (ctx, ty, nms <>> [], sc)
 
 -- turn vars into lets for forced values.
--- Maybe we need to do more? revist the paper.
+-- substitute inside values
+-- FIXME we're not going under closures at the moment.
+substVal : Nat -> Val -> Val -> Val
+substVal k v tm = go tm
+  where
+    go : Val -> Val
+    go (VVar fc j sp) = if j == k then v else (VVar fc j (map go sp))
+    go (VLet fc nm a b) = VLet fc nm (go a) b
+    go (VPi fc nm icit a b) = VPi fc nm icit (go a) b
+    go (VMeta fc ix sp) = VMeta fc ix (map go sp)
+    go (VRef fc nm y sp) = VRef fc nm y (map go sp)
+    go tm = tm
+    -- go (VLam fc nm sc) = VLam fc nm sc
+    -- go (VCase x sc xs) = ?rhs_2
+    -- go (VU x) = ?rhs_7
+    -- go (VLit x y) = ?rhs_8
+
+
 updateContext : Context -> List (Nat, Val) -> M Context
 updateContext ctx [] = pure ctx
 updateContext ctx ((k, val) :: cs) = let ix = (length ctx.env `minus` k) `minus` 1 in
-  updateContext ({env $= replace ix val, bds $= replaceV ix Defined } ctx) cs
+  updateContext ({env $= map (substVal k val), bds $= replaceV ix Defined } ctx) cs
+  -- updateContext ({env $= replace ix val, bds $= replaceV ix Defined } ctx) cs
   where
     replace : Nat -> a -> List a -> List a
     replace k x [] = []
@@ -573,13 +600,6 @@ makeClause top (lhs, rhs) = do
   pure $ MkClause (getFC lhs) [] pats rhs
 
 
-dumpCtx : Context -> M String
-dumpCtx ctx = do
-  let names = (toList $ map fst ctx.types)
-  -- I want to know which ones are defines. I should skip the `=` bit if they match, I'll need indices in here too.
-  env <- for (zip ctx.env (toList ctx.types)) $ \(v, n, ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)} = \{pprint names !(quote ctx.lvl v)}"
-  let msg = unlines (toList $ reverse env) -- ++ "  -----------\n" ++ "  goal \{pprint names ty'}"
-  pure msg
 
 checkDone : Context -> List (String, Pattern) -> Raw -> Val -> M Tm
 checkDone ctx [] body ty = do
