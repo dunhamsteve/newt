@@ -136,15 +136,24 @@ parameters (ctx: Context)
   solve : Nat -> Nat -> SnocList Val -> Val  -> M  ()
   solve l m sp t = do
     debug "solve \{show m} lvl \{show l} sp \{show sp} is \{show t}"
-    meta <- lookupMeta m
-    debug "meta \{show meta}"
-    ren <- invert l sp
-    tm <- rename m ren l t
-    let tm = lams (length sp) tm
-    top <- get
-    soln <- eval [] CBN tm
-    solveMeta top m soln
-    pure ()
+    meta@(Unsolved metaFC ix ctx ty) <- lookupMeta m
+      | _ => error (getFC t) "Meta \{show m} already solved!"
+    let size = length $ filter (\x => x == Bound) $ toList ctx.bds
+    debug "\{show m} size is \{show size}"
+    if (length sp /= size) then do
+        -- need INFO that works like debug.
+        -- FIXME we probably need to hold onto the constraint and recheck when we solve the meta?
+        info (getFC t) "meta \{show m} applied to \{show $ length sp} args insted of \{show size}"
+        -- error (getFC t) "meta \{show m} applied to \{show $ length sp} args insted of \{show size}"
+      else do
+        debug "meta \{show meta}"
+        ren <- invert l sp
+        tm <- rename m ren l t
+        let tm = lams (length sp) tm
+        top <- get
+        soln <- eval [] CBN tm
+        solveMeta top m soln
+        pure ()
 
   trySolve : Nat -> Nat -> SnocList Val -> Val -> M ()
   trySolve l m sp t = do
@@ -210,8 +219,12 @@ parameters (ctx: Context)
       (t, VVar fc k [<]) => pure $ MkResult[(k, t)]
 
       (VLam _ _ t,  VLam _ _ t') => unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
-      (t,         VLam fc' _ t') => unify (l + 1) !(t `vapp` VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
-      (VLam fc _ t,  t'       ) => unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' `vapp` VVar emptyFC l [<])
+      (t,         VLam fc' _ t') => do
+        debug "ETA \{show t}"
+        unify (l + 1) !(t `vapp` VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
+      (VLam fc _ t,  t'       ) => do
+        debug "ETA' \{show t'}"
+        unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' `vapp` VVar emptyFC l [<])
 
       -- REVIEW - consider separate value for DCon/TCon
       (VRef fc k def sp,   VRef fc' k' def' sp'  ) =>

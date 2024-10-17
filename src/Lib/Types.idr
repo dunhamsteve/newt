@@ -33,6 +33,13 @@ Show Icit where
 public export
 data BD = Bound | Defined
 
+public export
+Eq BD where
+  Bound == Bound = True
+  Defined == Defined = True
+  _ == _ = False
+
+
 Show BD where
   show Bound = "bnd"
   show Defined = "def"
@@ -218,6 +225,9 @@ getValFC (VPi fc _ _ a b) = fc
 getValFC (VU fc) = fc
 getValFC (VLit fc _) = fc
 
+
+public export
+HasFC Val where getFC = getValFC
 
 Show Closure
 
@@ -449,6 +459,10 @@ debug : Lazy String -> M ()
 debug x = do
   top <- get
   when top.verbose $ putStrLn x
+
+export
+info : FC -> String -> M ()
+info fc msg = putStrLn "INFO at \{show fc}: \{show msg}"
 
 ||| Version of debug that makes monadic computation lazy
 export
