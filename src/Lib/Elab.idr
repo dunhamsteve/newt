@@ -143,8 +143,8 @@ parameters (ctx: Context)
     if (length sp /= size) then do
         -- need INFO that works like debug.
         -- FIXME we probably need to hold onto the constraint and recheck when we solve the meta?
-        info (getFC t) "meta \{show m} applied to \{show $ length sp} args insted of \{show size}"
-        -- error (getFC t) "meta \{show m} applied to \{show $ length sp} args insted of \{show size}"
+        info (getFC t) "meta \{show m} (\{show ix}) applied to \{show $ length sp} args instead of \{show size}"
+        -- error (getFC t) "meta \{show m} applied to \{show $ length sp} args instead of \{show size}"
       else do
         debug "meta \{show meta}"
         ren <- invert l sp

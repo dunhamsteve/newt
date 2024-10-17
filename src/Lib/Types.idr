@@ -39,7 +39,7 @@ Eq BD where
   Defined == Defined = True
   _ == _ = False
 
-
+public export
 Show BD where
   show Bound = "bnd"
   show Defined = "def"

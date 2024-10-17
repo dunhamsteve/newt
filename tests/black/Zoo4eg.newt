@@ -56,15 +56,15 @@ list1 : List Bool
 list1 = cons true (cons false (cons true nil))
 
 -- dependent function composition
-comp : {A} {B : A -> U} {C : {a} -> B a -> U}
-       (f : {a} (b : B a) -> C b)
+comp : {A} {B : A -> U} {C : {a : A} -> B a -> U}
+       (f : {a : A} (b : B a) -> C b)
        (g : (a : A) -> B a)
        (a : A)
        -> C (g a)
 comp = \f g a => f (g a)
 
-compExample : _
-compExample = comp (cons true) (cons false) nil
+-- compExample : Bool
+-- compExample = comp (cons true) (cons false) nil
 
 Nat : U
 Nat = (N : U) -> (N -> N) -> N -> N

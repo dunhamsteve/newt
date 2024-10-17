@@ -1,6 +1,7 @@
 
 ## TODO
 
+- [ ] unsolved meta errors repeat (need to freeze at some point)
 - [x] Sanitize JS idents, e.g. `_+_`
 - [ ] Generate some programs that do stuff
 - [x] import
