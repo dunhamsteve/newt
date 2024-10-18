@@ -462,7 +462,7 @@ debug x = do
 
 export
 info : FC -> String -> M ()
-info fc msg = putStrLn "INFO at \{show fc}: \{show msg}"
+info fc msg = putStrLn "INFO at \{show fc}: \{msg}"
 
 ||| Version of debug that makes monadic computation lazy
 export

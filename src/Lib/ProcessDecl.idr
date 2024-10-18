@@ -40,9 +40,10 @@ processDecl (TypeSig fc nm tm) = do
   putStrLn "TypeSig \{nm} \{show tm}"
   ty <- check (mkCtx top.metas fc) tm (VU fc)
   putStrLn "got \{pprint [] ty}"
-  ty' <- nf [] ty
-  putStrLn "nf \{pprint [] ty'}"
-  modify $ setDef nm ty' Axiom
+  -- I was doing this previously, but I don't want to over-expand VRefs
+  -- ty' <- nf [] ty
+  -- putStrLn "nf \{pprint [] ty'}"
+  modify $ setDef nm ty Axiom
 
 processDecl (PType fc nm ty) = do
   ctx <- get

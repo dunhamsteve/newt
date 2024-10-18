@@ -69,10 +69,6 @@ tryEval k sp =
 
 -- Lennart needed more forcing for recursive nat,
 forceType : Val -> M Val
-forceType tm@(VRef fc nm def sp) =
-  case !(tryEval nm sp) of
-    Just tm => pure tm
-    _ => pure tm
 forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Unsolved x k xs _) => pure (VMeta fc ix sp)
   (Solved k t) => vappSpine t sp >>= forceType

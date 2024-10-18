@@ -57,7 +57,7 @@ be acc w k ((i, Line) :: xs) = (be (acc :< LINE i) w i xs)
 be acc w k ((i, (Text s)) :: xs) = (be (acc :< TEXT s) w (k + length s) xs)
 be acc w k ((i, (Nest j x)) :: xs) = be acc w k ((i+j,x)::xs)
 be acc w k ((i, (Seq x y)) :: xs) = be acc w k ((i,x) :: (i,y) :: xs)
--- We're doing extra work here - the first branch should cut if it exhausts w before the first LINE
+-- We're doing extra work here - the first branch should cut if it exhausts w - k before the first LINE
 be acc w k ((i, (Alt x y)) :: xs) = acc <>> better w k (be [<] w k ((i,x)::xs))
                                                        (be [<] w k ((i,y)::xs))
 
