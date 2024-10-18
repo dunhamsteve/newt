@@ -12,9 +12,9 @@ import Data.Nat
 export
 data Doc = Empty | Line | Text String | Nest Nat Doc | Seq Doc Doc | Alt Doc Doc
 
-||| `DOC` is an intermediate form used during layout/rendering
-||| The capitalization is the opposite of the paper.
-data DOC = EMPTY | TEXT String DOC | LINE Nat DOC
+||| The original paper had a List-like structure Doc (the above was DOC) which
+||| had Empty and a tail on Text and Line.
+data Item = TEXT String | LINE Nat
 
 export
 empty : Doc
@@ -31,36 +31,38 @@ flatten (Alt x y) = flatten x
 group : Doc -> Doc
 group x = Alt (flatten x) x
 
-layout : DOC -> String
-layout EMPTY = ""
-layout (LINE k x) = "\n" ++ replicate k ' ' ++ layout x
-layout (TEXT str x) = str ++ layout x
-
-
+-- TODO - we can accumulate snoc and cat all at once
+layout : List Item -> String
+layout [] = ""
+layout (LINE k :: x) = "\n" ++ replicate k ' ' ++ layout x
+layout (TEXT str :: x) = str ++ layout x
 
 ||| Whether a documents first line fits.
-fits : Nat -> DOC -> Bool
-fits w x = if w == 0 then False else case x of
-            EMPTY => True
-            (LINE k x) => True
-            (TEXT s x) => fits (w `minus` length s) x
+fits : Nat -> List Item -> Bool
+fits 0 x = False
+fits w ((TEXT s) :: xs) = fits (w `minus` length s) xs
+fits w _ = True
 
 -- The lazy is important
-better : Nat -> Nat -> DOC -> Lazy DOC -> DOC
+better : Nat -> Nat -> List Item -> Lazy (List Item) -> List Item
 better w k x y = if fits (w `minus` k) x then x else y
 
-be : Nat -> Nat -> List (Nat, Doc) -> DOC
-be w k [] = EMPTY
-be w k ((i, Empty) :: xs) = be w k xs
-be w k ((i, Line) :: xs) = LINE i (be w i xs)
-be w k ((i, (Text s)) :: xs) = TEXT s (be w (k + length s) xs)
-be w k ((i, (Nest j x)) :: xs) = be w k ((i+j,x)::xs)
-be w k ((i, (Seq x y)) :: xs) = be w k ((i,x) :: (i,y) :: xs)
-be w k ((i, (Alt x y)) :: xs) = better w k (be w k ((i,x)::xs))
-                                           (be w k ((i,y)::xs))
+-- vs Wadler, we're collecting the left side as a SnocList to prevent
+-- blowing out the stack on the Text case.  The original had DOC as
+-- a Linked-List like structure (now List Item)
+be : SnocList Item -> Nat -> Nat -> List (Nat, Doc) -> List Item
+be acc w k [] = acc <>> []
+be acc w k ((i, Empty) :: xs) = be acc w k xs
+be acc w k ((i, Line) :: xs) = (be (acc :< LINE i) w i xs)
+be acc w k ((i, (Text s)) :: xs) = (be (acc :< TEXT s) w (k + length s) xs)
+be acc w k ((i, (Nest j x)) :: xs) = be acc w k ((i+j,x)::xs)
+be acc w k ((i, (Seq x y)) :: xs) = be acc w k ((i,x) :: (i,y) :: xs)
+-- We're doing extra work here - the first branch should cut if it exhausts w before the first LINE
+be acc w k ((i, (Alt x y)) :: xs) = acc <>> better w k (be [<] w k ((i,x)::xs))
+                                                       (be [<] w k ((i,y)::xs))
 
-best : Nat -> Nat -> Doc -> DOC
-best w k x = be w k [(0,x)]
+best : Nat -> Nat -> Doc -> List Item
+best w k x = be [<] w k [(0,x)]
 
 -- Public interface
 public export
