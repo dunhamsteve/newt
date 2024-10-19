@@ -115,21 +115,22 @@ termToJS env (CCase t alts) f =
   -- TODO default case, let's drop the extra field.
 
   termToJS env t $ \case
-    (Var nm) => maybeCaseStmt nm alts
+    (Var nm) => maybeCaseStmt env nm alts
     t' =>
       let nm = fresh "sc" env in
-        JSnoc (JConst nm t') (maybeCaseStmt nm alts)
+        JSnoc (JConst nm t') (maybeCaseStmt (Var nm :: env) nm alts)
 
   where
-    termToJSAlt : String -> CAlt -> JAlt
-    termToJSAlt nm (CConAlt name args u) = JConAlt name (termToJS (mkEnv nm 0 env args) u f)
+    termToJSAlt : List JSExp -> String -> CAlt -> JAlt
+    termToJSAlt env nm (CConAlt name args u) = JConAlt name (termToJS (mkEnv nm 0 env args) u f)
     -- intentionally reusing scrutinee name here
-    termToJSAlt nm (CDefAlt u) = JDefAlt (termToJS (Var nm :: env) u f)
+    termToJSAlt env nm (CDefAlt u) = JDefAlt (termToJS (Var nm :: env) u f)
 
-    maybeCaseStmt : String -> List CAlt -> JSStmt e
+    maybeCaseStmt : List JSExp -> String -> List CAlt -> JSStmt e
     -- If there is a single alt, assume it matched
-    maybeCaseStmt nm [(CConAlt _ args u)] = (termToJS (mkEnv nm 0 env args) u f)
-    maybeCaseStmt nm alts = (JCase (Dot (Var nm) "tag") (map (termToJSAlt nm) alts))
+    maybeCaseStmt env nm [(CConAlt _ args u)] = (termToJS (mkEnv nm 0 env args) u f)
+    maybeCaseStmt env nm alts = 
+          (JCase (Dot (Var nm) "tag") (map (termToJSAlt env nm) alts))
 
 
 -- REVIEW the escaping in show might not match JS
@@ -184,7 +185,7 @@ expToDoc (Dot obj nm) = expToDoc obj ++ "." ++ jsIdent nm
 
 caseBody : JSStmt e -> Doc
 caseBody stmt@(JReturn x) = nest 2 (line ++ stmtToDoc stmt)
-caseBody stmt = nest 2 (line ++ stmtToDoc stmt </> text "break;")
+caseBody stmt = "{" </> nest 2 (line ++ stmtToDoc stmt </> text "break;") </> "}"
 
 altToDoc : JAlt -> Doc
 altToDoc (JConAlt nm stmt) = text "case" <+> jsString nm ++ ":" ++ caseBody stmt
