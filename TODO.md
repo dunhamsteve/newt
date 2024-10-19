@@ -1,7 +1,7 @@
 
 ## TODO
 
-- [ ] unsolved meta errors repeat (need to freeze at some point)
+- [ ] unsolved meta errors repeat (need to freeze or only report at end)
 - [x] Sanitize JS idents, e.g. `_+_`
 - [ ] Generate some programs that do stuff
 - [x] import
@@ -11,7 +11,6 @@
   - When printing `Value`, I now print the spine size instead of spine.
 - [x] eval for case (see order.newt)
 - [ ] dynamic pattern unification (add test case first)
-  - Possibly the cause of issue in code commented out in `TestCase4.newt`
 - [x] switch from commit/mustWork to checking progress
 - [x] type constructors are no longer generated?  And seem to have 0 arity.
 - [x] raw let is not yet implemented (although define used by case tree building)

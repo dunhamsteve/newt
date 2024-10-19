@@ -4,6 +4,7 @@ module Lib.Prettier
 
 import Data.String
 import Data.Nat
+import Data.Maybe
 
 ||| `Doc` is a pretty printing document.  Constructors are private, use
 ||| methods below.  `Alt` in particular has some invariants on it, see paper
@@ -43,26 +44,27 @@ fits 0 x = False
 fits w ((TEXT s) :: xs) = fits (w `minus` length s) xs
 fits w _ = True
 
--- The lazy is important
-better : Nat -> Nat -> List Item -> Lazy (List Item) -> List Item
-better w k x y = if fits (w `minus` k) x then x else y
-
 -- vs Wadler, we're collecting the left side as a SnocList to prevent
 -- blowing out the stack on the Text case.  The original had DOC as
 -- a Linked-List like structure (now List Item)
-be : SnocList Item -> Nat -> Nat -> List (Nat, Doc) -> List Item
-be acc w k [] = acc <>> []
-be acc w k ((i, Empty) :: xs) = be acc w k xs
-be acc w k ((i, Line) :: xs) = (be (acc :< LINE i) w i xs)
-be acc w k ((i, (Text s)) :: xs) = (be (acc :< TEXT s) w (k + length s) xs)
-be acc w k ((i, (Nest j x)) :: xs) = be acc w k ((i+j,x)::xs)
-be acc w k ((i, (Seq x y)) :: xs) = be acc w k ((i,x) :: (i,y) :: xs)
--- We're doing extra work here - the first branch should cut if it exhausts w - k before the first LINE
-be acc w k ((i, (Alt x y)) :: xs) = acc <>> better w k (be [<] w k ((i,x)::xs))
-                                                       (be [<] w k ((i,y)::xs))
+
+-- I've now added a `fit` boolean to indicate if we should cut when we hit the line length
+-- Wadler was relying on laziness to stop the first branch before LINE if necessary
+be : Bool -> SnocList Item -> Nat -> Nat -> List (Nat, Doc) -> Maybe (List Item)
+be fit acc w k [] = Just (acc <>> [])
+be fit acc w k ((i, Empty) :: xs) = be fit acc w k xs
+be fit acc w k ((i, Line) :: xs) = (be False (acc :< LINE i) w i xs)
+be fit acc w k ((i, (Text s)) :: xs) =
+  if not fit || (k + length s < w) 
+     then (be fit (acc :< TEXT s) w (k + length s) xs) 
+     else Nothing
+be fit acc w k ((i, (Nest j x)) :: xs) = be fit acc w k ((i+j,x)::xs)
+be fit acc w k ((i, (Seq x y)) :: xs) = be fit acc w k ((i,x) :: (i,y) :: xs)
+be fit acc w k ((i, (Alt x y)) :: xs) =
+  (acc <>>) <$> (be True [<] w k ((i,x)::xs) <|> be fit [<] w k ((i,y)::xs))
 
 best : Nat -> Nat -> Doc -> List Item
-best w k x = be [<] w k [(0,x)]
+best w k x = fromMaybe [] $ be False [<] w k [(0,x)]
 
 -- Public interface
 public export
