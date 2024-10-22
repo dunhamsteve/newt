@@ -27,7 +27,7 @@ opChar : Lexer
 opChar = pred isOpChar
 
 identMore : Lexer
-identMore = alphaNum <|> exact "." <|> exact "'"
+identMore = alphaNum <|> exact "." <|> exact "'" <|> exact "_"
 
 quo : Recognise True
 quo = is '"'
@@ -53,6 +53,7 @@ rawTokens
   <|> match (upper <+> many identMore) checkUKW
   <|> match (some digit) (Tok Number)
   <|> match (is '#' <+> many alpha) (Tok Pragma)
+  <|> match charLit (Tok Character)
   <|> match (exact "_" <+> (some opChar <|> exact ",") <+> exact "_") (Tok MixFix)
   <|> match (quo <+> manyUntil quo ((esc any <+> any) <|> any) <+> opt quo) (Tok StringKind . unquote)
   <|> match (lineComment (exact "--")) (Tok Space)

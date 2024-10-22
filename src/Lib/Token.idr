@@ -12,6 +12,7 @@ data Kind
   | Oper
   | MixFix
   | Number
+  | Character
   | StringKind
   | Symbol
   | Space
@@ -31,6 +32,7 @@ Show Kind where
   show Oper    = "Oper"
   show MixFix = "MixFix"
   show Number  = "Number"
+  show Character  = "Character"
   show Symbol  = "Symbol"
   show Space  = "Space"
   show LBrace  = "LBrace"
@@ -48,6 +50,7 @@ Eq Kind where
   Oper    == Oper = True
   MixFix  == MixFix = True
   Number  == Number = True
+  Character == Character = True
   Symbol  == Symbol = True
   Space   == Space = True
   LBrace  == LBrace = True

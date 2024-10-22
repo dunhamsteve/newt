@@ -321,6 +321,9 @@ data Bind = MkBind String Icit Val
 Show Bind where
   show (MkBind str icit x) = "\{str} \{show icit}"
 
+
+---------------- Case builder
+
 public export
 record Problem where
   constructor MkProb
@@ -356,7 +359,8 @@ findSplit : List Constraint -> Maybe Constraint
 findSplit [] = Nothing
     -- FIXME look up type, ensure it's a constructor
 findSplit (x@(nm, PatCon _ _ cnm pats) :: xs) = Just x
-findSplit (_ :: xs) = findSplit xs
+findSplit (x@(nm, PatLit _ val) :: xs) = Just x
+findSplit (x :: xs) = findSplit xs
 
 
 -- ***************
@@ -550,20 +554,22 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         else (nm, pat) :: makeConst xs pats
     makeConst ((MkBind nm Explicit x) :: xs) (pat :: pats) = (nm, pat) :: makeConst xs pats
 
-    rewriteCons : List Bind -> List Constraint -> List Constraint -> Maybe (List Constraint)
-    rewriteCons vars [] acc = Just acc
-    rewriteCons vars (c@(nm, y) :: xs) acc =
+    -- replace constraint with constraints on parameters, or nothing if non-matching clause
+    rewriteConstraint : List Bind -> List Constraint -> List Constraint -> Maybe (List Constraint)
+    rewriteConstraint vars [] acc = Just acc
+    rewriteConstraint vars (c@(nm, y) :: xs) acc =
       if nm == scnm
         then case y of
           PatVar _ _ s => Just $ c :: (xs ++ acc)
           PatWild _ _ => Just $ c :: (xs ++ acc)
+          PatLit fc lit => Nothing -- error fc "Literal \{show lit} in constructor split"
           PatCon _ _ str ys => if str == dcName
             then Just $ (makeConst vars ys) ++ xs ++ acc
             else Nothing
-        else rewriteCons vars xs (c :: acc)
+        else rewriteConstraint vars xs (c :: acc)
 
     rewriteClause : List Bind -> Clause -> Maybe Clause
-    rewriteClause vars (MkClause fc cons pats expr) = pure $ MkClause fc !(rewriteCons vars cons []) pats expr
+    rewriteClause vars (MkClause fc cons pats expr) = pure $ MkClause fc !(rewriteConstraint vars cons []) pats expr
 
 
 splitArgs : Raw -> List (Raw, Icit) -> (Raw, List (Raw, Icit))
@@ -583,8 +589,9 @@ mkPat top (tm, icit) = do
                                 [] => pure $ PatVar fc icit nm
                                 _ => error (getFC tm) "patvar applied to args"
     ((RImplicit fc), []) => pure $ PatWild fc icit
-    ((RImplicit fc), _) => error fc "implicit pat can't be applied"
-    -- ((RLit x y), b) => ?rhs_19
+    ((RImplicit fc), _) => error fc "implicit pat can't be applied to arguments"
+    ((RLit fc lit), []) => pure $ PatLit fc lit
+    ((RLit fc y), b) => error fc "lit cannot be applied to arguments"
     (a,b) => error (getFC a) "expected pat var or constructor"
 
 
@@ -624,7 +631,74 @@ checkDone ctx ((nm, (PatVar _ _ nm')) :: xs) body ty = checkDone ({ types $= ren
         then (nm', ty) :: xs
         else (name, ty) :: rename xs
 
-checkDone ctx ((x, pat) :: xs) body ty = error emptyFC "stray constraint \{x} /? \{show pat}"
+checkDone ctx ((x, pat) :: xs) body ty = error (getFC pat) "stray constraint \{x} /? \{show pat}"
+
+-- need to run constructors, then run default
+
+-- wild/var can come before 'x' so we need a list first
+getLits : String -> List Clause -> List Literal
+getLits nm [] = []
+getLits nm ((MkClause fc cons pats expr) :: cs) = case find ((nm==) . fst) cons of
+  Just (_, (PatLit _ lit)) => lit :: getLits nm cs
+  _ => getLits nm cs
+
+
+-- then build a lit case for each of those
+
+buildLitCase : Context -> Problem -> FC -> String -> Val -> Literal -> M CaseAlt
+buildLitCase ctx prob fc scnm scty lit = do
+
+  -- Constrain the scrutinee's variable to be lit value
+  let Just ix = findIndex ((==scnm) . fst) ctx.types
+    | Nothing => error ctx.fc "\{scnm} not is scope?"
+  let lvl = ((length ctx.env) `minus` (cast ix)) `minus` 1
+  let scon : (Nat, Val) = (lvl, VLit fc lit)
+  ctx' <- updateContext ctx [scon]
+  let clauses = mapMaybe rewriteClause prob.clauses
+
+  when (length clauses == 0) $ error ctx.fc "Missing case for \{show lit} splitting \{scnm}"
+  tm <- buildTree ctx' (MkProb clauses prob.ty)
+  pure $ CaseLit lit tm
+
+  where
+    -- replace constraint with constraints on parameters, or nothing if non-matching clause
+    rewriteConstraint : List Constraint -> List Constraint -> Maybe (List Constraint)
+    rewriteConstraint [] acc = Just acc
+    rewriteConstraint (c@(nm, y) :: xs) acc =
+      if nm == scnm
+        then case y of
+          PatVar _ _ s => Just $ c :: (xs ++ acc)
+          PatWild _ _ => Just $ c :: (xs ++ acc)
+          PatLit fc lit' => if lit' == lit then Just $ (xs ++ acc) else Nothing
+          PatCon _ _ str ys => Nothing -- error matching lit against constructor
+        else rewriteConstraint xs (c :: acc)
+
+    rewriteClause : Clause -> Maybe Clause
+    rewriteClause (MkClause fc cons pats expr) = pure $ MkClause fc !(rewriteConstraint cons []) pats expr
+
+
+
+buildLitCases : Context -> Problem -> FC -> String -> Val -> M (List CaseAlt)
+buildLitCases ctx prob fc scnm scty = do
+  let lits = getLits scnm prob.clauses
+  alts <- traverse (buildLitCase ctx prob fc scnm scty) lits
+  -- TODO build default case
+  -- run getLits
+  -- buildLitCase for each
+
+  let defclauses = filter isDefault prob.clauses
+  when (length defclauses == 0) $ error fc "no default for literal slot on \{show scnm}"
+  tm <- buildTree ctx (MkProb defclauses prob.ty)
+
+  pure $ alts ++ [ CaseDefault tm ]
+  where
+    isDefault : Clause -> Bool
+    isDefault cl = case find ((==scnm) . fst) cl.cons of
+      Just (_, (PatVar _ _ _)) => True
+      Just (_, (PatWild _ _)) => True
+      Nothing => True
+      _ => False
+
 
 -- This process is similar to extendPi, but we need to stop
 -- if one clause is short on patterns.
@@ -643,26 +717,38 @@ buildTree ctx prob@(MkProb ((MkClause fc cons pats@(x :: xs) expr) :: cs) ty) =
 -- need to find some name we can split in (x :: xs)
 -- so LHS of constraint is name (or VVar - if we do Val)
 -- then run the split
+-- some of this is copied into check
 buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
   debug "buildTree \{show constraints} \{show expr}"
   let Just (scnm, pat) := findSplit constraints
-    | _ => checkDone ctx constraints expr ty
+    | _ => do
+      debug "checkDone \{show constraints}"
+      checkDone ctx constraints expr ty
 
   debug "SPLIT on \{scnm} because \{show pat} \{show $ getFC pat}"
   let Just (sctm, scty) := lookupName ctx scnm
     | _ => error fc "Internal Error: can't find \{scnm} in environment"
 
-  -- expand vars that may be solved
-  scty' <- unlet ctx scty
-  debug "EXP \{show scty} -> \{show scty'}"
-  cons <- getConstructors ctx (getFC pat) scty'
-  debug "CONS \{show $ map fst cons}"
-  alts <- traverse (buildCase ctx prob scnm scty) cons
-  debug "GOTALTS \{show alts}"
-  when (length (catMaybes alts) == 0) $ error (fc) "no alts for \{show scty'}"
-  -- TODO check for empty somewhere?
-  pure $ Case fc sctm (catMaybes alts)
-
+  case pat of
+    PatCon _ _ _ _ => do
+      -- expand vars that may be solved
+      scty' <- unlet ctx scty
+      debug "EXP \{show scty} -> \{show scty'}"
+      -- this is per the paper, but it would be nice to coalesce
+      -- default cases
+      cons <- getConstructors ctx (getFC pat) scty'
+      debug "CONS \{show $ map fst cons}"
+      alts <- traverse (buildCase ctx prob scnm scty) cons
+      debug "GOTALTS \{show alts}"
+      when (length (catMaybes alts) == 0) $ error (fc) "no alts for \{show scty'}"
+      -- TODO check for empty somewhere?
+      pure $ Case fc sctm (catMaybes alts)
+    PatLit fc v => do
+      -- need to run through all of the PatLits in this slot and then find a fallback
+      -- walk the list of patterns, stop if we hit a PatVar / PatWild, fail if we don't
+      alts <- buildLitCases ctx prob fc scnm scty
+      pure $ Case fc sctm alts
+    pat => error (getFC pat) "Internal error - tried to split on \{show pat}"
 
 showDef : Context -> List String -> Nat -> Val -> M String
 showDef ctx names n v@(VVar _ n' [<]) =  if n == n' then pure "" else pure "= \{pprint names !(quote ctx.lvl v)}"
@@ -670,8 +756,6 @@ showDef ctx names n v = pure "= \{pprint names !(quote ctx.lvl v)}"
 
 check ctx tm ty = case (tm, !(forceType ty)) of
   (RCase fc rsc alts, ty) => do
-    -- We've got a beta redex or need to do something...
-    -- Maybe we can let the scrutinee and jump into the middle?
     (sc, scty) <- infer ctx rsc
     scty <- forceMeta scty
     debug "SCTM \{pprint (names ctx) sc}"
@@ -679,16 +763,10 @@ check ctx tm ty = case (tm, !(forceType ty)) of
 
     let scnm = fresh "sc"
     top <- get
-    -- FIXME FC
-    clauses <- traverse (\(MkAlt pat rawRHS) => pure $ MkClause fc [(scnm, !(mkPat top (pat, Explicit)))] [] rawRHS ) alts
-
-    -- buildCase expects scrutinee to be a name in the context because
-    -- it's compared against the first part of Constraint.  We could switch
-    -- to a level and only let if the scrutinee is not a var.
+    clauses <- traverse (\(MkAlt pat rawRHS) => pure $ MkClause (getFC pat) [(scnm, !(mkPat top (pat, Explicit)))] [] rawRHS ) alts
+    -- buildCase expects scrutinee to be a name in the context, so we need to let it.
     let ctx' = extend ctx scnm scty
-    cons <- getConstructors ctx' fc scty
-    alts <- traverse (buildCase ctx' (MkProb clauses ty) scnm scty) cons
-    pure $ Let fc scnm sc $ Case fc (Bnd fc 0) (catMaybes alts)
+    pure $ Let fc scnm sc !(buildTree ctx' $ MkProb clauses ty)
 
   -- Document a hole, pretend it's implemented
   (RHole fc, ty) => do
@@ -697,8 +775,7 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     -- I want to know which ones are defines. I should skip the `=` bit if they match, I'll need indices in here too.
     env <- for (zip ctx.env (toList ctx.types)) $ \(v, n, ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)} = \{pprint names !(quote ctx.lvl v)}"
     let msg = unlines (toList $ reverse env) ++ "  -----------\n" ++ "  goal \{pprint names ty'}"
-    putStrLn "INFO at \{show fc}: "
-    putStrLn msg
+    info fc "\n\{msg}"
     -- let context = unlines foo
     -- need to print 'warning' with position
     -- fixme - just put a name on it like idris and stuff it into top.

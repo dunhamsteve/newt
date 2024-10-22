@@ -212,6 +212,7 @@ zonkApp top l env t sp = pure $ appSpine !(zonk top l env t) sp
 
 zonkAlt : TopContext -> Nat -> Env -> CaseAlt -> M CaseAlt
 zonkAlt top l env (CaseDefault t) = CaseDefault <$> zonkBind top l env t
+zonkAlt top l env (CaseLit lit t) = CaseLit lit <$> zonkBind top l env t
 zonkAlt top l env (CaseCons name args t) = CaseCons name args <$> go l env args t
   where
     go : Nat -> Env -> List String -> Tm -> M Tm

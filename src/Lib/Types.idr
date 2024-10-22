@@ -54,25 +54,38 @@ data PrimType = StringType | IntType
 data PrimVal : Type where
   PrimString : String -> PrimVal
   PrimInt : Int -> PrimVal
+  PrimChar : Char -> PrimVal
 
 public export
 data Tm : Type
+
+public export
+data Literal = LString String | LInt Int | LChar Char
+
+%name Literal lit
+
+public export
+Show Literal where
+  show (LString str) = show str
+  show (LInt i) = show i
+  show (LChar c) = show c
 
 public export
 data CaseAlt : Type where
   CaseDefault : Tm -> CaseAlt
   -- I've also seen a list of stuff that gets replaced
   CaseCons : (name : String) -> (args : List String) -> Tm ->  CaseAlt
-  -- CaseLit : Literal -> Tm ->  CaseAlt
+  CaseLit : Literal -> Tm ->  CaseAlt
 
 data Def : Type
 
-public export
-data Literal = LString String | LInt Int
 
-Show Literal where
-  show (LString str) = show str
-  show (LInt i) = show i
+public export
+Eq Literal where
+  LString x == LString y = x == y
+  LInt x == LInt y = x == y
+  LChar x == LChar y = x == y
+  _ == _ = False
 
 data Tm : Type where
   Bnd : FC -> Nat -> Tm
@@ -113,6 +126,7 @@ public export covering
 Show CaseAlt where
   show (CaseDefault tm) = "_ => \{show tm}"
   show (CaseCons nm args tm) = "\{nm} \{unwords args} => \{show tm}"
+  show (CaseLit lit tm) = "\{show lit} => \{show tm}"
 
 public export covering
 Show Tm where
@@ -159,7 +173,8 @@ pprint names tm = render 80 $ go names tm
     goAlt : List String -> CaseAlt -> Doc
 
     goAlt names (CaseDefault t) = "_" <+> "=>" <+> go ("_" :: names) t
-    goAlt names (CaseCons name args t) = text name <+> spread (map text args) <+> "=>" <+> go (args ++ names) t
+    goAlt names (CaseCons name args t) = text name <+> spread (map text args) <+> "=>" <+/> go (args ++ names) t
+    goAlt names (CaseLit lit t) = text (show lit) <+> "=>" <+/> go names t
 
     go names (Bnd _ k) = case getAt k names of
       Nothing => text "BND:\{show k}"
@@ -175,7 +190,7 @@ pprint names tm = render 80 $ go names tm
       text "((" <+> text nm <+> ":" <+> go names t <+> ")" <+> "->" <+> go (nm :: names) u <+> ")"
     -- FIXME - probably way wrong on the names here.  There is implicit binding going on
     go names (Case _ sc alts) = text "case" <+> go names sc <+> text "of" </> (nest 2 (line ++ stack (map (goAlt names) alts)))
-    go names (Lit _ lit) = text "\{show lit}"
+    go names (Lit _ lit) = text (show lit)
     go names (Let _ nm t u) = text "let" <+> text nm <+> ":=" <+> go names t </> (nest 2 $ go names u)
 
 -- public export

@@ -18,13 +18,14 @@ data Pattern
   | PatCon FC Icit Name (List Pattern)
   | PatWild FC Icit
   -- Not handling this yet, but we need to be able to work with numbers and strings...
-  -- | PatLit Literal
+  | PatLit FC Literal
 
 export
 getIcit : Pattern -> Icit
 getIcit (PatVar x icit str) = icit
 getIcit (PatCon x icit str xs) = icit
 getIcit (PatWild x icit) = icit
+getIcit (PatLit fc lit) = Explicit
 
 
 export
@@ -32,6 +33,7 @@ HasFC Pattern where
   getFC (PatVar fc _ _) = fc
   getFC (PatCon fc _ _ _) = fc
   getFC (PatWild fc _) = fc
+  getFC (PatLit fc lit) = fc
 
 -- %runElab deriveShow `{Pattern}
 public export
@@ -117,9 +119,10 @@ record Module where
 foo : List String -> String
 foo ts = "(" ++ unwords ts ++ ")"
 
-Show Literal where
-  show (LString str) = foo [ "LString", show str]
-  show (LInt i) = foo [ "LInt", show i]
+-- Show Literal where
+--   show (LString str) = foo [ "LString", show str]
+--   show (LInt i) = foo [ "LInt", show i]
+--   show (LChar c) = foo [ "LChar", show c]
 
 export
 covering
@@ -160,6 +163,7 @@ Show Pattern where
   show (PatVar _ icit str) = foo ["PatVar", show icit, show str]
   show (PatCon _ icit str xs) = foo ["PatCon", show icit, show str, assert_total $ show xs]
   show (PatWild _ icit) = foo ["PatWild", show icit]
+  show (PatLit _ lit) = foo ["PatLit", show lit]
 
 covering
 Show RCaseAlt where
@@ -181,11 +185,18 @@ Show Raw where
   show (RU _) = "U"
 
 export
+Pretty Literal where
+  pretty (LString str) = text $ interpolate str
+  pretty (LInt i) = text $ show i
+  pretty (LChar c) = text $ show c
+
+export
 Pretty Pattern where
   -- FIXME - wrap Implicit with {}
   pretty (PatVar _ icit nm) = text nm
   pretty (PatCon _ icit nm args) = text nm <+> spread (map pretty args)
-  pretty (PatWild _icit)= "_"
+  pretty (PatWild _icit) = "_"
+  pretty (PatLit _ lit) = pretty lit
 
 
 
@@ -218,8 +229,7 @@ Pretty Raw where
           <+/> text "in" <+> asDoc p scope
     -- does this exist?
     asDoc p (RAnn _ x y) = text "TODO - RAnn"
-    asDoc p (RLit _ (LString str)) = text $ interpolate str
-    asDoc p (RLit _ (LInt i)) = text $ show i
+    asDoc p (RLit _ lit) = pretty lit
     asDoc p (RCase _ x xs) = text "TODO - RCase"
     asDoc p (RImplicit _) = text "_"
     asDoc p (RHole _) = text "?"

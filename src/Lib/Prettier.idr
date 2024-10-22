@@ -55,8 +55,8 @@ be fit acc w k [] = Just (acc <>> [])
 be fit acc w k ((i, Empty) :: xs) = be fit acc w k xs
 be fit acc w k ((i, Line) :: xs) = (be False (acc :< LINE i) w i xs)
 be fit acc w k ((i, (Text s)) :: xs) =
-  if not fit || (k + length s < w) 
-     then (be fit (acc :< TEXT s) w (k + length s) xs) 
+  if not fit || (k + length s < w)
+     then (be fit (acc :< TEXT s) w (k + length s) xs)
      else Nothing
 be fit acc w k ((i, (Nest j x)) :: xs) = be fit acc w k ((i+j,x)::xs)
 be fit acc w k ((i, (Seq x y)) :: xs) = be fit acc w k ((i,x) :: (i,y) :: xs)
@@ -124,7 +124,7 @@ export
 bracket : String -> Doc -> String -> Doc
 bracket l x r = group (text l ++ nest 2 (line ++ x) ++ line ++ text r)
 
-infixl 5 <+/>
+export infixl 5 <+/>
 
 ||| Either space or newline
 export

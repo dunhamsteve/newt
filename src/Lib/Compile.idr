@@ -11,10 +11,12 @@ import Data.Nat
 data Kind = Plain | Return | Assign String
 
 data JSStmt : Kind -> Type
+data JSExp : Type
 
 data JAlt : Type where
   JConAlt : String -> JSStmt e -> JAlt
   JDefAlt : JSStmt e -> JAlt
+  JLitAlt : JSExp -> JSStmt e -> JAlt
 
 data JSExp : Type where
   LitArray : List JSExp -> JSExp
@@ -48,6 +50,11 @@ Cont e = JSExp -> JSStmt e
 ||| used to translate binders
 JSEnv : Type
 JSEnv = List JSExp
+
+litToJS : Literal -> JSExp
+litToJS (LString str) = LitString str
+litToJS (LChar c) = LitString $ cast c
+litToJS (LInt i) = LitInt i
 
 -- Stuff nm.h1, nm.h2, ... into environment
 mkEnv : String -> Nat -> List JSExp -> List String -> List JSExp
@@ -89,6 +96,7 @@ termToJS env (CFun nms t) f =
 termToJS env (CRef nm) f = f $ Var nm
 termToJS env (CMeta k) f = f $ LitString "META \{show k}"
 termToJS env (CLit (LString str)) f = f (LitString str)
+termToJS env (CLit (LChar c)) f = f (LitString $ cast c)
 termToJS env (CLit (LInt i)) f = f (LitInt i)
 -- if it's a var, just use the original
 termToJS env (CLet nm (CBnd k) u) f = case getAt k env of
@@ -125,11 +133,12 @@ termToJS env (CCase t alts) f =
     termToJSAlt env nm (CConAlt name args u) = JConAlt name (termToJS (mkEnv nm 0 env args) u f)
     -- intentionally reusing scrutinee name here
     termToJSAlt env nm (CDefAlt u) = JDefAlt (termToJS (Var nm :: env) u f)
+    termToJSAlt env nm (CLitAlt lit u) = JLitAlt (litToJS lit) (termToJS (Var nm :: env) u f)
 
     maybeCaseStmt : List JSExp -> String -> List CAlt -> JSStmt e
     -- If there is a single alt, assume it matched
     maybeCaseStmt env nm [(CConAlt _ args u)] = (termToJS (mkEnv nm 0 env args) u f)
-    maybeCaseStmt env nm alts = 
+    maybeCaseStmt env nm alts =
           (JCase (Dot (Var nm) "tag") (map (termToJSAlt env nm) alts))
 
 
@@ -185,18 +194,21 @@ expToDoc (Dot obj nm) = expToDoc obj ++ "." ++ jsIdent nm
 
 caseBody : JSStmt e -> Doc
 caseBody stmt@(JReturn x) = nest 2 (line ++ stmtToDoc stmt)
-caseBody stmt = "{" </> nest 2 (line ++ stmtToDoc stmt </> text "break;") </> "}"
+-- caseBody {e = Return} stmt@(JCase{}) = nest 2 (line ++ stmtToDoc stmt)
+caseBody {e} stmt@(JCase{}) = nest 2 (line ++ stmtToDoc stmt </> text "break;")
+caseBody stmt = line ++ "{" ++ nest 2 (line ++ stmtToDoc stmt </> text "break;") </> "}"
 
 altToDoc : JAlt -> Doc
 altToDoc (JConAlt nm stmt) = text "case" <+> jsString nm ++ ":" ++ caseBody stmt
 altToDoc (JDefAlt stmt) = text "default" ++ ":" ++ caseBody stmt
+altToDoc (JLitAlt a stmt) = text "case" <+> expToDoc a ++ ":" ++ caseBody stmt
 
 stmtToDoc (JSnoc x y) = stmtToDoc x </> stmtToDoc y
 stmtToDoc (JPlain x) = expToDoc x ++ ";"
 -- I might not need these split yet.
 stmtToDoc (JLet nm body) = "let" <+> jsIdent nm ++ ";" </> stmtToDoc body
 stmtToDoc (JAssign nm expr) = jsIdent nm <+> "=" <+> expToDoc expr ++ ";"
-stmtToDoc (JConst nm x) = text "const" <+> jsIdent nm <+> "=" <+/> expToDoc x ++ ";"
+stmtToDoc (JConst nm x) = text "const" <+> jsIdent nm <+> nest 2 ("=" <+/> expToDoc x ++ ";")
 stmtToDoc (JReturn x) = text "return" <+> expToDoc x ++ ";"
 stmtToDoc (JError str) = text "throw new Error(" ++ jsString str ++ ");"
 stmtToDoc (JCase sc alts) =
@@ -220,9 +232,10 @@ entryToDoc (MkEntry name ty (Fn tm)) = do
   -- and we might need betas? It seems like a mirror of what happens in CExp
   debug "compileFun \{pprint [] tm}"
   ct <- compileFun tm
-  -- now show for ct...
-  let body = stmtToDoc $ termToJS [] ct JPlain
-  pure (text "const" <+> jsIdent name <+> text "=" <+/> body)
+  -- If ct has zero arity and is a compount expression, this fails..
+  let body@(JPlain {}) = termToJS [] ct JPlain
+    | js => error (getFC tm) "Not a plain expression: \{render 80 $ stmtToDoc js}"
+  pure (text "const" <+> jsIdent name <+> text "=" <+/> stmtToDoc body)
 entryToDoc (MkEntry name type Axiom) = pure ""
 entryToDoc (MkEntry name type (TCon strs)) = pure $ dcon name (piArity type)
 entryToDoc (MkEntry name type (DCon arity str)) = pure $ dcon name arity

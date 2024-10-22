@@ -1,6 +1,11 @@
 
 ## TODO
 
+- [ ] Default cases (currently gets expanded to all constructors)
+- [ ] Case for primitives
+- [ ] aoc2023 translation
+  - some "real world" examples
+- [ ] Maybe Eq and stuff would work for typeclass without dealing with unification issues yet
 - [ ] unsolved meta errors repeat (need to freeze or only report at end)
 - [x] Sanitize JS idents, e.g. `_+_`
 - [ ] Generate some programs that do stuff

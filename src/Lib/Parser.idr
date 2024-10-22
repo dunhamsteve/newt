@@ -1,7 +1,7 @@
 module Lib.Parser
 import Lib.Types
 import Debug.Trace
-
+import Data.String
 
 -- app: foo {a} a b
 -- lam: λ {A} {b : A} (c : Blah) d e f => something
@@ -50,8 +50,14 @@ intLit = do
   pure $ RLit fc (LInt (cast t))
 
 
+charLit : Parser Raw
+charLit = do
+  fc <- getPos
+  v <- token Character
+  pure $ RLit fc (LChar $ assert_total $ strIndex v 1)
+
 lit : Parser Raw
-lit = intLit <|> stringLit
+lit = intLit <|> stringLit <|> charLit
 
 -- typeExpr is term with arrows.
 export typeExpr : Parser Raw

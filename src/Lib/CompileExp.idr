@@ -20,6 +20,7 @@ data CAlt : Type where
   -- REVIEW keep var name?
   CDefAlt : CExp -> CAlt
   -- literal
+  CLitAlt : Literal -> CExp -> CAlt
 
 data CExp : Type where
   CBnd : Nat -> CExp
@@ -110,7 +111,8 @@ compileTerm (Case _ t alts) = do
   t' <- compileTerm t
   alts' <- traverse (\case
     CaseDefault tm => pure $ CDefAlt !(compileTerm tm)
-    CaseCons nm args tm => pure $ CConAlt nm args !(compileTerm tm)) alts
+    CaseCons nm args tm => pure $ CConAlt nm args !(compileTerm tm)
+    CaseLit lit tm => pure $ CLitAlt lit !(compileTerm tm)) alts
   pure $ CCase t' alts'
 compileTerm (Lit _ lit) = pure $ CLit lit
 compileTerm (Let _ nm t u) = pure $ CLet nm !(compileTerm t) !(compileTerm u)
