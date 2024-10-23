@@ -19,11 +19,11 @@ lookup nm top = go top.defs
 export
 covering
 Show TopContext where
-  show (MkTop defs metas _ _ _) = "\nContext:\n [\{ joinBy "\n" $ map show defs}]"
+  show (MkTop defs metas _ _ _ _) = "\nContext:\n [\{ joinBy "\n" $ map show defs}]"
 
 public export
 empty : HasIO m => m TopContext
-empty = pure $ MkTop [] !(newIORef (MC [] 0)) False !(newIORef []) []
+empty = pure $ MkTop [] !(newIORef (MC [] 0)) False !(newIORef []) [] []
 
 ||| set or replace def. probably need to check types and Axiom on replace
 public export

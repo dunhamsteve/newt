@@ -90,6 +90,10 @@ parseApp = do
   rest <- many pArg
   pure $ foldl (\a, (icit,fc,b) => RApp fc a b icit) hd rest
 
+lookup : String -> List OpDef -> Maybe OpDef
+lookup _ [] = Nothing
+lookup name (op :: ops) = if op.name == name then Just op else lookup name ops
+
 parseOp : Parser Raw
 parseOp = parseApp >>= go 0
   where
@@ -100,7 +104,7 @@ parseOp = parseApp >>= go 0
         op <- token Oper
         ops <- getOps
         let op' = "_" ++ op ++ "_"
-        let Just (p,fix) = lookup op' ops
+        let Just (MkOp _ p fix) = lookup op' ops
           -- this is eaten, but we need `->` and `:=` to not be an operator to have fatal here
          | Nothing => case op of
          -- Location is poor on these because we pull off of the remaining token list...
@@ -320,12 +324,21 @@ export
 parseDecl : Parser Decl
 parseDecl = parseMixfix <|> parsePType <|> parsePFunc <|> parseNorm <|> parseData <|> (try $ parseSig) <|> parseDef
 
+
+export
+parseModHeader : Parser String
+parseModHeader = sameLevel (keyword "module") >> uident
+
+export
+parseImports : Parser (List Import)
+parseImports = manySame $ parseImport
+
 export
 parseMod : Parser Module
 parseMod = do
-  keyword "module"
-  name <- uident
   startBlock $ do
+    keyword "module"
+    name <- uident
     imports <- manySame $ parseImport
     decls <- manySame $ parseDecl
     pure $ MkModule name imports decls

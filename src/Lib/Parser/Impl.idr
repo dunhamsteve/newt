@@ -49,11 +49,18 @@ showError src (E (line, col) msg) = "ERROR at \{show (line,col)}: \{msg}\n" ++ g
       else if line - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
       else go (l + 1) xs
 
+public export
+record OpDef where
+  constructor MkOp
+  name : String
+  prec : Int
+  fix : Fixity
+
 -- Result of a parse
 public export
 data Result : Type -> Type where
-  OK : a -> (toks : TokenList) -> (com : Bool) -> List (String, Int, Fixity) -> Result a
-  Fail : Bool -> Error -> (toks : TokenList) -> (com : Bool) -> List (String, Int, Fixity) -> Result a
+  OK : a -> (toks : TokenList) -> (com : Bool) -> List OpDef -> Result a
+  Fail : Bool -> Error -> (toks : TokenList) -> (com : Bool) -> List OpDef -> Result a
 
 export
 Functor Result where
@@ -74,10 +81,10 @@ Functor Result where
 -- This is a Reader in FC, a State in Operators, Commit flag, TokenList
 
 export
-data Parser a = P (TokenList -> Bool -> List (String, Int, Fixity) -> (lc : FC) -> Result a)
+data Parser a = P (TokenList -> Bool -> List OpDef -> (lc : FC) -> Result a)
 
 export
-runP : Parser a -> TokenList -> Bool -> List (String, Int, Fixity) -> FC -> Result a
+runP : Parser a -> TokenList -> Bool -> List OpDef -> FC -> Result a
 runP (P f) = f
 
 error : TokenList -> String -> Error
@@ -90,6 +97,13 @@ parse pa toks = case runP pa toks False [] (-1,-1) of
   Fail fatal err toks com ops => Left err
   OK a [] _ _ => Right a
   OK a ts _ _ => Left (error ts "Extra toks")
+
+||| Intended for parsing a top level declaration
+export
+partialParse : Parser a -> List OpDef -> TokenList -> Either Error (a, List OpDef, TokenList)
+partialParse pa ops toks = case runP pa toks False ops (0,0) of
+  Fail fatal err toks com ops => Left err
+  OK a ts _ ops => Right (a,ops,ts)
 
 -- I think I want to drop the typeclasses for v1
 
@@ -108,13 +122,13 @@ fatal : String -> Parser a
 fatal msg = P $ \toks,com,ops,col => Fail True (error toks msg) toks com ops
 
 export
-getOps : Parser (List (String, Int, Fixity))
+getOps : Parser (List OpDef)
 getOps = P $ \ toks, com, ops, col => OK ops toks com ops
 
 export
 addOp : String -> Int -> Fixity -> Parser ()
 addOp nm prec fix = P $ \ toks, com, ops, col =>
-  OK () toks com ((nm, prec, fix) :: ops)
+  OK () toks com ((MkOp nm prec fix) :: ops)
 
 export
 Functor Parser where

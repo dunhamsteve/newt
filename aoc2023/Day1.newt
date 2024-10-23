@@ -1,23 +1,6 @@
 module Day1
 
 import Lib
-ptype Int
-
--- TODO fix import of fixity declarations
-infixr 4 _::_
-infixl 3 _<_
-infixl 4 _-_
-infixl 4 _+_
-infixl 5 _*_
-infixl 5 _/_
-infixr 0 _$_
--- Code
-
-
-infixl 7 _._
-_._ : {A B C : U} -> (B -> C) -> (A -> B) -> A -> C
-(f . g) x = f ( g x)
-
 
 digits1 : List Char -> List Int
 digits1 Nil = Nil

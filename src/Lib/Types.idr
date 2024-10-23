@@ -366,7 +366,7 @@ record TopContext where
   errors : IORef (List Error)
   ||| loaded modules
   loaded : List String
-
+  ops : List OpDef
 
 -- we'll use this for typechecking, but need to keep a TopContext around too.
 public export

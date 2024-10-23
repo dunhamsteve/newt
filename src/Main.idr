@@ -38,7 +38,6 @@ dumpContext top = do
     go [] = pure ()
     go (x :: xs) = putStrLn "    \{show x}" >> go xs
 
-
 writeSource : String -> M ()
 writeSource fn = do
   docs <- compile
@@ -50,50 +49,57 @@ writeSource fn = do
   Right _ <- chmodRaw fn 493 | Left err => fail (show err)
   pure ()
 
-parseFile : String -> M (String,Module)
-parseFile fn = do
+||| New style loader, one def at a time
+processModule : String -> List String -> String -> M String
+processModule base stk name = do
+  top <- get
+  let False := elem name top.loaded | _ => pure ""
+  modify { loaded $= (name::) }
+  let fn = base ++ "/" ++ name ++ ".newt"
   Right src <- readFile $ fn
     | Left err => fail (show err)
   let toks = tokenise src
-  let Right res = parse parseMod toks
-    | Left y => fail (showError src y)
-  pure (src, res)
 
-loadModule : String -> List String -> String -> M ()
-loadModule base stk name = do
-  top <- get
-  -- already loaded?
-  let False := elem name top.loaded | _ => pure ()
-  modify { loaded $= (name::) }
-  let fn = base ++ "/" ++ name ++ ".newt"
-  (src, res) <- parseFile fn
-  putStrLn "module \{res.name}"
-  let True = name == res.name
-    | _ => fail "ERROR at (0, 0): module name \{show res.name} doesn't match file name \{show fn}"
-  -- TODO separate imports and detect loops / redundant
-  for_ res.imports $ \ (MkImport fc name') => do
+  let Right (modName, ops, toks) := partialParse parseModHeader top.ops toks
+    | Left err => fail (showError src err)
+
+
+  putStrLn "module \{modName}"
+  let True = name == modName
+    | _ => fail "ERROR at (0, 0): module name \{show modName} doesn't match file name \{show fn}"
+
+  let Right (imports, ops, toks) := partialParse parseImports ops toks
+    | Left err => fail (showError src err)
+
+  for_ imports $ \ (MkImport fc name') => do
     -- we could use `fc` if it had a filename in it
-    when (name' `elem` stk) $ error emptyFC "import loop \{show name} -> \{show name'}"
-    loadModule base (name :: stk) name'
 
-  -- TODO Lift the error exit, so import errors can get a FC in current file
+    when (name' `elem` stk) $ error emptyFC "import loop \{show name} -> \{show name'}"
+    processModule base (name :: stk) name'
+
+  top <- get
+  let Right (decls, ops, toks) := partialParse (manySame parseDecl) top.ops toks
+    | Left err => fail (showError src err)
+  let [] := toks | (x :: xs) => fail "extra toks" -- FIXME FC from xs
+
+  modify { ops := ops }
+
   putStrLn "process Decls"
-  Right _ <- tryError $ traverse_ processDecl (collectDecl res.decls)
+  Right _ <- tryError $ traverse_ processDecl (collectDecl decls)
     | Left y => fail (showError src y)
 
-  pure ()
+  pure src
 
 processFile : String -> M ()
 processFile fn = do
   putStrLn "*** Process \{fn}"
-  (src, res) <- parseFile fn
-  putStrLn "module \{res.name}"
   let parts = splitPath fn
   let file = fromMaybe "" $ last' parts
   let dir = fromMaybe "./" $ parent fn
   let (name,ext) = splitFileName (fromMaybe "" $ last' parts)
   putStrLn "\{show dir} \{show name} \{show ext}"
-  loadModule dir [] name
+
+  src <- processModule dir [] name
   top <- get
   -- dumpContext top
 

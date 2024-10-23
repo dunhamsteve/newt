@@ -131,3 +131,8 @@ foldl f acc (x :: xs) = foldl f (f acc x) xs
 map : {A B : U} -> (A -> B) -> List A -> List B
 map f Nil = Nil
 map f (x :: xs) = f x :: map f xs
+
+
+infixl 7 _._
+_._ : {A B C : U} -> (B -> C) -> (A -> B) -> A -> C
+(f . g) x = f ( g x)

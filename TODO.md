@@ -1,10 +1,8 @@
 
 ## TODO
 
-- [ ] Remember operators from imports
-  - This one is tricky because we need to parse to get imports, but can't parse expressions until we've loaded imports.
-  - It could be handled by parsing and processing one declaration at a time. We would want this with memoization to do Lean-style incremental builds, but we're not at the LSP stage yet.
-- [ ] Default cases (currently gets expanded to all constructors)
+- [x] Remember operators from imports
+- [ ] Default cases for non-primitives (currently gets expanded to all constructors)
 - [x] Case for primitives
 - [ ] aoc2023 translation
   - [x] day1
