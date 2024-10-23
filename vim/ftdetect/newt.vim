@@ -1,0 +1,1 @@
+autocmd BufRead,BufNewFile *.newt set filetype=newt
