@@ -48,8 +48,16 @@ Cont e = JSExp -> JSStmt e
 
 ||| JSEnv contains `Var` for binders or `Dot` for destructured data. It
 ||| used to translate binders
-JSEnv : Type
-JSEnv = List JSExp
+record JSEnv where
+  constructor MkEnv
+  env : List JSExp
+  depth : Nat
+
+push : JSEnv -> JSExp -> JSEnv
+push env exp = { env $= (exp ::) } env
+
+empty : JSEnv
+empty = MkEnv [] Z
 
 litToJS : Literal -> JSExp
 litToJS (LString str) = LitString str
@@ -57,23 +65,24 @@ litToJS (LChar c) = LitString $ cast c
 litToJS (LInt i) = LitInt i
 
 -- Stuff nm.h1, nm.h2, ... into environment
-mkEnv : String -> Nat -> List JSExp -> List String -> List JSExp
+-- TODO consider JSExp instead of nm, so we can have $foo.h1 instead of assigning a sc.
+mkEnv : String -> Nat -> JSEnv -> List String -> JSEnv
 mkEnv nm k env [] = env
-mkEnv nm k env (x :: xs) = mkEnv nm (S k) (Dot (Var nm) "h\{show k}" :: env) xs
+mkEnv nm k env (x :: xs) = mkEnv nm (S k) (push env (Dot (Var nm) "h\{show k}")) xs
 
 envNames : Env -> List String
 
 ||| given a name, find a similar one that doesn't shadow in Env
 fresh : String -> JSEnv -> String
-fresh nm env = if free env nm then nm else go nm 1
+fresh nm env = if free env.env nm then nm else go nm 1
   where
-    free : JSEnv -> String -> Bool
+    free : List JSExp -> String -> Bool
     free [] nm = True
     free (Var n :: xs) nm = if n == nm then False else free xs nm
     free (_ :: xs) nm = free xs nm
 
     go : String -> Nat -> String
-    go nm k = let nm' = "\{nm}\{show k}" in if free env nm' then nm' else go nm (S k)
+    go nm k = let nm' = "\{nm}\{show k}" in if free env.env nm' then nm' else go nm (S k)
 
 -- This is inspired by A-normalization, look into the continuation monad
 -- There is an index on JSStmt, adopted from Stefan Hoeck's code.
@@ -81,30 +90,28 @@ fresh nm env = if free env nm then nm else go nm 1
 -- Here we turn a Term into a statement (which may be a sequence of statements), there
 -- is a continuation, which turns the final JSExpr into a JSStmt, and the function returns
 -- a JSStmt, wrapping recursive calls in JSnoc if necessary.
-termToJS : List JSExp -> CExp -> Cont e -> JSStmt e
-termToJS env (CBnd k) f = case getAt k env of
+termToJS : JSEnv -> CExp -> Cont e -> JSStmt e
+termToJS env (CBnd k) f = case getAt k env.env of
   (Just e) => f e
   Nothing => ?bad_bounds
 termToJS env (CLam nm t) f =
   let nm' = fresh nm env -- "\{nm}$\{show $ length env}"
-      env' = (Var nm' :: env)
+      env' = push env (Var nm')
   in f $ JLam [nm'] (termToJS env' t JReturn)
 termToJS env (CFun nms t) f =
   let nms' = map (\nm => fresh nm env) nms
-      env' = foldl (\ e, nm => Var nm :: e) env nms'
+      env' = foldl (\ e, nm => push e (Var nm)) env nms'
   in f $ JLam nms' (termToJS env' t JReturn)
 termToJS env (CRef nm) f = f $ Var nm
 termToJS env (CMeta k) f = f $ LitString "META \{show k}"
-termToJS env (CLit (LString str)) f = f (LitString str)
-termToJS env (CLit (LChar c)) f = f (LitString $ cast c)
-termToJS env (CLit (LInt i)) f = f (LitInt i)
+termToJS env (CLit lit) f = f (litToJS lit)
 -- if it's a var, just use the original
-termToJS env (CLet nm (CBnd k) u) f = case getAt k env of
-  Just e  => termToJS (e :: env) u f
+termToJS env (CLet nm (CBnd k) u) f = case getAt k env.env of
+  Just e  => termToJS (push env e) u f
   Nothing => ?bad_bounds2
 termToJS env (CLet nm t u) f =
   let nm' = fresh nm env
-      env' = (Var nm' :: env)
+      env' = push env (Var nm')
   -- If it's a simple term, use const
   in case termToJS env t (JAssign nm') of
     (JAssign _ exp) => JSnoc (JConst nm' exp) (termToJS env' u f)
@@ -124,20 +131,24 @@ termToJS env (CCase t alts) f =
 
   termToJS env t $ \case
     (Var nm) => maybeCaseStmt env nm alts
-    t' =>
-      let nm = fresh "sc" env in
-        JSnoc (JConst nm t') (maybeCaseStmt (Var nm :: env) nm alts)
+    t' => do
+      -- TODO refactor nm to be a JSExp with Var{} or Dot{}
+      let nm = "sc$\{show env.depth}"
+      let env' = { depth $= S } env
+      JSnoc (JConst nm t') (maybeCaseStmt env' nm alts)
 
   where
-    termToJSAlt : List JSExp -> String -> CAlt -> JAlt
+    termToJSAlt : JSEnv -> String -> CAlt -> JAlt
     termToJSAlt env nm (CConAlt name args u) = JConAlt name (termToJS (mkEnv nm 0 env args) u f)
     -- intentionally reusing scrutinee name here
-    termToJSAlt env nm (CDefAlt u) = JDefAlt (termToJS (Var nm :: env) u f)
-    termToJSAlt env nm (CLitAlt lit u) = JLitAlt (litToJS lit) (termToJS (Var nm :: env) u f)
+    termToJSAlt env nm (CDefAlt u) = JDefAlt (termToJS  (env) u f)
+    termToJSAlt env nm (CLitAlt lit u) = JLitAlt (litToJS lit) (termToJS env u f)
 
-    maybeCaseStmt : List JSExp -> String -> List CAlt -> JSStmt e
+    maybeCaseStmt : JSEnv -> String -> List CAlt -> JSStmt e
     -- If there is a single alt, assume it matched
     maybeCaseStmt env nm [(CConAlt _ args u)] = (termToJS (mkEnv nm 0 env args) u f)
+    maybeCaseStmt env nm alts@(CLitAlt _ _  :: _) =
+        (JCase (Var nm) (map (termToJSAlt env nm) alts))
     maybeCaseStmt env nm alts =
           (JCase (Dot (Var nm) "tag") (map (termToJSAlt env nm) alts))
 
@@ -233,7 +244,7 @@ entryToDoc (MkEntry name ty (Fn tm)) = do
   debug "compileFun \{pprint [] tm}"
   ct <- compileFun tm
   -- If ct has zero arity and is a compount expression, this fails..
-  let body@(JPlain {}) = termToJS [] ct JPlain
+  let body@(JPlain {}) = termToJS empty ct JPlain
     | js => error (getFC tm) "Not a plain expression: \{render 80 $ stmtToDoc js}"
   pure (text "const" <+> jsIdent name <+> text "=" <+/> stmtToDoc body)
 entryToDoc (MkEntry name type Axiom) = pure ""
@@ -243,7 +254,7 @@ entryToDoc (MkEntry name type PrimTCon) = pure $ dcon name (piArity type)
 entryToDoc (MkEntry name _ (PrimFn src)) = pure $ text "const" <+> jsIdent name <+> "=" <+> text src
 
 export
-compile : M Doc
+compile : M (List Doc)
 compile = do
   top <- get
-  pure $ stack $ !(traverse entryToDoc top.defs)
+  traverse entryToDoc top.defs

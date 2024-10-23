@@ -38,15 +38,13 @@ dumpContext top = do
     go [] = pure ()
     go (x :: xs) = putStrLn "    \{show x}" >> go xs
 
-dumpSource : M ()
-dumpSource = do
-  doc <- compile
-  putStrLn $ render 90 doc
 
 writeSource : String -> M ()
 writeSource fn = do
-  doc <- compile
-  let src = "#!/usr/bin/env node\n" ++ render 90 doc ++ "\nmain();"
+  docs <- compile
+  let src = unlines $ ["#!/usr/bin/env node"]
+        ++ map (render 90) docs
+        ++ [ "main();" ]
   Right _ <- writeFile fn src
     | Left err => fail (show err)
   Right _ <- chmodRaw fn 493 | Left err => fail (show err)

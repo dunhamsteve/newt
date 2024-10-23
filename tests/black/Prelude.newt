@@ -12,3 +12,13 @@ data Either : U -> U -> U where
   Left : {a b : U} -> a -> Either a b
   Right : {a b : U} -> b -> Either a b
 
+data List : U -> U where
+  Nil : {a : U} -> List a
+  Cons : {a : U} -> a -> List a -> List a
+
+-- Currently if I say _::_ = Cons, it gets curried
+
+infixr 4 _::_
+_::_ : {a : U} -> a -> List a -> List a
+_::_ x xs = Cons x xs
+

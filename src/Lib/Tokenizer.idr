@@ -44,6 +44,7 @@ unquote str = case unpack str of
     go : List Char -> List Char
     go [] = []
     go ['"'] = []
+    go ('\\' :: ('n' :: xs)) = '\n' :: go xs
     go ('\\' :: (x :: xs)) = x :: go xs
     go (x :: xs) = x :: go xs
 
@@ -55,7 +56,7 @@ rawTokens
   <|> match (is '#' <+> many alpha) (Tok Pragma)
   <|> match charLit (Tok Character)
   <|> match (exact "_" <+> (some opChar <|> exact ",") <+> exact "_") (Tok MixFix)
-  <|> match (quo <+> manyUntil quo ((esc any <+> any) <|> any) <+> opt quo) (Tok StringKind . unquote)
+  <|> match (quo <+> manyUntil quo (esc any <|> any) <+> quo) (Tok StringKind . unquote)
   <|> match (lineComment (exact "--")) (Tok Space)
   <|> match (blockComment (exact "/-") (exact "-/")) (Tok Space)
   <|> match (exact ",") (Tok Oper)

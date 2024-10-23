@@ -73,7 +73,6 @@ Show Literal where
 public export
 data CaseAlt : Type where
   CaseDefault : Tm -> CaseAlt
-  -- I've also seen a list of stuff that gets replaced
   CaseCons : (name : String) -> (args : List String) -> Tm ->  CaseAlt
   CaseLit : Literal -> Tm ->  CaseAlt
 
@@ -98,7 +97,6 @@ data Tm : Type where
   App : FC -> Tm -> Tm -> Tm
   U   : FC -> Tm
   Pi  : FC -> Name -> Icit -> Tm -> Tm -> Tm
-  -- REVIEW - do we want to just push it up like idris?
   Case : FC -> Tm -> List CaseAlt -> Tm
   -- need type?
   Let : FC -> Name -> Tm -> Tm -> Tm
@@ -173,7 +171,7 @@ pprint names tm = render 80 $ go names tm
     goAlt : List String -> CaseAlt -> Doc
 
     goAlt names (CaseDefault t) = "_" <+> "=>" <+> go ("_" :: names) t
-    goAlt names (CaseCons name args t) = text name <+> spread (map text args) <+> "=>" <+/> go (args ++ names) t
+    goAlt names (CaseCons name args t) = text name <+> spread (map text args) <+> "=>" <+/> go (reverse args ++ names) t
     goAlt names (CaseLit lit t) = text (show lit) <+> "=>" <+/> go names t
 
     go names (Bnd _ k) = case getAt k names of

@@ -680,7 +680,7 @@ buildLitCase ctx prob fc scnm scty lit = do
 
 buildLitCases : Context -> Problem -> FC -> String -> Val -> M (List CaseAlt)
 buildLitCases ctx prob fc scnm scty = do
-  let lits = getLits scnm prob.clauses
+  let lits = nub $ getLits scnm prob.clauses
   alts <- traverse (buildLitCase ctx prob fc scnm scty) lits
   -- TODO build default case
   -- run getLits
