@@ -1,9 +1,13 @@
 
 ## TODO
 
+- [ ] Remember operators from imports
+  - This one is tricky because we need to parse to get imports, but can't parse expressions until we've loaded imports.
+  - It could be handled by parsing and processing one declaration at a time. We would want this with memoization to do Lean-style incremental builds, but we're not at the LSP stage yet.
 - [ ] Default cases (currently gets expanded to all constructors)
-- [ ] Case for primitives
+- [x] Case for primitives
 - [ ] aoc2023 translation
+  - [x] day1
   - some "real world" examples
 - [ ] Maybe Eq and stuff would work for typeclass without dealing with unification issues yet
 - [ ] unsolved meta errors repeat (need to freeze or only report at end)
@@ -29,16 +33,16 @@
 - [x] matching on operators
   - [x] top level
   - [x] case statements
-- [x] SKIP list syntax
+- [x] ~~SKIP list syntax~~
   - Agda doesn't have it, clashes with pair syntax
 - [ ] autos / typeclass resolution
-  - We need special handling in unification to make this possible
+  - We need special handling in unification to make this possible for typeclasses on `U -> U`, we could still do `Eq` or `Show` with the current unification
   - options
     - keep as implicit and do auto if the type constructor is flagged auto
     - keep as implicit and mark auto, behavior overlaps a lot with implicit
     - have separate type of implict with `{{}}`
     - `TypeClass.newt` is the exercise for this
-- [ ] do blocks
+- [ ] do blocks (needs typeclass, overloaded functions, or constrain to IO)
 - [ ] some solution for `+` problem (classes? ambiguity?)
 - [x] show compiler failure in the editor (exit code != 0)
 - [x] write output to file
@@ -55,7 +59,7 @@
 - [ ] magic tuple? (codegen as array)
 - [ ] magic newtype? (drop in codegen)
 - [ ] records / copatterns
-- [ ] vscode: syntax highlighting for String
+- [x] vscode: syntax highlighting for String
 
 ### Parsing
 
