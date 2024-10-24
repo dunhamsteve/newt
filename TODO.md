@@ -6,6 +6,7 @@
 - [x] Case for primitives
 - [ ] aoc2023 translation
   - [x] day1
+  - [x] day2
   - some "real world" examples
 - [ ] Maybe Eq and stuff would work for typeclass without dealing with unification issues yet
 - [ ] unsolved meta errors repeat (need to freeze or only report at end)
@@ -31,6 +32,8 @@
 - [x] matching on operators
   - [x] top level
   - [x] case statements
+- [ ] Lean / Agda ⟨ ⟩
+- [ ] Lean-like .map, etc? (resolve name in namespace of target type, etc)
 - [x] ~~SKIP list syntax~~
   - Agda doesn't have it, clashes with pair syntax
 - [ ] autos / typeclass resolution

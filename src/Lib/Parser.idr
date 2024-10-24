@@ -124,7 +124,7 @@ letExpr = do
   alts <- startBlock $ someSame $ letAssign
   keyword' "in"
   scope <- typeExpr
-  pure $ foldl (\ acc, (n,fc,v) => RLet fc n (RImplicit fc) v acc) scope alts
+  pure $ foldl (\ acc, (n,fc,v) => RLet fc n (RImplicit fc) v acc) scope (reverse alts)
   where
     letAssign : Parser (Name,FC,Raw)
     letAssign = do

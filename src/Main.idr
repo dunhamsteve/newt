@@ -80,8 +80,9 @@ processModule base stk name = do
   top <- get
   let Right (decls, ops, toks) := partialParse (manySame parseDecl) top.ops toks
     | Left err => fail (showError src err)
-  let [] := toks | (x :: xs) => fail "extra toks" -- FIXME FC from xs
-
+  let [] := toks
+    | (x :: xs) =>
+        fail (showError src (E (startBounds x.bounds) "extra toks")) -- FIXME FC from xs
   modify { ops := ops }
 
   putStrLn "process Decls"

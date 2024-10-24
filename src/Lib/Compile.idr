@@ -133,7 +133,9 @@ termToJS env (CCase t alts) f =
     (Var nm) => maybeCaseStmt env nm alts
     t' => do
       -- TODO refactor nm to be a JSExp with Var{} or Dot{}
-      let nm = "sc$\{show env.depth}"
+      -- FIXME sc$ seemed to shadow something else, lets get this straightened out
+      -- we need fresh names that are not in env (i.e. do not play in debruijn)
+      let nm = "_sc$\{show env.depth}"
       let env' = { depth $= S } env
       JSnoc (JConst nm t') (maybeCaseStmt env' nm alts)
 

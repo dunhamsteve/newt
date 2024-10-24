@@ -1,6 +1,8 @@
 module Lib
 
 -- Prelude
+data Unit : U where
+  MkUnit : Unit
 
 data Bool : U where
   True : Bool
@@ -35,6 +37,9 @@ reverse' (x :: xs) acc = reverse' xs (x :: acc)
 reverse : {A : U} -> List A -> List A
 reverse xs = reverse' xs Nil
 
+length : {a : U} -> List a -> Nat
+length Nil = Z
+length (x :: xs) = S (length xs)
 
 infixr 2 _,_
 
@@ -73,6 +78,20 @@ pfunc arrayToList : {a : U} -> Array a -> List a := "
 }
 "
 
+pfunc listToArray : {a : U} -> List a -> Array a := "
+(a, l) => {
+  let rval = []
+  while (l.tag !== 'Nil') {
+    rval.push(l.h1)
+    l = l.h2
+  }
+  return rval
+}
+"
+pfunc alen : {a : U} -> Array a -> Int := "(a,arr) => arr.length"
+pfunc aget : {a : U} -> Array a -> Int -> a := "(a, arr, ix) => arr[ix]"
+pfunc aempty : {a : U} -> Unit -> Array a := "() => []"
+
 pfunc getArgs : List String := "arrayToList(String, process.argv)"
 -- Maybe integrate promises?
 
@@ -80,11 +99,13 @@ pfunc getArgs : List String := "arrayToList(String, process.argv)"
 pfunc ord : Char -> Int := "(c) => c.charCodeAt(0)"
 
 pfunc _<_ : Int -> Int -> Bool := "(x,y) => (x < y) ? True : False"
+pfunc _<=_ : Int -> Int -> Bool := "(x,y) => (x <= y) ? True : False"
 pfunc _+_ : Int -> Int -> Int := "(x,y) => x + y"
 pfunc _-_ : Int -> Int -> Int := "(x,y) => x - y"
 pfunc _*_ : Int -> Int -> Int := "(x,y) => x * y"
 pfunc _/_ : Int -> Int -> Int := "(x,y) => x / y"
-infixl 3 _<_
+infix 3 _<_
+infix 3 _<=_
 infixl 4 _-_
 infixl 4 _+_
 infixl 5 _*_
@@ -109,6 +130,11 @@ pfunc split : String -> String -> List String := "(s, by) => {
   return rval
 }"
 
+pfunc slen : String -> Int := "s => s.length"
+pfunc sindex : String -> Int -> Char := "(s,i) => s[i]"
+
+
+infixl 4 _++_
 pfunc _++_ : String -> String -> String := "(a,b) => a + b"
 
 
