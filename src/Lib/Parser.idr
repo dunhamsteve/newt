@@ -244,13 +244,13 @@ typeExpr = binders
 
 export
 parseSig : Parser Decl
-parseSig = TypeSig <$> getPos <*> (ident <|> uident) <* keyword ":" <*> typeExpr
+parseSig = TypeSig <$> getPos <*> some (ident <|> uident) <* keyword ":" <*> typeExpr
 
 parseImport : Parser Import
 parseImport = MkImport <$> getPos <* keyword "import" <*> uident
 
 -- Do we do pattern stuff now? or just name = lambda?
-
+-- TODO multiple names
 parseMixfix : Parser Decl
 parseMixfix = do
   fc <- getPos
@@ -258,9 +258,9 @@ parseMixfix = do
      <|> InfixR <$ keyword "infixr"
      <|> Infix <$ keyword "infix"
   prec <- token Number
-  op <- token MixFix
-  addOp op (cast prec) fix
-  pure $ PMixFix fc op (cast prec) fix
+  ops <- some $ token MixFix
+  for_ ops $ \ op => addOp op (cast prec) fix
+  pure $ PMixFix fc ops (cast prec) fix
 
 getName : Raw -> Parser String
 getName (RVar x nm) = pure nm

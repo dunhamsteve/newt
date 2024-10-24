@@ -12,7 +12,7 @@ data Game : U where
 -- Add, Sub, Mul, Neg
 
 -- NB this is not lazy!
-infixl 2 _&&_
+infixl 5 _&&_
 
 _&&_ : Bool -> Bool -> Bool
 a && b = case a of
@@ -68,7 +68,7 @@ parseGame line =
       _ => Left "No Game"
     _ => Left $ "No colon in " ++ line
 
-infixl 3 _>>_
+infixl 1 _>>_
 
 _>>_ : {A B : U} -> A -> B -> B
 a >> b = b

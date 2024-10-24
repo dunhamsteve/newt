@@ -18,7 +18,7 @@ data List : U -> U where
 
 -- Currently if I say _::_ = Cons, it gets curried
 
-infixr 4 _::_
+infixr 7 _::_
 _::_ : {a : U} -> a -> List a -> List a
 _::_ x xs = Cons x xs
 

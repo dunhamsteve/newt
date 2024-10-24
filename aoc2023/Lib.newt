@@ -21,7 +21,7 @@ data Either : U -> U -> U where
   Right : {a b : U} -> b -> Either a b
 
 
-infixr 4 _::_
+infixr 7 _::_
 data List : U -> U where
   Nil : {a : U} -> List a
   _::_ : {a : U} -> a -> List a -> List a
@@ -41,11 +41,12 @@ length : {a : U} -> List a -> Nat
 length Nil = Z
 length (x :: xs) = S (length xs)
 
-infixr 2 _,_
+infixr 0 _,_
 
 data Pair : U -> U -> U where
   _,_ : {a b : U} -> a -> b -> Pair a b
 
+-- Idris says it special cases to deal with unification issues
 infixr 0 _$_
 
 _$_ : {a b : U} -> (a -> b) -> a -> b
@@ -104,13 +105,10 @@ pfunc _+_ : Int -> Int -> Int := "(x,y) => x + y"
 pfunc _-_ : Int -> Int -> Int := "(x,y) => x - y"
 pfunc _*_ : Int -> Int -> Int := "(x,y) => x * y"
 pfunc _/_ : Int -> Int -> Int := "(x,y) => x / y"
-infix 3 _<_
-infix 3 _<=_
-infixl 4 _-_
-infixl 4 _+_
-infixl 5 _*_
-infixl 5 _/_
 
+infix 6 _<_ _<=_
+infixl 8 _+_ _-_
+infixl 9 _*_ _/_
 
 -- Ideally we'd have newt write the arrows for us to keep things correct
 -- We'd still have difficulty with callbacks...
@@ -134,7 +132,7 @@ pfunc slen : String -> Int := "s => s.length"
 pfunc sindex : String -> Int -> Char := "(s,i) => s[i]"
 
 
-infixl 4 _++_
+infixl 7 _++_
 pfunc _++_ : String -> String -> String := "(a,b) => a + b"
 
 
@@ -159,6 +157,6 @@ map f Nil = Nil
 map f (x :: xs) = f x :: map f xs
 
 
-infixl 7 _._
+infixl 9 _._
 _._ : {A B C : U} -> (B -> C) -> (A -> B) -> A -> C
 (f . g) x = f ( g x)

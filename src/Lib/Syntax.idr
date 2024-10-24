@@ -100,13 +100,13 @@ data Import = MkImport FC Name
 -- FIXME - I think I don't want "where" here, but the parser has an issue
 public export
 data Decl
-  = TypeSig FC Name Raw
+  = TypeSig FC (List Name) Raw
   | Def FC Name (List (Raw,Raw)) -- (List Clause)
   | DCheck FC Raw Raw
   | Data FC Name Raw (List Decl)
   | PType FC Name (Maybe Raw)
   | PFunc FC Name Raw String
-  | PMixFix FC Name Nat Fixity
+  | PMixFix FC (List Name) Nat Fixity
 
 
 public export
@@ -148,7 +148,7 @@ Show Decl where
   show (DCheck _ x y) = foo ["DCheck", show x, show y]
   show (PType _ name ty) = foo ["PType", name, show ty]
   show (PFunc _ nm ty src) = foo ["PFunc", nm, show ty, show src]
-  show (PMixFix _ nm prec fix) = foo ["PMixFix", nm, show prec, show fix]
+  show (PMixFix _ nms prec fix) = foo ["PMixFix", show nms, show prec, show fix]
 
 export covering
 Show Module where
@@ -246,11 +246,11 @@ Pretty Module where
         doImport (MkImport _ nm) = text "import" <+> text nm ++ line
 
         doDecl : Decl -> Doc
-        doDecl (TypeSig _ nm ty) = text nm <+> text ":" <+> nest 2 (pretty ty)
+        doDecl (TypeSig _ nm ty) = spread (map text nm) <+> text ":" <+> nest 2 (pretty ty)
         doDecl (Def _ nm clauses) = stack $ map (\(a,b) => pretty a <+> "=" <+> pretty b) clauses
         -- the behavior of nest is kinda weird, I have to do the nest before/around the </>.
         doDecl (Data _ nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map doDecl xs))
         doDecl (DCheck _ x y) = text "#check" <+> pretty x <+> ":" <+> pretty y
         doDecl (PType _ nm ty) = text "ptype" <+> text nm <+> (maybe empty (\ty => ":" <+> pretty ty) ty)
         doDecl (PFunc _ nm ty src) = "pfunc" <+> text nm <+> ":" <+> nest 2 (pretty ty <+> ":=" <+/> text (show src))
-        doDecl (PMixFix _ _ _ fix) = text (show fix)
+        doDecl (PMixFix _ names prec fix) = text (show fix) <+> text (show prec) <+> spread (map text names)

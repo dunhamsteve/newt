@@ -1,6 +1,7 @@
 module Lib.ProcessDecl
 
 import Data.IORef
+import Data.String
 
 import Lib.Elab
 import Lib.Parser
@@ -30,20 +31,23 @@ collectDecl (x :: xs) = x :: collectDecl xs
 export
 processDecl : Decl -> M ()
 
+-- REVIEW I supposed I could have updated top here instead of the dance with the parser...
 processDecl (PMixFix{})  = pure ()
 
-processDecl (TypeSig fc nm tm) = do
+processDecl (TypeSig fc names tm) = do
   top <- get
-  let Nothing := lookup nm top
-    | _ => error fc "\{show nm} is already defined"
+  for_ names $ \nm => do
+    let Nothing := lookup nm top
+      | _ => error fc "\{show nm} is already defined"
+    pure ()
   putStrLn "-----"
-  putStrLn "TypeSig \{nm} \{show tm}"
+  putStrLn "TypeSig \{unwords names} : \{show tm}"
   ty <- check (mkCtx top.metas fc) tm (VU fc)
   putStrLn "got \{pprint [] ty}"
   -- I was doing this previously, but I don't want to over-expand VRefs
   -- ty' <- nf [] ty
   -- putStrLn "nf \{pprint [] ty'}"
-  modify $ setDef nm ty Axiom
+  for_ names $ \nm => modify $ setDef nm ty Axiom
 
 processDecl (PType fc nm ty) = do
   ctx <- get
@@ -114,11 +118,10 @@ processDecl (Data fc nm ty cons) = do
   modify $ setDef nm tyty Axiom
   ctx <- get
   cnames <- for cons $ \x => case x of
-      -- expecting tm to be a Pi type
-      (TypeSig fc nm' tm) => do
+      (TypeSig fc names tm) => do
           ctx <- get
           dty <- check (mkCtx ctx.metas fc) tm (VU fc)
-          debug "dty \{nm'} is \{pprint [] dty}"
+          debug "dty \{show names} is \{pprint [] dty}"
 
           -- We only check that codomain uses the right type constructor
           -- We know it's in U because it's part of a checked Pi type
@@ -130,15 +133,11 @@ processDecl (Data fc nm ty cons) = do
           when (hn /= nm) $
             error (getFC codomain) "Constructor codomain is \{pprint tnames codomain} rather than \{nm}"
 
-          modify $ setDef nm' dty (DCon (getArity dty) nm)
-          pure nm'
+          for_ names $ \ nm' => modify $ setDef nm' dty (DCon (getArity dty) nm)
+          pure names
       _ => throwError $ E (0,0) "expected constructor declaration"
-  -- TODO check tm is VU or Pi ending in VU
-  -- Maybe a pi -> binders function
-  -- TODO we're putting in axioms, we need constructors
-  -- for each constructor, check and add
-  putStrLn "setDef \{nm}  TCon \{show cnames}"
-  modify $ setDef nm tyty (TCon cnames)
+  putStrLn "setDef \{nm}  TCon \{show $ join cnames}"
+  modify $ setDef nm tyty (TCon (join cnames))
   pure ()
   where
     checkDeclType : Tm -> M ()

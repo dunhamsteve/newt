@@ -51,7 +51,7 @@ part1 text digits =
   let nums = map combine $ map digits lines in
   foldl _+_ 0 nums
 
-infixl 3 _>>_
+infixl 1 _>>_
 
 _>>_ : {A B : U} -> A -> B -> B
 a >> b = b
