@@ -50,8 +50,8 @@ processDecl (TypeSig fc names tm) = do
   for_ names $ \nm => modify $ setDef nm ty Axiom
 
 processDecl (PType fc nm ty) = do
-  ctx <- get
-  ty' <- check (mkCtx ctx.metas fc) (maybe (RU fc) id ty) (VU fc)
+  top <- get
+  ty' <- check (mkCtx top.metas fc) (maybe (RU fc) id ty) (VU fc)
   modify $ setDef nm ty' PrimTCon
 
 processDecl (PFunc fc nm ty src) = do
@@ -64,8 +64,10 @@ processDecl (PFunc fc nm ty src) = do
 processDecl (Def fc nm clauses) = do
   putStrLn "-----"
   putStrLn "def \{show nm}"
-  ctx <- get
-  let Just entry = lookup nm ctx
+  top <- get
+  mc <- readIORef top.metas
+  let mstart = length mc.metas
+  let Just entry = lookup nm top
     | Nothing => throwError $ E fc "skip def \{nm} without Decl"
   let (MkEntry name ty Axiom) := entry
     | _ => throwError $ E fc "\{nm} already defined"
@@ -75,31 +77,24 @@ processDecl (Def fc nm clauses) = do
   putStrLn "vty is \{show vty}"
 
   -- I can take LHS apart syntactically or elaborate it with an infer
-  clauses' <- traverse (makeClause ctx) clauses
-  tm <- buildTree (mkCtx ctx.metas fc) (MkProb clauses' vty)
+  clauses' <- traverse (makeClause top) clauses
+  tm <- buildTree (mkCtx top.metas fc) (MkProb clauses' vty)
   putStrLn "Ok \{pprint [] tm}"
-  tm' <- zonk ctx 0 [] tm
+  tm' <- zonk top 0 [] tm
   putStrLn "NF \{pprint[] tm'}"
-  mc <- readIORef ctx.metas
+  mc <- readIORef top.metas
 
   -- Maybe here we try search?
 
-
-  for_ mc.metas $ \case
+  for_ (drop mstart mc.metas) $ \case
     (Solved k x) => pure ()
     (Unsolved (l,c) k ctx ty User) => do
       -- TODO print here
       pure ()
     (Unsolved (l,c) k ctx ty kind) => do
-      -- should just print, but it's too subtle in the sea of messages
-      -- we'd also need the ability to mark the whole top context as failure if we continue
-      -- put a list of errors in TopContext
-
-      -- Something wrong here - bad VVar
       tm <- quote ctx.lvl !(forceMeta ty)
-      -- putStrLn $ showError "" $ E (l,c) "Unsolved meta \{show k} type \{show ty}"
+      -- Now that we're collecting errors, maybe we simply check at the end
       addError $ E (l,c) "Unsolved meta \{show k} type \{pprint (names ctx) tm}"
-      -- throwError $ E (l,c) "Unsolved meta \{show k}"
   debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
   modify $ setDef nm ty (Fn tm')
 
@@ -116,14 +111,12 @@ processDecl (DCheck fc tm ty) = do
   putStrLn "NF "
 
 processDecl (Data fc nm ty cons) = do
-  ctx <- get
-  tyty <- check (mkCtx ctx.metas fc) ty (VU fc)
+  top <- get
+  tyty <- check (mkCtx top.metas fc) ty (VU fc)
   modify $ setDef nm tyty Axiom
-  ctx <- get
   cnames <- for cons $ \x => case x of
       (TypeSig fc names tm) => do
-          ctx <- get
-          dty <- check (mkCtx ctx.metas fc) tm (VU fc)
+          dty <- check (mkCtx top.metas fc) tm (VU fc)
           debug "dty \{show names} is \{pprint [] dty}"
 
           -- We only check that codomain uses the right type constructor
