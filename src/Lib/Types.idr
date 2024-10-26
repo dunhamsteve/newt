@@ -21,7 +21,7 @@ Name : Type
 Name = String
 
 public export
-data Icit = Implicit | Explicit
+data Icit = Implicit | Explicit | Auto
 
 %name Icit icit
 
@@ -29,6 +29,7 @@ export
 Show Icit where
   show Implicit = "Implicit"
   show Explicit = "Explicit"
+  show Auto = "Auto"
 
 public export
 data BD = Bound | Defined
@@ -137,6 +138,7 @@ Show Tm where
   show (U _) = "U"
   show (Pi _ str Explicit t u) = "(Pi (\{str} : \{show t}) => \{show u})"
   show (Pi _ str Implicit t u) = "(Pi {\{str} : \{show t}} => \{show u})"
+  show (Pi _ str Auto t u) = "(Pi {{\{str} : \{show t}}} => \{show u})"
   show (Case _ sc alts) = "(Case \{show sc} \{show alts})"
   show (Let _ nm t u) = "(Let \{nm} \{show t} \{show u})"
 
@@ -147,6 +149,7 @@ export
 Eq Icit where
   Implicit == Implicit = True
   Explicit == Explicit = True
+  Auto == Auto = True
   _ == _ = False
 
 ||| Eq on Tm. We've got deBruijn indices, so I'm not comparing names
@@ -182,6 +185,8 @@ pprint names tm = render 80 $ go names tm
     go names (Lam _ nm t) = text "(\\ \{nm} =>" <+> go (nm :: names) t <+> ")"
     go names (App _ t u) = text "(" <+> go names t <+> go names u <+> ")"
     go names (U _) = "U"
+    go names (Pi _ nm Auto t u) =
+      text "({{" <+> text nm <+> ":" <+> go names t <+> "}}" <+> "->" <+> go (nm :: names) u <+> ")"
     go names (Pi _ nm Implicit t u) =
       text "({" <+> text nm <+> ":" <+> go names t <+> "}" <+> "->" <+> go (nm :: names) u <+> ")"
     go names (Pi _ nm Explicit t u) =
@@ -312,7 +317,16 @@ Can I get val back? Do we need to quote? What happens if we don't?
 record Context
 
 public export
-data MetaEntry = Unsolved FC Nat Context Val | Solved Nat Val
+data MetaKind = Normal | User | AutoSolve
+
+public export
+Show MetaKind where
+  show Normal = "Normal"
+  show User = "User"
+  show AutoSolve = "Auto"
+
+public export
+data MetaEntry = Unsolved FC Nat Context Val MetaKind | Solved Nat Val
 
 
 public export
@@ -402,7 +416,7 @@ define ctx name val ty =
 export
 covering
 Show MetaEntry where
-  show (Unsolved pos k ctx ty) = "Unsolved \{show pos} \{show k} : \{show ty} \{show ctx.bds}"
+  show (Unsolved pos k ctx ty kind) = "Unsolved \{show pos} \{show k} \{show kind} : \{show ty} \{show ctx.bds}"
   show (Solved k x) = "Solved \{show k} \{show x}"
 
 export withPos : Context -> FC -> Context
@@ -429,11 +443,11 @@ error' : String -> M a
 error' msg = throwError $ E (0,0) msg
 
 export
-freshMeta : Context -> FC -> Val -> M Tm
-freshMeta ctx fc ty = do
+freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
+freshMeta ctx fc ty kind = do
   mc <- readIORef ctx.metas
   putStrLn "INFO at \{show fc}: fresh meta \{show mc.next} : \{show ty}"
-  writeIORef ctx.metas $ { next $= S, metas $= (Unsolved fc mc.next ctx ty ::) } mc
+  writeIORef ctx.metas $ { next $= S, metas $= (Unsolved fc mc.next ctx ty kind ::) } mc
   pure $ applyBDs 0 (Meta emptyFC mc.next) ctx.bds
   where
     -- hope I got the right order here :)
@@ -457,7 +471,7 @@ lookupMeta ix = do
   where
     go : List MetaEntry -> M MetaEntry
     go [] = error' "Meta \{show ix} not found"
-    go (meta@(Unsolved _ k ys _) :: xs) = if k == ix then pure meta else go xs
+    go (meta@(Unsolved _ k ys _ _) :: xs) = if k == ix then pure meta else go xs
     go (meta@(Solved k x) :: xs) = if k == ix then pure meta else go xs
 
 -- we need more of topcontext later - Maybe switch it up so we're not passing

@@ -94,7 +94,7 @@ eval env mode (App _ t u) = evalSpine env mode t [!(eval env mode u)]
 eval env mode (U fc) = pure (VU fc)
 eval env mode (Meta fc i) =
   case !(lookupMeta i) of
-        (Unsolved _ k xs _) => pure $ VMeta fc i [<]
+        (Unsolved _ k xs _ _) => pure $ VMeta fc i [<]
         (Solved k t) => pure $ t
 eval env mode (Lam fc x t) = pure $ VLam fc x (MkClosure env t)
 eval env mode (Pi fc x icit a b) = pure $ VPi fc x icit !(eval env mode a) (MkClosure env b)
@@ -127,7 +127,7 @@ quote l (VVar fc k sp) = if k < l
   else ?borken
 quote l (VMeta fc i sp) =
   case !(lookupMeta i) of
-        (Unsolved _ k xs _) => quoteSp l (Meta fc i) sp
+        (Unsolved _ k xs _ _) => quoteSp l (Meta fc i) sp
         (Solved k t) => quote l !(vappSpine t sp)
 quote l (VLam fc x t) = pure $ Lam fc x !(quote (S l) !(t $$ VVar emptyFC l [<]))
 quote l (VPi fc x icit a b) = pure $ Pi fc x icit !(quote l a) !(quote (S l) !(b $$ VVar emptyFC l [<]))
@@ -161,7 +161,7 @@ solveMeta ctx ix tm = do
   where
     go : List MetaEntry -> SnocList MetaEntry -> M (List MetaEntry)
     go [] _ = error' "Meta \{show ix} not found"
-    go (meta@(Unsolved pos k _ _) :: xs) lhs = if k == ix
+    go (meta@(Unsolved pos k _ _ _) :: xs) lhs = if k == ix
       then do
         -- empty context should be ok, because this needs to be closed
         putStrLn "INFO at \{show pos}: solve \{show k} as \{!(prval tm)}"
@@ -207,7 +207,7 @@ zonkApp top l env t@(Meta fc k) sp = case !(lookupMeta k) of
     foo <- vappSpine v ([<] <>< sp')
     debug "-> result is \{show foo}"
     quote l foo
-  (Unsolved x j xs _) => pure $ appSpine t sp
+  (Unsolved x j xs _ _) => pure $ appSpine t sp
 zonkApp top l env t sp = pure $ appSpine !(zonk top l env t) sp
 
 zonkAlt : TopContext -> Nat -> Env -> CaseAlt -> M CaseAlt

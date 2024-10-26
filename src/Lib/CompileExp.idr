@@ -93,7 +93,7 @@ compileTerm tm@(App _ _ _) with (funArgs tm)
         -- apply (CRef "Meta\{show k}") args' [<] 0
         arity <- case meta of
                 -- maybe throw
-                (Unsolved x j ctx _) => pure 0 -- FIXME # of Bound in ctx.bds
+                (Unsolved x j ctx _ _) => pure 0 -- FIXME # of Bound in ctx.bds
                 (Solved j tm) => pure $ getArity !(quote 0 tm)
         apply (CRef "Meta\{show k}") args' [<] arity
   _ | (t@(Ref fc nm _), args) = do

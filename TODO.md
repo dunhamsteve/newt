@@ -61,6 +61,7 @@
 - [ ] magic newtype? (drop in codegen)
 - [ ] records / copatterns
 - [x] vscode: syntax highlighting for String
+- [ ] add `pop` or variant of `pfunc` that maps to an operator, giving the js operator and precedence on RHS
 
 ### Parsing
 

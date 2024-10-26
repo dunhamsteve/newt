@@ -33,6 +33,13 @@ braces pa = do
   sym "}"
   pure t
 
+dbraces : Parser a -> Parser a
+dbraces pa = do
+  sym "{{"
+  t <- pa
+  sym "}}"
+  pure t
+
 
 optional : Parser a -> Parser (Maybe a)
 optional pa = Just <$> pa <|> pure Nothing
@@ -81,7 +88,9 @@ atom = RU <$> getPos <* keyword "U"
 pArg : Parser (Icit,FC,Raw)
 pArg = do
   fc <- getPos
-  (Explicit,fc,) <$> atom <|> (Implicit,fc,) <$> braces typeExpr
+  (Explicit,fc,) <$> atom
+    <|> (Implicit,fc,) <$> braces typeExpr
+    <|> (Auto,fc,) <$> dbraces typeExpr
 
 parseApp : Parser Raw
 parseApp = do
@@ -137,6 +146,7 @@ letExpr = do
 
 pLetArg : Parser (Icit, String, Maybe Raw)
 pLetArg = (Implicit,,) <$> braces (ident <|> uident) <*> optional (sym ":" >> typeExpr)
+       <|> (Auto,,) <$> dbraces (ident <|> uident) <*> optional (sym ":" >> typeExpr)
        <|> (Explicit,,) <$> parens (ident <|> uident) <*> optional (sym ":" >> typeExpr)
        <|> (Explicit,,Nothing) <$> (ident <|> uident)
        <|> (Explicit,"_",Nothing) <$ keyword "_"
@@ -169,6 +179,9 @@ patAtom = do
     <|> braces (PatVar fc Implicit <$> ident)
     <|> braces (PatWild fc Implicit <$ keyword "_")
     <|> braces (PatCon fc Implicit <$> (uident <|> token MixFix) <*> many patAtom)
+    <|> dbraces (PatVar fc Auto <$> ident)
+    <|> dbraces (PatWild fc Auto <$ keyword "_")
+    <|> dbraces (PatCon fc Auto <$> (uident <|> token MixFix) <*> many patAtom)
     <|> parens pPattern
 
 pPattern = PatCon (!getPos) Explicit <$> (uident <|> token MixFix) <*> many patAtom <|> patAtom
@@ -196,11 +209,13 @@ term =  caseExpr
     <|> lamExpr
     <|> parseOp
 
+varname : Parser String
+varname = (ident <|> uident <|> keyword "_" *> pure "_")
 
 ebind : Parser (List (FC, String, Icit, Raw))
 ebind = do
   sym "("
-  names <- some $ withPos (ident <|> uident)
+  names <- some $ withPos varname
   sym ":"
   ty <- typeExpr
   sym ")"
@@ -209,10 +224,19 @@ ebind = do
 ibind : Parser (List (FC, String, Icit, Raw))
 ibind = do
   sym "{"
-  names <- some $ withPos (ident <|> uident)
+  -- REVIEW - I have name required and type optional, which I think is the opposite of what I expect
+  names <- some $ withPos varname
   ty <- optional (sym ":" >> typeExpr)
   sym "}"
   pure $ map (\(pos,name) => (pos, name, Implicit, fromMaybe (RImplicit pos) ty)) names
+
+abind : Parser (List (FC, String, Icit, Raw))
+abind = do
+  sym "{{"
+  names <- some $ withPos varname
+  ty <- optional (sym ":" >> typeExpr)
+  sym "}}"
+  pure $ map (\(pos,name) => (pos, name, Auto, fromMaybe (RImplicit pos) ty)) names
 
 arrow : Parser Unit
 arrow = sym "->" <|> sym "→"
@@ -220,7 +244,7 @@ arrow = sym "->" <|> sym "→"
 -- Collect a bunch of binders (A : U) {y : A} -> ...
 binders : Parser Raw
 binders = do
-  binds <- many (ibind <|> try ebind)
+  binds <- many (abind <|> ibind <|> try ebind)
   arrow
   scope <- typeExpr
   pure $ foldr (uncurry mkBind) scope (join binds)

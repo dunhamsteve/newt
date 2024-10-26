@@ -87,7 +87,10 @@ processDecl (Def fc nm clauses) = do
 
   for_ mc.metas $ \case
     (Solved k x) => pure ()
-    (Unsolved (l,c) k ctx ty) => do
+    (Unsolved (l,c) k ctx ty User) => do
+      -- TODO print here
+      pure ()
+    (Unsolved (l,c) k ctx ty kind) => do
       -- should just print, but it's too subtle in the sea of messages
       -- we'd also need the ability to mark the whole top context as failure if we continue
       -- put a list of errors in TopContext

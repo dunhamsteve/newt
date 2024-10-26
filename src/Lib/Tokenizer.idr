@@ -61,6 +61,7 @@ rawTokens
   <|> match (blockComment (exact "/-") (exact "-/")) (Tok Space)
   <|> match (exact ",") (Tok Oper)
   <|> match (some opChar) checkOp
+  <|> match (exact "{{" <|> exact "}}") (Tok Keyword)
   <|> match symbol (Tok Symbol)
   <|> match spaces (Tok Space)
 

@@ -207,6 +207,7 @@ Pretty Raw where
     wrap : Icit -> Doc -> Doc
     wrap Explicit x = x
     wrap Implicit x = text "{" ++ x ++ text "}"
+    wrap Auto x = text "{{" ++ x ++ text "}}"
 
     par : Nat -> Nat -> Doc -> Doc
     par p p' d = if p' < p then text "(" ++ d ++ text ")" else d
@@ -217,12 +218,11 @@ Pretty Raw where
     -- This needs precedence and operators...
     asDoc p (RApp _ x y Explicit) = par p 2 $ asDoc 2 x <+> asDoc 3 y
     asDoc p (RApp _ x y Implicit) = par p 2 $ asDoc 2 x <+> text "{" ++ asDoc 0 y ++ text "}"
+    asDoc p (RApp _ x y Auto) = par p 2 $ asDoc 2 x <+> text "{{" ++ asDoc 0 y ++ text "}}"
     asDoc p (RU _) = text "U"
     asDoc p (RPi _ Nothing Explicit ty scope) = par p 1 $ asDoc p ty <+> text "->" <+/> asDoc p scope
-    asDoc p (RPi _ (Just x) Explicit ty scope) =
-      par p 1 $ text "(" <+> text x <+> text ":" <+> asDoc p ty <+> text ")" <+> text "->" <+/> asDoc p scope
-    asDoc p (RPi _ nm Implicit ty scope) =
-      par p 1 $ text "{" <+> text (fromMaybe "_" nm) <+> text ":" <+> asDoc p ty <+> text "}" <+> text "->" <+/> asDoc 1 scope
+    asDoc p (RPi _ nm icit ty scope) =
+      par p 1 $ wrap icit (text (fromMaybe "_" nm) <+> text ":" <+> asDoc p ty ) <+> text "->" <+/> asDoc 1 scope
     asDoc p (RLet _ x v ty scope) =
       par p 0 $ text "let" <+> text x <+> text ":" <+> asDoc p ty
           <+> text "=" <+> asDoc p v

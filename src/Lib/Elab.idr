@@ -53,7 +53,7 @@ lookupDef ctx name = go 0 ctx.types ctx.env
 export
 forceMeta : Val -> M Val
 forceMeta (VMeta fc ix sp) = case !(lookupMeta ix) of
-  (Unsolved pos k xs _) => pure (VMeta fc ix sp)
+  (Unsolved pos k xs _ _) => pure (VMeta fc ix sp)
   (Solved k t) => vappSpine t sp >>= forceMeta
 forceMeta x = pure x
 
@@ -70,7 +70,7 @@ tryEval k sp =
 -- Lennart needed more forcing for recursive nat,
 forceType : Val -> M Val
 forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
-  (Unsolved x k xs _) => pure (VMeta fc ix sp)
+  (Unsolved x k xs _ _) => pure (VMeta fc ix sp)
   (Solved k t) => vappSpine t sp >>= forceType
 forceType x = pure x
 
@@ -141,7 +141,7 @@ parameters (ctx: Context)
   solve : Nat -> Nat -> SnocList Val -> Val  -> M  ()
   solve l m sp t = do
     debug "solve \{show m} lvl \{show l} sp \{show sp} is \{show t}"
-    meta@(Unsolved metaFC ix ctx ty) <- lookupMeta m
+    meta@(Unsolved metaFC ix ctx ty _) <- lookupMeta m
       | _ => error (getFC t) "Meta \{show m} already solved!"
     let size = length $ filter (\x => x == Bound) $ toList ctx.bds
     debug "\{show m} size is \{show size}"
@@ -297,8 +297,15 @@ unifyCatch fc ctx ty' ty = do
 insert : (ctx : Context) -> Tm -> Val -> M (Tm, Val)
 insert ctx tm ty = do
   case !(forceMeta ty) of
+    VPi fc x Auto a b => do
+      -- FIXME mark meta as auto, maybe try to solve here?
+      m <- freshMeta ctx (getFC tm) a AutoSolve
+      debug "INSERT Auto \{pprint (names ctx) m} : \{show a}"
+      debug "TM \{pprint (names ctx) tm}"
+      mv <- eval ctx.env CBN m
+      insert ctx (App (getFC tm) tm m) !(b $$ mv)
     VPi fc x Implicit a b => do
-      m <- freshMeta ctx (getFC tm) a
+      m <- freshMeta ctx (getFC tm) a Normal
       debug "INSERT \{pprint (names ctx) m} : \{show a}"
       debug "TM \{pprint (names ctx) tm}"
       mv <- eval ctx.env CBN m
@@ -346,9 +353,11 @@ introClause : String -> Icit -> Clause -> M Clause
 introClause nm icit (MkClause fc cons (pat :: pats) expr) =
   if icit == getIcit pat then pure $ MkClause fc ((nm, pat) :: cons) pats expr
   else if icit == Implicit then pure $ MkClause fc ((nm, PatWild fc Implicit) :: cons) (pat :: pats) expr
-  else error fc "Explicit arg and implicit pattern \{show nm} \{show icit} \{show pat}"
+  else if icit == Auto then pure $ MkClause fc ((nm, PatWild fc Auto) :: cons) (pat :: pats) expr
+  else error fc "Explicit arg and \{show $ getIcit pat} pattern \{show nm}  \{show pat}"
 -- handle implicts at end?
 introClause nm Implicit (MkClause fc cons [] expr) = pure $ MkClause fc ((nm, PatWild fc Implicit) :: cons) [] expr
+introClause nm Auto (MkClause fc cons [] expr) = pure $ MkClause fc ((nm, PatWild fc Auto) :: cons) [] expr
 introClause nm icit (MkClause fc cons [] expr) = error fc "Clause size doesn't match"
 
 -- A split candidate looks like x /? Con ...
@@ -542,17 +551,21 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
     -- We get a list of clauses back (a Problem) and then solve that
     -- If they all fail, we have a coverage issue. (Assuming the constructor is valid)
 
-    makeConst : List Bind -> List Pattern -> List (String, Pattern)
-    makeConst [] [] = []
+    makeConstr : List Bind -> List Pattern -> List (String, Pattern)
+    makeConstr [] [] = []
     -- would need M in here to throw, and I'm building stuff as I go, I suppose I could <$>
-    makeConst [] (pat :: pats) = ?extra_patterns
-    makeConst ((MkBind nm Implicit x) :: xs) [] = (nm, PatWild emptyFC Implicit) :: makeConst xs []
-    makeConst ((MkBind nm Explicit x) :: xs) [] = ?extra_binders_2
-    makeConst ((MkBind nm Implicit x) :: xs) (pat :: pats) =
+    makeConstr [] (pat :: pats) = ?extra_patterns
+    makeConstr ((MkBind nm Implicit x) :: xs) [] = (nm, PatWild emptyFC Implicit) :: makeConstr xs []
+    makeConstr ((MkBind nm Auto x) :: xs) [] = (nm, PatWild emptyFC Auto) :: makeConstr xs []
+    makeConstr ((MkBind nm Explicit x) :: xs) [] = ?extra_binders_2
+    makeConstr ((MkBind nm Explicit x) :: xs) (pat :: pats) =
       if getIcit pat == Explicit
-        then (nm, PatWild (getFC pat) Implicit) :: makeConst xs (pat :: pats)
-        else (nm, pat) :: makeConst xs pats
-    makeConst ((MkBind nm Explicit x) :: xs) (pat :: pats) = (nm, pat) :: makeConst xs pats
+        then (nm, pat) :: makeConstr xs pats
+        else ?explict_implicit_mismatch
+    makeConstr ((MkBind nm icit x) :: xs) (pat :: pats) =
+      if getIcit pat /= icit -- Implicit/Explicit Implicit/Auto, etc
+        then (nm, PatWild (getFC pat) icit) :: makeConstr xs (pat :: pats)
+        else (nm, pat) :: makeConstr xs pats
 
     -- replace constraint with constraints on parameters, or nothing if non-matching clause
     rewriteConstraint : List Bind -> List Constraint -> List Constraint -> Maybe (List Constraint)
@@ -564,7 +577,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
           PatWild _ _ => Just $ c :: (xs ++ acc)
           PatLit fc lit => Nothing -- error fc "Literal \{show lit} in constructor split"
           PatCon _ _ str ys => if str == dcName
-            then Just $ (makeConst vars ys) ++ xs ++ acc
+            then Just $ (makeConstr vars ys) ++ xs ++ acc
             else Nothing
         else rewriteConstraint vars xs (c :: acc)
 
@@ -791,7 +804,7 @@ check ctx tm ty = case (tm, !(forceType ty)) of
               let ctx' = extend ctx nm a
               tm' <- check ctx' tm !(b $$ var)
               pure $ Lam fc nm tm'
-            else if icit' == Implicit then do
+            else if icit' /= Explicit then do
               let var = VVar fc (length ctx.env) [<]
               ty' <- b $$ var
               -- use nm' here if we want them automatically in scope
@@ -804,7 +817,7 @@ check ctx tm ty = case (tm, !(forceType ty)) of
 
   (tm, ty@(VPi fc nm' Implicit a b)) => do
     let names = toList $ map fst ctx.types
-    debug "XXX edge add implicit lambda {\{nm'} : \{show a}} to \{show tm} "
+    debug "XXX edge case add implicit lambda {\{nm'} : \{show a}} to \{show tm} "
     let var = VVar fc (length ctx.env) [<]
     ty' <- b $$ var
     debugM $ pure "XXX ty' is \{!(prvalCtx {ctx=(extend ctx nm' a)} ty')}"
@@ -825,9 +838,11 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     -- assuming all of the implicit ty have been handled above
     let names = toList $ map fst ctx.types
     (tm', ty') <- case !(infer ctx tm) of
-      -- Kovacs doesn't insert on tm = Implicit Lam, we don't have Plicity there
+      -- Kovacs doesn't insert on tm = Implicit Lam, we don't have Plicity in Lam
       -- so I'll check the inferred type for an implicit pi
-      (tm'@(Lam{}), ty'@(VPi _ _ Implicit _ _)) => do debug "Lambda"; pure (tm', ty')
+      -- This seems wrong, the ty' is what insert runs on, so we're just short circuiting here
+      (tm'@(Lam{}), ty'@(VPi _ _ Implicit _ _)) => do debug "CheckMe 1"; pure (tm', ty')
+      (tm'@(Lam{}), ty'@(VPi _ _ Auto _ _)) => do debug "CheckMe 2"; pure (tm', ty')
       (tm', ty') => do
         debug "RUN INSERT ON \{pprint names tm'} at \{show ty'}"
         insert ctx tm' ty'
@@ -848,6 +863,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
       else go (i + 1) xs
   -- need environment of name -> type..
 infer ctx (RApp fc t u icit) = do
+  -- If the app is explicit, add any necessary metas
   (icit, t, tty) <- case the Icit icit of
       Explicit => do
         (t, tty) <- infer ctx t
@@ -856,6 +872,9 @@ infer ctx (RApp fc t u icit) = do
       Implicit => do
         (t, tty) <- infer ctx t
         pure (Implicit, t, tty)
+      Auto => do
+        (t, tty) <- infer ctx t
+        pure (Auto, t, tty)
 
   (a,b) <- case !(forceMeta tty) of
     (VPi fc str icit' a b) => if icit' == icit then pure (a,b)
@@ -865,8 +884,8 @@ infer ctx (RApp fc t u icit) = do
     -- TODO test case to cover this.
     tty => do
       debug "unify PI for \{show tty}"
-      a <- eval ctx.env CBN !(freshMeta ctx fc (VU emptyFC))
-      b <- MkClosure ctx.env <$> freshMeta (extend ctx ":ins" a) fc (VU emptyFC)
+      a <- eval ctx.env CBN !(freshMeta ctx fc (VU emptyFC) Normal)
+      b <- MkClosure ctx.env <$> freshMeta (extend ctx ":ins" a) fc (VU emptyFC) Normal
       unifyCatch fc ctx tty (VPi fc ":ins" icit a b)
       pure (a,b)
 
@@ -896,7 +915,7 @@ infer ctx (RAnn fc tm rty) = do
   pure (tm, vty)
 
 infer ctx (RLam fc nm icit tm) = do
-  a <- freshMeta ctx fc (VU emptyFC) >>= eval ctx.env CBN
+  a <- freshMeta ctx fc (VU emptyFC) Normal >>= eval ctx.env CBN
   let ctx' = extend ctx nm a
   (tm', b) <- infer ctx' tm
   debug "make lam for \{show nm} scope \{pprint (names ctx) tm'} : \{show b}"
@@ -904,9 +923,9 @@ infer ctx (RLam fc nm icit tm) = do
   -- error {ctx} [DS "can't infer lambda"]
 
 infer ctx (RImplicit fc) = do
-  ty <- freshMeta ctx fc (VU emptyFC)
+  ty <- freshMeta ctx fc (VU emptyFC) Normal
   vty <- eval ctx.env CBN ty
-  tm <- freshMeta ctx fc vty
+  tm <- freshMeta ctx fc vty Normal
   pure (tm, vty)
 
 infer ctx (RLit fc (LString str)) = pure (Lit fc (LString str), !(primType fc "String"))
