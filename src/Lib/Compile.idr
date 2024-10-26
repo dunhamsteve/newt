@@ -159,9 +159,15 @@ termToJS env (CCase t alts) f =
 jsString : String -> Doc
 jsString str = text (show str)
 
+keywords : List String
+keywords = [
+  "var", "true", "false", "let", "case", "switch", "if", "then", "else",
+  "function", "void", "undefined", "null", "await", "async", "return", "const"
+]
+
 ||| escape identifiers for js
 jsIdent : String -> Doc
-jsIdent id = text $ pack $ fix (unpack id)
+jsIdent id = if elem id keywords then text ("$" ++ id) else text $ pack $ fix (unpack id)
   where
     chars : List Char
     chars = unpack "0123456789ABCDEF"
