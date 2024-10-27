@@ -125,13 +125,15 @@ parameters (ctx: Context)
         -- REVIEW is this the right fc?
         then error fc "meta occurs check"
         else goSpine ren lvl (Meta fc ix) sp
-      go ren lvl (VLam fc n t) = pure (Lam fc n !(go (lvl :: ren) (S lvl) !(t $$ VVar emptyFC lvl [<])))
+      go ren lvl (VLam fc n t) = pure (Lam fc n !(go (lvl :: ren) (S lvl) !(t $$ VVar fc lvl [<])))
       go ren lvl (VPi fc n icit ty tm) = pure (Pi fc n icit !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar emptyFC lvl [<])))
       go ren lvl (VU fc) = pure (U fc)
       -- for now, we don't do solutions with case in them.
       go ren lvl (VCase fc sc alts) = error fc "Case in solution"
       go ren lvl (VLit fc lit) = pure (Lit fc lit)
-      go ren lvl (VLet fc {}) = error fc "rename Let not implemented"
+      go ren lvl (VLet fc name val body) =
+        pure $ Let fc name !(go ren lvl val) !(go (lvl :: ren) (S lvl) !(body $$ VVar fc lvl [<]))
+
 
   lams : Nat -> Tm -> Tm
   lams 0 tm = tm
@@ -141,9 +143,9 @@ parameters (ctx: Context)
   export
   solve : (lvl : Nat) -> (k : Nat) -> SnocList Val -> Val -> M  ()
   solve l m sp t = do
-    debug "solve \{show m} lvl \{show l} sp \{show sp} is \{show t}"
-    meta@(Unsolved metaFC ix ctx ty _) <- lookupMeta m
+    meta@(Unsolved metaFC ix ctx ty kind) <- lookupMeta m
       | _ => error (getFC t) "Meta \{show m} already solved!"
+    debug "SOLVE \{show m} \{show kind} lvl \{show l} sp \{show sp} is \{show t}"
     let size = length $ filter (\x => x == Bound) $ toList ctx.bds
     debug "\{show m} size is \{show size}"
     if (length sp /= size) then do
@@ -234,15 +236,21 @@ parameters (ctx: Context)
 
       -- REVIEW - consider separate value for DCon/TCon
       (VRef fc k def sp,   VRef fc' k' def' sp'  ) =>
-        if k == k' then do
-          debug "unify \{show l} spine at \{k} \{show sp} \{show sp'}"
-          unifySpine l (k == k') sp sp'
-        else do
+        -- This is a problem for cmp (S x) (S y) =?= cmp x y, when the
+        -- same is an equation in cmp.
+
+        -- if k == k' then do
+        --   debug "unify \{show l} spine at \{k} \{show sp} \{show sp'}"
+        --   unifySpine l (k == k') sp sp'
+        -- else
+          do
           Nothing <- tryEval k sp
             | Just v => unify l v u'
           Nothing <- tryEval k' sp'
             | Just v => unify l t' v
-          error fc "vref mismatch \{show k} \{show k'} -- \{show sp} \{show sp'}"
+          if k == k'
+            then  unifySpine l (k == k') sp sp'
+            else error fc "vref mismatch \{show k} \{show k'} -- \{show sp} \{show sp'}"
 
       (VU _, VU _) => pure neutral
       -- Lennart.newt cursed type references itself
@@ -745,8 +753,8 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
 
   case pat of
     PatCon _ _ _ _ => do
-      -- expand vars that may be solved
-      scty' <- unlet ctx scty
+      -- expand vars that may be solved, eval top level functions
+      scty' <- unlet ctx scty >>= forceType
       debug "EXP \{show scty} -> \{show scty'}"
       -- this is per the paper, but it would be nice to coalesce
       -- default cases

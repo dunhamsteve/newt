@@ -22,10 +22,6 @@ isCandidate (VRef _ nm _ _) (Ref fc nm' def) = nm == nm'
 isCandidate ty (App fc t u) = isCandidate ty t
 isCandidate _ _ = False
 
-    -- go : List Binder -> Tm -> (Tm, List Binder)
-    -- go ts (Pi fc nm icit t u) = go (MkBind fc nm icit t :: ts) u
-    -- go ts tm = (tm, reverse ts)
-
 
 -- This is a crude first pass
 -- TODO consider ctx
@@ -44,10 +40,11 @@ findMatches ty ((MkEntry name type def@(Fn t)) :: xs) = do
       debug "TRY \{name} : \{pprint [] type} for \{show ty}"
       tm <- check (mkCtx  top.metas fc) (RVar fc name) ty
       debug "Found \{pprint [] tm} for \{show ty}"
-      (tm ::) <$> findMatches ty xs)
-    (\ _ => do
       writeIORef top.metas mc
-      debug "No match \{show ty} \{pprint [] type}"
+      (tm ::) <$> findMatches ty xs)
+    (\ err => do
+      debug "No match \{show ty} \{pprint [] type} \{showError "" err}"
+      writeIORef top.metas mc
       findMatches ty xs)
 findMatches ty (y :: xs) = findMatches ty xs
 

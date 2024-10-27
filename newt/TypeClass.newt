@@ -26,34 +26,42 @@ data Either : U -> U -> U where
   Left : {A B : U} -> A -> Either A B
   Right : {A B : U} -> B -> Either A B
 
-EitherMonad : {A : U} -> Monad (Either A)
-EitherMonad = MkMonad {Either A} (\ ma amb =>
---                     ^ Need this for scrut type to be non-meta
-  case ma of
-    Left a => Left a
-    Right b => amb b)
+bindEither : {A B C : U} -> (Either A B) -> (B -> Either A C) -> Either A C
+bindEither (Left a) amb = Left a
+bindEither (Right b) amb = amb b
 
--- [instance]
+EitherMonad : {A : U} -> Monad (Either A)
+EitherMonad = MkMonad {Either A} bindEither
+
+bindMaybe : {A B : U} -> Maybe A -> (A -> Maybe B) -> Maybe B
+bindMaybe Nothing amb = Nothing
+bindMaybe (Just a) amb = amb a
+
+-- I think it was picking up the Maybe before I made it less aggressive about eval
+
 MaybeMonad : Monad Maybe
--- Agda case lambda might be nice..
--- The {Maybe} isn't solved in type for the case
-MaybeMonad = MkMonad {Maybe} (\ {A} ma amb =>
-  case ma of
-      Nothing => Nothing
-      -- It doesn't discover pat$5 is A during pattern matching
-      -- oh, but var 0 value is var5
-      Just a => amb a)
+MaybeMonad = MkMonad {Maybe} bindMaybe
 
 -- So the idea here is to have some implicits that are solved by search
 
-_>>=_ : {a b : U} -> {m : U -> U} -> {x : Monad m} -> (m a) -> (a -> m b) -> m b
-_>>=_ {a} {b} {m} {MkMonad bind'}  ma amb = bind' {a} {b} ma amb
+-- Error here is from foo, with a bad FC. I think it might be showing up during search.
+_>>=_ : {a b : U} -> {m : U -> U} -> {{x : Monad m}} -> (m a) -> (a -> m b) -> m b
+_>>=_ {a} {b} {m} {{MkMonad bind'}}  ma amb = bind' {a} {b} ma amb
 
 infixl 1 _>>=_
 
 ptype Int
 
--- For now, we may try to solve this at creation time, but it's possible postpone is needed
+-- It's bailing on MaybeMonad and picking up Either?
+
+foo : Int -> Maybe Int
+foo x = (Just x) >>= (\ x  => Just 10)
+
+-- NOW
+
+-- Older notes below, but this is _close_, we're doing something like agda, and we're getting the right solution
+-- It's over-expanded, and there is an unsolved meta that I think the solution would unlock. (Need to collect and
+-- retry constraints)
 
 -- *SOLVE meta 6 sp [< (%var 0 [< ]), (%meta 4 [< (%var 0 [< ])])] val (%ref Maybe [< (%meta 9 [< (%var 0 [< ]), (%var 1 [< ])])])
 
@@ -81,8 +89,7 @@ ptype Int
 -- Agda seems complicated, minting fresh metas for bits of potential solutions (which
 -- may be tossed if the solution is ruled out.)
 
-foo : Int -> Maybe Int
-foo x = _>>=_ {_} {_} {_} {_} (Just x) (\ x  => Just 10)
+
 --                         ^
 /-
 So, agda style we'd guess ?m8 is MonadMaybe or MonadEither - agda's "maybe" case

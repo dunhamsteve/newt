@@ -12,10 +12,12 @@ The goal is to have inductive types, pattern matching, compile to javascript, an
 self hosted. Ideally I could build a little browser "playground" to compile, view
 output, and run code.
 
+The repository is tagging `.newt` files as Agda to convince github to highlight them.
+
 ## Building
 
 There is a `Makefile` that builds both chez and javascript versions.  They end up in
-`build/exec` as usual.  I've also added a `pack.toml`, so `pack build`
+`build/exec` as usual.  I've also added a `pack.toml`, so `pack build` also works.
 
 There is a vscode extension in `newt-vscode`. Running `make vscode` will build and install it. The extension expects `build/exec/newt` to exist in the workspace.
 
@@ -47,6 +49,11 @@ from `Tm` to `Val`. I think I'll need a way to eval a VCase during unification, 
 ## Evaluation
 
 Following kovacs, I'm putting `VVar` into context env when I go under binders. This avoids substitution.
+
+## Autos
+
+Newt has primitive auto implicits. As a first pass, higher order ones, like monad, will not
+
 
 ## Issues
 

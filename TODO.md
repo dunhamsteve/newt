@@ -1,6 +1,14 @@
 
 ## TODO
 
+NOW - two things
+
+1. I broke Tree.newt by removing some over-aggressive reduction.  I need to
+make it happen during unification. Not sure if I have all of the bits to vappspine there.
+
+2. Need to collect constraints and re-run, I think that may get me to
+typeclasses
+
 - [x] Remember operators from imports
 - [ ] Default cases for non-primitives (currently gets expanded to all constructors)
 - [x] Case for primitives
