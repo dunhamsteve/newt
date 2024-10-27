@@ -8,10 +8,10 @@
   - [x] day1
   - [x] day2
   - some "real world" examples
-- [ ] Maybe Eq and stuff would work for typeclass without dealing with unification issues yet
-- [ ] unsolved meta errors repeat (need to freeze or only report at end)
+- [x] Maybe Eq and stuff would work for typeclass without dealing with unification issues yet
+- [x] unsolved meta errors repeat (need to freeze or only report at end)
 - [x] Sanitize JS idents, e.g. `_+_`
-- [ ] Generate some programs that do stuff
+- [x] Generate some programs that do stuff
 - [x] import
 - [ ] consider making meta application implicit in term, so its more readable when printed
   - Currently we have explicit `App` surrounding `Meta` when inserting metas. Some people
@@ -37,6 +37,7 @@
 - [x] ~~SKIP list syntax~~
   - Agda doesn't have it, clashes with pair syntax
 - [ ] autos / typeclass resolution
+  - [x] very primitive version in place, not higher order, search at end
   - We need special handling in unification to make this possible for typeclasses on `U -> U`, we could still do `Eq` or `Show` with the current unification
   - options
     - keep as implicit and do auto if the type constructor is flagged auto
@@ -44,7 +45,7 @@
     - have separate type of implict with `{{}}`
     - `TypeClass.newt` is the exercise for this
 - [ ] do blocks (needs typeclass, overloaded functions, or constrain to IO)
-- [ ] some solution for `+` problem (classes? ambiguity?)
+- [x] some solution for `+` problem (classes? ambiguity?)
 - [x] show compiler failure in the editor (exit code != 0)
 - [x] write output to file
   - uses `-o` option

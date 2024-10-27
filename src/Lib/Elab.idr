@@ -67,11 +67,12 @@ tryEval k sp =
             v => pure $ Just v
       _ => pure Nothing
 
--- Lennart needed more forcing for recursive nat,
+-- Force far enough to compare types
 forceType : Val -> M Val
 forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Unsolved x k xs _ _) => pure (VMeta fc ix sp)
   (Solved k t) => vappSpine t sp >>= forceType
+forceType x@(VRef fc nm _ sp) = fromMaybe x <$> tryEval nm sp
 forceType x = pure x
 
 public export

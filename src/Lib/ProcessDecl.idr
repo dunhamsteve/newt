@@ -12,12 +12,27 @@ import Lib.Eval
 import Lib.Types
 import Lib.Util
 
+-- Check that the arguments are not explicit and the type constructor in codomain matches
+-- Later we will build a table of codomain type, and maybe make the user tag the candidates
+-- like Idris does with %hint
+isCandidate : Val -> Tm -> Bool
+isCandidate ty (Pi fc nm Explicit t u) = False
+isCandidate ty (Pi fc nm icit t u) = isCandidate ty u
+isCandidate (VRef _ nm _ _) (Ref fc nm' def) = nm == nm'
+isCandidate ty (App fc t u) = isCandidate ty t
+isCandidate _ _ = False
+
+    -- go : List Binder -> Tm -> (Tm, List Binder)
+    -- go ts (Pi fc nm icit t u) = go (MkBind fc nm icit t :: ts) u
+    -- go ts tm = (tm, reverse ts)
+
 
 -- This is a crude first pass
 -- TODO consider ctx
 findMatches : Val -> List TopEntry -> M (List Tm)
 findMatches ty [] = pure []
 findMatches ty ((MkEntry name type def@(Fn t)) :: xs) = do
+  let True = isCandidate ty type | False => findMatches ty xs
   top <- get
   let ctx = mkCtx top.metas (getFC ty)
   -- FIXME we're restoring state, but the INFO logs have already been emitted
@@ -26,6 +41,7 @@ findMatches ty ((MkEntry name type def@(Fn t)) :: xs) = do
   catchError {e=Error} (do
       -- TODO sort out the FC here
       let fc = getFC ty
+      debug "TRY \{name} : \{pprint [] type} for \{show ty}"
       tm <- check (mkCtx  top.metas fc) (RVar fc name) ty
       debug "Found \{pprint [] tm} for \{show ty}"
       (tm ::) <$> findMatches ty xs)
@@ -121,6 +137,7 @@ processDecl (Def fc nm clauses) = do
       [tm] <- findMatches ty top.defs
         | res => error fc "Failed to solve \{show ty}, matches: \{show $ map (pprint []) res}"
       val <- eval ctx.env CBN tm
+      debug "solution \{pprint [] tm} evaled to \{show val}"
       let sp = makeSpine ctx.lvl ctx.bds
       solve ctx ctx.lvl k sp val
       pure ()
@@ -130,8 +147,7 @@ processDecl (Def fc nm clauses) = do
   putStrLn "NF \{pprint[] tm'}"
 
   mc <- readIORef top.metas
-  -- for_ (take mlen mc.metas) $ \case
-  for_ (mc.metas) $ \case
+  for_ (take mlen mc.metas) $ \case
     (Solved k x) => pure ()
     (Unsolved (l,c) k ctx ty User) => do
       -- TODO print here instead of during Elab

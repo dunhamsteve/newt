@@ -88,7 +88,8 @@ evalSpine env mode (Ref fc nm (Fn tm)) sp = do
     v => pure v
 evalSpine env mode tm sp = vappSpine !(eval env mode tm) ([<] <>< sp)
 
-eval env mode (Ref _ x (Fn tm)) = eval env mode tm
+-- This is too aggressive...
+-- eval env mode (Ref _ x (Fn tm)) = eval env mode tm
 eval env mode (Ref fc x def) = pure $ VRef fc x def [<]
 eval env mode (App _ t u) = evalSpine env mode t [!(eval env mode u)]
 eval env mode (U fc) = pure (VU fc)
