@@ -97,7 +97,7 @@ parameters (ctx: Context)
         if elem k acc
           then do
             debug "\{show k} \{show acc}"
-
+            -- when does this happen?
             error fc "non-linear pattern: \{show sp}"
           else go xs (k :: acc)
       go (xs :< v) _ = error emptyFC "non-variable in pattern \{show v}"
@@ -137,8 +137,8 @@ parameters (ctx: Context)
   -- REVIEW can I get better names in here?
   lams (S k) tm = Lam emptyFC "arg_\{show k}" (lams k tm)
 
-
-  solve : Nat -> Nat -> SnocList Val -> Val  -> M  ()
+  export
+  solve : (lvl : Nat) -> (k : Nat) -> SnocList Val -> Val -> M  ()
   solve l m sp t = do
     debug "solve \{show m} lvl \{show l} sp \{show sp} is \{show t}"
     meta@(Unsolved metaFC ix ctx ty _) <- lookupMeta m

@@ -2,6 +2,7 @@ module Lib.ProcessDecl
 
 import Data.IORef
 import Data.String
+import Data.Vect
 
 import Lib.Elab
 import Lib.Parser
@@ -10,6 +11,29 @@ import Lib.TopContext
 import Lib.Eval
 import Lib.Types
 import Lib.Util
+
+
+-- This is a crude first pass
+-- TODO consider ctx
+findMatches : Val -> List TopEntry -> M (List Tm)
+findMatches ty [] = pure []
+findMatches ty ((MkEntry name type def@(Fn t)) :: xs) = do
+  top <- get
+  let ctx = mkCtx top.metas (getFC ty)
+  -- FIXME we're restoring state, but the INFO logs have already been emitted
+  -- Also redo this whole thing to run during elab, recheck constraints, etc.
+  mc <- readIORef top.metas
+  catchError {e=Error} (do
+      -- TODO sort out the FC here
+      let fc = getFC ty
+      tm <- check (mkCtx  top.metas fc) (RVar fc name) ty
+      debug "Found \{pprint [] tm} for \{show ty}"
+      (tm ::) <$> findMatches ty xs)
+    (\ _ => do
+      writeIORef top.metas mc
+      debug "No match \{show ty} \{pprint [] type}"
+      findMatches ty xs)
+findMatches ty (y :: xs) = findMatches ty xs
 
 getArity : Tm -> Nat
 getArity (Pi x str icit t u) = S (getArity u)
@@ -27,6 +51,13 @@ collectDecl ((Def fc nm cl) :: rest@(Def _ nm' cl' :: xs)) =
   if nm == nm' then collectDecl (Def fc nm (cl ++ cl') :: xs)
   else (Def fc nm cl :: collectDecl rest)
 collectDecl (x :: xs) = x :: collectDecl xs
+
+-- Makes the arg for `solve` when we solve an auto
+makeSpine : Nat -> Vect k BD -> SnocList Val
+makeSpine k [] = [<]
+makeSpine (S k) (Defined :: xs) = makeSpine k xs
+makeSpine (S k) (Bound :: xs) = makeSpine k xs :< VVar emptyFC k [<]
+makeSpine 0 xs = ?fixme
 
 export
 processDecl : Decl -> M ()
@@ -80,21 +111,35 @@ processDecl (Def fc nm clauses) = do
   clauses' <- traverse (makeClause top) clauses
   tm <- buildTree (mkCtx top.metas fc) (MkProb clauses' vty)
   putStrLn "Ok \{pprint [] tm}"
+
+  mc <- readIORef top.metas
+  let mlen = length mc.metas `minus` mstart
+  for_ (take mlen mc.metas) $ \case
+    (Unsolved fc k ctx ty AutoSolve) => do
+      debug "auto solving \{show k} : \{show ty}"
+      -- we want the context here too.
+      [tm] <- findMatches ty top.defs
+        | res => error fc "Failed to solve \{show ty}, matches: \{show $ map (pprint []) res}"
+      val <- eval ctx.env CBN tm
+      let sp = makeSpine ctx.lvl ctx.bds
+      solve ctx ctx.lvl k sp val
+      pure ()
+    _ => pure ()
+
   tm' <- zonk top 0 [] tm
   putStrLn "NF \{pprint[] tm'}"
+
   mc <- readIORef top.metas
-
-  -- Maybe here we try search?
-
-  for_ (drop mstart mc.metas) $ \case
+  -- for_ (take mlen mc.metas) $ \case
+  for_ (mc.metas) $ \case
     (Solved k x) => pure ()
     (Unsolved (l,c) k ctx ty User) => do
-      -- TODO print here
+      -- TODO print here instead of during Elab
       pure ()
     (Unsolved (l,c) k ctx ty kind) => do
       tm <- quote ctx.lvl !(forceMeta ty)
       -- Now that we're collecting errors, maybe we simply check at the end
-      addError $ E (l,c) "Unsolved meta \{show k} type \{pprint (names ctx) tm}"
+      addError $ E (l,c) "Unsolved meta \{show k} \{show kind} type \{pprint (names ctx) tm}"
   debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
   modify $ setDef nm ty (Fn tm')
 
