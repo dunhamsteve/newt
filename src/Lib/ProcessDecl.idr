@@ -25,7 +25,7 @@ isCandidate _ _ = False
 
 -- This is a crude first pass
 -- TODO consider ctx
-findMatches : Val -> List TopEntry -> M (List Tm)
+findMatches : Val -> List TopEntry -> M (List (Tm, MetaContext))
 findMatches ty [] = pure []
 findMatches ty ((MkEntry name type def@(Fn t)) :: xs) = do
   let True = isCandidate ty type | False => findMatches ty xs
@@ -38,10 +38,12 @@ findMatches ty ((MkEntry name type def@(Fn t)) :: xs) = do
       -- TODO sort out the FC here
       let fc = getFC ty
       debug "TRY \{name} : \{pprint [] type} for \{show ty}"
-      tm <- check (mkCtx  top.metas fc) (RVar fc name) ty
+      -- This check is solving metas, so we save mc below in case we want this solution
+      tm <- check (mkCtx top.metas fc) (RVar fc name) ty
       debug "Found \{pprint [] tm} for \{show ty}"
+      mc' <- readIORef top.metas
       writeIORef top.metas mc
-      (tm ::) <$> findMatches ty xs)
+      ((tm, mc') ::) <$> findMatches ty xs)
     (\ err => do
       debug "No match \{show ty} \{pprint [] type} \{showError "" err}"
       writeIORef top.metas mc
@@ -127,14 +129,16 @@ processDecl (Def fc nm clauses) = do
 
   mc <- readIORef top.metas
   let mlen = length mc.metas `minus` mstart
+  -- FIXME every time we hit solve in this loop, we need to start over with mc.metas
   for_ (take mlen mc.metas) $ \case
-    (Unsolved fc k ctx ty AutoSolve) => do
-      debug "auto solving \{show k} : \{show ty}"
+    (Unsolved fc k ctx ty AutoSolve _) => do
+      debug "AUTO solving \{show k} : \{show ty}"
       -- we want the context here too.
-      [tm] <- findMatches ty top.defs
-        | res => error fc "Failed to solve \{show ty}, matches: \{show $ map (pprint []) res}"
+      [(tm,mc)] <- findMatches ty top.defs
+        | res => error fc "FAILED to solve \{show ty}, matches: \{show $ map (pprint [] . fst) res}"
+      writeIORef top.metas mc
       val <- eval ctx.env CBN tm
-      debug "solution \{pprint [] tm} evaled to \{show val}"
+      debug "SOLUTION \{pprint [] tm} evaled to \{show val}"
       let sp = makeSpine ctx.lvl ctx.bds
       solve ctx ctx.lvl k sp val
       pure ()
@@ -146,13 +150,15 @@ processDecl (Def fc nm clauses) = do
   mc <- readIORef top.metas
   for_ (take mlen mc.metas) $ \case
     (Solved k x) => pure ()
-    (Unsolved (l,c) k ctx ty User) => do
+    (Unsolved (l,c) k ctx ty User cons) => do
       -- TODO print here instead of during Elab
       pure ()
-    (Unsolved (l,c) k ctx ty kind) => do
+    (Unsolved (l,c) k ctx ty kind cons) => do
       tm <- quote ctx.lvl !(forceMeta ty)
       -- Now that we're collecting errors, maybe we simply check at the end
-      addError $ E (l,c) "Unsolved meta \{show k} \{show kind} type \{pprint (names ctx) tm}"
+      -- TODO - log constraints?
+      addError $ E (l,c) "Unsolved meta \{show k} \{show kind} type \{pprint (names ctx) tm} \{show $ length cons} constraints"
+
   debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
   modify $ setDef nm ty (Fn tm')
 

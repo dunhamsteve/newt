@@ -9,6 +9,7 @@ import Lib.Prettier
 import Data.List
 import Data.Vect
 import Data.String
+import Data.IORef
 import Lib.Types
 import Lib.Eval
 import Lib.TopContext
@@ -53,7 +54,7 @@ lookupDef ctx name = go 0 ctx.types ctx.env
 export
 forceMeta : Val -> M Val
 forceMeta (VMeta fc ix sp) = case !(lookupMeta ix) of
-  (Unsolved pos k xs _ _) => pure (VMeta fc ix sp)
+  (Unsolved pos k xs _ _ _) => pure (VMeta fc ix sp)
   (Solved k t) => vappSpine t sp >>= forceMeta
 forceMeta x = pure x
 
@@ -70,7 +71,7 @@ tryEval k sp =
 -- Force far enough to compare types
 forceType : Val -> M Val
 forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
-  (Unsolved x k xs _ _) => pure (VMeta fc ix sp)
+  (Unsolved x k xs _ _ _) => pure (VMeta fc ix sp)
   (Solved k t) => vappSpine t sp >>= forceType
 forceType x@(VRef fc nm _ sp) = fromMaybe x <$> tryEval nm sp
 forceType x = pure x
@@ -86,6 +87,30 @@ Semigroup UnifyResult where
 
 Monoid UnifyResult where
   neutral = MkResult []
+
+-- We need to switch to SortedMap here
+export
+updateMeta : Context -> Nat -> (MetaEntry -> M MetaEntry) -> M ()
+updateMeta ctx ix f = do
+  mc <- readIORef ctx.metas
+  metas <- go mc.metas
+  writeIORef ctx.metas $ {metas := metas} mc
+  where
+    go : List MetaEntry -> M (List MetaEntry)
+    go [] = error' "Meta \{show ix} not found"
+    go (x@((Unsolved y k z w v ys)) :: xs) = if k == ix then (::xs) <$> f x else (x ::) <$> go xs
+    go (x@((Solved k y)) :: xs) = if k == ix then (::xs) <$> f x else (x ::) <$> go xs
+
+export
+addConstraint : Context -> Nat -> SnocList Val -> Val -> M ()
+addConstraint ctx ix sp tm = do
+  mc <- readIORef ctx.metas
+  updateMeta ctx ix $ \case
+    (Unsolved pos k a b c cons) => do
+      info (getFC tm) "Add constraint m\{show ix} \{show sp} =?= \{show tm}"
+      pure (Unsolved pos k a b c (MkMc (getFC tm) ctx sp tm :: cons))
+    (Solved k tm) => error' "Meta \{show k} already solved"
+  pure ()
 
 parameters (ctx: Context)
   -- return renaming, the position is the new VVar
@@ -140,28 +165,51 @@ parameters (ctx: Context)
   -- REVIEW can I get better names in here?
   lams (S k) tm = Lam emptyFC "arg_\{show k}" (lams k tm)
 
+
+  export
+  unify : (l : Nat) -> Val -> Val  -> M UnifyResult
+
   export
   solve : (lvl : Nat) -> (k : Nat) -> SnocList Val -> Val -> M  ()
   solve l m sp t = do
-    meta@(Unsolved metaFC ix ctx ty kind) <- lookupMeta m
+    meta@(Unsolved metaFC ix ctx ty kind cons) <- lookupMeta m
       | _ => error (getFC t) "Meta \{show m} already solved!"
     debug "SOLVE \{show m} \{show kind} lvl \{show l} sp \{show sp} is \{show t}"
     let size = length $ filter (\x => x == Bound) $ toList ctx.bds
-    debug "\{show m} size is \{show size}"
-    if (length sp /= size) then do
+    debug "\{show m} size is \{show size} sps \{show $ length sp}"
+    let True = length sp == size
+      | _ => do
         -- need INFO that works like debug.
         -- FIXME we probably need to hold onto the constraint and recheck when we solve the meta?
         info (getFC t) "meta \{show m} (\{show ix}) applied to \{show $ length sp} args instead of \{show size}"
+        debug "CONSTRAINT m\{show ix} \{show sp} =?= \{show t}"
         -- error (getFC t) "meta \{show m} applied to \{show $ length sp} args instead of \{show size}"
-      else do
-        debug "meta \{show meta}"
-        ren <- invert l sp
-        tm <- rename m ren l t
-        let tm = lams (length sp) tm
-        top <- get
-        soln <- eval [] CBN tm
-        solveMeta top m soln
-        pure ()
+
+-- add constraint to meta m
+-- we can keep a list and run them when it is solved.
+        addConstraint ctx m sp t
+
+    debug "meta \{show meta}"
+    ren <- invert l sp
+    tm <- rename m ren l t
+    let tm = lams (length sp) tm
+    top <- get
+    soln <- eval [] CBN tm
+
+    updateMeta ctx m $ \case
+      (Unsolved pos k _ _ _ cons) => do
+          putStrLn "INFO at \{show pos}: solve \{show k} as \{pprint [] !(quote 0 soln)}"
+          pure $ Solved k soln
+      (Solved k x) => error' "Meta \{show ix} already solved!"
+    -- We're not breaking anything, but not quite getting an answer?
+    for_ cons $ \case
+      MkMc fc ctx sp rhs => do
+        val <- vappSpine soln sp
+        debug "discharge l=\{show ctx.lvl} \{(show val)} =?= \{(show rhs)}"
+        -- is this the right depth?
+        unify ctx.lvl val rhs
+
+    pure ()
 
   trySolve : Nat -> Nat -> SnocList Val -> Val -> M ()
   trySolve l m sp t = do
@@ -170,8 +218,6 @@ parameters (ctx: Context)
       pure ())
 
 
-  export
-  unify : (l : Nat) -> Val -> Val  -> M UnifyResult
 
   unifySpine : Nat -> Bool -> SnocList Val -> SnocList Val  -> M UnifyResult
   unifySpine l False _ _ = error emptyFC "unify failed at head" -- unreachable now

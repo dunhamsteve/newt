@@ -79,7 +79,7 @@ eval env mode (App _ t u) = vapp !(eval env mode t) !(eval env mode u)
 eval env mode (U fc) = pure (VU fc)
 eval env mode (Meta fc i) =
   case !(lookupMeta i) of
-        (Unsolved _ k xs _ _) => pure $ VMeta fc i [<]
+        (Unsolved _ k xs _ _ _) => pure $ VMeta fc i [<]
         (Solved k t) => pure $ t
 eval env mode (Lam fc x t) = pure $ VLam fc x (MkClosure env t)
 eval env mode (Pi fc x icit a b) = pure $ VPi fc x icit !(eval env mode a) (MkClosure env b)
@@ -112,7 +112,7 @@ quote l (VVar fc k sp) = if k < l
   else ?borken
 quote l (VMeta fc i sp) =
   case !(lookupMeta i) of
-        (Unsolved _ k xs _ _) => quoteSp l (Meta fc i) sp
+        (Unsolved _ k xs _ _ _) => quoteSp l (Meta fc i) sp
         (Solved k t) => quote l !(vappSpine t sp)
 quote l (VLam fc x t) = pure $ Lam fc x !(quote (S l) !(t $$ VVar emptyFC l [<]))
 quote l (VPi fc x icit a b) = pure $ Pi fc x icit !(quote l a) !(quote (S l) !(b $$ VVar emptyFC l [<]))
@@ -129,33 +129,8 @@ nf : Env -> Tm -> M Tm
 nf env t = quote (length env) !(eval env CBN t)
 
 export
-prval : Val -> M String
-prval v = pure $ pprint [] !(quote 0 v)
-
-export
 prvalCtx : {auto ctx : Context} -> Val -> M String
 prvalCtx v = pure $ pprint (toList $ map fst ctx.types) !(quote ctx.lvl v)
-
-
-export
-solveMeta : TopContext -> Nat -> Val -> M ()
-solveMeta ctx ix tm = do
-  mc <- readIORef ctx.metas
-  metas <- go mc.metas [<]
-  writeIORef ctx.metas $ {metas := metas} mc
-  where
-    go : List MetaEntry -> SnocList MetaEntry -> M (List MetaEntry)
-    go [] _ = error' "Meta \{show ix} not found"
-    go (meta@(Unsolved pos k _ _ _) :: xs) lhs = if k == ix
-      then do
-        -- empty context should be ok, because this needs to be closed
-        putStrLn "INFO at \{show pos}: solve \{show k} as \{!(prval tm)}"
-        pure $ lhs <>> (Solved k tm :: xs)
-      else go xs (lhs :< meta)
-    go (meta@(Solved k _) :: xs) lhs = if k == ix
-      then error' "Meta \{show ix} already solved!"
-      else go xs (lhs :< meta)
-
 
 -- REVIEW - might be easier if we inserted the meta without a bunch of explicit App
 -- I believe Kovacs is doing that.
@@ -183,6 +158,7 @@ appSpine : Tm -> List Tm -> Tm
 appSpine t [] = t
 appSpine t (x :: xs) = appSpine (App (getFC t) t x) xs
 
+-- TODO replace this with a variant on nf
 zonkApp : TopContext -> Nat -> Env -> Tm -> List Tm -> M Tm
 zonkApp top l env (App fc t u) sp = zonkApp top l env t (!(zonk top l env u) :: sp)
 zonkApp top l env t@(Meta fc k) sp = case !(lookupMeta k) of
@@ -192,7 +168,7 @@ zonkApp top l env t@(Meta fc k) sp = case !(lookupMeta k) of
     foo <- vappSpine v ([<] <>< sp')
     debug "-> result is \{show foo}"
     quote l foo
-  (Unsolved x j xs _ _) => pure $ appSpine t sp
+  (Unsolved x j xs _ _ _) => pure $ appSpine t sp
 zonkApp top l env t sp = pure $ appSpine !(zonk top l env t) sp
 
 zonkAlt : TopContext -> Nat -> Env -> CaseAlt -> M CaseAlt

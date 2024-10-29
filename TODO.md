@@ -1,21 +1,13 @@
 
 ## TODO
 
-NOW - two things
-
-1. I broke Tree.newt by removing some over-aggressive reduction.  I need to
-make it happen during unification. Not sure if I have all of the bits to vappspine there.
-
-2. Need to collect constraints and re-run, I think that may get me to
-typeclasses
-
 - [x] Remember operators from imports
 - [ ] Default cases for non-primitives (currently gets expanded to all constructors)
 - [x] Case for primitives
 - [ ] aoc2023 translation
   - [x] day1
   - [x] day2
-  - some "real world" examples
+  - some "real world" examples -v
 - [x] Maybe Eq and stuff would work for typeclass without dealing with unification issues yet
 - [x] unsolved meta errors repeat (need to freeze or only report at end)
 - [x] Sanitize JS idents, e.g. `_+_`
@@ -46,12 +38,7 @@ typeclasses
   - Agda doesn't have it, clashes with pair syntax
 - [ ] autos / typeclass resolution
   - [x] very primitive version in place, not higher order, search at end
-  - We need special handling in unification to make this possible for typeclasses on `U -> U`, we could still do `Eq` or `Show` with the current unification
-  - options
-    - keep as implicit and do auto if the type constructor is flagged auto
-    - keep as implicit and mark auto, behavior overlaps a lot with implicit
-    - have separate type of implict with `{{}}`
-    - `TypeClass.newt` is the exercise for this
+  - [x] monad is now working
 - [ ] do blocks (needs typeclass, overloaded functions, or constrain to IO)
 - [x] some solution for `+` problem (classes? ambiguity?)
 - [x] show compiler failure in the editor (exit code != 0)
@@ -67,7 +54,7 @@ typeclasses
   - I think we got this by not switching for single cases
 - [ ] magic nat (codegen as number with appropriate pattern matching)
 - [ ] magic tuple? (codegen as array)
-- [ ] magic newtype? (drop in codegen)
+- [ ] magic newtype? (drop them in codegen)
 - [ ] records / copatterns
 - [x] vscode: syntax highlighting for String
 - [ ] add `pop` or variant of `pfunc` that maps to an operator, giving the js operator and precedence on RHS

@@ -325,8 +325,12 @@ Show MetaKind where
   show User = "User"
   show AutoSolve = "Auto"
 
+-- constrain meta applied to val to be a val
 public export
-data MetaEntry = Unsolved FC Nat Context Val MetaKind | Solved Nat Val
+data MConstraint = MkMc FC Context (SnocList Val) Val
+
+public export
+data MetaEntry = Unsolved FC Nat Context Val MetaKind (List MConstraint) | Solved Nat Val
 
 
 public export
@@ -399,6 +403,7 @@ record Context where
   metas : IORef MetaContext
   fc : FC
 
+%name Context ctx
 
 ||| add a binding to environment
 export
@@ -416,7 +421,7 @@ define ctx name val ty =
 export
 covering
 Show MetaEntry where
-  show (Unsolved pos k ctx ty kind) = "Unsolved \{show pos} \{show k} \{show kind} : \{show ty} \{show ctx.bds}"
+  show (Unsolved pos k ctx ty kind constraints) = "Unsolved \{show pos} \{show k} \{show kind} : \{show ty} \{show ctx.bds} cs \{show $ length constraints}"
   show (Solved k x) = "Solved \{show k} \{show x}"
 
 export withPos : Context -> FC -> Context
@@ -447,7 +452,7 @@ freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
 freshMeta ctx fc ty kind = do
   mc <- readIORef ctx.metas
   putStrLn "INFO at \{show fc}: fresh meta \{show mc.next} : \{show ty}"
-  writeIORef ctx.metas $ { next $= S, metas $= (Unsolved fc mc.next ctx ty kind ::) } mc
+  writeIORef ctx.metas $ { next $= S, metas $= (Unsolved fc mc.next ctx ty kind [] ::) } mc
   pure $ applyBDs 0 (Meta emptyFC mc.next) ctx.bds
   where
     -- hope I got the right order here :)
@@ -471,7 +476,7 @@ lookupMeta ix = do
   where
     go : List MetaEntry -> M MetaEntry
     go [] = error' "Meta \{show ix} not found"
-    go (meta@(Unsolved _ k ys _ _) :: xs) = if k == ix then pure meta else go xs
+    go (meta@(Unsolved _ k ys _ _ _) :: xs) = if k == ix then pure meta else go xs
     go (meta@(Solved k x) :: xs) = if k == ix then pure meta else go xs
 
 -- we need more of topcontext later - Maybe switch it up so we're not passing

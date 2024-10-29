@@ -1,8 +1,5 @@
 module TypeClass
 
--- experiment on one option for typeclass (we don't have record yet)
-
--- we need a bit more than this, but
 data Monad : (U -> U) -> U where
   MkMonad : { M : U -> U } ->
             (bind : {A B : U} -> (M A) -> (A -> M B) -> M B) ->
@@ -12,18 +9,30 @@ data Maybe : U -> U where
   Just    : {A : U} -> A -> Maybe A
   Nothing : {A : U} -> Maybe A
 
+data Either : U -> U -> U where
+  Left : {A B : U} -> A -> Either A B
+  Right : {A B : U} -> B -> Either A B
 
--- NEXT trying to get this to work. An equivalence is not found in pattern
--- matching
+bindEither : {A B C : U} -> (Either A B) -> (B -> Either A C) -> Either A C
+bindEither (Left a) amb = Left a
+bindEither (Right b) amb = amb b
 
--- [instance]
+EitherMonad : {A : U} -> Monad (Either A)
+EitherMonad = MkMonad {Either A} bindEither
+
+bindMaybe : {A B : U} -> Maybe A -> (A -> Maybe B) -> Maybe B
+bindMaybe Nothing amb = Nothing
+bindMaybe (Just a) amb = amb a
+
 MaybeMonad : Monad Maybe
--- Agda case lambda might be nice..
--- The {Maybe} isn't solved in type for the case
-MaybeMonad = MkMonad {Maybe} (\ {A} ma amb =>
-  case ma of
-      Nothing => Nothing
-      -- It doesn't discover pat$5 is A during pattern matching
-      -- oh, but var 0 value is var5
-      Just a => amb a)
+MaybeMonad = MkMonad bindMaybe
 
+_>>=_ : {a b : U} -> {m : U -> U} -> {{x : Monad m}} -> (m a) -> (a -> m b) -> m b
+_>>=_ {a} {b} {m} {{MkMonad bind'}}  ma amb = bind' {a} {b} ma amb
+
+infixl 1 _>>=_
+
+ptype Int
+
+foo : Int -> Maybe Int
+foo x = (Just x) >>= (\ x => Just 10)

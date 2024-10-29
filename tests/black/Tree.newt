@@ -91,9 +91,6 @@ insert (intv x lx xu) (node2 y tly tyu) = case cmp x y of
     inr tyu' => inr (node2 y tly tyu')
 insert (intv x lx xu) (node3 y z tly tyz tzu) = case cmp x y of
   inl xy => case insert (intv {_} {N y} x lx xy) tly of
-    -- TODO Here a meta is applied to an extra argument, if we ignore that
-    -- constraint we get a better one later - _but_ we probably need to check
-    -- the constraint later.
     inl (v ** (tlv , tvy)) => inl (y ** (node2 v tlv tvy, node2 z tyz tzu))
     inr tly' => inr (node3 y z tly' tyz tzu)
   inr yx => case cmp x z of
