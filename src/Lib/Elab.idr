@@ -833,6 +833,8 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     sc <- check (extend ctx nm' a) tm ty'
     pure $ Lam (getFC tm) nm' sc
 
+  (RImplicit fc, ty) => freshMeta ctx fc ty Normal
+
   (RLet fc nm ty v sc, rty) => do
     ty' <- check ctx ty (VU emptyFC)
     vty <- eval ctx.env CBN ty'
