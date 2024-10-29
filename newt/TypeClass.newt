@@ -40,7 +40,7 @@ bindMaybe (Just a) amb = amb a
 -- I think it was picking up the Maybe before I made it less aggressive about eval
 
 MaybeMonad : Monad Maybe
-MaybeMonad = MkMonad {Maybe} bindMaybe
+MaybeMonad = MkMonad bindMaybe
 
 -- So the idea here is to have some implicits that are solved by search
 
