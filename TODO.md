@@ -42,7 +42,7 @@
 - [ ] autos / typeclass resolution
   - [x] very primitive version in place, not higher order, search at end
   - [x] monad is now working
-- [ ] do blocks (needs typeclass, overloaded functions, or constrain to IO)
+- [x] do blocks (needs typeclass, overloaded functions, or constrain to IO)
 - [x] some solution for `+` problem (classes? ambiguity?)
 - [x] show compiler failure in the editor (exit code != 0)
 - [x] write output to file

@@ -51,4 +51,4 @@ bar x = do
   let y = x
   z <- Just x
   -- This is not sorting out the Maybe...
-  pure {_} {_} z
+  pure z

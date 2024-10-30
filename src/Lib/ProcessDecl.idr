@@ -74,6 +74,27 @@ makeSpine (S k) (Defined :: xs) = makeSpine k xs
 makeSpine (S k) (Bound :: xs) = makeSpine k xs :< VVar emptyFC k [<]
 makeSpine 0 xs = ?fixme
 
+solveAutos : Nat -> List MetaEntry -> M ()
+solveAutos mlen [] = pure ()
+solveAutos mlen ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
+      debug "AUTO solving \{show k} : \{show ty}"
+      -- we want the context here too.
+      top <- get
+      [(tm,mc)] <- findMatches ty top.defs
+        | res => do
+          debug "FAILED to solve \{show ty}, matches: \{show $ map (pprint [] . fst) res}"
+          solveAutos mlen es
+        -- | res => error fc "FAILED to solve \{show ty}, matches: \{show $ map (pprint [] . fst) res}"
+      writeIORef top.metas mc
+      val <- eval ctx.env CBN tm
+      debug "SOLUTION \{pprint [] tm} evaled to \{show val}"
+      let sp = makeSpine ctx.lvl ctx.bds
+      solve ctx ctx.lvl k sp val
+      mc <- readIORef top.metas
+      solveAutos mlen (take mlen mc.metas)
+solveAutos mlen (_ :: es) = solveAutos mlen es
+
+
 export
 processDecl : Decl -> M ()
 
@@ -129,20 +150,7 @@ processDecl (Def fc nm clauses) = do
 
   mc <- readIORef top.metas
   let mlen = length mc.metas `minus` mstart
-  -- FIXME every time we hit solve in this loop, we need to start over with mc.metas
-  for_ (take mlen mc.metas) $ \case
-    (Unsolved fc k ctx ty AutoSolve _) => do
-      debug "AUTO solving \{show k} : \{show ty}"
-      -- we want the context here too.
-      [(tm,mc)] <- findMatches ty top.defs
-        | res => error fc "FAILED to solve \{show ty}, matches: \{show $ map (pprint [] . fst) res}"
-      writeIORef top.metas mc
-      val <- eval ctx.env CBN tm
-      debug "SOLUTION \{pprint [] tm} evaled to \{show val}"
-      let sp = makeSpine ctx.lvl ctx.bds
-      solve ctx ctx.lvl k sp val
-      pure ()
-    _ => pure ()
+  solveAutos mlen (take mlen mc.metas)
 
   tm' <- zonk top 0 [] tm
   putStrLn "NF \{pprint[] tm'}"

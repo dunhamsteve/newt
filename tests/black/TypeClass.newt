@@ -44,11 +44,10 @@ test : Maybe Int
 test = pure 10
 
 foo : Int -> Maybe Int
-foo x = Just 42 >> Just x >>= (\ x => pure {_} {Maybe} 10)
+foo x = Just 42 >> Just x >>= (\ x => pure 10)
 
 bar : Int -> Maybe Int
 bar x = do
   let y = x
   z <- Just x
-  -- NOW each of these implicits is a different error, fix them
-  pure {_} {Maybe} z
+  pure z
