@@ -19,7 +19,7 @@ The repository is tagging `.newt` files as Agda to convince github to highlight 
 There is a `Makefile` that builds both chez and javascript versions.  They end up in
 `build/exec` as usual.  I've also added a `pack.toml`, so `pack build` also works.
 
-There is a vscode extension in `newt-vscode`. Running `make vscode` will build and install it. The extension expects `build/exec/newt` to exist in the workspace.
+There is a vscode extension in `newt-vscode`. Running `make vscode` will build and install it. The extension expects `build/exec/newt` to exist in the workspace. And `make test` will run a few black box tests. Currently it simply checks return codes, since the output is in flux.
 
 ## Overview
 
@@ -52,8 +52,7 @@ Following kovacs, I'm putting `VVar` into context env when I go under binders. T
 
 ## Autos
 
-Newt has primitive auto implicits. As a first pass, higher order ones, like monad, will not
-
+Newt has primitive auto implicits. They are denoted by double braces `{{}}` as in Agda. Newt will search for a function that returns a type in the same family, only has implicit and auto-implicit arguments, and unifies (satisfying any relevant constraints).
 
 ## Issues
 

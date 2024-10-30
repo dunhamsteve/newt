@@ -1,6 +1,8 @@
 module Tree
 
--- https://youtu.be/v2yXrOkzt5w?t=3013
+-- adapted from Conor McBride's 2-3 tree example
+-- youtube video: https://youtu.be/v2yXrOkzt5w?t=3013
+
 
 data Nat : U where
   Z : Nat
@@ -60,43 +62,35 @@ data T23 : Bnd -> Bnd -> Nat -> U where
 
 infixl 5 _*_
 infixr 1 _,_
-infixr 1 _**_
 data Sg : (A : U) -> (A -> U) -> U where
-  _**_ : {A : U} {B : A -> U} -> (a : A) -> B a -> Sg A B
+  _,_ : {A : U} {B : A -> U} -> (a : A) -> B a -> Sg A B
 
-
--- Accidentally defined this as a separate data because I was
--- guessing the def behind _*_. I get an unsolved meta below if
--- I define in terms of Sg.
-
--- _*_ : U -> U -> U
--- A * B = Sg A (\ _ => B)
-
-data _*_ : (A B : U) -> U where
-   _,_ : {A B : U} -> A -> B -> A * B
+_*_ : U -> U -> U
+A * B = Sg A (\ _ => B)
 
 TooBig : Bnd -> Bnd -> Nat -> U
 TooBig l u h = Sg Nat (\ x => T23 l (N x) h * T23 (N x) u h)
 
 insert : {h : Nat} {l u : Bnd} -> Intv l u -> T23 l u h -> TooBig l u h + T23 l u h
 -- Agda is yellow here, needs h = x on each leaf
-insert (intv x lx xu) (leaf lu) = inl (x ** (leaf {_} {_} {x} lx , leaf {_} {_} {x} xu))
+-- The second arg to the second _,_ is unsolved and pi-typed
+insert (intv x lx xu) (leaf lu) = inl (x , (leaf {_} {_} {x} lx , leaf {_} {_} {x} xu))
 insert (intv x lx xu) (node2 y tly tyu) = case cmp x y of
   -- u := N y is not solved at this time
   inl xy => case insert (intv {_} {N y} x lx xy) tly of
-    inl (z ** (tlz, tzy)) => inr (node3 z y tlz tzy tyu)
+    inl (z , (tlz , tzy)) => inr (node3 z y tlz tzy tyu)
     inr tly' => inr (node2 y tly' tyu)
   inr yx => case insert (intv {N y} x yx xu) tyu of
-    inl (z ** (tyz, tzu)) => inr (node3 y z tly tyz tzu)
+    inl (z , (tyz , tzu)) => inr (node3 y z tly tyz tzu)
     inr tyu' => inr (node2 y tly tyu')
 insert (intv x lx xu) (node3 y z tly tyz tzu) = case cmp x y of
   inl xy => case insert (intv {_} {N y} x lx xy) tly of
-    inl (v ** (tlv , tvy)) => inl (y ** (node2 v tlv tvy, node2 z tyz tzu))
+    inl (v , (tlv , tvy)) => inl (y , (node2 v tlv tvy , node2 z tyz tzu))
     inr tly' => inr (node3 y z tly' tyz tzu)
   inr yx => case cmp x z of
     inl xz => case insert (intv {N y} {N z} x yx xz) tyz of
-      inl (w ** (tyw , twz)) => inl (w ** (node2 y tly tyw, node2 z twz tzu))
+      inl (w , (tyw , twz)) => inl (w , (node2 y tly tyw , node2 z twz tzu))
       inr tyz' => inr (node3 y z tly tyz' tzu)
     inr zx => case insert (intv {N z} x zx xu) tzu of
-      inl (w ** (tzw, twu)) => inl (z ** (node2 y tly tyz, node2 w tzw twu))
+      inl (w , (tzw , twu)) => inl (z , (node2 y tly tyz , node2 w tzw twu))
       inr tzu' => inr (node3 y z tly tyz tzu')
