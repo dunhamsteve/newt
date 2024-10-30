@@ -257,10 +257,14 @@ parameters (ctx: Context)
     debug "env \{show ctx.env}"
     debug "types \{show $ ctx.types}"
     case (t',u') of
+
+      -- flex/flex
       (VMeta fc k sp,  VMeta fc' k' sp' ) =>
         if k == k' then unifySpine l (k == k') sp sp'
         -- TODO, might want to try the other way, too.
-        else solve l k sp (VMeta fc' k' sp') >> pure neutral
+        else if length sp < length sp'
+          then solve l k' sp' (VMeta fc k sp) >> pure neutral
+          else solve l k sp (VMeta fc' k' sp') >> pure neutral
       (t,           VMeta fc' i' sp') => solve l i' sp' t >> pure neutral
       (VMeta fc i sp, t'           ) => solve l i sp t' >> pure neutral
       (VPi fc _ _ a b, VPi fc' _ _ a' b') => [| unify l a a' <+> unify (S l) !(b $$ VVar emptyFC l [<]) !(b' $$ VVar emptyFC l [<]) |]
@@ -612,7 +616,8 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
     makeConstr [] (pat :: pats) = ?extra_patterns
     makeConstr ((MkBind nm Implicit x) :: xs) [] = (nm, PatWild emptyFC Implicit) :: makeConstr xs []
     makeConstr ((MkBind nm Auto x) :: xs) [] = (nm, PatWild emptyFC Auto) :: makeConstr xs []
-    makeConstr ((MkBind nm Explicit x) :: xs) [] = ?extra_binders_2
+    -- FIXME need a proper error, but requires wiring M three levels down
+    makeConstr ((MkBind nm Explicit x) :: xs) [] = ?insufficient_patterns
     makeConstr ((MkBind nm Explicit x) :: xs) (pat :: pats) =
       if getIcit pat == Explicit
         then (nm, pat) :: makeConstr xs pats
@@ -822,7 +827,18 @@ showDef : Context -> List String -> Nat -> Val -> M String
 showDef ctx names n v@(VVar _ n' [<]) =  if n == n' then pure "" else pure "= \{pprint names !(quote ctx.lvl v)}"
 showDef ctx names n v = pure "= \{pprint names !(quote ctx.lvl v)}"
 
+
+undo : List DoStmt -> M Raw
+undo [] = error emptyFC "do block must end in expression"
+undo ((DoExpr fc tm) :: Nil) = pure tm
+-- TODO decide if we want to use >> or just >>=
+undo ((DoExpr fc tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc "_" Explicit !(undo xs)) Explicit
+-- undo ((DoExpr fc tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>_") tm Explicit) !(undo xs) Explicit
+undo ((DoLet fc nm tm) :: xs) = RLet fc nm (RImplicit fc) tm <$> undo xs
+undo ((DoArrow fc nm tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc nm Explicit !(undo xs)) Explicit
+
 check ctx tm ty = case (tm, !(forceType ty)) of
+  (RDo fc stmts, ty) => check ctx !(undo stmts) ty
   (RCase fc rsc alts, ty) => do
     (sc, scty) <- infer ctx rsc
     scty <- forceMeta scty
@@ -989,7 +1005,3 @@ infer ctx (RLit fc (LString str)) = pure (Lit fc (LString str), !(primType fc "S
 infer ctx (RLit fc (LInt i)) = pure (Lit fc (LInt i), !(primType fc "Int"))
 
 infer ctx tm = error (getFC tm) "Implement infer \{show tm}"
-
--- The idea here is to insert a hole for a parse error
--- but the parser doesn't emit this yet.
--- infer ctx (RParseError str) = ?todo_insert_meta

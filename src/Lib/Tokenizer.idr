@@ -5,11 +5,11 @@ import Text.Lexer.Tokenizer
 import Lib.Token
 
 keywords : List String
-keywords = ["let", "in", "where", "case", "of", "data", "U",
+keywords = ["let", "in", "where", "case", "of", "data", "U", "do",
             "ptype", "pfunc", "module", "infixl", "infixr", "infix"]
 
 specialOps : List String
-specialOps = ["->", ":", "=>", ":=", "="]
+specialOps = ["->", ":", "=>", ":=", "=", "<-"]
 
 checkKW : String -> Token Kind
 checkKW s = if elem s keywords then Tok Keyword s else Tok Ident s

@@ -203,10 +203,28 @@ caseExpr = do
   alts <- startBlock $ someSame $ caseAlt
   pure $ RCase fc sc alts
 
+doArrow : Parser DoStmt
+doArrow = do
+  fc <- getPos
+  name <- try $ ident <* keyword "<-"
+  expr <- term
+  pure $ DoArrow fc name expr
+
+doStmt : Parser DoStmt
+doStmt
+  = DoArrow <$> getPos <*> (try $ ident <* keyword "<-") <*> term
+  <|> DoLet <$> getPos <* keyword "let" <*> ident <* keyword "=" <*> term
+  <|> DoExpr <$> getPos <*> term
+
+doExpr : Parser Raw
+doExpr = RDo <$> getPos <* keyword "do" <*> (startBlock $ someSame doStmt)
+
+
 -- This hits an idris codegen bug if parseOp is last and Lazy
 term =  caseExpr
     <|> letExpr
     <|> lamExpr
+    <|> doExpr
     <|> parseOp
 
 varname : Parser String

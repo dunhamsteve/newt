@@ -59,6 +59,12 @@ record Clause where
 public export
 data RCaseAlt = MkAlt Raw Raw
 
+public export
+data DoStmt : Type where
+  DoExpr : (fc : FC) -> Raw -> DoStmt
+  DoLet : (fc : FC) -> String -> Raw -> DoStmt
+  DoArrow : (fc: FC) -> String -> Raw -> DoStmt
+
 data Raw : Type where
   RVar : (fc : FC) -> (nm : Name) -> Raw
   RLam : (fc : FC) -> (nm : String) -> (icit : Icit) -> (ty : Raw) -> Raw
@@ -71,8 +77,8 @@ data Raw : Type where
   RCase : (fc : FC) -> (scrut : Raw) -> (alts : List RCaseAlt) -> Raw
   RImplicit : (fc : FC) -> Raw
   RHole : (fc : FC) -> Raw
-  -- not used, but intended to allow error recovery
-  RParseError : (fc : FC) -> String -> Raw
+  RDo : (fc : FC) -> List DoStmt -> Raw
+
 
 %name Raw tm
 
@@ -89,7 +95,7 @@ HasFC Raw where
   getFC (RCase fc scrut alts) = fc
   getFC (RImplicit fc) = fc
   getFC (RHole fc) = fc
-  getFC (RParseError fc str) = fc
+  getFC (RDo fc stmts) = fc
 -- derive some stuff - I'd like json, eq, show, ...
 
 
@@ -181,7 +187,7 @@ Show Raw where
   show (RApp _ x y z) = foo [ "App", show x, show y, show z]
   show (RLam _ x i y) = foo [ "Lam", show x, show i, show y]
   show (RCase _ x xs) = foo [ "Case", show x, show xs]
-  show (RParseError _ str) = foo [ "ParseError", "str"]
+  show (RDo _ stmts) = foo [ "DO", "FIXME"]
   show (RU _) = "U"
 
 export
@@ -233,7 +239,7 @@ Pretty Raw where
     asDoc p (RCase _ x xs) = text "TODO - RCase"
     asDoc p (RImplicit _) = text "_"
     asDoc p (RHole _) = text "?"
-    asDoc p (RParseError _ str) = text "ParseError \{str}"
+    asDoc p (RDo _ stmts) = text "TODO - RDo"
 
 export
 Pretty Module where
