@@ -60,19 +60,19 @@ public export
 data RCaseAlt = MkAlt Raw Raw
 
 data Raw : Type where
-  RVar : FC -> (nm : Name) -> Raw
-  RLam : FC -> (nm : String) -> (icit : Icit) -> (ty : Raw) -> Raw
-  RApp : FC -> (t : Raw) -> (u : Raw) -> (icit : Icit) -> Raw
-  RU   : FC -> Raw
-  RPi  : FC -> (nm : Maybe Name) -> (icit : Icit) -> (ty : Raw) -> (sc : Raw) -> Raw
-  RLet : FC -> (nm : Name) -> (ty : Raw) -> (v : Raw) -> (sc : Raw) -> Raw
-  RAnn  : FC -> (tm : Raw) -> (ty : Raw) -> Raw
-  RLit : FC -> Literal -> Raw
-  RCase : FC -> (scrut : Raw) -> (alts : List RCaseAlt) -> Raw
-  RImplicit : FC -> Raw
-  RHole : FC -> Raw
+  RVar : (fc : FC) -> (nm : Name) -> Raw
+  RLam : (fc : FC) -> (nm : String) -> (icit : Icit) -> (ty : Raw) -> Raw
+  RApp : (fc : FC) -> (t : Raw) -> (u : Raw) -> (icit : Icit) -> Raw
+  RU   : (fc : FC) -> Raw
+  RPi  : (fc : FC) -> (nm : Maybe Name) -> (icit : Icit) -> (ty : Raw) -> (sc : Raw) -> Raw
+  RLet : (fc : FC) -> (nm : Name) -> (ty : Raw) -> (v : Raw) -> (sc : Raw) -> Raw
+  RAnn : (fc : FC) -> (tm : Raw) -> (ty : Raw) -> Raw
+  RLit : (fc : FC) -> Literal -> Raw
+  RCase : (fc : FC) -> (scrut : Raw) -> (alts : List RCaseAlt) -> Raw
+  RImplicit : (fc : FC) -> Raw
+  RHole : (fc : FC) -> Raw
   -- not used, but intended to allow error recovery
-  RParseError : FC -> String -> Raw
+  RParseError : (fc : FC) -> String -> Raw
 
 %name Raw tm
 

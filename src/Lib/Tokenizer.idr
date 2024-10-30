@@ -48,6 +48,8 @@ unquote str = case unpack str of
     go ('\\' :: (x :: xs)) = x :: go xs
     go (x :: xs) = x :: go xs
 
+opMiddle = pred (\c => not (isSpace c || c == '_'))
+
 rawTokens : Tokenizer (Token Kind)
 rawTokens
    =  match (lower <+> many identMore) checkKW
@@ -55,7 +57,7 @@ rawTokens
   <|> match (some digit) (Tok Number)
   <|> match (is '#' <+> many alpha) (Tok Pragma)
   <|> match charLit (Tok Character)
-  <|> match (exact "_" <+> (some opChar <|> exact ",") <+> exact "_") (Tok MixFix)
+  <|> match (exact "_" <+> (some opMiddle) <+> exact "_") (Tok MixFix)
   <|> match (quo <+> manyUntil quo (esc any <|> any) <+> quo) (Tok StringKind . unquote)
   <|> match (lineComment (exact "--")) (Tok Space)
   <|> match (blockComment (exact "/-") (exact "-/")) (Tok Space)

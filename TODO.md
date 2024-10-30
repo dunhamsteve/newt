@@ -1,6 +1,9 @@
 
 ## TODO
 
+- [ ] Allow unicode operators/names
+  - refactored parser to prep for this
+- [ ] handle if_then_else_
 - [x] Remember operators from imports
 - [ ] Default cases for non-primitives (currently gets expanded to all constructors)
 - [x] Case for primitives

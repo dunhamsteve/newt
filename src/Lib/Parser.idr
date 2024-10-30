@@ -74,6 +74,10 @@ export term : (Parser Raw)
 withPos : Parser a -> Parser (FC, a)
 withPos pa = (,) <$> getPos <*> pa
 
+lookup : String -> List OpDef -> Maybe OpDef
+lookup _ [] = Nothing
+lookup name (op :: ops) = if op.name == name then Just op else lookup name ops
+
 -- the inside of Raw
 atom : Parser Raw
 atom = RU <$> getPos <* keyword "U"
@@ -91,40 +95,36 @@ pArg = do
   (Explicit,fc,) <$> atom
     <|> (Implicit,fc,) <$> braces typeExpr
     <|> (Auto,fc,) <$> dbraces typeExpr
+    <|> (Explicit,fc,) . RVar fc <$> token Oper
 
-parseApp : Parser Raw
-parseApp = do
-  fc <- getPos
-  hd <- atom
-  rest <- many pArg
-  pure $ foldl (\a, (icit,fc,b) => RApp fc a b icit) hd rest
+AppSpine = List (Icit,FC,Raw)
 
-lookup : String -> List OpDef -> Maybe OpDef
-lookup _ [] = Nothing
-lookup name (op :: ops) = if op.name == name then Just op else lookup name ops
+pratt : List OpDef -> Int -> Raw -> AppSpine -> Parser (Raw, AppSpine)
+pratt ops prec left [] = pure (left, [])
+pratt ops prec left rest@((Explicit, fc, tm@(RVar x nm)) :: xs) =
+  let op' = ("_" ++ nm ++ "_") in
+  case lookup op' ops of
+    Nothing => pratt ops prec (RApp fc left tm Explicit) xs
+    Just (MkOp name p fix) => if p < prec
+      then pure (left, rest)
+      else
+        let pr = case fix of InfixR => p; _ => p + 1 in
+        case xs of
+          ((_, _, right) :: rest) => do
+            (right, rest) <- pratt ops pr right rest
+            pratt ops prec (RApp fc(RApp fc (RVar fc op') left Explicit) right Explicit) rest
+          _ => fail "trailing operator"
+pratt ops prec left ((icit, fc, tm) :: xs) = pratt ops prec (RApp fc left tm icit) xs
 
 parseOp : Parser Raw
-parseOp = parseApp >>= go 0
-  where
-    go : Int -> Raw -> Parser Raw
-    go prec left =
-      try (do
-        fc <- getPos
-        op <- token Oper
-        ops <- getOps
-        let op' = "_" ++ op ++ "_"
-        let Just (MkOp _ p fix) = lookup op' ops
-          -- this is eaten, but we need `->` and `:=` to not be an operator to have fatal here
-         | Nothing => case op of
-         -- Location is poor on these because we pull off of the remaining token list...
-          "->" => fail "no infix decl for \{op}"
-          ":=" => fail "no infix decl for \{op}"
-          op => fatal "no infix decl for \{op}"
-        if p >= prec then pure () else fail ""
-        let pr = case fix of InfixR => p; _ => p + 1
-        right <- go pr !(parseApp)
-        go prec (RApp fc (RApp fc (RVar fc op') left Explicit) right Explicit))
-      <|> pure left
+parseOp = do
+  fc <- getPos
+  ops <- getOps
+  hd <- atom
+  rest <- many pArg
+  (res, []) <- pratt ops 0 hd rest
+    | _ => fail "extra stuff"
+  pure res
 
 export
 letExpr : Parser Raw
