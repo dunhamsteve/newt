@@ -6,9 +6,15 @@ data Monad : (U -> U) -> U where
             (pure : {A : U} -> A -> M A) ->
             Monad M
 
-data Maybe : U -> U where
-  Just    : {A : U} -> A -> Maybe A
-  Nothing : {A : U} -> Maybe A
+infixl 1 _>>=_ _>>_
+_>>=_ : {a b : U} -> {m : U -> U} -> {{x : Monad m}} -> (m a) -> (a -> m b) -> m b
+_>>=_ {a} {b} {m} {{MkMonad bind' _}}  ma amb = bind' {a} {b} ma amb
+
+_>>_ : {a b : U} -> {m : U -> U} -> {{x : Monad m}} -> m a -> m b -> m b
+ma >> mb = mb
+
+pure : {a : U} {m : U -> U} {{_ : Monad m}} -> a -> m a
+pure {_} {_} {{MkMonad _ pure'}} a = pure' a
 
 data Either : U -> U -> U where
   Left : {A B : U} -> A -> Either A B
@@ -21,6 +27,10 @@ bindEither (Right b) amb = amb b
 EitherMonad : {A : U} -> Monad (Either A)
 EitherMonad = MkMonad {Either A} bindEither Right
 
+data Maybe : U -> U where
+  Just    : {A : U} -> A -> Maybe A
+  Nothing : {A : U} -> Maybe A
+
 bindMaybe : {A B : U} -> Maybe A -> (A -> Maybe B) -> Maybe B
 bindMaybe Nothing amb = Nothing
 bindMaybe (Just a) amb = amb a
@@ -28,16 +38,30 @@ bindMaybe (Just a) amb = amb a
 MaybeMonad : Monad Maybe
 MaybeMonad = MkMonad bindMaybe Just
 
-_>>=_ : {a b : U} -> {m : U -> U} -> {{x : Monad m}} -> (m a) -> (a -> m b) -> m b
-_>>=_ {a} {b} {m} {{MkMonad bind' _}}  ma amb = bind' {a} {b} ma amb
+infixr 7 _::_
+data List : U -> U where
+  Nil : {A : U} -> List A
+  _::_ : {A : U} -> A -> List A -> List A
 
-pure : {a : U} {m : U -> U} {{_ : Monad m}} -> a -> m a
-pure {_} {_} {{MkMonad _ pure'}} a = pure' a
+infixl 7 _++_
+_++_ : {A : U} -> List A -> List A -> List A
+Nil ++ ys = ys
+(x :: xs) ++ ys = x :: (xs ++ ys)
 
-infixl 1 _>>=_ _>>_
+bindList : {A B : U} -> List A -> (A -> List B) -> List B
+bindList Nil f = Nil
+bindList (x :: xs) f = f x ++ bindList xs f
 
-_>>_ : {a b : U} -> {m : U -> U} -> {{x : Monad m}} -> m a -> m b -> m b
-ma >> mb = mb
+singleton : {A : U} -> A -> List A
+singleton a = a :: Nil
+
+-- TODO need better error when the monad is not defined
+ListMonad : Monad List
+ListMonad = MkMonad bindList singleton
+
+infixr 1 _,_
+data Pair : U -> U -> U where
+  _,_ : {A B : U} -> A -> B -> Pair A B
 
 ptype Int
 
@@ -45,10 +69,16 @@ test : Maybe Int
 test = pure 10
 
 foo : Int -> Maybe Int
-foo x = Just 42 >> Just x >>= (\ x => pure 10)
+foo x = Just 42 >> Just x >>= (\ x => pure {_} {Maybe} 10)
 
 bar : Int -> Maybe Int
 bar x = do
   let y = x
   z <- Just x
   pure z
+
+baz : {A B : U} -> List A -> List B -> List (Pair A B)
+baz xs ys = do
+  x <- xs
+  y <- ys
+  pure (x , y)
