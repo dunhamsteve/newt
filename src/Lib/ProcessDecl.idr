@@ -159,7 +159,7 @@ processDecl (Def fc nm clauses) = do
 
   mc <- readIORef top.metas
   for_ (take mlen mc.metas) $ \case
-    (Solved k x) => pure ()
+    (Solved fc k soln) => info fc "solve \{show k} as \{pprint [] !(quote 0 soln)}"
     (Unsolved fc k ctx ty User cons) => do
       ty' <- quote ctx.lvl ty
       let names = (toList $ map fst ctx.types)

@@ -55,7 +55,7 @@ export
 forceMeta : Val -> M Val
 forceMeta (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Unsolved pos k xs _ _ _) => pure (VMeta fc ix sp)
-  (Solved k t) => vappSpine t sp >>= forceMeta
+  (Solved _ k t) => vappSpine t sp >>= forceMeta
 forceMeta x = pure x
 
 tryEval : String -> SnocList Val -> M (Maybe Val)
@@ -72,7 +72,7 @@ tryEval k sp =
 forceType : Val -> M Val
 forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Unsolved x k xs _ _ _) => pure (VMeta fc ix sp)
-  (Solved k t) => vappSpine t sp >>= forceType
+  (Solved _ k t) => vappSpine t sp >>= forceType
 forceType x@(VRef fc nm _ sp) = fromMaybe x <$> tryEval nm sp
 forceType x = pure x
 
@@ -99,7 +99,7 @@ updateMeta ctx ix f = do
     go : List MetaEntry -> M (List MetaEntry)
     go [] = error' "Meta \{show ix} not found"
     go (x@((Unsolved y k z w v ys)) :: xs) = if k == ix then (::xs) <$> f x else (x ::) <$> go xs
-    go (x@((Solved k y)) :: xs) = if k == ix then (::xs) <$> f x else (x ::) <$> go xs
+    go (x@((Solved _ k y)) :: xs) = if k == ix then (::xs) <$> f x else (x ::) <$> go xs
 
 export
 addConstraint : Context -> Nat -> SnocList Val -> Val -> M ()
@@ -107,9 +107,9 @@ addConstraint ctx ix sp tm = do
   mc <- readIORef ctx.metas
   updateMeta ctx ix $ \case
     (Unsolved pos k a b c cons) => do
-      info (getFC tm) "Add constraint m\{show ix} \{show sp} =?= \{show tm}"
+      debug "Add constraint m\{show ix} \{show sp} =?= \{show tm}"
       pure (Unsolved pos k a b c (MkMc (getFC tm) ctx sp tm :: cons))
-    (Solved k tm) => error' "Meta \{show k} already solved"
+    (Solved _ k tm) => error' "Meta \{show k} already solved"
   pure ()
 
 parameters (ctx: Context)
@@ -191,25 +191,13 @@ parameters (ctx: Context)
     soln <- eval [] CBN tm
 
     updateMeta ctx m $ \case
-      (Unsolved pos k _ _ _ cons) => do
-          putStrLn "INFO at \{show pos}: solve \{show k} as \{pprint [] !(quote 0 soln)}"
-          pure $ Solved k soln
-      (Solved k x) => error' "Meta \{show ix} already solved!"
+      (Unsolved pos k _ _ _ cons) => pure $ Solved pos k soln
+      (Solved _ k x) => error' "Meta \{show ix} already solved!"
     for_ cons $ \case
       MkMc fc ctx sp rhs => do
         val <- vappSpine soln sp
         debug "discharge l=\{show ctx.lvl} \{(show val)} =?= \{(show rhs)}"
         unify ctx.lvl val rhs
-
-    pure ()
-
-  trySolve : Nat -> Nat -> SnocList Val -> Val -> M ()
-  trySolve l m sp t = do
-    catchError {e=Error} (solve l m sp t) $ (\err => do
-      debug $ showError "" err
-      pure ())
-
-
 
   unifySpine : Nat -> Bool -> SnocList Val -> SnocList Val  -> M UnifyResult
   unifySpine l False _ _ = error emptyFC "unify failed at head" -- unreachable now

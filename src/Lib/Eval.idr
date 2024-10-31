@@ -80,7 +80,7 @@ eval env mode (U fc) = pure (VU fc)
 eval env mode (Meta fc i) =
   case !(lookupMeta i) of
         (Unsolved _ k xs _ _ _) => pure $ VMeta fc i [<]
-        (Solved k t) => pure $ t
+        (Solved _ k t) => pure $ t
 eval env mode (Lam fc x t) = pure $ VLam fc x (MkClosure env t)
 eval env mode (Pi fc x icit a b) = pure $ VPi fc x icit !(eval env mode a) (MkClosure env b)
 eval env mode (Let fc nm t u) = pure $ VLet fc nm !(eval env mode t) (MkClosure env u)
@@ -113,7 +113,7 @@ quote l (VVar fc k sp) = if k < l
 quote l (VMeta fc i sp) =
   case !(lookupMeta i) of
         (Unsolved _ k xs _ _ _) => quoteSp l (Meta fc i) sp
-        (Solved k t) => quote l !(vappSpine t sp)
+        (Solved _ k t) => quote l !(vappSpine t sp)
 quote l (VLam fc x t) = pure $ Lam fc x !(quote (S l) !(t $$ VVar emptyFC l [<]))
 quote l (VPi fc x icit a b) = pure $ Pi fc x icit !(quote l a) !(quote (S l) !(b $$ VVar emptyFC l [<]))
 quote l (VLet fc nm t u) = pure $ Let fc nm !(quote l t) !(quote (S l) !(u $$ VVar emptyFC l [<]))
@@ -162,7 +162,7 @@ appSpine t (x :: xs) = appSpine (App (getFC t) t x) xs
 zonkApp : TopContext -> Nat -> Env -> Tm -> List Tm -> M Tm
 zonkApp top l env (App fc t u) sp = zonkApp top l env t (!(zonk top l env u) :: sp)
 zonkApp top l env t@(Meta fc k) sp = case !(lookupMeta k) of
-  (Solved j v) => do
+  (Solved _ j v) => do
     sp' <- traverse (eval env CBN) sp
     debug "zonk \{show k} -> \{show v} spine \{show sp'}"
     foo <- vappSpine v ([<] <>< sp')

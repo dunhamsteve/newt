@@ -330,7 +330,7 @@ public export
 data MConstraint = MkMc FC Context (SnocList Val) Val
 
 public export
-data MetaEntry = Unsolved FC Nat Context Val MetaKind (List MConstraint) | Solved Nat Val
+data MetaEntry = Unsolved FC Nat Context Val MetaKind (List MConstraint) | Solved FC Nat Val
 
 
 public export
@@ -422,7 +422,7 @@ export
 covering
 Show MetaEntry where
   show (Unsolved pos k ctx ty kind constraints) = "Unsolved \{show pos} \{show k} \{show kind} : \{show ty} \{show ctx.bds} cs \{show $ length constraints}"
-  show (Solved k x) = "Solved \{show k} \{show x}"
+  show (Solved _ k x) = "Solved \{show k} \{show x}"
 
 export withPos : Context -> FC -> Context
 withPos ctx fc = { fc := fc } ctx
@@ -434,6 +434,24 @@ names ctx = toList $ map fst ctx.types
 public export
 M : Type -> Type
 M = (StateT TopContext (EitherT Impl.Error IO))
+
+||| Force argument and print if verbose is true
+export
+debug : Lazy String -> M ()
+debug x = do
+  top <- get
+  when top.verbose $ putStrLn x
+
+export
+info : FC -> String -> M ()
+info fc msg = putStrLn "INFO at \{show fc}: \{msg}"
+
+||| Version of debug that makes monadic computation lazy
+export
+debugM : M String -> M ()
+debugM x = do
+  top <- get
+  when top.verbose $ do putStrLn !(x)
 
 export partial
 Show Context where
@@ -451,7 +469,7 @@ export
 freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
 freshMeta ctx fc ty kind = do
   mc <- readIORef ctx.metas
-  putStrLn "INFO at \{show fc}: fresh meta \{show mc.next} : \{show ty}"
+  debug "fresh meta \{show mc.next} : \{show ty}"
   writeIORef ctx.metas $ { next $= S, metas $= (Unsolved fc mc.next ctx ty kind [] ::) } mc
   pure $ applyBDs 0 (Meta emptyFC mc.next) ctx.bds
   where
@@ -477,28 +495,10 @@ lookupMeta ix = do
     go : List MetaEntry -> M MetaEntry
     go [] = error' "Meta \{show ix} not found"
     go (meta@(Unsolved _ k ys _ _ _) :: xs) = if k == ix then pure meta else go xs
-    go (meta@(Solved k x) :: xs) = if k == ix then pure meta else go xs
+    go (meta@(Solved _ k x) :: xs) = if k == ix then pure meta else go xs
 
 -- we need more of topcontext later - Maybe switch it up so we're not passing
 -- around top
 export
 mkCtx : IORef MetaContext -> FC -> Context
 mkCtx metas fc = MkCtx 0 [] [] [] metas fc
-
-||| Force argument and print if verbose is true
-export
-debug : Lazy String -> M ()
-debug x = do
-  top <- get
-  when top.verbose $ putStrLn x
-
-export
-info : FC -> String -> M ()
-info fc msg = putStrLn "INFO at \{show fc}: \{msg}"
-
-||| Version of debug that makes monadic computation lazy
-export
-debugM : M String -> M ()
-debugM x = do
-  top <- get
-  when top.verbose $ do putStrLn !(x)
