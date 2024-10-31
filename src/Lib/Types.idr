@@ -251,8 +251,8 @@ Show Closure
 
 covering export
 Show Val where
-  show (VVar _ k sp) = "(%var \{show k} \{show sp})"
-  show (VRef _ nm _ sp) = "(%ref \{nm} \{show sp})"
+  show (VVar _ k sp) = "(%var \{show k} \{unwords $ map show (sp <>> [])})"
+  show (VRef _ nm _ sp) = "(%ref \{nm} \{unwords $ map show (sp <>> [])})"
   show (VMeta _ ix sp) = "(%meta \{show ix} \{show $ length sp})"
   show (VLam _ str x) = "(%lam \{str} \{show x})"
   show (VPi fc str Implicit x y) = "(%pi {\{str} : \{show  x}}. \{show  y})"

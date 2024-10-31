@@ -37,6 +37,7 @@ pure {_} {_} {{MkMonad _ pure'}} a = pure' a
 infixl 1 _>>=_ _>>_
 
 _>>_ : {a b : U} -> {m : U -> U} -> {{x : Monad m}} -> m a -> m b -> m b
+ma >> mb = mb
 
 ptype Int
 
@@ -50,5 +51,4 @@ bar : Int -> Maybe Int
 bar x = do
   let y = x
   z <- Just x
-  -- This is not sorting out the Maybe...
   pure z

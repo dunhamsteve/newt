@@ -179,14 +179,8 @@ parameters (ctx: Context)
     debug "\{show m} size is \{show size} sps \{show $ length sp}"
     let True = length sp == size
       | _ => do
-        -- need INFO that works like debug.
-        -- FIXME we probably need to hold onto the constraint and recheck when we solve the meta?
-        info (getFC t) "meta \{show m} (\{show ix}) applied to \{show $ length sp} args instead of \{show size}"
+        debug "meta \{show m} (\{show ix}) applied to \{show $ length sp} args instead of \{show size}"
         debug "CONSTRAINT m\{show ix} \{show sp} =?= \{show t}"
-        -- error (getFC t) "meta \{show m} applied to \{show $ length sp} args instead of \{show size}"
-
--- add constraint to meta m
--- we can keep a list and run them when it is solved.
         addConstraint ctx m sp t
 
     debug "meta \{show meta}"
@@ -201,12 +195,10 @@ parameters (ctx: Context)
           putStrLn "INFO at \{show pos}: solve \{show k} as \{pprint [] !(quote 0 soln)}"
           pure $ Solved k soln
       (Solved k x) => error' "Meta \{show ix} already solved!"
-    -- We're not breaking anything, but not quite getting an answer?
     for_ cons $ \case
       MkMc fc ctx sp rhs => do
         val <- vappSpine soln sp
         debug "discharge l=\{show ctx.lvl} \{(show val)} =?= \{(show rhs)}"
-        -- is this the right depth?
         unify ctx.lvl val rhs
 
     pure ()
@@ -852,21 +844,8 @@ check ctx tm ty = case (tm, !(forceType ty)) of
     let ctx' = extend ctx scnm scty
     pure $ Let fc scnm sc !(buildTree ctx' $ MkProb clauses ty)
 
-  -- Document a hole, pretend it's implemented
-  (RHole fc, ty) => do
-    ty' <- quote ctx.lvl ty
-    let names = (toList $ map fst ctx.types)
-    -- I want to know which ones are defines. I should skip the `=` bit if they match, I'll need indices in here too.
-    env <- for (zip ctx.env (toList ctx.types)) $ \(v, n, ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)} = \{pprint names !(quote ctx.lvl v)}"
-    let msg = unlines (toList $ reverse env) ++ "  -----------\n" ++ "  goal \{pprint names ty'}"
-    info fc "\n\{msg}"
-    -- let context = unlines foo
-    -- need to print 'warning' with position
-    -- fixme - just put a name on it like idris and stuff it into top.
-    -- error [DS "hole:\n\{msg}"]
-    -- TODO mark this meta as a user hole
-    -- freshMeta ctx fc
-    pure $ Ref fc "?" Axiom
+  -- rendered in ProcessDecl
+  (RHole fc, ty) => freshMeta ctx fc ty User
 
   (t@(RLam fc nm icit tm), ty@(VPi fc' nm' icit' a b)) => do
           debug "icits \{nm} \{show icit} \{nm'} \{show icit'}"

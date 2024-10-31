@@ -152,15 +152,21 @@ processDecl (Def fc nm clauses) = do
   let mlen = length mc.metas `minus` mstart
   solveAutos mlen (take mlen mc.metas)
 
+  -- Expand metas
+  -- tm' <- nf [] tm  -- TODO - nf that expands all metas, Day1.newt is a test case
   tm' <- zonk top 0 [] tm
   putStrLn "NF \{pprint[] tm'}"
 
   mc <- readIORef top.metas
   for_ (take mlen mc.metas) $ \case
     (Solved k x) => pure ()
-    (Unsolved (l,c) k ctx ty User cons) => do
-      -- TODO print here instead of during Elab
-      pure ()
+    (Unsolved fc k ctx ty User cons) => do
+      ty' <- quote ctx.lvl ty
+      let names = (toList $ map fst ctx.types)
+      -- I want to know which ones are defines. I should skip the `=` bit if they match, I'll need indices in here too.
+      env <- for (zip ctx.env (toList ctx.types)) $ \(v, n, ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)} = \{pprint names !(quote ctx.lvl v)}"
+      let msg = "\{unlines (toList $ reverse env)}  -----------\n  goal \{pprint names ty'}"
+      info fc "User Hole\n\{msg}"
     (Unsolved (l,c) k ctx ty kind cons) => do
       tm <- quote ctx.lvl !(forceMeta ty)
       -- Now that we're collecting errors, maybe we simply check at the end

@@ -3,7 +3,8 @@
 
 - [ ] Allow unicode operators/names
   - refactored parser to prep for this
-- [ ] handle if_then_else_
+- [ ] get rid of stray INFO from auto resolution
+- [ ] handle if_then_else_j
 - [x] Remember operators from imports
 - [ ] Default cases for non-primitives (currently gets expanded to all constructors)
 - [x] Case for primitives
