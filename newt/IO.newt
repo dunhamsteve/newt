@@ -13,18 +13,32 @@ data IORes : U -> U where
 IO : U -> U
 IO a = World -> IORes a
 
+-- TODO - if I move w to the left, I get "extra pattern variable"
+-- because I'm not looking instide the IO b type, probably should force it.
 iobind : {a b : U} -> IO a -> (a -> IO b) -> IO b
-iobind ma mab w = case ma w of
+iobind ma mab = \ w => case ma w of
   (MkIORes a w) => mab a w
 
-_>>=_ : {a b : U} -> IO a -> (a -> IO b) -> IO b
-_>>=_ = iobind
+iopure : {a : U} -> a -> IO a
+iopure a = \ w => MkIORes a w
 
-infixr 2 _>>=_
-infixr 2 _>>_
+IOMonad : Monad IO
+IOMonad = MkMonad iobind iopure
 
--- FIXME - bad parse error for lambda without the parens
+data Unit : U where
+  MkUnit : Unit
 
-_>>_ :  {a b : U} -> IO a -> IO b -> IO b
-_>>_ ma mb = ma >>= (\ _ => mb)
+ptype String
 
+pfunc log : String -> IO Unit := "(s) => (w) => MkIORes(console.log(s),w)"
+
+-- this version wraps with IO, but leaves this plog in scope
+pfunc plog : String -> Unit := "(s) => console.log(s)"
+
+log2 : String -> IO Unit
+log2 s = pure $ plog s
+
+main : IO Unit
+main = do
+  log "woot"
+  log2 "line 2"

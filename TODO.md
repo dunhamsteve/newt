@@ -33,6 +33,7 @@
 - [x] implicit patterns
 - [x] operators
 - [x] pair syntax (via comma operator)
+- [ ] `data` sugar: `data Maybe a = Nothing | Just a`
 - [x] matching on operators
   - [x] top level
   - [x] case statements

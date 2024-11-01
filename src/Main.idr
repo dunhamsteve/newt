@@ -43,7 +43,9 @@ writeSource fn = do
   docs <- compile
   let src = unlines $ ["#!/usr/bin/env node"]
         ++ map (render 90) docs
-        ++ [ "main();" ]
+        ++ [ "const PiType = (h0, h1) => ({ tag: \"PiType\", h0, h1 })"
+           , "main();"
+           ]
   Right _ <- writeFile fn src
     | Left err => fail (show err)
   Right _ <- chmodRaw fn 493 | Left err => fail (show err)
