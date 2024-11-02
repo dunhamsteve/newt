@@ -1,7 +1,7 @@
 module Lib.Types
 
 -- For FC, Error
-import public Lib.Parser.Impl
+import public Lib.Common
 import Lib.Prettier
 
 import public Control.Monad.Error.Either
@@ -433,7 +433,7 @@ names ctx = toList $ map fst ctx.types
 
 public export
 M : Type -> Type
-M = (StateT TopContext (EitherT Impl.Error IO))
+M = (StateT TopContext (EitherT Error IO))
 
 ||| Force argument and print if verbose is true
 export

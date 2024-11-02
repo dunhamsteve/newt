@@ -11,7 +11,7 @@ import Data.IORef
 -- import Lib.Elab
 import Lib.Compile
 import Lib.Parser
--- import Lib.Parser.Impl
+import Lib.Parser.Impl
 import Lib.Prettier
 import Lib.ProcessDecl
 import Lib.Token
@@ -60,7 +60,8 @@ processModule base stk name = do
   let fn = base ++ "/" ++ name ++ ".newt"
   Right src <- readFile $ fn
     | Left err => fail (show err)
-  let toks = tokenise src
+  let Right toks = tokenise src
+    | Left err => fail (showError src err)
 
   let Right (modName, ops, toks) := partialParse parseModHeader top.ops toks
     | Left err => fail (showError src err)

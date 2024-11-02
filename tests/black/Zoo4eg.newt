@@ -12,7 +12,7 @@ group1 : {A B : U}(x y z : A) -> B -> B
 group1 = \x y z b => b
 
 group2 : {A B}(x y z : A) -> B -> B
-group2 = \x y z b=> b
+group2 = \x y z b => b
 
 -- explicit id function used for annotation as in Idris
 the : (A : _) -> A -> A

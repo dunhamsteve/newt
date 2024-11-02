@@ -3,15 +3,24 @@
 
 - [ ] Allow unicode operators/names
   - refactored parser to prep for this
-- [ ] get rid of stray INFO from auto resolution
-- [ ] handle if_then_else_j
+- [ ] Web tool
+  - edit, view output, view js, run js, monaco would be nice.
+  - need to shim out Buffer
+- [x] get rid of stray INFO from auto resolution
+- [ ] handle if_then_else_ style mixfix
+- [ ] Search should look at context
+- [ ] records
+- [ ] copattern matching
+- [ ] Support @ on the LHS
 - [x] Remember operators from imports
 - [ ] Default cases for non-primitives (currently gets expanded to all constructors)
+  - This may need a little care. But I think I could collect all constructors that only match wildcards into a single case. This would lose any information from the individual, unnamed cases though.
+  - There are cases where we have  `_` and then `Foo` on the next line, but they should all get collected into the `Foo` case. I think I sorted all of this out for primitives.
 - [x] Case for primitives
 - [ ] aoc2023 translation
   - [x] day1
   - [x] day2
-  - some "real world" examples -v
+  - some "real world" examples
 - [x] Maybe Eq and stuff would work for typeclass without dealing with unification issues yet
 - [x] unsolved meta errors repeat (need to freeze or only report at end)
 - [x] Sanitize JS idents, e.g. `_+_`
@@ -22,7 +31,6 @@
     leave that implicit for efficiency. I think it would also make printing more readable.
   - When printing `Value`, I now print the spine size instead of spine.
 - [x] eval for case (see order.newt)
-- [ ] dynamic pattern unification (add test case first)
 - [x] switch from commit/mustWork to checking progress
 - [x] type constructors are no longer generated?  And seem to have 0 arity.
 - [x] raw let is not yet implemented (although define used by case tree building)
@@ -60,17 +68,19 @@
 - [ ] magic nat (codegen as number with appropriate pattern matching)
 - [ ] magic tuple? (codegen as array)
 - [ ] magic newtype? (drop them in codegen)
-- [ ] records / copatterns
 - [x] vscode: syntax highlighting for String
 - [ ] add `pop` or variant of `pfunc` that maps to an operator, giving the js operator and precedence on RHS
 
 ### Parsing
 
 - [ ] consider allowing σ etc in identifiers
-  - Probably need to merge oper / ident first and sort out mixfix in parsing.
+  - Probably need to merge oper / ident first and sort out mixfix in parsing
+  - The mixfix parsing can handle this now, need to update lexing.
+- [ ] Parse error not ideal for `\x y z b=> b` (points to lambda)
 
 ### Background
 
 - [ ] Read Ulf Norell thesis
+- [ ] Finish reading dynamic pattern unification paper to see what is missing/wrong with the current implementation
 
 

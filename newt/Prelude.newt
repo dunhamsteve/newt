@@ -17,6 +17,7 @@ data Either : U -> U -> U where
 
 infixr 0 _$_
 
+-- Currently very noisy in generated code
 _$_ : {a b : U} -> (a -> b) -> a -> b
 f $ a = f a
 

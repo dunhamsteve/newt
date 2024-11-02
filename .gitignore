@@ -7,3 +7,4 @@ build/
 *.agdai
 *.js
 input.txt
+node_modules

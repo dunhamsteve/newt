@@ -95,7 +95,6 @@ pArg = do
   (Explicit,fc,) <$> atom
     <|> (Implicit,fc,) <$> braces typeExpr
     <|> (Auto,fc,) <$> dbraces typeExpr
-    <|> (Explicit,fc,) . RVar fc <$> token Oper
 
 AppSpine = List (Icit,FC,Raw)
 
@@ -203,13 +202,6 @@ caseExpr = do
   alts <- startBlock $ someSame $ caseAlt
   pure $ RCase fc sc alts
 
-doArrow : Parser DoStmt
-doArrow = do
-  fc <- getPos
-  name <- try $ ident <* keyword "<-"
-  expr <- term
-  pure $ DoArrow fc name expr
-
 doStmt : Parser DoStmt
 doStmt
   = DoArrow <$> getPos <*> (try $ ident <* keyword "<-") <*> term
@@ -232,9 +224,8 @@ varname = (ident <|> uident <|> keyword "_" *> pure "_")
 
 ebind : Parser (List (FC, String, Icit, Raw))
 ebind = do
-  sym "("
-  names <- some $ withPos varname
-  sym ":"
+  -- don't commit until we see the ":"
+  names <- try (sym "(" *> some (withPos varname) <* sym ":")
   ty <- typeExpr
   sym ")"
   pure $ map (\(pos, name) => (pos, name, Explicit, ty)) names
@@ -262,7 +253,7 @@ arrow = sym "->" <|> sym "→"
 -- Collect a bunch of binders (A : U) {y : A} -> ...
 binders : Parser Raw
 binders = do
-  binds <- many (abind <|> ibind <|> try ebind)
+  binds <- many (abind <|> ibind <|> ebind)
   arrow
   scope <- typeExpr
   pure $ foldr (uncurry mkBind) scope (join binds)
@@ -286,7 +277,7 @@ typeExpr = binders
 
 export
 parseSig : Parser Decl
-parseSig = TypeSig <$> getPos <*> some (ident <|> uident) <* keyword ":" <*> typeExpr
+parseSig = TypeSig <$> getPos <*> try (some (ident <|> uident) <* keyword ":") <*> typeExpr
 
 parseImport : Parser Import
 parseImport = MkImport <$> getPos <* keyword "import" <*> uident
@@ -364,7 +355,7 @@ parseNorm = DCheck <$> getPos <* keyword "#check" <*> typeExpr <* keyword ":" <*
 
 export
 parseDecl : Parser Decl
-parseDecl = parseMixfix <|> parsePType <|> parsePFunc <|> parseNorm <|> parseData <|> (try $ parseSig) <|> parseDef
+parseDecl = parseMixfix <|> parsePType <|> parsePFunc <|> parseNorm <|> parseData <|> parseSig <|> parseDef
 
 
 export

@@ -15,7 +15,7 @@ head (x :: xs) = x
 
 -- These came from a Conor McBride lecture where they use SHE
 
-vapp : {s t: U} {k : Nat} -> Vect k (s -> t) -> Vect k s -> Vect k t
+vapp : {s t : U} {k : Nat} -> Vect k (s -> t) -> Vect k s -> Vect k t
 vapp (f :: fs) (t :: ts) = f t :: vapp fs ts
 vapp Nil Nil = Nil
 
@@ -32,7 +32,7 @@ fmap f (x :: xs) = (f x :: fmap f xs)
 pure : {a : U} {n : Nat} -> a -> Vect n a
 pure {a} {n} = vec n
 
-_<*>_ : {s t: U} {k : Nat} -> Vect k (s -> t) -> Vect k s -> Vect k t
+_<*>_ : {s t : U} {k : Nat} -> Vect k (s -> t) -> Vect k s -> Vect k t
 _<*>_ = vapp
 
 -- and idiom brackets (maybe someday)

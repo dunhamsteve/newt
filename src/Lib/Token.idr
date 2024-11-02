@@ -9,7 +9,6 @@ data Kind
   = Ident
   | UIdent
   | Keyword
-  | Oper
   | MixFix
   | Number
   | Character
@@ -29,7 +28,6 @@ Show Kind where
   show Ident   = "Ident"
   show UIdent   = "UIdent"
   show Keyword = "Keyword"
-  show Oper    = "Oper"
   show MixFix = "MixFix"
   show Number  = "Number"
   show Character  = "Character"
@@ -47,7 +45,6 @@ Eq Kind where
   Ident   == Ident = True
   UIdent  == UIdent = True
   Keyword == Keyword = True
-  Oper    == Oper = True
   MixFix  == MixFix = True
   Number  == Number = True
   Character == Character = True
