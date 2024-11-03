@@ -15,4 +15,7 @@ two : Eq (plus (S Z) (S Z)) (S (S Z))
 two = Refl
 
 three : Eq (plus (S Z) (S (S Z))) (plus (S (S Z)) (S Z))
-three = Refl {Nat} {S (S (S Z))}
+three = Refl
+
+addZero : {n : Nat} -> Eq (plus Z n) n
+addZero {n} = Refl

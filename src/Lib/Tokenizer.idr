@@ -23,7 +23,7 @@ identMore : Lexer
 identMore = alphaNum <|> exact "." <|> exact "'" <|> exact "_"
 
 singleton : Lexer
-singleton = oneOf "()\\{}[],"
+singleton = oneOf "()\\{}[],?"
 
 quo : Recognise True
 quo = is '"'

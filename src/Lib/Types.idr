@@ -142,6 +142,10 @@ Show Tm where
   show (Case _ sc alts) = "(Case \{show sc} \{show alts})"
   show (Let _ nm t u) = "(Let \{nm} \{show t} \{show u})"
 
+public export
+showTm : Tm -> String
+showTm = show
+
 -- I can't really show val because it's HOAS...
 
 -- TODO derive
@@ -228,7 +232,7 @@ data Val : Type where
   VMeta : FC -> (ix : Nat) -> (sp : SnocList Val) -> Val
   VLam : FC -> Name -> Closure -> Val
   VPi : FC -> Name -> Icit -> (a : Lazy Val) -> (b : Closure) -> Val
-  VLet : FC -> Name -> Val -> (b : Closure) -> Val
+  VLet : FC -> Name -> Val -> Val -> Val
   VU : FC -> Val
   VLit : FC -> Literal -> Val
 
@@ -242,6 +246,7 @@ getValFC (VLam fc _ _) = fc
 getValFC (VPi fc _ _ a b) = fc
 getValFC (VU fc) = fc
 getValFC (VLit fc _) = fc
+getValFC (VLet fc _ _ _) = fc
 
 
 public export
@@ -260,6 +265,7 @@ Show Val where
   show (VCase fc sc alts) = "(%case \{show sc} ...)"
   show (VU _) = "U"
   show (VLit _ lit) = show lit
+  show (VLet _ nm a b) = "(%let \{show nm} = \{show a} in \{show b}"
 
 -- Not used - I was going to change context to have a List Binder
 -- instead of env, types, bds

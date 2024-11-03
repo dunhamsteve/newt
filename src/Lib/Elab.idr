@@ -58,8 +58,8 @@ forceMeta (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Solved _ k t) => vappSpine t sp >>= forceMeta
 forceMeta x = pure x
 
-tryEval : String -> SnocList Val -> M (Maybe Val)
-tryEval k sp =
+tryEval : Val -> M (Maybe Val)
+tryEval (VRef fc k _ sp) =
   case lookup k !(get) of
       Just (MkEntry name ty (Fn tm)) => do
           vtm <- eval [] CBN tm
@@ -67,14 +67,14 @@ tryEval k sp =
             VCase{} => pure Nothing
             v => pure $ Just v
       _ => pure Nothing
+tryEval _ = pure Nothing
 
 -- Force far enough to compare types
 forceType : Val -> M Val
 forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Unsolved x k xs _ _ _) => pure (VMeta fc ix sp)
   (Solved _ k t) => vappSpine t sp >>= forceType
-forceType x@(VRef fc nm _ sp) = fromMaybe x <$> tryEval nm sp
-forceType x = pure x
+forceType x = fromMaybe x <$> tryEval x
 
 public export
 record UnifyResult where
@@ -87,6 +87,8 @@ Semigroup UnifyResult where
 
 Monoid UnifyResult where
   neutral = MkResult []
+
+data UnifyMode = Normal | Pattern
 
 -- We need to switch to SortedMap here
 export
@@ -157,7 +159,7 @@ parameters (ctx: Context)
       go ren lvl (VCase fc sc alts) = error fc "Case in solution"
       go ren lvl (VLit fc lit) = pure (Lit fc lit)
       go ren lvl (VLet fc name val body) =
-        pure $ Let fc name !(go ren lvl val) !(go (lvl :: ren) (S lvl) !(body $$ VVar fc lvl [<]))
+        pure $ Let fc name !(go ren lvl val) !(go (lvl :: ren) (S lvl) body)
 
 
   lams : Nat -> Tm -> Tm
@@ -167,7 +169,7 @@ parameters (ctx: Context)
 
 
   export
-  unify : (l : Nat) -> Val -> Val  -> M UnifyResult
+  unify : (l : Nat) -> UnifyMode -> Val -> Val  -> M UnifyResult
 
   export
   solve : (lvl : Nat) -> (k : Nat) -> SnocList Val -> Val -> M  ()
@@ -197,13 +199,13 @@ parameters (ctx: Context)
       MkMc fc ctx sp rhs => do
         val <- vappSpine soln sp
         debug "discharge l=\{show ctx.lvl} \{(show val)} =?= \{(show rhs)}"
-        unify ctx.lvl val rhs
+        unify ctx.lvl Normal val rhs
 
-  unifySpine : Nat -> Bool -> SnocList Val -> SnocList Val  -> M UnifyResult
-  unifySpine l False _ _ = error emptyFC "unify failed at head" -- unreachable now
-  unifySpine l True [<] [<] = pure (MkResult [])
-  unifySpine l True (xs :< x) (ys :< y) = [| unify l x y <+> (unifySpine l True xs ys) |]
-  unifySpine l True _ _ = error emptyFC "meta spine length mismatch"
+  unifySpine : Nat -> UnifyMode -> Bool -> SnocList Val -> SnocList Val  -> M UnifyResult
+  unifySpine l mode False _ _ = error emptyFC "unify failed at head" -- unreachable now
+  unifySpine l mode True [<] [<] = pure (MkResult [])
+  unifySpine l mode True (xs :< x) (ys :< y) = [| unify l mode x y <+> (unifySpine l mode True xs ys) |]
+  unifySpine l mode True _ _ = error emptyFC "meta spine length mismatch"
 
   lookupVar : Nat -> Maybe Val
   lookupVar k = let l = length ctx.env in
@@ -226,7 +228,7 @@ parameters (ctx: Context)
           pure t
   unlet x = pure x
 
-  unify l t u = do
+  unify l mode t u = do
     debug "Unify \{show ctx.lvl}"
     debug "  \{show l} \{show t}"
     debug "  =?= \{show u}"
@@ -240,32 +242,41 @@ parameters (ctx: Context)
 
       -- flex/flex
       (VMeta fc k sp,  VMeta fc' k' sp' ) =>
-        if k == k' then unifySpine l (k == k') sp sp'
+        if k == k' then unifySpine l mode (k == k') sp sp'
         -- TODO, might want to try the other way, too.
         else if length sp < length sp'
           then solve l k' sp' (VMeta fc k sp) >> pure neutral
           else solve l k sp (VMeta fc' k' sp') >> pure neutral
       (t,           VMeta fc' i' sp') => solve l i' sp' t >> pure neutral
       (VMeta fc i sp, t'           ) => solve l i sp t' >> pure neutral
-      (VPi fc _ _ a b, VPi fc' _ _ a' b') => [| unify l a a' <+> unify (S l) !(b $$ VVar emptyFC l [<]) !(b' $$ VVar emptyFC l [<]) |]
+      (VPi fc _ _ a b, VPi fc' _ _ a' b') => [| unify l mode a a' <+> unify (S l) mode !(b $$ VVar emptyFC l [<]) !(b' $$ VVar emptyFC l [<]) |]
       (VVar fc k sp,   (VVar fc' k' sp')  ) =>
-        if k == k' then unifySpine l (k == k') sp sp'
+        if k == k' then unifySpine l mode (k == k') sp sp'
         else if k < k' then pure $ MkResult [(k,u')] else pure $ MkResult [(k',t')]
 
-      -- attempt at building constraints
-      (VVar fc k [<], u) => pure $ MkResult[(k, u)]
-      (t, VVar fc k [<]) => pure $ MkResult[(k, t)]
+      -- We only want to do this for LHS pattern vars, otherwise, try expanding
+      (VVar fc k [<], u) => case mode of
+        Pattern => pure $ MkResult[(k, u)]
+        Normal => case !(tryEval u) of
+          Just v => unify l mode t' v
+          Nothing => error ctx.fc "Failed to unify \{show t'} and \{show u'}"
 
-      (VLam _ _ t,  VLam _ _ t') => unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
+      (t, VVar fc k [<]) => case mode of
+        Pattern => pure $ MkResult[(k, t)]
+        Normal => case !(tryEval t) of
+          Just v => unify l mode v u'
+          Nothing => error ctx.fc "Failed to unify \{show t'} and \{show u'}"
+
+      (VLam _ _ t,  VLam _ _ t') => unify (l + 1) mode !(t $$ VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
       (t,         VLam fc' _ t') => do
         debug "ETA \{show t}"
-        unify (l + 1) !(t `vapp` VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
+        unify (l + 1) mode !(t `vapp` VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
       (VLam fc _ t,  t'       ) => do
         debug "ETA' \{show t'}"
-        unify (l + 1) !(t $$ VVar emptyFC l [<]) !(t' `vapp` VVar emptyFC l [<])
+        unify (l + 1) mode !(t $$ VVar emptyFC l [<]) !(t' `vapp` VVar emptyFC l [<])
 
       -- REVIEW - consider separate value for DCon/TCon
-      (VRef fc k def sp,   VRef fc' k' def' sp'  ) =>
+      (VRef fc k def sp,  VRef fc' k' def' sp') =>
         -- This is a problem for cmp (S x) (S y) =?= cmp x y, when the
         -- same is an equation in cmp.
 
@@ -274,12 +285,12 @@ parameters (ctx: Context)
         --   unifySpine l (k == k') sp sp'
         -- else
           do
-          Nothing <- tryEval k sp
-            | Just v => unify l v u'
-          Nothing <- tryEval k' sp'
-            | Just v => unify l t' v
+          Nothing <- tryEval t'
+            | Just v => unify l mode v u'
+          Nothing <- tryEval u'
+            | Just v => unify l mode t' v
           if k == k'
-            then  unifySpine l (k == k') sp sp'
+            then unifySpine l mode (k == k') sp sp'
             else error fc "vref mismatch \{show k} \{show k'} -- \{show sp} \{show sp'}"
 
       (VU _, VU _) => pure neutral
@@ -288,13 +299,13 @@ parameters (ctx: Context)
       (t,         VRef fc' k' def sp') => do
         debug "expand \{show t} =?= %ref \{k'}"
         case lookup k' !(get) of
-          Just (MkEntry name ty (Fn tm)) => unify l t !(vappSpine !(eval [] CBN tm) sp')
+          Just (MkEntry name ty (Fn tm)) => unify l mode t !(vappSpine !(eval [] CBN tm) sp')
           _ => error ctx.fc "unify failed \{show t'} =?= \{show u'} [no Fn]\n  env is \{show ctx.env} \{show $ map fst ctx.types}"
 
       (VRef fc k def sp, u) => do
         debug "expand %ref \{k} \{show sp} =?= \{show u}"
         case lookup k !(get) of
-          Just (MkEntry name ty (Fn tm)) => unify l !(vappSpine !(eval [] CBN tm) sp) u
+          Just (MkEntry name ty (Fn tm)) => unify l mode !(vappSpine !(eval [] CBN tm) sp) u
           _ => error ctx.fc "unify failed \{show t'} [no Fn] =?= \{show u'}\n  env is \{show ctx.env} \{show $ map fst ctx.types}"
 
       -- REVIEW I'd like to quote this back, but we have l that aren't in the environment.
@@ -312,7 +323,7 @@ parameters (ctx: Context)
 
 unifyCatch : FC -> Context -> Val -> Val -> M ()
 unifyCatch fc ctx ty' ty = do
-    res <- catchError (unify ctx ctx.lvl ty' ty) $ \(E x str) => do
+    res <- catchError (unify ctx ctx.lvl Normal ty' ty) $ \(E x str) => do
       let names = toList $ map fst ctx.types
       debug "fail \{show ty'} \{show ty}"
       a <- quote ctx.lvl ty'
@@ -509,7 +520,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   -- We get unification constraints from matching the data constructors
   -- codomain with the scrutinee type
   debug "unify dcon cod with scrut\n  \{show ty'}\n  \{show scty}"
-  Just res <- catchError {e = Error} (Just <$> unify ctx' (length ctx'.env) ty' scty)
+  Just res <- catchError {e = Error} (Just <$> unify ctx' (length ctx'.env) Pattern ty' scty)
               (\(E _ msg) => do
                   debug "SKIP \{dcName} because unify error \{msg}"
                   pure Nothing)
@@ -540,7 +551,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         pure $ Just $ CaseCons dcName (map getName vars) tm
 
     _ => do
-        Right res <- tryError {e = Error} (unify ctx' (length ctx'.env) ty' scty)
+        Right res <- tryError {e = Error} (unify ctx' (length ctx'.env) Pattern ty' scty)
           | Left (E _ msg) => do
             debug "SKIP \{dcName} because unify error \{msg}"
             pure Nothing

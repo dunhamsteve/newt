@@ -26,8 +26,8 @@ Ctx : U
 Ctx = List Type
 
 data Ref : Type -> Ctx -> U where
-  Z : {σ : Type} {Γ : Ctx} -> Ref σ (σ :: Γ)
-  S : {σ τ : Type} {Γ : Ctx} -> Ref σ Γ -> Ref σ (τ :: Γ)
+  Here : {σ : Type} {Γ : Ctx} -> Ref σ (σ :: Γ)
+  There : {σ τ : Type} {Γ : Ctx} -> Ref σ Γ -> Ref σ (τ :: Γ)
 
 data Term : Ctx -> Type -> U where
   App : {Γ : Ctx} {σ τ : Type} -> Term Γ (σ ~> τ) -> Term Γ σ -> Term Γ τ
@@ -35,6 +35,35 @@ data Term : Ctx -> Type -> U where
   Var : {Γ : Ctx} {σ : Type} -> Ref σ Γ → Term Γ σ
 
 -- FIXME, I'm not getting an error for Nil, but it's shadowing Nil
+infixr 7 _:::_
 data Env : Ctx -> U where
   ENil : Env Nil
-  ECons : {Γ : Ctx} {σ : Type} → Val σ → Env Γ → Env (σ :: Γ)
+  _:::_ : {Γ : Ctx} {σ : Type} → Val σ → Env Γ → Env (σ :: Γ)
+
+-- TODO there is a problem here with coverage checking
+-- I suspect something is being split before it's ready
+
+-- lookup : {σ : Type} {Γ : Ctx} → Ref σ Γ → Env Γ → Val σ
+-- lookup Z (x ::: y) = x
+-- lookup (S i) (x ::: env) = lookup i env
+
+
+-- lookup2 : {σ : Type} {Γ : Ctx} → Env Γ → Ref σ Γ → Val σ
+-- lookup2 (x ::: y) Here = x
+-- lookup2 (x ::: env) (There i) = lookup2 env i
+
+-- -- MixFix - this was ⟦_⟧
+-- eval : {Γ : Ctx} {σ : Type} → Term Γ σ → (Env Γ → Val σ)
+-- eval (App t u) env = ? -- (eval t env) (eval u env)
+-- eval (Lam t) env = \ x => ? -- eval t (x ::: env)
+-- eval (Var i) env = lookup2 env i
+
+-- something really strange here, the arrow in the goal type is backwards...
+foo : {σ τ ξ : Type} → Val (σ ~> (τ ~> ξ))
+foo {σ} {τ} {ξ} = ? -- \ x y => x
+
+-- data Comb : (Γ : Ctx) → (u : Type) → (Env Γ → Val u) → U where
+--   -- S : {Γ : Ctx} {σ τ τ' : Type} → Comb Γ ((σ ~> τ ~> τ') ~> (σ ~> τ) ~> (σ ~> τ')) (\ env => \ f g x => (f x) (g x))
+--   K : {Γ : Ctx} {σ τ : Type} → Comb Γ (σ ~> τ ~> σ) (\ env => \ x => \ y => x)
+
+

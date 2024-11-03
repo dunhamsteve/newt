@@ -83,7 +83,7 @@ eval env mode (Meta fc i) =
         (Solved _ k t) => pure $ t
 eval env mode (Lam fc x t) = pure $ VLam fc x (MkClosure env t)
 eval env mode (Pi fc x icit a b) = pure $ VPi fc x icit !(eval env mode a) (MkClosure env b)
-eval env mode (Let fc nm t u) = pure $ VLet fc nm !(eval env mode t) (MkClosure env u)
+eval env mode (Let fc nm t u) = pure $ VLet fc nm !(eval env mode t) !(eval (VVar fc (length env) [<] :: env) mode u)
 -- Here, we assume env has everything. We push levels onto it during type checking.
 -- I think we could pass in an l and assume everything outside env is free and
 -- translate to a level
@@ -116,7 +116,7 @@ quote l (VMeta fc i sp) =
         (Solved _ k t) => quote l !(vappSpine t sp)
 quote l (VLam fc x t) = pure $ Lam fc x !(quote (S l) !(t $$ VVar emptyFC l [<]))
 quote l (VPi fc x icit a b) = pure $ Pi fc x icit !(quote l a) !(quote (S l) !(b $$ VVar emptyFC l [<]))
-quote l (VLet fc nm t u) = pure $ Let fc nm !(quote l t) !(quote (S l) !(u $$ VVar emptyFC l [<]))
+quote l (VLet fc nm t u) = pure $ Let fc nm !(quote l t) !(quote (S l) u)
 quote l (VU fc) = pure (U fc)
 quote l (VRef fc n def sp) = quoteSp l (Ref fc n def) sp
 quote l (VCase fc sc alts) = pure $ Case fc !(quote l sc) alts
@@ -127,6 +127,10 @@ quote l (VLit fc lit) = pure $ Lit fc lit
 export
 nf : Env -> Tm -> M Tm
 nf env t = quote (length env) !(eval env CBN t)
+
+export
+nfv : Env -> Tm -> M Tm
+nfv env t = quote (length env) !(eval env CBV t)
 
 export
 prvalCtx : {auto ctx : Context} -> Val -> M String

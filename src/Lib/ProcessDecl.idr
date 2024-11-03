@@ -165,7 +165,7 @@ processDecl (Def fc nm clauses) = do
       let names = (toList $ map fst ctx.types)
       -- I want to know which ones are defines. I should skip the `=` bit if they match, I'll need indices in here too.
       env <- for (zip ctx.env (toList ctx.types)) $ \(v, n, ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)} = \{pprint names !(quote ctx.lvl v)}"
-      let msg = "\{unlines (toList $ reverse env)}  -----------\n  goal \{pprint names ty'}"
+      let msg = "\{unlines (toList $ reverse env)}  -----------\n  \{pprint names ty'}\n  \{showTm ty'}"
       info fc "User Hole\n\{msg}"
     (Unsolved (l,c) k ctx ty kind cons) => do
       tm <- quote ctx.lvl !(forceMeta ty)
@@ -177,23 +177,29 @@ processDecl (Def fc nm clauses) = do
   modify $ setDef nm ty (Fn tm')
 
 processDecl (DCheck fc tm ty) = do
+  putStrLn "----- DCheck"
   top <- get
-  putStrLn "check \{show tm} at \{show ty}"
-  ty' <- check (mkCtx top.metas fc) tm (VU fc)
-  putStrLn "got type \{pprint [] ty'}"
+
+  putStrLn "INFO at \{show fc}: check \{show tm} at \{show ty}"
+  ty' <- check (mkCtx top.metas fc) ty (VU fc)
+  putStrLn "  got type \{pprint [] ty'}"
   vty <- eval [] CBN ty'
-  res <- check (mkCtx top.metas fc) ty vty
-  putStrLn "got \{pprint [] res}"
+  res <- check (mkCtx top.metas fc) tm vty
+  putStrLn "  got \{pprint [] res}"
   norm <- nf [] res
-  putStrLn "norm \{pprint [] norm}"
-  putStrLn "NF "
+  putStrLn "  NF \{pprint [] norm}"
+  norm <- nfv [] res
+  putStrLn "  NFV \{pprint [] norm}"
 
 processDecl (Data fc nm ty cons) = do
+  putStrLn "-----"
+  putStrLn "process data \{nm}"
   top <- get
   tyty <- check (mkCtx top.metas fc) ty (VU fc)
   modify $ setDef nm tyty Axiom
   cnames <- for cons $ \x => case x of
       (TypeSig fc names tm) => do
+          debug "check dcon \{show names} \{show tm}"
           dty <- check (mkCtx top.metas fc) tm (VU fc)
           debug "dty \{show names} is \{pprint [] dty}"
 

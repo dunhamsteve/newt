@@ -1,0 +1,36 @@
+module Debug
+
+data Unit : U where
+  MkUnit : Unit
+
+infixr 7 _::_
+data List : U -> U where
+  Nil : {A : U} -> List A
+  _::_ : {A : U} -> A -> List A -> List A
+
+-- prj/menagerie/papers/combinatory
+
+infixr 6 _~>_
+data Type : U where
+  ι : Type
+  _~>_ : Type -> Type -> Type
+
+A : U
+A = Unit
+
+Val : Type -> U
+Val ι = A
+Val (x ~> y) = Val x -> Val y
+
+id : {a : U} -> a -> a
+id x = x
+
+-- can't get Val to expand here.
+#check (\ x => \ y => \ z => id (Val (x ~> y ~> z))) : Type -> Type -> Type -> U
+
+-- NOW something really strange here, the arrow in the goal type is backwards...
+-- I think case eval is broken.
+
+foo : {σ τ ξ : Type} → Val (σ ~> (τ ~> ξ))
+foo {σ} {τ} {ξ} = ? -- \ x y => x
+
