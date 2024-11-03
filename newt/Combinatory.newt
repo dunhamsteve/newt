@@ -1,5 +1,7 @@
 module Combinatory
 
+-- "A correct-by-construction conversion from lambda calculus to combinatory logic", Wouter Swierstra
+
 data Unit : U where
   MkUnit : Unit
 
@@ -34,7 +36,7 @@ data Term : Ctx -> Type -> U where
   Lam : {Γ : Ctx} {σ τ : Type} -> Term (σ :: Γ) τ -> Term Γ (σ ~> τ)
   Var : {Γ : Ctx} {σ : Type} -> Ref σ Γ → Term Γ σ
 
--- FIXME, I'm not getting an error for Nil, but it's shadowing Nil
+-- FIXME, I wasn't getting an error when I had Nil shadowing Nil
 infixr 7 _:::_
 data Env : Ctx -> U where
   ENil : Env Nil
@@ -44,26 +46,54 @@ data Env : Ctx -> U where
 -- I suspect something is being split before it's ready
 
 -- lookup : {σ : Type} {Γ : Ctx} → Ref σ Γ → Env Γ → Val σ
--- lookup Z (x ::: y) = x
--- lookup (S i) (x ::: env) = lookup i env
+-- lookup Here (x ::: y) = x
+-- lookup (There i) (x ::: env) = lookup i env
 
 
--- lookup2 : {σ : Type} {Γ : Ctx} → Env Γ → Ref σ Γ → Val σ
--- lookup2 (x ::: y) Here = x
--- lookup2 (x ::: env) (There i) = lookup2 env i
+lookup2 : {σ : Type} {Γ : Ctx} → Env Γ → Ref σ Γ → Val σ
+lookup2 (x ::: y) Here = x
+lookup2 (x ::: env) (There i) = lookup2 env i
 
--- -- MixFix - this was ⟦_⟧
--- eval : {Γ : Ctx} {σ : Type} → Term Γ σ → (Env Γ → Val σ)
--- eval (App t u) env = ? -- (eval t env) (eval u env)
--- eval (Lam t) env = \ x => ? -- eval t (x ::: env)
--- eval (Var i) env = lookup2 env i
+-- TODO MixFix - this was ⟦_⟧
+eval : {Γ : Ctx} {σ : Type} → Term Γ σ → (Env Γ → Val σ)
+-- TODO unification error in direct application
+eval (App t u) env = -- (eval t env) (eval u env)
+  let a = (eval t env)
+      b = (eval u env)
+   in a b
+eval (Lam t) env = \ x => eval t (x ::: env)
+eval (Var i) env = lookup2 env i
 
--- something really strange here, the arrow in the goal type is backwards...
-foo : {σ τ ξ : Type} → Val (σ ~> (τ ~> ξ))
-foo {σ} {τ} {ξ} = ? -- \ x y => x
+data Comb : (Γ : Ctx) → (u : Type) → (Env Γ → Val u) → U where
+  S : {Γ : Ctx} {σ τ τ' : Type} → Comb Γ ((σ ~> τ ~> τ') ~> (σ ~> τ) ~> (σ ~> τ')) (\ env => \ f g x => (f x) (g x))
+  K : {Γ : Ctx} {σ τ : Type} → Comb Γ (σ ~> τ ~> σ) (\ env => \ x y => x)
+  I : {Γ : Ctx} {σ : Type} → Comb Γ (σ ~> σ) (\ env => \ x => x)
+  B : {Γ : Ctx} {σ τ τ' : Type} → Comb Γ ((τ ~> τ') ~> (σ ~> τ) ~> (σ ~> τ')) (\ env => \ f g x => f (g x))
+  C : {Γ : Ctx} {σ τ τ' : Type} → Comb Γ ((σ ~> τ ~> τ') ~> τ ~> (σ ~> τ')) (\ env => \ f g x => (f x) g)
+  CVar : {Γ : Ctx} {σ : Type} → (i : Ref σ Γ) → Comb Γ σ (\ env => lookup2 env i)
+  CApp : {Γ : Ctx} {σ τ : Type} {f : _} {x : _} → Comb Γ (σ ~> τ) f → Comb Γ σ x → Comb Γ τ (\ env => (f env) (x env))
 
--- data Comb : (Γ : Ctx) → (u : Type) → (Env Γ → Val u) → U where
---   -- S : {Γ : Ctx} {σ τ τ' : Type} → Comb Γ ((σ ~> τ ~> τ') ~> (σ ~> τ) ~> (σ ~> τ')) (\ env => \ f g x => (f x) (g x))
---   K : {Γ : Ctx} {σ τ : Type} → Comb Γ (σ ~> τ ~> σ) (\ env => \ x => \ y => x)
+sapp : {Γ : Ctx} {σ τ ρ : Type} {f : _} {x : _} →
+  Comb Γ (σ ~> τ ~> ρ) f →
+  Comb Γ (σ ~> τ) x →
+  Comb Γ (σ ~> ρ) (\ env y => (f env y) (x env y))
+-- sapp (CApp K t) I = t
+-- sapp (CApp K t) (CApp K u) = CApp K (CApp t u)
+-- sapp (CApp K t) u = CApp (CApp B t) u
+-- sapp t (CApp K u) = CApp (CApp C t) u
+-- sapp t u = CApp (CApp S t) u
 
+abs : {Γ : Ctx} {σ τ : Type} {f : _} → Comb (σ :: Γ) τ f → Comb Γ (σ ~> τ) (\ env x => f (x ::: env))
+abs S = CApp K S
+abs K = CApp K K
+abs I = CApp K I
+abs B = CApp K B
+abs C = CApp K C
+abs (CApp t u) = sapp (abs t) (abs u)
+abs (CVar Here) = ? -- I
+abs (CVar (There i)) = ? -- CApp K (Var i)
 
+translate : {Γ : Ctx} {σ : Type} → (tm : Term Γ σ) → Comb Γ σ (eval tm)
+translate (App t u) = ? -- CApp (translate t) (translate u)
+translate (Lam t) = abs (translate t)
+translate (Var i) = CVar i

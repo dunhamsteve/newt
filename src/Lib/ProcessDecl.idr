@@ -95,6 +95,28 @@ solveAutos mlen ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
 solveAutos mlen (_ :: es) = solveAutos mlen es
 
 
+logMetas : Nat -> M ()
+logMetas mstart = do
+  -- FIXME, now this isn't logged for Sig / Data.
+  top <- get
+  mc <- readIORef top.metas
+  let mlen = length mc.metas `minus` mstart
+  for_ (take mlen mc.metas) $ \case
+    (Solved fc k soln) => info fc "solve \{show k} as \{pprint [] !(quote 0 soln)}"
+    (Unsolved fc k ctx ty User cons) => do
+      ty' <- quote ctx.lvl ty
+      let names = (toList $ map fst ctx.types)
+      -- I want to know which ones are defines. I should skip the `=` bit if they match, I'll need indices in here too.
+      env <- for (zip ctx.env (toList ctx.types)) $ \(v, n, ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)} = \{pprint names !(quote ctx.lvl v)}"
+      let msg = "\{unlines (toList $ reverse env)}  -----------\n  \{pprint names ty'}\n  \{showTm ty'}"
+      info fc "User Hole\n\{msg}"
+    (Unsolved (l,c) k ctx ty kind cons) => do
+      tm <- quote ctx.lvl !(forceMeta ty)
+      -- Now that we're collecting errors, maybe we simply check at the end
+      -- TODO - log constraints?
+      addError $ E (l,c) "Unsolved meta \{show k} \{show kind} type \{pprint (names ctx) tm} \{show $ length cons} constraints"
+
+
 export
 processDecl : Decl -> M ()
 
@@ -103,6 +125,8 @@ processDecl (PMixFix{})  = pure ()
 
 processDecl (TypeSig fc names tm) = do
   top <- get
+  mc <- readIORef top.metas
+  let mstart = length mc.metas
   for_ names $ \nm => do
     let Nothing := lookup nm top
       | _ => error fc "\{show nm} is already defined"
@@ -115,6 +139,7 @@ processDecl (TypeSig fc names tm) = do
   -- ty' <- nf [] ty
   -- putStrLn "nf \{pprint [] ty'}"
   for_ names $ \nm => modify $ setDef nm ty Axiom
+  logMetas mstart
 
 processDecl (PType fc nm ty) = do
   top <- get
@@ -153,28 +178,12 @@ processDecl (Def fc nm clauses) = do
   solveAutos mlen (take mlen mc.metas)
 
   -- Expand metas
-  -- tm' <- nf [] tm  -- TODO - nf that expands all metas, Day1.newt is a test case
+  -- tm' <- nf [] tm  -- TODO - make nf that expands all metas, Day1.newt is a test case
   tm' <- zonk top 0 [] tm
   putStrLn "NF \{pprint[] tm'}"
-
-  mc <- readIORef top.metas
-  for_ (take mlen mc.metas) $ \case
-    (Solved fc k soln) => info fc "solve \{show k} as \{pprint [] !(quote 0 soln)}"
-    (Unsolved fc k ctx ty User cons) => do
-      ty' <- quote ctx.lvl ty
-      let names = (toList $ map fst ctx.types)
-      -- I want to know which ones are defines. I should skip the `=` bit if they match, I'll need indices in here too.
-      env <- for (zip ctx.env (toList ctx.types)) $ \(v, n, ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)} = \{pprint names !(quote ctx.lvl v)}"
-      let msg = "\{unlines (toList $ reverse env)}  -----------\n  \{pprint names ty'}\n  \{showTm ty'}"
-      info fc "User Hole\n\{msg}"
-    (Unsolved (l,c) k ctx ty kind cons) => do
-      tm <- quote ctx.lvl !(forceMeta ty)
-      -- Now that we're collecting errors, maybe we simply check at the end
-      -- TODO - log constraints?
-      addError $ E (l,c) "Unsolved meta \{show k} \{show kind} type \{pprint (names ctx) tm} \{show $ length cons} constraints"
-
   debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
   modify $ setDef nm ty (Fn tm')
+  logMetas mstart
 
 processDecl (DCheck fc tm ty) = do
   putStrLn "----- DCheck"
@@ -195,6 +204,8 @@ processDecl (Data fc nm ty cons) = do
   putStrLn "-----"
   putStrLn "process data \{nm}"
   top <- get
+  mc <- readIORef top.metas
+  let mstart = length mc.metas
   tyty <- check (mkCtx top.metas fc) ty (VU fc)
   modify $ setDef nm tyty Axiom
   cnames <- for cons $ \x => case x of
@@ -218,7 +229,7 @@ processDecl (Data fc nm ty cons) = do
       _ => throwError $ E (0,0) "expected constructor declaration"
   putStrLn "setDef \{nm}  TCon \{show $ join cnames}"
   modify $ setDef nm tyty (TCon (join cnames))
-  pure ()
+  logMetas mstart
   where
     checkDeclType : Tm -> M ()
     checkDeclType (U _) = pure ()

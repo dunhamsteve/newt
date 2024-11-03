@@ -1,13 +1,13 @@
 
 ## TODO
 
-- [ ] Allow unicode operators/names
-  - refactored parser to prep for this
+- [x] Allow unicode operators/names
 - [ ] Web tool
   - edit, view output, view js, run js, monaco would be nice.
   - need to shim out Buffer
 - [x] get rid of stray INFO from auto resolution
 - [ ] handle if_then_else_ style mixfix
+- [ ] Check for shadowing when declaring dcon
 - [ ] Search should look at context
 - [ ] records
 - [ ] copattern matching

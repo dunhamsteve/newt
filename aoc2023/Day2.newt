@@ -85,7 +85,7 @@ part2 : List Game -> Int
 part2 Nil = 0
 part2 (MkGame n parts :: rest) =
   case foldl maxd (0,0,0) parts of
-    (a,b,c) => a*b*c + part2 rest
+    (a,b,c) => a * b * c + part2 rest
 
 run : String -> Dummy
 run fn =
