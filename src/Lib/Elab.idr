@@ -673,8 +673,6 @@ checkDone ctx [] body ty = do
   debug "DONE-> check body \{show body} at \{show ty}"
   -- TODO dump context function
   debugM $ dumpCtx ctx
-  debug "ENV \{show ctx.env}"
-  debug "TY \{show ctx.types}"
   -- I'm running an eval here to run case statements that are
   -- unblocked by lets in the env. (Tree.newt:cmp)
   -- The case eval code only works in the Tm -> Val case at the moment.

@@ -22,15 +22,9 @@ Val : Type -> U
 Val ι = A
 Val (x ~> y) = Val x -> Val y
 
-id : {a : U} -> a -> a
-id x = x
-
 -- can't get Val to expand here.
-#check (\ x => \ y => \ z => id (Val (x ~> y ~> z))) : Type -> Type -> Type -> U
+#check (\ x => \ y => \ z => (Val (x ~> y ~> z))) : Type -> Type -> Type -> U
 
--- NOW something really strange here, the arrow in the goal type is backwards...
--- I think case eval is broken.
-
-foo : {σ τ ξ : Type} → Val (σ ~> (τ ~> ξ))
-foo {σ} {τ} {ξ} = ? -- \ x y => x
+foo : {σ τ ξ : Type} → Val (σ ~> (τ ~> σ))
+foo {σ} {τ} {σ} = \ x => \ y => x
 

@@ -45,15 +45,17 @@ vappSpine t [<] = pure t
 vappSpine t (xs :< x) = vapp !(vappSpine t xs) x
 
 evalCase : Env -> Mode -> Val -> List CaseAlt -> M (Maybe Val)
-evalCase env mode sc@(VRef _ nm y sp) (cc@(CaseCons name nms t) :: xs) =
+evalCase env mode sc@(VRef _ nm _ sp) (cc@(CaseCons name nms t) :: xs) =
   if nm == name
-    then go env sp nms
+    then do
+      debug "ECase \{nm} \{show sp} \{show nms} \{showTm t}"
+      go env (sp <>> []) nms
     else evalCase env mode sc xs
   where
-    go : Env -> SnocList Val -> List String -> M (Maybe Val)
-    go env (args :< arg) (nm :: nms) = go (arg :: env) args nms
-    go env args [] = Just <$> vappSpine !(eval env mode t) args
-    go env [<] rest = pure Nothing
+    go : Env -> List Val -> List String -> M (Maybe Val)
+    go env (arg :: args) (nm :: nms) = go (arg :: env) args nms
+    go env args [] = Just <$> vappSpine !(eval env mode t) ([<] <>< args)
+    go env [] rest = pure Nothing
 
 evalCase env mode sc (CaseDefault u :: xs) = pure $ Just !(eval (sc :: env) mode u)
 evalCase env mode sc cc = do

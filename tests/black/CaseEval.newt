@@ -19,3 +19,14 @@ three = Refl
 
 addZero : {n : Nat} -> Eq (plus Z n) n
 addZero {n} = Refl
+
+infixr 1 _,_
+data Pair : U -> U -> U where
+  _,_ : {A B : U} -> A -> B -> Pair A B
+
+fst : {A B : U} -> Pair A B -> A
+fst (a,b) = a
+
+-- I had an ordering issue, but it didn't show up with only one constructor argument
+test : Eq (fst (Z, S Z)) Z
+test = Refl
