@@ -1,8 +1,59 @@
-import * as monaco from 'monaco-editor'
+import * as monaco from "monaco-editor";
 
-export let newtLanguage: monaco.languages.IMonarchLanguage = {
+export let newtConfig: monaco.languages.LanguageConfiguration = {
+  comments: {
+    // symbol used for single line comment. Remove this entry if your language does not support line comments
+    lineComment: "--",
+    // symbols used for start and end a block comment. Remove this entry if your language does not support block comments
+    blockComment: ["/-", "-/"],
+  },
+  // symbols used as brackets
+  brackets: [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"],
+  ],
+  // symbols that are auto closed when typing
+  autoClosingPairs: [
+    { open: "{", close: "}" },
+    { open: "[", close: "]" },
+    { open: "(", close: ")" },
+    { open: '"', close: '"' },
+    { open: "'", close: "'" },
+  ],
+  // symbols that can be used to surround a selection
+  surroundingPairs: [
+    { open: "{", close: "}" },
+    { open: "[", close: "]" },
+    { open: "(", close: ")" },
+    { open: '"', close: '"' },
+    { open: "'", close: "'" },
+  ],
+  onEnterRules: [
+    {
+      beforeText: /^\s+$/,
+      action: {
+        indentAction: monaco.languages.IndentAction.Outdent,
+      },
+    },
+    {
+      beforeText: /\bwhere$/,
+      action: {
+        indentAction: monaco.languages.IndentAction.Indent,
+      },
+    },
+    {
+      beforeText: /\bof$/,
+      action: {
+        indentAction: monaco.languages.IndentAction.Indent,
+      },
+    },
+  ],
+};
+
+export let newtTokens: monaco.languages.IMonarchLanguage = {
   // Set defaultToken to invalid to see what you do not tokenize yet
-  // defaultToken: 'invalid',
+  defaultToken: "invalid",
 
   keywords: [
     "let",

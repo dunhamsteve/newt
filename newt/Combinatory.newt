@@ -77,11 +77,11 @@ sapp : {Γ : Ctx} {σ τ ρ : Type} {f : _} {x : _} →
   Comb Γ (σ ~> τ ~> ρ) f →
   Comb Γ (σ ~> τ) x →
   Comb Γ (σ ~> ρ) (\ env y => (f env y) (x env y))
--- sapp (CApp K t) I = t
--- sapp (CApp K t) (CApp K u) = CApp K (CApp t u)
--- sapp (CApp K t) u = CApp (CApp B t) u
--- sapp t (CApp K u) = CApp (CApp C t) u
--- sapp t u = CApp (CApp S t) u
+sapp (CApp K t) I = t
+sapp (CApp K t) (CApp K u) = CApp K (CApp t u)
+sapp (CApp K t) u = CApp (CApp B t) u
+sapp t (CApp K u) = CApp (CApp C t) u
+sapp t u = CApp (CApp S t) u
 
 abs : {Γ : Ctx} {σ τ : Type} {f : _} → Comb (σ :: Γ) τ f → Comb Γ (σ ~> τ) (\ env x => f (x ::: env))
 abs S = CApp K S

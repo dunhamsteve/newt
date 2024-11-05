@@ -140,6 +140,7 @@ main' = do
     Just name => writeSource name
   -- traverse_ processFile (filter (".newt" `isSuffixOf`) files) out
 
+%export "javascript:newtMain"
 main : IO ()
 main = do
   -- we'll need to reset for each file, etc.

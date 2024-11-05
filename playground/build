@@ -1,0 +1,9 @@
+#!/bin/sh
+echo Builds the workMain.js and copies newt.js
+esbuild --bundle node_modules/monaco-editor/esm/vs/editor/editor.worker.js > public/workerMain.js
+# bare javascript, it fakes node api for the idris code in newt.js
+esbuild src/shim.ts > public/shim.js
+cp ../build/exec/newt.js public
+# uncomment to make this smaller
+# esbuild --minify ../build/exec/newt.min.js > public/newt.js
+

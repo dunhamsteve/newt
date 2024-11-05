@@ -5,6 +5,6 @@ build/
 *.log
 *.agda
 *.agdai
-*.js
+/*.js
 input.txt
 node_modules

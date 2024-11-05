@@ -139,7 +139,8 @@ processDecl (TypeSig fc names tm) = do
   -- ty' <- nf [] ty
   -- putStrLn "nf \{pprint [] ty'}"
   for_ names $ \nm => modify $ setDef nm ty Axiom
-  logMetas mstart
+  -- Zoo4eg has metas in TypeSig, need to decide if I want to support that going forward.
+  -- logMetas mstart
 
 processDecl (PType fc nm ty) = do
   top <- get

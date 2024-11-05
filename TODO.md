@@ -1,17 +1,19 @@
 
 ## TODO
 
+- [ ] Check for shadowing when declaring dcon
+- [ ] Require infix decl before declaring names
 - [x] Allow unicode operators/names
 - [ ] Web tool
   - edit, view output, view js, run js, monaco would be nice.
   - need to shim out Buffer
 - [x] get rid of stray INFO from auto resolution
-- [ ] handle if_then_else_ style mixfix
-- [ ] Check for shadowing when declaring dcon
+- [ ] handle `if_then_else_` style mixfix
 - [ ] Search should look at context
 - [ ] records
 - [ ] copattern matching
 - [ ] Support @ on the LHS
+- [ ] Get `Combinatory.newt` to work
 - [x] Remember operators from imports
 - [ ] Default cases for non-primitives (currently gets expanded to all constructors)
   - This may need a little care. But I think I could collect all constructors that only match wildcards into a single case. This would lose any information from the individual, unnamed cases though.
@@ -83,4 +85,7 @@
 - [ ] Read Ulf Norell thesis
 - [ ] Finish reading dynamic pattern unification paper to see what is missing/wrong with the current implementation
 
+### Other issues
+
+- [ ] Name space flattening makes it a bit more subtle when a misspelled (or shadowed) constructor turns into a variable.
 
