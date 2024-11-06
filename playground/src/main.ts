@@ -1,79 +1,174 @@
+import { effect, signal } from "@preact/signals";
 import { newtConfig, newtTokens } from "./monarch.ts";
 import * as monaco from "monaco-editor";
+import { useEffect, useRef, useState } from "preact/hooks";
+import { h, render } from "preact";
 
 monaco.languages.register({ id: "newt" });
 monaco.languages.setMonarchTokensProvider("newt", newtTokens);
 monaco.languages.setLanguageConfiguration("newt", newtConfig);
 
-const newtWorker = new Worker("worker.js")//new URL("worker.js", import.meta.url))
+const newtWorker = new Worker("worker.js"); //new URL("worker.js", import.meta.url))
+
+function run(src: string) {
+  newtWorker.postMessage({ src });
+}
+
+newtWorker.onmessage = (ev) => {
+  console.log("worker sent", ev.data);
+  state.output.value = ev.data.output;
+  state.javascript.value = ev.data.javascript;
+};
 
 self.MonacoEnvironment = {
-  getWorkerUrl(moduleId, label) {
+  getWorkerUrl(moduleId, _label) {
     console.log("Get worker", moduleId);
     return moduleId;
   },
 };
 
+const state = {
+  output: signal(""),
+  javascript: signal(""),
+  editor: signal<monaco.editor.IStandaloneCodeEditor | null>(null),
+};
+
 // I keep pressing this.
-document.addEventListener('keydown', (ev) => {
-  if (ev.metaKey && ev.code == 'KeyS') ev.preventDefault();
-})
+document.addEventListener("keydown", (ev) => {
+  if (ev.metaKey && ev.code == "KeyS") ev.preventDefault();
+});
 
 let value = localStorage.code || "module Main\n";
 
-let container = document.getElementById("editor")!;
-let result = document.getElementById("result")!;
-const editor = monaco.editor.create(container, {
-  value,
-  language: "newt",
-  theme: "vs",
-  automaticLayout: true,
-  minimap: { enabled: false },
+// let result = document.getElementById("result")!;
+
+// the editor might handle this itself with the right prodding.
+effect(() => {
+  let text = state.output.value;
+  let editor = state.editor.value;
+  if (editor) processOutput(editor, text);
 });
+
+interface EditorProps {
+  initialValue: string;
+}
+
+function Editor({ initialValue }: EditorProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const container = ref.current!;
+    const editor = monaco.editor.create(container, {
+      value,
+      language: "newt",
+      theme: "vs",
+      automaticLayout: true,
+      minimap: { enabled: false },
+    });
+    state.editor.value = editor;
+
+    editor.onDidChangeModelContent((ev) => {
+      console.log("mc", ev);
+      let value = editor.getValue();
+      clearTimeout(timeout);
+      timeout = setTimeout(() => run(value), 1000);
+      localStorage.code = value;
+    });
+    run(initialValue);
+  }, []);
+
+  return h("div", { id: "editor", ref });
+}
+
+// for extra credit, we could have a read-only monaco
+function JavaScript() {
+  const text = state.javascript.value;
+  return h("div", {id:'javascript'}, text);
+}
+
+function Result() {
+  const text = state.output.value;
+  return h("div", { id: "result" }, text);
+}
+
+const RESULTS = "Output"
+const JAVASCRIPT = "JS"
+
+function Tabs() {
+  const [selected, setSelected] = useState(RESULTS);
+
+  const Tab = (label: string) => {
+    let onClick = () => setSelected(label);
+    let className = "tab";
+    if (label == selected) className += " selected";
+    return h("div", { className, onClick }, label);
+  };
+
+  let body;
+  switch (selected) {
+    case RESULTS:
+      body = h(Result, {});
+      break;
+    case JAVASCRIPT:
+      body = h(JavaScript, {});
+      break;
+    default:
+      body = h("div", {});
+  }
+
+  return h(
+    "div",
+    { className: "tabPanel" },
+    h("div", { className: "tabBar" }, Tab(RESULTS), Tab(JAVASCRIPT)),
+    h("div", { className: "tabBody" }, body)
+  );
+}
+
+function App() {
+  return h(
+    "div",
+    { className: "wrapper" },
+    h(Editor, { initialValue: value }),
+    h(Tabs, {})
+  );
+}
+
+render(h(App, {}), document.getElementById("app")!);
 
 let timeout: number | undefined;
 
-function run(src: string) {
-  newtWorker.postMessage({src})
-}
-
-newtWorker.onmessage = (ev) => {
-  console.log('worker sent', ev.data)
-  let {output, javascript} = ev.data
-  processOutput(output);
-}
-
 // Adapted from the vscode extension, but types are slightly different
 // and positions are 1-based.
-const processOutput = (output: string) => {
-  result.innerText = output
-
-  let model = editor.getModel()!
-  let markers: monaco.editor.IMarkerData[] = []
-  let lines = output.split('\n')
+const processOutput = (
+  editor: monaco.editor.IStandaloneCodeEditor,
+  output: string
+) => {
+  let model = editor.getModel()!;
+  let markers: monaco.editor.IMarkerData[] = [];
+  let lines = output.split("\n");
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const match = line.match(/(INFO|ERROR) at \((\d+), (\d+)\):\s*(.*)/);
     if (match) {
       let [_full, kind, line, col, message] = match;
-      let lineNumber = +line+1
-      let column = +col+1;
-      let start = {column, lineNumber};
+      let lineNumber = +line + 1;
+      let column = +col + 1;
+      let start = { column, lineNumber };
       // we don't have the full range, so grab the surrounding word
-      let endColumn = column + 1
-      let word = model.getWordAtPosition(start)
-      if (word) endColumn = word.endColumn
+      let endColumn = column + 1;
+      let word = model.getWordAtPosition(start);
+      if (word) endColumn = word.endColumn;
 
       // heuristics to grab the entire message:
       // anything indented
       // Context:, or Goal: are part of PRINTME
       // unexpected / expecting appear in parse errors
-      while (
-        lines[i + 1]?.match(/^(  )/)
-      ) {
+      while (lines[i + 1]?.match(/^(  )/)) {
         message += "\n" + lines[++i];
       }
-      const severity = kind === 'ERROR' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Info
+      const severity =
+        kind === "ERROR"
+          ? monaco.MarkerSeverity.Error
+          : monaco.MarkerSeverity.Info;
 
       markers.push({
         severity,
@@ -82,19 +177,8 @@ const processOutput = (output: string) => {
         endLineNumber: lineNumber,
         startColumn: column,
         endColumn,
-      })
+      });
     }
   }
-  console.log('setMarkers', markers)
-  monaco.editor.setModelMarkers(model, 'newt', markers)
-}
-
-editor.onDidChangeModelContent((ev) => {
-  console.log("mc", ev);
-  let value = editor.getValue();
-  clearTimeout(timeout);
-  timeout = setTimeout(() => run(value), 1000);
-  localStorage.code = value;
-});
-
-run(value);
+  monaco.editor.setModelMarkers(model, "newt", markers);
+};

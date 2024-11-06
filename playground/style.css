@@ -12,10 +12,32 @@
 }
 .wrapper > div {
   flex: 1 1;
+  width: 100px;
 }
-#result {
+.tabPanel {
+  display: flex;
+  flex-direction: column;
+}
+.tabBar {
+  display:flex;
+  flex-direction: row;
+  gap: 10px;
+  margin: 10px 0;
+  border-bottom: solid 1px black;
+}
+.tab {
+  padding: 4px;
+  border: solid 1px transparent;
+}
+.tab.selected {
+  border: solid 1px black;
+  border-bottom: 0px
+}
+
+#result, #javascript {
   overflow: auto;
   font-family: 'Comic Code', monospace;
   font-size: 12px;
   white-space: pre;
+  padding: 5px;
 }
