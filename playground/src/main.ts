@@ -1,10 +1,11 @@
-// import "./style.css";
 import { newtConfig, newtTokens } from "./monarch.ts";
 import * as monaco from "monaco-editor";
 
 monaco.languages.register({ id: "newt" });
 monaco.languages.setMonarchTokensProvider("newt", newtTokens);
 monaco.languages.setLanguageConfiguration("newt", newtConfig);
+
+const newtWorker = new Worker("worker.js")//new URL("worker.js", import.meta.url))
 
 self.MonacoEnvironment = {
   getWorkerUrl(moduleId, label) {
@@ -32,31 +33,24 @@ const editor = monaco.editor.create(container, {
 
 let timeout: number | undefined;
 
-function run(s: string) {
-  console.log("run", s);
-  process.argv = ["", "", "src/Main.newt", "-o", "out.js"];
-  console.log("args", process.argv);
-  files["src/Main.newt"] = s;
-  result.innerHTML = "";
-  stdout = ''
-  newtMain();
-  processOutput();
+function run(src: string) {
+  newtWorker.postMessage({src})
 }
 
-let stdout = ''
-// We'll want to collect and put info in the monaco
-process.stdout.write = (s) => {
-  stdout += s
-};
+newtWorker.onmessage = (ev) => {
+  console.log('worker sent', ev.data)
+  let {output, javascript} = ev.data
+  processOutput(output);
+}
 
 // Adapted from the vscode extension, but types are slightly different
 // and positions are 1-based.
-const processOutput = () => {
-  result.innerText = stdout
+const processOutput = (output: string) => {
+  result.innerText = output
 
   let model = editor.getModel()!
   let markers: monaco.editor.IMarkerData[] = []
-  let lines = stdout.split('\n')
+  let lines = output.split('\n')
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const match = line.match(/(INFO|ERROR) at \((\d+), (\d+)\):\s*(.*)/);

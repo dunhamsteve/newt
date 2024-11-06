@@ -110,3 +110,25 @@ const process: Process = {
 };
 
 const require = (x: string) => shim[x];
+
+// Maybe the shim goes here and we append newt...
+
+let stdout = ''
+// We'll want to collect and put info in the monaco
+process.stdout.write = (s) => {
+  stdout += s
+};
+
+onmessage = function (e) {
+  console.log('worker got', e.data)
+  let {src} = e.data
+  process.argv = ["", "", "src/Main.newt", "-o", "out.js"];
+  console.log("args", process.argv);
+  files["src/Main.newt"] = src;
+  stdout = ''
+  newtMain();
+  let javascript = files['out.js']
+  let output = stdout
+  console.log('WORKER POSTS', {javascript, output})
+  postMessage({javascript, output})
+}
