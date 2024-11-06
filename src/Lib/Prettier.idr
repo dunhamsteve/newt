@@ -33,10 +33,10 @@ group : Doc -> Doc
 group x = Alt (flatten x) x
 
 -- TODO - we can accumulate snoc and cat all at once
-layout : List Item -> String
-layout [] = ""
-layout (LINE k :: x) = "\n" ++ replicate k ' ' ++ layout x
-layout (TEXT str :: x) = str ++ layout x
+layout : List Item -> SnocList String -> String
+layout [] acc = fastConcat $ cast acc
+layout (LINE k :: x) acc = layout x (acc :< "\n" :< replicate k ' ')
+layout (TEXT str :: x) acc = layout x (acc :< str)
 
 ||| Whether a documents first line fits.
 fits : Nat -> List Item -> Bool
@@ -73,7 +73,7 @@ interface Pretty a where
 
 export
 render : Nat -> Doc -> String
-render w x = layout (best w 0 x)
+render w x = layout (best w 0 x) [<]
 
 public export
 Semigroup Doc where x <+> y = Seq x (Seq (Text " ") y)
