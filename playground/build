@@ -5,5 +5,5 @@ echo newt worker
 esbuild src/worker.ts > public/worker.js
 echo newt
 cat ../build/exec/newt.js |grep -v '^#'>> public/worker.js
-
+cp samples/* public
 # esbuild --minify ../build/exec/newt.min.js > public/newt.js

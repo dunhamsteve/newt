@@ -121,9 +121,13 @@ process.stdout.write = (s) => {
 
 onmessage = function (e) {
   let {src} = e.data
-  process.argv = ["", "", "src/Main.newt", "-o", "out.js"];
+  let module = 'Main'
+  let m = src.match(/module (\w+)/)
+  if (m) module = m[1]
+  let fn = `src/${module}.newt`
+  process.argv = ["", "", fn, "-o", "out.js"];
   console.log("args", process.argv);
-  files["src/Main.newt"] = src;
+  files[fn] = src;
   files['out.js'] = 'No JS output';
   stdout = ''
   try {

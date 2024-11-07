@@ -1,0 +1,75 @@
+module Day1
+
+-- Need to visit Lib.newt for this to work in playground
+import Lib
+
+digits1 : List Char -> List Int
+digits1 Nil = Nil
+digits1 (c :: cs) = let x = ord c in
+  case x < 58 of
+    True => case 48 < x of
+      True => x - 48 :: digits1 cs
+      False => digits1 cs
+    False => digits1 cs
+
+tail : {a : U} -> List a -> List a
+tail Nil = Nil
+tail (x :: xs) = xs
+
+-- TODO I used @ patterns in Lean
+digits2 : List Char -> List Int
+digits2 xs = case xs of
+    ('o' :: 'n' :: 'e' :: _) => 1 :: digits2 (tail xs)
+    ('t' :: 'w' :: 'o' :: _) => 2 :: digits2 (tail xs)
+    ('t' :: 'h' :: 'r' :: 'e' :: 'e' :: _) => 3 :: digits2 (tail xs)
+    ('f' :: 'o' :: 'u' :: 'r' :: _) => 4 :: digits2 (tail xs)
+    ('f' :: 'i' :: 'v' :: 'e' :: _) => 5 :: digits2 (tail xs)
+    ('s' :: 'i' :: 'x' :: _) => 6 :: digits2 (tail xs)
+    ('s' :: 'e' :: 'v' :: 'e' :: 'n' :: _) => 7 :: digits2 (tail xs)
+    ('e' :: 'i' :: 'g' :: 'h' :: 't' :: _) => 8 :: digits2 (tail xs)
+    ('n' :: 'i' :: 'n' :: 'e' :: _) => 9 :: digits2 (tail xs)
+    (c :: cs) => let x = ord c in
+        case x < 58 of
+          True => case 48 < x of
+            True => x - 48 :: digits2 cs
+            False => digits2 cs
+          False => digits2 cs
+    Nil => Nil
+
+
+combine : List Int -> Int
+combine Nil = 0
+combine (x :: Nil) = x * 10 + x
+combine (x :: y :: Nil) = x * 10 + y
+combine (x :: y :: xs) = combine (x :: xs)
+
+part1 : String -> (String -> List Int) -> Int
+part1 text digits =
+  let lines = split (trim text) "\n" in
+  let nums = map combine $ map digits lines in
+  foldl _+_ 0 nums
+
+-- Hack from before I had support for typeclasses
+infixl 1 _>>_
+_>>_ : {A B : U} -> A -> B -> B
+a >> b = b
+
+
+runFile : String -> Dummy
+runFile fn =
+  let text = readFile fn in
+  log fn >>
+  log "part1" >>
+  log (part1 text (digits1 . unpack)) >>
+  log "part2" >>
+  log (part1 text (digits2 . unpack)) >>
+  log ""
+
+
+-- Argument is a hack to keep it from running at startup.  Need to add IO
+main : Int -> Dummy
+main _ =
+  runFile "aoc2023/day1/eg.txt" >>
+  runFile "aoc2023/day1/eg2.txt" >>
+  runFile "aoc2023/day1/input.txt"
+

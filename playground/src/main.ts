@@ -2,7 +2,8 @@ import { effect, signal } from "@preact/signals";
 import { newtConfig, newtTokens } from "./monarch.ts";
 import * as monaco from "monaco-editor";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { h, render } from "preact";
+import { h, render, VNode } from "preact";
+import { ChangeEvent } from "preact/compat";
 
 monaco.languages.register({ id: "newt" });
 monaco.languages.setMonarchTokensProvider("newt", newtTokens);
@@ -68,8 +69,8 @@ function Editor({ initialValue }: EditorProps) {
     editor.onDidChangeModelContent((ev) => {
       clearTimeout(timeout);
       timeout = setTimeout(() => {
-        let value = editor.getValue()
-        run(value)
+        let value = editor.getValue();
+        run(value);
         localStorage.code = value;
       }, 1000);
     });
@@ -82,7 +83,7 @@ function Editor({ initialValue }: EditorProps) {
 // for extra credit, we could have a read-only monaco
 function JavaScript() {
   const text = state.javascript.value;
-  return h("div", {id:'javascript'}, text);
+  return h("div", { id: "javascript" }, text);
 }
 
 function Result() {
@@ -90,8 +91,8 @@ function Result() {
   return h("div", { id: "result" }, text);
 }
 
-const RESULTS = "Output"
-const JAVASCRIPT = "JS"
+const RESULTS = "Output";
+const JAVASCRIPT = "JS";
 
 function Tabs() {
   const [selected, setSelected] = useState(RESULTS);
@@ -123,11 +124,54 @@ function Tabs() {
   );
 }
 
+const SAMPLES = [
+  "Tree.newt",
+  // "Prelude.newt",
+  "Lib.newt",
+  "Day1.newt",
+  "Day2.newt",
+  "TypeClass.newt",
+
+];
+
+function EditWrap() {
+  const options = SAMPLES.map((value) => h("option", { value }, value));
+
+  const onChange = async (ev: ChangeEvent) => {
+    if (ev.target instanceof HTMLSelectElement) {
+      let fn = ev.target.value;
+      ev.target.value = "";
+      if (fn) {
+        const res = await fetch(fn);
+        const text = await res.text();
+        state.editor.value!.setValue(text);
+      } else {
+        state.editor.value!.setValue("module Main\n");
+      }
+    }
+  };
+  return h(
+    "div",
+    { className: "tabPanel" },
+    h(
+      "div",
+      { className: "tabBar" },
+      h(
+        "select",
+        { onChange },
+        h("option", { value: "" }, "choose sample"),
+        options
+      )
+    ),
+    h("div", { className: "tabBody" }, h(Editor, { initialValue: value }))
+  );
+}
+
 function App() {
   return h(
     "div",
     { className: "wrapper" },
-    h(Editor, { initialValue: value }),
+    h(EditWrap, {}),
     h(Tabs, {})
   );
 }

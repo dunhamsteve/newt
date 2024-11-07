@@ -1,0 +1,96 @@
+module Tree
+
+-- adapted from Conor McBride's 2-3 tree example
+-- youtube video: https://youtu.be/v2yXrOkzt5w?t=3013
+
+
+data Nat : U where
+  Z : Nat
+  S : Nat -> Nat
+
+data Unit : U where
+  MkUnit : Unit
+
+data Void : U where
+
+infixl 4 _+_
+
+data _+_ : U -> U -> U where
+  inl : {A B : U} -> A -> A + B
+  inr : {A B : U} -> B -> A + B
+
+infix 4 _<=_
+
+_<=_ : Nat -> Nat -> U
+Z <= y = Unit
+S x <= Z = Void
+S x <= S y = x <= y
+
+cmp : (x y : Nat) -> (x <= y) + (y <= x)
+cmp Z y = inl MkUnit
+cmp (S z) Z = inr MkUnit
+cmp (S x) (S y) = cmp x y
+
+-- 53:21
+
+data Bnd : U where
+  Bot : Bnd
+  N : Nat -> Bnd
+  Top : Bnd
+
+infix 4 _<<=_
+
+_<<=_ : Bnd -> Bnd -> U
+Bot <<= _ = Unit
+N x <<= N y = x <= y
+_ <<= Top = Unit
+_ <<= _ = Void
+
+data Intv : Bnd -> Bnd -> U where
+  intv : {l u : Bnd} (x : Nat) (lx : l <<= N x) (xu : N x <<= u) -> Intv l u
+
+data T23 : Bnd -> Bnd -> Nat -> U where
+  leaf : {l u : Bnd} {h : Nat} (lu : l <<= u) -> T23 l u Z
+  node2 : {l u : Bnd} {h : Nat} (x : _)
+    (tlx : T23 l (N x) h) (txu : T23 (N x) u h) ->
+    T23 l u (S h)
+  node3 : {l u : Bnd} {h : Nat} (x y : _)
+    (tlx : T23 l (N x) h) (txy : T23 (N x) (N y) h) (tyu : T23 (N y) u h) ->
+    T23 l u (S h)
+
+-- 56:
+
+infixl 5 _*_
+infixr 1 _,_
+data Sg : (A : U) -> (A -> U) -> U where
+  _,_ : {A : U} {B : A -> U} -> (a : A) -> B a -> Sg A B
+
+_*_ : U -> U -> U
+A * B = Sg A (\ _ => B)
+
+TooBig : Bnd -> Bnd -> Nat -> U
+TooBig l u h = Sg Nat (\ x => T23 l (N x) h * T23 (N x) u h)
+
+insert : {h : Nat} {l u : Bnd} -> Intv l u -> T23 l u h -> TooBig l u h + T23 l u h
+-- Agda is yellow here, needs h = x on each leaf
+-- The second arg to the second _,_ is unsolved and pi-typed
+insert (intv x lx xu) (leaf lu) = inl (x , (leaf {_} {_} {x} lx , leaf {_} {_} {x} xu))
+insert (intv x lx xu) (node2 y tly tyu) = case cmp x y of
+  -- u := N y is not solved at this time
+  inl xy => case insert (intv {_} {N y} x lx xy) tly of
+    inl (z , (tlz , tzy)) => inr (node3 z y tlz tzy tyu)
+    inr tly' => inr (node2 y tly' tyu)
+  inr yx => case insert (intv {N y} x yx xu) tyu of
+    inl (z , (tyz , tzu)) => inr (node3 y z tly tyz tzu)
+    inr tyu' => inr (node2 y tly tyu')
+insert (intv x lx xu) (node3 y z tly tyz tzu) = case cmp x y of
+  inl xy => case insert (intv {_} {N y} x lx xy) tly of
+    inl (v , (tlv , tvy)) => inl (y , (node2 v tlv tvy , node2 z tyz tzu))
+    inr tly' => inr (node3 y z tly' tyz tzu)
+  inr yx => case cmp x z of
+    inl xz => case insert (intv {N y} {N z} x yx xz) tyz of
+      inl (w , (tyw , twz)) => inl (w , (node2 y tly tyw , node2 z twz tzu))
+      inr tyz' => inr (node3 y z tly tyz' tzu)
+    inr zx => case insert (intv {N z} x zx xu) tzu of
+      inl (w , (tzw , twu)) => inl (z , (node2 y tly tyz , node2 w tzw twu))
+      inr tzu' => inr (node3 y z tly tyz tzu')

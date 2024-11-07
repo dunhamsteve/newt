@@ -1,0 +1,105 @@
+module Day2
+
+-- Need to visit Lib.newt for this to work in playground
+import Lib
+
+Draw : U
+Draw = Pair Int (Pair Int Int)
+
+data Game : U where
+  MkGame : Int -> List Draw -> Game
+
+-- Original had class and instance...
+-- Add, Sub, Mul, Neg
+
+-- NB this is not lazy!
+infixl 5 _&&_
+
+_&&_ : Bool -> Bool -> Bool
+a && b = case a of
+  False => False
+  True => b
+
+max : Int -> Int -> Int
+max x y = case x < y of
+  True => y
+  False => x
+
+pfunc repr : {a : U} -> a -> String := "(a,o) => ''+o"
+pfunc jrepr : {a : U} -> a -> String := "(a,o) => JSON.stringify(o, null, '  ')"
+pfunc toInt : String -> Int := "s => Number(s)"
+
+mapM : {a b c : U} -> (a -> Either b c) -> List a -> Either b (List c)
+mapM f Nil = Right Nil
+mapM f (x :: xs) = case f x of
+  Left msg => Left msg
+  Right v => case mapM f xs of
+    Left msg => Left msg
+    Right vs => Right $ v :: vs
+
+maxd : Draw -> Draw -> Draw
+maxd (a,b,c) (d,e,f) = (max a d, max b e, max c f)
+
+lte : Draw -> Draw -> Bool
+lte (a,b,c) (d,e,f) = a <= d && b <= e && c <= f
+
+parseColor : String -> Either String Draw
+parseColor line = case split line " " of
+  (n :: "red" :: Nil) => Right (toInt n,0,0)
+  (n :: "green" :: Nil) => Right (0,toInt n,0)
+  (n :: "blue" :: Nil) => Right (0,0,toInt n)
+  x => Left $ "Bad draw" ++ repr x
+
+parseDraw : String -> Either String Draw
+parseDraw line = case mapM parseColor $ split line ", " of
+  Right parts => Right $ foldl maxd (0,0,0) parts
+  Left err => Left err
+
+parseGame : String -> Either String Game
+parseGame line =
+  -- Need the Idris | sugar...
+  case split line ": " of
+    -- this is splitting on the Nil instead of the a
+    (a :: b :: Nil) => case split a " " of
+      ("Game" :: ns :: Nil) =>
+        let num = toInt ns in
+        case mapM parseDraw $ split b "; " of
+          Right parts => Right $ MkGame num parts
+          Left err => Left err
+      _ => Left "No Game"
+    _ => Left $ "No colon in " ++ line
+
+infixl 1 _>>_
+
+_>>_ : {A B : U} -> A -> B -> B
+a >> b = b
+
+part1 : List Game -> Int
+part1 Nil = 0
+part1 (MkGame n parts :: rest) =
+  let total = foldl maxd (0,0,0) parts in
+  case lte total (12,13,14) of
+    True => n + part1 rest
+    False => part1 rest
+
+part2 : List Game -> Int
+part2 Nil = 0
+part2 (MkGame n parts :: rest) =
+  case foldl maxd (0,0,0) parts of
+    (a,b,c) => a * b * c + part2 rest
+
+run : String -> Dummy
+run fn =
+  let text = readFile fn in
+  case mapM parseGame (split (trim text) "\n") of
+    Left err => log $ "fail " ++ err
+    Right games =>
+      log "part1" >>
+      log (part1 games) >>
+      log "part2" >>
+      log (part2 games)
+
+main : Dummy -> Dummy
+main _ =
+  run "aoc2023/day2/eg.txt" >>
+  run "aoc2023/day2/input.txt"

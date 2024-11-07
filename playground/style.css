@@ -5,6 +5,9 @@
   right: 0;
   position: absolute;
 }
+#editor {
+  height: 100%;
+}
 .wrapper {
   display: flex;
   flex-direction: row;
@@ -25,6 +28,10 @@
   gap: 10px;
   margin: 10px 0 0 0;
   border-bottom: solid 1px black;
+  height: 30px;
+}
+.tabBar>select {
+  margin: 0 5px 5px;
 }
 .tab {
   padding: 4px;
