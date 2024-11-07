@@ -120,15 +120,21 @@ process.stdout.write = (s) => {
 };
 
 onmessage = function (e) {
-  console.log('worker got', e.data)
   let {src} = e.data
   process.argv = ["", "", "src/Main.newt", "-o", "out.js"];
   console.log("args", process.argv);
   files["src/Main.newt"] = src;
+  files['out.js'] = 'No JS output';
   stdout = ''
-  newtMain();
+  try {
+    newtMain();
+  } catch (e) {
+    // make it clickable
+    console.error(e)
+    // make it visable
+    stdout += '\n' + String(e)
+  }
   let javascript = files['out.js']
   let output = stdout
-  console.log('WORKER POSTS', {javascript, output})
   postMessage({javascript, output})
 }

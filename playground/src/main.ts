@@ -15,7 +15,6 @@ function run(src: string) {
 }
 
 newtWorker.onmessage = (ev) => {
-  console.log("worker sent", ev.data);
   state.output.value = ev.data.output;
   state.javascript.value = ev.data.javascript;
 };
@@ -67,11 +66,12 @@ function Editor({ initialValue }: EditorProps) {
     state.editor.value = editor;
 
     editor.onDidChangeModelContent((ev) => {
-      console.log("mc", ev);
-      let value = editor.getValue();
       clearTimeout(timeout);
-      timeout = setTimeout(() => run(value), 1000);
-      localStorage.code = value;
+      timeout = setTimeout(() => {
+        let value = editor.getValue()
+        run(value)
+        localStorage.code = value;
+      }, 1000);
     });
     run(initialValue);
   }, []);

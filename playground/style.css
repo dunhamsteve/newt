@@ -12,6 +12,7 @@
 }
 .wrapper > div {
   flex: 1 1;
+  /* allow smaller than natural */
   width: 100px;
 }
 .tabPanel {
@@ -22,7 +23,7 @@
   display:flex;
   flex-direction: row;
   gap: 10px;
-  margin: 10px 0;
+  margin: 10px 0 0 0;
   border-bottom: solid 1px black;
 }
 .tab {
@@ -33,9 +34,11 @@
   border: solid 1px black;
   border-bottom: 0px
 }
-
-#result, #javascript {
+.tabBody {
   overflow: auto;
+  flex: 1 1;
+}
+#result, #javascript {
   font-family: 'Comic Code', monospace;
   font-size: 12px;
   white-space: pre;
