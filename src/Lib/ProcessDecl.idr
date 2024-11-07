@@ -22,15 +22,14 @@ isCandidate (VRef _ nm _ _) (Ref fc nm' def) = nm == nm'
 isCandidate ty (App fc t u) = isCandidate ty t
 isCandidate _ _ = False
 
-
 -- This is a crude first pass
 -- TODO consider ctx
-findMatches : Val -> List TopEntry -> M (List (Tm, MetaContext))
-findMatches ty [] = pure []
-findMatches ty ((MkEntry name type def@(Fn t)) :: xs) = do
-  let True = isCandidate ty type | False => findMatches ty xs
+findMatches : Context -> Val -> List TopEntry -> M (List (Tm, MetaContext))
+findMatches ctx ty [] = pure []
+findMatches ctx ty ((MkEntry name type def@(Fn t)) :: xs) = do
+  let True = isCandidate ty type | False => findMatches ctx ty xs
   top <- get
-  let ctx = mkCtx top.metas (getFC ty)
+  -- let ctx = mkCtx top.metas (getFC ty)
   -- FIXME we're restoring state, but the INFO logs have already been emitted
   -- Also redo this whole thing to run during elab, recheck constraints, etc.
   mc <- readIORef top.metas
@@ -39,16 +38,39 @@ findMatches ty ((MkEntry name type def@(Fn t)) :: xs) = do
       let fc = getFC ty
       debug "TRY \{name} : \{pprint [] type} for \{show ty}"
       -- This check is solving metas, so we save mc below in case we want this solution
-      tm <- check (mkCtx top.metas fc) (RVar fc name) ty
+      -- tm <- check (mkCtx top.metas fc) (RVar fc name) ty
+      tm <- check ctx (RVar fc name) ty
       debug "Found \{pprint [] tm} for \{show ty}"
       mc' <- readIORef top.metas
       writeIORef top.metas mc
-      ((tm, mc') ::) <$> findMatches ty xs)
+      ((tm, mc') ::) <$> findMatches ctx ty xs)
     (\ err => do
       debug "No match \{show ty} \{pprint [] type} \{showError "" err}"
       writeIORef top.metas mc
-      findMatches ty xs)
-findMatches ty (y :: xs) = findMatches ty xs
+      findMatches ctx ty xs)
+findMatches ctx ty (y :: xs) = findMatches ctx ty xs
+
+contextMatches : Context -> Val -> M (List (Tm, MetaContext))
+contextMatches ctx ty = go (zip ctx.env (toList ctx.types))
+  where
+    go : List (Val, String, Val) -> M (List (Tm, MetaContext))
+    go [] = pure []
+    go ((tm, nm, vty) :: xs) = do
+      type <- quote ctx.lvl vty
+      let True = isCandidate ty type | False => go xs
+      top <- get
+      mc <- readIORef top.metas
+      catchError {e=Error} (do
+          debug "TRY context \{nm} : \{pprint (names ctx) type} for \{show ty}"
+          unifyCatch (getFC ty) ctx ty vty
+          mc' <- readIORef top.metas
+          writeIORef top.metas mc
+          tm <- quote ctx.lvl tm
+          ((tm, mc') ::) <$> go xs)
+        (\ err => do
+          debug "No match \{show ty} \{pprint (names ctx) type} \{showError "" err}"
+          writeIORef top.metas mc
+          go xs)
 
 getArity : Tm -> Nat
 getArity (Pi x str icit t u) = S (getArity u)
@@ -80,7 +102,9 @@ solveAutos mlen ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
       debug "AUTO solving \{show k} : \{show ty}"
       -- we want the context here too.
       top <- get
-      [(tm,mc)] <- findMatches ty top.defs
+      [(tm, mc)] <- case !(contextMatches ctx ty) of
+            [] => findMatches ctx ty top.defs
+            xs => pure xs
         | res => do
           debug "FAILED to solve \{show ty}, matches: \{show $ map (pprint [] . fst) res}"
           solveAutos mlen es

@@ -1,0 +1,35 @@
+module TestCase5
+
+-- last bit tests pulling solutions from context
+
+data Plus : U -> U where
+    MkPlus : {A : U} -> (A -> A -> A) -> Plus A
+
+infixl 7 _+_
+_+_ : {A : U} {{_ : Plus A}} -> A -> A -> A
+_+_ {{MkPlus plus}} x y = plus x y
+
+ptype Int
+pfunc plusInt : Int -> Int -> Int := "(x,y) => x + y"
+
+PlusInt : Plus Int
+PlusInt = MkPlus plusInt
+
+-- TODO this needs some aggressive inlining...
+double : Int -> Int
+double x = x + x
+
+data Nat : U where
+    Z : Nat
+    S : Nat -> Nat
+
+plus : Nat -> Nat -> Nat
+plus Z m = m
+plus (S n) m = S (plus n m)
+
+PlusNat : Plus Nat
+PlusNat = MkPlus plus
+
+double2 : {A : U} {{foo : Plus A}} -> A -> A
+double2 = \ a => a + a
+

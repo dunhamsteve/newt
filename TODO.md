@@ -1,15 +1,21 @@
 
 ## TODO
 
+- [ ] I've made `{x}` be `{x : _}` instead of `{_ : x}`. Change this.
+- [ ] Remove context lambdas when printing solutions (show names from context)
+  - build list of names and strip λ, then call pprint with names
 - [ ] Check for shadowing when declaring dcon
-- [ ] Require infix decl before declaring names
+- [ ] Require infix decl before declaring names (helps find bugs)
 - [x] Allow unicode operators/names
-- [ ] Web tool
-  - edit, view output, view js, run js, monaco would be nice.
-  - need to shim out Buffer
+- Web playground
+  - [x] editor
+  - [x] view output
+  - [x] view javascript
+  - [ ] run javascript
+  - [x] need to shim out Buffer
 - [x] get rid of stray INFO from auto resolution
 - [ ] handle `if_then_else_` style mixfix
-- [ ] Search should look at context
+- [x] Search should look at context
 - [ ] records
 - [ ] copattern matching
 - [ ] Support @ on the LHS

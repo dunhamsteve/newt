@@ -191,7 +191,7 @@ stmtToDoc : JSStmt e -> Doc
 ||| separate with space
 export
 commaSep : List Doc -> Doc
-commaSep = folddoc (\a, b => a ++ "," <+> b)
+commaSep = folddoc (\a, b => a ++ "," <+/> b)
 
 expToDoc : JSExp -> Doc
 expToDoc (LitArray xs) = ?expToDoc_rhs_0
@@ -203,7 +203,7 @@ expToDoc (LitObject xs) = text "{" <+> folddoc (\ a, e => a ++ ", " <+/> e) (map
 
 expToDoc (LitString str) = jsString str
 expToDoc (LitInt i) = text $ show i
-expToDoc (Apply x xs) = expToDoc x ++ "(" ++ commaSep (map expToDoc xs) ++ ")"
+expToDoc (Apply x xs) = expToDoc x ++ "(" ++ nest 2 (commaSep (map expToDoc xs)) ++ ")"
 expToDoc (Var nm) = jsIdent nm
 expToDoc (JLam nms (JReturn exp)) = text "(" <+> commaSep (map jsIdent nms) <+> ") =>" <+> "(" ++ expToDoc exp ++ ")"
 expToDoc (JLam nms body) = text "(" <+> commaSep (map jsIdent nms) <+> ") =>" <+> bracket "{" (stmtToDoc body) "}"

@@ -320,7 +320,7 @@ parameters (ctx: Context)
             Just v => Just v
             Nothing => Nothing
 
-
+export
 unifyCatch : FC -> Context -> Val -> Val -> M ()
 unifyCatch fc ctx ty' ty = do
     res <- catchError (unify ctx ctx.lvl Normal ty' ty) $ \(E x str) => do
