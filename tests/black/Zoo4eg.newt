@@ -4,14 +4,14 @@ id : {A : U} -> A -> A
 id = \x => x   -- elaborated to \{A} x. x
 
 -- implicit arg types can be omitted
-const : {A B} -> A -> B -> A
+const : {A B : U} -> A -> B -> A
 const = \x y => x
 
 -- function arguments can be grouped:
 group1 : {A B : U}(x y z : A) -> B -> B
 group1 = \x y z b => b
 
-group2 : {A B}(x y z : A) -> B -> B
+group2 : {A B : U}(x y z : A) -> B -> B
 group2 = \x y z b => b
 
 -- explicit id function used for annotation as in Idris
@@ -43,20 +43,20 @@ false = \B t f => f
 List : U -> U
 List = \A => (L : _) -> (A -> L -> L) -> L -> L
 
-nil : {A} -> List A
+nil : {A : U} -> List A
 nil = \L cons nil => nil
 
-cons : {A} -> A -> List A -> List A
+cons : {A : U} -> A -> List A -> List A
 cons = \ x xs L cons nil => cons x (xs L cons nil)
 
-map : {A B} -> (A -> B) -> List A -> List B
+map : {A B : U} -> (A -> B) -> List A -> List B
 map = \{A} {B} f xs L c n => xs L (\a => c (f a)) n
 
 list1 : List Bool
 list1 = cons true (cons false (cons true nil))
 
 -- dependent function composition
-comp : {A} {B : A -> U} {C : {a : A} -> B a -> U}
+comp : {A : U} {B : A -> U} {C : {a : A} -> B a -> U}
        (f : {a : A} (b : B a) -> C b)
        (g : (a : A) -> B a)
        (a : A)
@@ -80,13 +80,13 @@ hundred : _
 hundred = mul ten ten
 
 -- Leibniz equality
-Eq : {A} -> A -> A -> U
+Eq : {A: U} -> A -> A -> U
 Eq = \{A} x y => (P : A -> U) -> P x -> P y
 
-refl : {A} {x : A} -> Eq x x
+refl : {A : U} {x : A} -> Eq x x
 refl = \_ px => px
 
-sym : {A x y} -> Eq {A} x y -> Eq y x
+sym : {A x y : _} -> Eq {A} x y -> Eq y x
 sym = \p => p (\y => Eq y x) refl
 
 eqtest : Eq (mul ten ten) hundred

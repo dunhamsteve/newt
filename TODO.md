@@ -1,7 +1,7 @@
 
 ## TODO
 
-- [ ] I've made `{x}` be `{x : _}` instead of `{_ : x}`. Change this.
+- [x] I've made `{x}` be `{x : _}` instead of `{_ : x}`. Change this.
 - [ ] Remove context lambdas when printing solutions (show names from context)
   - build list of names and strip λ, then call pprint with names
 - [ ] Check for shadowing when declaring dcon

@@ -225,7 +225,8 @@ varname = (ident <|> uident <|> keyword "_" *> pure "_")
 ebind : Parser (List (FC, String, Icit, Raw))
 ebind = do
   -- don't commit until we see the ":"
-  names <- try (sym "(" *> some (withPos varname) <* sym ":")
+  sym "("
+  names <- try (some (withPos varname) <* sym ":")
   ty <- typeExpr
   sym ")"
   pure $ map (\(pos, name) => (pos, name, Explicit, ty)) names
@@ -234,18 +235,18 @@ ibind : Parser (List (FC, String, Icit, Raw))
 ibind = do
   sym "{"
   -- REVIEW - I have name required and type optional, which I think is the opposite of what I expect
-  names <- some $ withPos varname
-  ty <- optional (sym ":" >> typeExpr)
+  names <- try (some (withPos varname) <* sym ":")
+  ty <- typeExpr
   sym "}"
-  pure $ map (\(pos,name) => (pos, name, Implicit, fromMaybe (RImplicit pos) ty)) names
+  pure $ map (\(pos,name) => (pos, name, Implicit, ty)) names
 
 abind : Parser (List (FC, String, Icit, Raw))
 abind = do
   sym "{{"
-  names <- some $ withPos varname
-  ty <- optional (sym ":" >> typeExpr)
+  names <- try (some (withPos varname) <* sym ":")
+  ty <- typeExpr
   sym "}}"
-  pure $ map (\(pos,name) => (pos, name, Auto, fromMaybe (RImplicit pos) ty)) names
+  pure $ map (\(pos,name) => (pos, name, Auto, ty)) names
 
 arrow : Parser Unit
 arrow = sym "->" <|> sym "→"
