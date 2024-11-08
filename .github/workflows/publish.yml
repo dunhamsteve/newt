@@ -1,0 +1,52 @@
+name: Publish Playground
+concurrency:
+    group: production
+    cancel-in-progress: true
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ghcr.io/stefan-hoeck/idris2-pack:latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - name: dependencies
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: build
+        run: |
+          pack install contrib
+          make
+          cd playground
+          npm install -g esbuild vite
+          npm install
+          mkdir public
+          ./build
+          vite build --base /newt
+          #npm run build
+      - name: Upload playground
+        id: deployment
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: playground/dist/
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+
+
+
+
