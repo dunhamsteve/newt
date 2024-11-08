@@ -1,0 +1,197 @@
+
+
+/-
+  Ok, so this is newt, a dependent typed programming language that
+  I am implementing to learn how they work.  It targets javascript
+  and borrows a lot of syntax from Idris and Agda.
+
+  This page is a very simple web playground based on the monaco editor.
+  It runs newt, compiled by Idris2, in a web worker.
+
+  Block comments follow Lean because they're easier to type on a
+  US keyboard.
+
+  The output, to the right, is somewhat noisy and obtuse. You'll see
+  INFO and sometimes ERROR messages that show up in the editor view
+  on hover.  I'm emitting INFO for solved metas.
+
+  The Day1.newt and Day2.newt are last year's advent of code, translated
+  from Lean.  You need to visit `Lib.newt` to get it to the worker.
+
+-/
+
+-- One-line comments begin with two hypens
+
+-- every file begins with a `module` declaration
+-- it must match the filename
+module Tour
+
+-- We can import other modules, with a flat namespace and no cycles,
+-- diamonds are ok
+
+-- commented out until we preload other files into the worker
+-- import Lib
+
+-- We're calling the universe U and are doing type in type for now
+
+-- Inductive type definitions are similar to Idris, Agda, or Haskell
+data Nat : U where
+  Z : Nat
+  S : Nat -> Nat
+
+-- Multiple names are allowed on the left:
+data Bool : U where
+  True False : Bool
+
+-- function definitions are equations using dependent pattern matching
+plus : Nat -> Nat -> Nat
+plus Z m = m
+plus (S n) m = S (plus n m)
+
+-- we can also have case statements on the right side
+-- the core language includes case statements
+-- here `\` is used for a lambda expression:
+plus' : Nat -> Nat -> Nat
+plus' = \ n m => case n of
+    Z => m
+    S n => S (plus n m)
+
+-- We can define operators, currently only infix
+-- and we allow unicode and letters in operators
+infixl 2 _≡_
+
+-- Here is an equality, like Idris, everything goes to the right of the colon
+-- Implicits are denoted with braces `{ }`
+-- unlike idris, you have to declare all of your implicits
+data _≡_ : {A : U} -> A -> A -> U where
+  Refl : {A : U} {a : A} -> a ≡ a
+
+-- And now the compiler can verify that 1 + 1 = 2
+test : plus (S Z) (S Z) ≡ S (S Z)
+test = Refl
+
+-- Ok now we do typeclasses.  There isn't any sugar, but we have
+-- search for implicits marked with double brackets.
+
+-- Let's say we want a generic `_+_` operator
+infixl 7 _+_
+
+-- We don't have records yet, so we define a single constructor
+-- inductive type:
+data Plus : U -> U where
+  MkPlus : {A : U} -> (A -> A -> A) -> Plus A
+
+-- and the generic function that uses it
+-- the double brackets indicate an argument that is solved by search
+_+_ : {A : U} {{_ : Plus A}} -> A -> A -> A
+_+_ {{MkPlus f}} x y = f x y
+
+-- The typeclass is now defined, search will look for functions in scope
+-- that return a type matching (same type constructor) the implicit
+-- and only have implicit arguments (inspired by Agda).
+
+-- We make an instance `Plus Nat`
+PlusNat : Plus Nat
+PlusNat = MkPlus plus
+
+-- and it now finds the implicits, you'll see the solutions to the
+-- implicits if you hover over the `+`.
+two : Nat
+two = S Z + S Z
+
+-- We can leave a hole in an expression with ? and the editor will show us the
+-- scope and expected type (hover to see)
+foo : Nat -> Nat -> Nat
+foo a b = ?
+
+-- Newt compiles to javascript, there is a tab to the right that shows the
+-- javascript output. It is not doing erasure (or inlining) yet, so the
+-- code is a little verbose.
+
+-- We can define native types:
+
+ptype Int : U
+ptype String : U
+ptype Char : U
+
+-- The names of these three types are special, primitive numbers, strings,
+-- and characters inhabit them, respectively. We can match on primitives, but
+-- must provide a default case:
+
+isVowel : Char -> Bool
+isVowel 'a' = True
+isVowel 'e' = True
+isVowel 'i' = True
+isVowel 'o' = True
+isVowel 'u' = True
+isVowel _ = False
+
+-- And primitive functions have a type and a javascript definition:
+
+pfunc plusInt : Int -> Int -> Int := "(x,y) => x + y"
+pfunc plusString : String -> String -> String := "(x,y) => x + y"
+
+-- We can make them Plus instances:
+
+PlusInt : Plus Int
+PlusInt = MkPlus plusInt
+
+PlusString : Plus String
+PlusString = MkPlus plusString
+
+concat : String -> String -> String
+concat a b = a + b
+
+-- Now we define Monad
+
+data Monad : (U -> U) -> U where
+  MkMonad : {m : U -> U} ->
+            ({a : U} -> a -> m a) ->
+            ({a b : U} -> m a -> (a -> m b) -> m b) ->
+            Monad m
+
+pure : {m : U -> U} -> {{_ : Monad m}} -> {a : U} -> a -> m a
+pure {{MkMonad p _}} a = p a
+
+-- we can declare multiple infix operators at once
+infixl 1 _>>=_ _>>_
+
+_>>=_ : {m : U -> U} -> {{_ : Monad m}} -> {a b : U} -> m a -> (a -> m b) -> m b
+_>>=_ {{MkMonad _ b}} ma amb = b ma amb
+
+_>>_ :  {m : U -> U} -> {{_ : Monad m}} -> {a b : U} -> m a -> m b -> m b
+ma >> mb = ma >>= (λ _ => mb)
+
+-- That's our Monad typeclass, now let's make a List monad
+
+infixr 3 _::_
+data List : U -> U where
+  Nil : {A : U} -> List A
+  _::_ : {A : U} -> A -> List A -> List A
+
+infixr 7 _++_
+_++_ : {a : U} -> List a -> List a -> List a
+Nil ++ ys = ys
+(x :: xs) ++ ys = x :: (xs ++ ys)
+
+bindList : {a b : U} -> List a -> (a -> List b) -> List b
+bindList Nil f = Nil
+bindList (x :: xs) f = f x ++ bindList xs f
+
+-- Both `\` and `λ` work for lambda expressions:
+MonadList : Monad List
+MonadList = MkMonad (λ a => a :: Nil) bindList
+
+-- We'll want Pair below too.  `,` has been left for use as an operator.
+-- Also we see that → can be used in lieu of ->
+infixr 1 _,_ _×_
+data _×_ : U → U → U where
+  _,_ : {A B : U} → A → B → A × B
+
+-- The _>>=_ operator is used for desugaring do blocks
+
+prod : {A B : U} → List A → List B → List (A × B)
+prod xs ys = do
+  x <- xs
+  y <- ys
+  pure (x, y)

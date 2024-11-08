@@ -1,11 +1,13 @@
 
 ## TODO
 
+- [ ] Bad module name error has FC 0,0 instead of the module or name
 - [x] I've made `{x}` be `{x : _}` instead of `{_ : x}`. Change this.
 - [ ] Remove context lambdas when printing solutions (show names from context)
   - build list of names and strip λ, then call pprint with names
 - [ ] Check for shadowing when declaring dcon
 - [ ] Require infix decl before declaring names (helps find bugs)
+- [ ] sugar for typeclasses
 - [x] Allow unicode operators/names
 - Web playground
   - [x] editor
@@ -57,7 +59,7 @@
 - [ ] Lean-like .map, etc? (resolve name in namespace of target type, etc)
 - [x] ~~SKIP list syntax~~
   - Agda doesn't have it, clashes with pair syntax
-- [ ] autos / typeclass resolution
+- [x] autos / typeclass resolution
   - [x] very primitive version in place, not higher order, search at end
   - [x] monad is now working
 - [x] do blocks (needs typeclass, overloaded functions, or constrain to IO)

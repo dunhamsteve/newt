@@ -132,7 +132,7 @@ logMetas mstart = do
       let names = (toList $ map fst ctx.types)
       -- I want to know which ones are defines. I should skip the `=` bit if they match, I'll need indices in here too.
       env <- for (zip ctx.env (toList ctx.types)) $ \(v, n, ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)} = \{pprint names !(quote ctx.lvl v)}"
-      let msg = "\{unlines (toList $ reverse env)}  -----------\n  \{pprint names ty'}\n  \{showTm ty'}"
+      let msg = "\{unlines (toList $ reverse env)}  -----------\n  \{pprint names ty'}"
       info fc "User Hole\n\{msg}"
     (Unsolved (l,c) k ctx ty kind cons) => do
       tm <- quote ctx.lvl !(forceMeta ty)

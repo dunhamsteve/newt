@@ -130,6 +130,7 @@ onmessage = function (e) {
   files[fn] = src;
   files['out.js'] = 'No JS output';
   stdout = ''
+  const start = +new Date()
   try {
     newtMain();
   } catch (e) {
@@ -138,7 +139,9 @@ onmessage = function (e) {
     // make it visable
     stdout += '\n' + String(e)
   }
+  let duration = +new Date() - start
+  console.log(`process ${fn} in ${duration} ms`)
   let javascript = files['out.js']
   let output = stdout
-  postMessage({javascript, output})
+  postMessage({javascript, output, duration})
 }

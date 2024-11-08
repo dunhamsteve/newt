@@ -33,12 +33,24 @@ const state = {
   editor: signal<monaco.editor.IStandaloneCodeEditor | null>(null),
 };
 
+async function loadFile(fn: string) {
+  if (fn) {
+    const res = await fetch(fn);
+    const text = await res.text();
+    state.editor.value!.setValue(text);
+  } else {
+    state.editor.value!.setValue("module Main\n");
+  }
+}
+
 // I keep pressing this.
 document.addEventListener("keydown", (ev) => {
   if (ev.metaKey && ev.code == "KeyS") ev.preventDefault();
 });
 
-let value = localStorage.code || "module Main\n";
+const LOADING = "module Loading\n"
+
+let value = localStorage.code || LOADING;
 
 // let result = document.getElementById("result")!;
 
@@ -62,6 +74,7 @@ function Editor({ initialValue }: EditorProps) {
       language: "newt",
       theme: "vs",
       automaticLayout: true,
+      unicodeHighlight: { ambiguousCharacters: false },
       minimap: { enabled: false },
     });
     state.editor.value = editor;
@@ -74,7 +87,10 @@ function Editor({ initialValue }: EditorProps) {
         localStorage.code = value;
       }, 1000);
     });
-    run(initialValue);
+    if (initialValue === LOADING)
+      loadFile("Tour.newt")
+    else
+      run(initialValue);
   }, []);
 
   return h("div", { id: "editor", ref });
@@ -125,13 +141,13 @@ function Tabs() {
 }
 
 const SAMPLES = [
+  "Tour.newt",
   "Tree.newt",
   // "Prelude.newt",
   "Lib.newt",
   "Day1.newt",
   "Day2.newt",
   "TypeClass.newt",
-
 ];
 
 function EditWrap() {
@@ -141,13 +157,8 @@ function EditWrap() {
     if (ev.target instanceof HTMLSelectElement) {
       let fn = ev.target.value;
       ev.target.value = "";
-      if (fn) {
-        const res = await fetch(fn);
-        const text = await res.text();
-        state.editor.value!.setValue(text);
-      } else {
-        state.editor.value!.setValue("module Main\n");
-      }
+      loadFile(fn)
+
     }
   };
   return h(

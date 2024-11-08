@@ -48,6 +48,13 @@ export let newtConfig: monaco.languages.LanguageConfiguration = {
         indentAction: monaco.languages.IndentAction.Indent,
       },
     },
+    {
+      beforeText: /\/-/,
+      afterText: /-\//,
+      action: {
+        indentAction: monaco.languages.IndentAction.IndentOutdent,
+      },
+    },
   ],
 };
 
