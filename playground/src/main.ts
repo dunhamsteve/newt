@@ -51,6 +51,7 @@ document.addEventListener("keydown", (ev) => {
 const LOADING = "module Loading\n"
 
 let value = localStorage.code || LOADING;
+let initialVertical = localStorage.vertical == 'true'
 
 // let result = document.getElementById("result")!;
 
@@ -135,7 +136,7 @@ function Tabs() {
 
   return h(
     "div",
-    { className: "tabPanel" },
+    { className: "tabPanel right" },
     h("div", { className: "tabBar" }, Tab(RESULTS), Tab(JAVASCRIPT)),
     h("div", { className: "tabBody" }, body)
   );
@@ -152,7 +153,7 @@ const SAMPLES = [
   "TypeClass.newt",
 ];
 
-function EditWrap() {
+function EditWrap({vertical, toggle}: {vertical: boolean, toggle: () => void}) {
   const options = SAMPLES.map((value) => h("option", { value }, value));
 
   const onChange = async (ev: ChangeEvent) => {
@@ -163,9 +164,10 @@ function EditWrap() {
 
     }
   };
+  let d = vertical ?  "M0 0 h20 v20 h-20 z M0 10 h20" : "M0 0 h20 v20 h-20 z M10 0 v20"
   return h(
     "div",
-    { className: "tabPanel" },
+    { className: "tabPanel left" },
     h(
       "div",
       { className: "tabBar" },
@@ -174,17 +176,29 @@ function EditWrap() {
         { onChange },
         h("option", { value: "" }, "choose sample"),
         options
-      )
+      ),
+      h('div', {style: {flex: '1 1'}}),
+      h('button', {onClick: toggle},
+          h('svg', {width:20, height: 20},
+            h('path',{d,fill:'none',stroke:'black'})
+          )
+        )
     ),
     h("div", { className: "tabBody" }, h(Editor, { initialValue: value }))
   );
 }
 
 function App() {
+  let [vertical,setVertical] = useState(initialVertical)
+  let toggle = () => {
+    setVertical(!vertical)
+    localStorage.vertical = !vertical
+  }
+  let className = `wrapper ${vertical?"vertical":"horizontal"}`
   return h(
     "div",
-    { className: "wrapper" },
-    h(EditWrap, {}),
+    { className },
+    h(EditWrap, {vertical, toggle}),
     h(Tabs, {})
   );
 }

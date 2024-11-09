@@ -61,7 +61,7 @@ export let newtConfig: monaco.languages.LanguageConfiguration = {
 
 export let newtTokens: monaco.languages.IMonarchLanguage = {
   // Set defaultToken to invalid to see what you do not tokenize yet
-  defaultToken: "invalid",
+  // defaultToken: "invalid",
 
   keywords: [
     "let",
@@ -83,7 +83,7 @@ export let newtTokens: monaco.languages.IMonarchLanguage = {
   tokenizer: {
     root: [
       [
-        /[a-z_$][\w$]*/,
+        /[a-z_$'][\w$]*/,
         { cases: { "@keywords": "keyword", "@default": "identifier" } },
       ],
       [/[A-Z][\w\$]*/, "type.identifier"],

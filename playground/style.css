@@ -8,15 +8,33 @@
 #editor {
   height: 100%;
 }
-.wrapper {
+.wrapper.horizontal {
   display: flex;
   flex-direction: row;
   height: 100%;
 }
-.wrapper > div {
+.wrapper.horizontal > div {
   flex: 1 1;
   /* allow smaller than natural */
   width: 100px;
+}
+.wrapper.vertical {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.wrapper.vertical .tabPanel.left {
+  flex: .6 .6;
+  height: 100px;
+}
+.wrapper.vertical .tabPanel.right {
+  flex: .4 .4;
+  height: 100px;
+}
+.tabBar button {
+  border: none;
+  padding: none;
+  background: inherit;
 }
 .tabPanel {
   display: flex;
