@@ -1,6 +1,5 @@
 module Day1
 
--- Need to visit Lib.newt for this to work in playground
 import Lib
 
 digits1 : List Char -> List Int

@@ -73,7 +73,6 @@ TooBig l u h = Sg Nat (\ x => T23 l (N x) h * T23 (N x) u h)
 
 insert : {h : Nat} {l u : Bnd} -> Intv l u -> T23 l u h -> TooBig l u h + T23 l u h
 -- Agda is yellow here, needs h = x on each leaf
--- The second arg to the second _,_ is unsolved and pi-typed
 insert (intv x lx xu) (leaf lu) = inl (x , (leaf {_} {_} {x} lx , leaf {_} {_} {x} xu))
 insert (intv x lx xu) (node2 y tly tyu) = case cmp x y of
   -- u := N y is not solved at this time

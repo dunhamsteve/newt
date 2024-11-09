@@ -64,9 +64,7 @@ let shim: any = {
       let buf2 = new TextEncoder().encode(line);
       handle.buf =  Buffer.concat([handle.buf, buf2])
     },
-    chmodSync(fn: string, mode: number) {
-      console.log('chmod', fn, mode)
-    },
+    chmodSync(fn: string, mode: number) { },
     readSync(fd: number, buf: Buffer, start: number, len: number) {
       let hand = fds[fd];
       let avail = hand.buf.byteLength - hand.pos;
@@ -118,8 +116,18 @@ let stdout = ''
 process.stdout.write = (s) => {
   stdout += s
 };
+// hack for now
+const preload = ["Lib.newt"]
+onmessage = async function (e) {
+  for (let fn of preload) {
 
-onmessage = function (e) {
+    if (!files['src/'+fn]) {
+      console.log('preload', fn)
+      let res = await fetch(fn)
+      let text = await res.text()
+      files['src/'+fn] = text
+    }
+  }
   let {src} = e.data
   let module = 'Main'
   let m = src.match(/module (\w+)/)

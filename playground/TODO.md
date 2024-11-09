@@ -8,6 +8,8 @@
 - [x] tabs for source, compiler output
 - [x] Show errors in editor
 - [x] show tabs on rhs
-  - [ ] editor is a tab on mobile
-- [ ] publish / host on github
-- [ ] multiple files
+  - [ ] make editor a tab on mobile
+    - (or possibly put the tab bar under the keyboard)
+- [x] publish / host on github
+- [ ] multiple persistent files
+- [x] kill return for autocomplete

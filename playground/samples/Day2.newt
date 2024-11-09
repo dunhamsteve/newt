@@ -1,6 +1,5 @@
 module Day2
 
--- Need to visit Lib.newt for this to work in playground
 import Lib
 
 Draw : U

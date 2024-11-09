@@ -74,6 +74,7 @@ function Editor({ initialValue }: EditorProps) {
       language: "newt",
       theme: "vs",
       automaticLayout: true,
+      acceptSuggestionOnEnter: "off",
       unicodeHighlight: { ambiguousCharacters: false },
       minimap: { enabled: false },
     });
