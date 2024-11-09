@@ -16,7 +16,7 @@
   on hover.  I'm emitting INFO for solved metas.
 
   The Day1.newt and Day2.newt are last year's advent of code, translated
-  from Lean.  You need to visit `Lib.newt` to get it to the worker.
+  from Lean.
 
 -/
 

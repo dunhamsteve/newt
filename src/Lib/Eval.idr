@@ -4,6 +4,7 @@ module Lib.Eval
 import Lib.Parser.Impl
 import Lib.Prettier
 import Lib.Types
+import Lib.TopContext
 import Control.Monad.Error.Interface
 
 import Data.IORef
@@ -43,6 +44,18 @@ export
 vappSpine : Val -> SnocList Val -> M Val
 vappSpine t [<] = pure t
 vappSpine t (xs :< x) = vapp !(vappSpine t xs) x
+
+export
+tryEval : Val -> M (Maybe Val)
+tryEval (VRef fc k _ sp) =
+  case lookup k !(get) of
+      Just (MkEntry name ty (Fn tm)) => do
+          vtm <- eval [] CBN tm
+          case !(vappSpine vtm sp) of
+            VCase{} => pure Nothing
+            v => pure $ Just v
+      _ => pure Nothing
+tryEval _ = pure Nothing
 
 evalCase : Env -> Mode -> Val -> List CaseAlt -> M (Maybe Val)
 evalCase env mode sc@(VRef _ nm _ sp) (cc@(CaseCons name nms t) :: xs) =
@@ -94,11 +107,12 @@ eval env mode (Bnd fc i) = case getAt i env of
   Nothing => error' "Bad deBruin index \{show i}"
 eval env mode (Lit fc lit) = pure $ VLit fc lit
 
-eval env mode tm@(Case fc sc alts) =
-  case !(evalCase env mode !(eval env mode sc) alts) of
-    Just v => pure v
-    Nothing => pure $ fromMaybe (VCase fc !(eval env mode sc) alts)
-                                !(evalCase env mode !(eval env mode sc) alts)
+eval env mode tm@(Case fc sc alts) = do
+  -- TODO we need to be able to tell eval to expand aggressively here.
+  sc' <- eval env mode sc
+  let sc' = fromMaybe sc' !(tryEval sc')
+  pure $ fromMaybe (VCase fc !(eval env mode sc) alts)
+                             !(evalCase env mode sc' alts)
 
 export
 quote : (lvl : Nat) -> Val -> M Tm

@@ -58,17 +58,6 @@ forceMeta (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Solved _ k t) => vappSpine t sp >>= forceMeta
 forceMeta x = pure x
 
-tryEval : Val -> M (Maybe Val)
-tryEval (VRef fc k _ sp) =
-  case lookup k !(get) of
-      Just (MkEntry name ty (Fn tm)) => do
-          vtm <- eval [] CBN tm
-          case !(vappSpine vtm sp) of
-            VCase{} => pure Nothing
-            v => pure $ Just v
-      _ => pure Nothing
-tryEval _ = pure Nothing
-
 -- Force far enough to compare types
 forceType : Val -> M Val
 forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
