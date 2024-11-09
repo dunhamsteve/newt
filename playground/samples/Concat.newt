@@ -28,11 +28,33 @@ infixl 1 _≡_
 data _≡_ : {A : U} -> A -> A -> U where
     Refl : {A : U} {a : A} -> a ≡ a
 
+sym : {A : U} {a b : A} -> a ≡ b -> b ≡ a
+sym Refl = Refl
+
 replace : {A : U} {a b : A} -> (P : A -> U) -> a ≡ b -> P a -> P b
 replace p Refl x = x
 
 cong : {A B : U} {a b : A} -> (f : A -> B) -> a ≡ b -> f a ≡ f b
 
-thm : {A : U} (xs ys : List A) -> length (xs ++ ys) ≡ length xs + length ys
-thm Nil ys = Refl
-thm (x :: xs) ys = cong S (thm xs ys)
+length-++ : {A : U} (xs ys : List A) -> length (xs ++ ys) ≡ length xs + length ys
+length-++ Nil ys = Refl
+length-++ (x :: xs) ys = cong S (length-++ xs ys)
+
+-- PLFA definition
+reverse : {A : U} -> (xs : List A) -> List A
+reverse Nil = Nil
+reverse (x :: xs) = reverse xs ++ (x :: Nil)
+
+++-identity : {A : U} -> (xs : List A) -> xs ++ Nil ≡ xs
+++-identity Nil = Refl
+++-identity (x :: xs) = cong (_::_ x) (++-identity xs)
+
+++-associative : {A : U} (xs ys zs : List A) -> xs ++ (ys ++ zs) ≡ (xs ++ ys) ++ zs
+
+-- TODO port equational reasoning
+reverse-++-distrib : {A : U} -> (xs ys : List A) -> reverse (xs ++ ys) ≡ reverse ys ++ reverse xs
+reverse-++-distrib Nil ys = replace (\ z => reverse ys ≡ z) (sym (++-identity (reverse ys))) Refl
+reverse-++-distrib {A} (x :: xs) ys =
+  replace (\ z => (reverse (xs ++ ys) ++ (x :: Nil)) ≡ z)
+          (sym (++-associative (reverse ys) (reverse xs) (x :: Nil)))
+          (replace (\ z => (reverse (xs ++ ys)) ++ (x :: Nil) ≡ z ++ (x :: Nil)) (reverse-++-distrib xs ys) Refl)

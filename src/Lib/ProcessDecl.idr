@@ -197,7 +197,7 @@ processDecl (Def fc nm clauses) = do
   mc <- readIORef top.metas
   let mstart = length mc.metas
   let Just entry = lookup nm top
-    | Nothing => throwError $ E fc "skip def \{nm} without Decl"
+    | Nothing => throwError $ E fc "No declaration for \{nm}"
   let (MkEntry name ty Axiom) := entry
     | _ => throwError $ E fc "\{nm} already defined"
 

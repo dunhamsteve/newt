@@ -472,6 +472,16 @@ Show Context where
   show ctx = "Context \{show $ map fst $ ctx.types}"
 
 export
+errorMsg : Error -> String
+errorMsg (E x str) = str
+errorMsg (Postpone x k str) = str
+
+export
+HasFC Error where
+  getFC (E x str) = x
+  getFC (Postpone x k str) = x
+
+export
 error : FC -> String -> M a
 error fc msg = throwError $ E fc msg
 

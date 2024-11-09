@@ -146,7 +146,7 @@ main = do
   -- we'll need to reset for each file, etc.
   ctx <- empty
   Right _  <- runEitherT $ runStateT ctx $ main'
-    | Left (E (c, r) str) => do
-        putStrLn "ERROR at (\{show c}, \{show r}): \{show str}"
+    | Left err => do
+        putStrLn "ERROR at \{show $ getFC err}: \{errorMsg err}"
         exitFailure
   putStrLn "done"

@@ -19,12 +19,23 @@ emptyFC = (0,0)
 
 -- Error of a parse
 public export
-data Error = E FC String
+data Error
+  = E FC String
+  | Postpone FC Nat String
 %name Error err
 
 public export
 showError : String -> Error -> String
 showError src (E (line, col) msg) = "ERROR at \{show (line,col)}: \{msg}\n" ++ go 0 (lines src)
+  where
+    go : Int -> List String -> String
+    go l [] = ""
+    go l (x :: xs) =
+      if l == line then
+        "  \{x}\n  \{replicate (cast col) ' '}^\n"
+      else if line - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
+      else go (l + 1) xs
+showError src (Postpone (line, col) ix msg) = "ERROR at \{show (line,col)}: Postpone \{show ix} \{msg}\n" ++ go 0 (lines src)
   where
     go : Int -> List String -> String
     go l [] = ""

@@ -120,20 +120,29 @@ parameters (ctx: Context)
   rename meta ren lvl v = go ren lvl v
     where
       go : List Nat -> Nat -> Val  -> M  Tm
-      goSpine : List Nat -> Nat -> Tm -> SnocList Val  -> M  Tm
+      goSpine : List Nat -> Nat -> Tm -> SnocList Val  -> M Tm
       goSpine ren lvl tm [<] = pure tm
       goSpine ren lvl tm (xs :< x) = do
         xtm <- go ren lvl x
         pure $ App emptyFC !(goSpine ren lvl tm xs) xtm
 
       go ren lvl (VVar fc k sp) = case findIndex (== k) ren of
-        Nothing => error fc "scope/skolem thinger"
+        Nothing => error fc "scope/skolem thinger VVar \{show k} ren \{show ren}"
         Just x => goSpine ren lvl (Bnd fc $ cast x) sp
       go ren lvl (VRef fc nm def sp) = goSpine ren lvl (Ref fc nm def) sp
-      go ren lvl (VMeta fc ix sp) = if ix == meta
+      go ren lvl (VMeta fc ix sp) = do
+        -- So sometimes we have an unsolved meta in here which reference vars out of scope.
+        debug "rename Meta \{show ix} spine \{show sp}"
+        if ix == meta
         -- REVIEW is this the right fc?
-        then error fc "meta occurs check"
-        else goSpine ren lvl (Meta fc ix) sp
+          then error fc "meta occurs check"
+          else case !(lookupMeta ix) of
+            Solved fc _ val => do
+              debug "rename: \{show ix} is solved"
+              go ren lvl !(vappSpine val sp)
+            _ => do
+              debug "rename: \{show ix} is unsolved"
+              catchError {e=Error} (goSpine ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc ix (errorMsg err))
       go ren lvl (VLam fc n t) = pure (Lam fc n !(go (lvl :: ren) (S lvl) !(t $$ VVar fc lvl [<])))
       go ren lvl (VPi fc n icit ty tm) = pure (Pi fc n icit !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar emptyFC lvl [<])))
       go ren lvl (VU fc) = pure (U fc)
@@ -169,19 +178,29 @@ parameters (ctx: Context)
 
     debug "meta \{show meta}"
     ren <- invert l sp
-    tm <- rename m ren l t
-    let tm = lams (length sp) tm
-    top <- get
-    soln <- eval [] CBN tm
+    catchError {e=Error} (do
 
-    updateMeta ctx m $ \case
-      (Unsolved pos k _ _ _ cons) => pure $ Solved pos k soln
-      (Solved _ k x) => error' "Meta \{show ix} already solved!"
-    for_ cons $ \case
-      MkMc fc ctx sp rhs => do
-        val <- vappSpine soln sp
-        debug "discharge l=\{show ctx.lvl} \{(show val)} =?= \{(show rhs)}"
-        unify ctx.lvl Normal val rhs
+      tm <- rename m ren l t
+
+      let tm = lams (length sp) tm
+      top <- get
+      soln <- eval [] CBN tm
+
+      updateMeta ctx m $ \case
+        (Unsolved pos k _ _ _ cons) => pure $ Solved pos k soln
+        (Solved _ k x) => error' "Meta \{show ix} already solved!"
+      for_ cons $ \case
+        MkMc fc ctx sp rhs => do
+          val <- vappSpine soln sp
+          debug "discharge l=\{show ctx.lvl} \{(show val)} =?= \{(show rhs)}"
+          unify ctx.lvl Normal val rhs)
+      (\case
+        Postpone fc ix msg => do
+          -- let someone else solve this and then check again.
+          addConstraint ctx m sp t
+          pure ()
+        err => throwError err)
+
 
   unifySpine : Nat -> UnifyMode -> Bool -> SnocList Val -> SnocList Val  -> M UnifyResult
   unifySpine l mode False _ _ = error emptyFC "unify failed at head" -- unreachable now
@@ -305,12 +324,12 @@ parameters (ctx: Context)
 export
 unifyCatch : FC -> Context -> Val -> Val -> M ()
 unifyCatch fc ctx ty' ty = do
-    res <- catchError (unify ctx ctx.lvl Normal ty' ty) $ \(E x str) => do
+    res <- catchError (unify ctx ctx.lvl Normal ty' ty) $ \err => do
       let names = toList $ map fst ctx.types
       debug "fail \{show ty'} \{show ty}"
       a <- quote ctx.lvl ty'
       b <- quote ctx.lvl ty
-      let msg = "unification failure: \{str}\n  failed to unify \{pprint names a}\n    with \{pprint names b}\n  "
+      let msg = "unification failure: \{errorMsg err}\n  failed to unify \{pprint names a}\n    with \{pprint names b}\n  "
       throwError (E fc msg)
     case res of
       MkResult [] => pure ()
@@ -503,8 +522,8 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   -- codomain with the scrutinee type
   debug "unify dcon cod with scrut\n  \{show ty'}\n  \{show scty}"
   Just res <- catchError {e = Error} (Just <$> unify ctx' (length ctx'.env) Pattern ty' scty)
-              (\(E _ msg) => do
-                  debug "SKIP \{dcName} because unify error \{msg}"
+              (\err => do
+                  debug "SKIP \{dcName} because unify error \{errorMsg err}"
                   pure Nothing)
     | _ => pure Nothing
 
@@ -534,8 +553,8 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
 
     _ => do
         Right res <- tryError {e = Error} (unify ctx' (length ctx'.env) Pattern ty' scty)
-          | Left (E _ msg) => do
-            debug "SKIP \{dcName} because unify error \{msg}"
+          | Left err => do
+            debug "SKIP \{dcName} because unify error \{errorMsg err}"
             pure Nothing
 
         -- Constrain the scrutinee's variable to be dcon applied to args

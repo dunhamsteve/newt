@@ -1,6 +1,7 @@
 
 ## TODO
 
+- [ ] forall / ∀ sugar
 - [ ] Bad module name error has FC 0,0 instead of the module or name
 - [x] I've made `{x}` be `{x : _}` instead of `{_ : x}`. Change this.
 - [ ] Remove context lambdas when printing solutions (show names from context)
@@ -8,6 +9,7 @@
 - [ ] Check for shadowing when declaring dcon
 - [ ] Require infix decl before declaring names (helps find bugs)
 - [ ] sugar for typeclasses
+- [ ] maybe add implicits in core to help resugar operators?
 - [x] Allow unicode operators/names
 - Web playground
   - [x] editor
@@ -17,6 +19,7 @@
   - [x] need to shim out Buffer
 - [x] get rid of stray INFO from auto resolution
 - [ ] handle `if_then_else_` style mixfix
+  - [ ] equational reasoning sample (maybe PLFA "Lists")
 - [x] Search should look at context
 - [ ] records
 - [ ] copattern matching
