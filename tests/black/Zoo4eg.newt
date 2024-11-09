@@ -63,13 +63,13 @@ comp : {A : U} {B : A -> U} {C : {a : A} -> B a -> U}
        -> C (g a)
 comp = \f g a => f (g a)
 
--- compExample : Bool
+-- TODO unsolved metas in dependent function composition
+-- compExample : List Bool
 -- compExample = comp (cons true) (cons false) nil
 
 Nat : U
 Nat = (N : U) -> (N -> N) -> N -> N
 
--- TODO - first underscore there, why are there two metas?
 mul : Nat -> Nat -> Nat
 mul = \a b N s z => a _ (b _ s) z
 

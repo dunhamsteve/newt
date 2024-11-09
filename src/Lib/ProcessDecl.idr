@@ -118,6 +118,20 @@ solveAutos mlen ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
       solveAutos mlen (take mlen mc.metas)
 solveAutos mlen (_ :: es) = solveAutos mlen es
 
+dumpEnv : Context -> M String
+dumpEnv ctx =
+  unlines . reverse <$> go (names ctx) 0 (reverse $ zip ctx.env (toList ctx.types)) []
+  where
+    isVar : Nat -> Val -> Bool
+    isVar k (VVar _ k' [<]) = k == k'
+    isVar _ _ = False
+
+    go : List String -> Nat -> List (Val, String, Val) -> List String -> M (List String)
+    go _ _ [] acc = pure acc
+    go names k ((v, n, ty) :: xs) acc = if isVar k v
+      -- TODO - use Doc and add <+/> as appropriate to printing
+      then go names (S k) xs ("  \{n} : \{pprint names !(quote ctx.lvl ty)}":: acc)
+      else go names (S k) xs ("  \{n} = \{pprint names !(quote ctx.lvl v)} : \{pprint names !(quote ctx.lvl ty)}":: acc)
 
 logMetas : Nat -> M ()
 logMetas mstart = do
@@ -125,21 +139,19 @@ logMetas mstart = do
   top <- get
   mc <- readIORef top.metas
   let mlen = length mc.metas `minus` mstart
-  for_ (take mlen mc.metas) $ \case
+  for_ (reverse $ take mlen mc.metas) $ \case
     (Solved fc k soln) => info fc "solve \{show k} as \{pprint [] !(quote 0 soln)}"
     (Unsolved fc k ctx ty User cons) => do
       ty' <- quote ctx.lvl ty
       let names = (toList $ map fst ctx.types)
-      -- I want to know which ones are defines. I should skip the `=` bit if they match, I'll need indices in here too.
-      env <- for (zip ctx.env (toList ctx.types)) $ \(v, n, ty) => pure "  \{n} : \{pprint names !(quote ctx.lvl ty)} = \{pprint names !(quote ctx.lvl v)}"
-      let msg = "\{unlines (toList $ reverse env)}  -----------\n  \{pprint names ty'}"
+      env <- dumpEnv ctx
+      let msg = "\{env}  -----------\n  \{pprint names ty'}"
       info fc "User Hole\n\{msg}"
     (Unsolved (l,c) k ctx ty kind cons) => do
       tm <- quote ctx.lvl !(forceMeta ty)
       -- Now that we're collecting errors, maybe we simply check at the end
       -- TODO - log constraints?
       addError $ E (l,c) "Unsolved meta \{show k} \{show kind} type \{pprint (names ctx) tm} \{show $ length cons} constraints"
-
 
 export
 processDecl : Decl -> M ()

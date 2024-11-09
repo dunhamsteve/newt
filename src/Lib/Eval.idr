@@ -57,6 +57,18 @@ tryEval (VRef fc k _ sp) =
       _ => pure Nothing
 tryEval _ = pure Nothing
 
+-- Force far enough to compare types
+export
+forceType : Val -> M Val
+forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
+  (Unsolved x k xs _ _ _) => pure (VMeta fc ix sp)
+  (Solved _ k t) => vappSpine t sp >>= forceType
+--forceType x = fromMaybe x <$> tryEval x
+forceType x = do
+  Just x' <- tryEval x
+    | _ => pure x
+  forceType x'
+
 evalCase : Env -> Mode -> Val -> List CaseAlt -> M (Maybe Val)
 evalCase env mode sc@(VRef _ nm _ sp) (cc@(CaseCons name nms t) :: xs) =
   if nm == name
@@ -69,7 +81,7 @@ evalCase env mode sc@(VRef _ nm _ sp) (cc@(CaseCons name nms t) :: xs) =
     go env (arg :: args) (nm :: nms) = go (arg :: env) args nms
     go env args [] = Just <$> vappSpine !(eval env mode t) ([<] <>< args)
     go env [] rest = pure Nothing
-
+-- FIXME not good if stuck function
 evalCase env mode sc (CaseDefault u :: xs) = pure $ Just !(eval (sc :: env) mode u)
 evalCase env mode sc cc = do
   debug "CASE BAIL sc \{show sc} vs \{show cc}"
@@ -110,7 +122,7 @@ eval env mode (Lit fc lit) = pure $ VLit fc lit
 eval env mode tm@(Case fc sc alts) = do
   -- TODO we need to be able to tell eval to expand aggressively here.
   sc' <- eval env mode sc
-  let sc' = fromMaybe sc' !(tryEval sc')
+  sc' <- forceType sc'
   pure $ fromMaybe (VCase fc !(eval env mode sc) alts)
                              !(evalCase env mode sc' alts)
 

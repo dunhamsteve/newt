@@ -58,13 +58,6 @@ forceMeta (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Solved _ k t) => vappSpine t sp >>= forceMeta
 forceMeta x = pure x
 
--- Force far enough to compare types
-forceType : Val -> M Val
-forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
-  (Unsolved x k xs _ _ _) => pure (VMeta fc ix sp)
-  (Solved _ k t) => vappSpine t sp >>= forceType
-forceType x = fromMaybe x <$> tryEval x
-
 public export
 record UnifyResult where
   constructor MkResult
@@ -280,7 +273,7 @@ parameters (ctx: Context)
             | Just v => unify l mode t' v
           if k == k'
             then unifySpine l mode (k == k') sp sp'
-            else error fc "vref mismatch \{show k} \{show k'} -- \{show sp} \{show sp'}"
+            else error fc "vref mismatch \{show t'} \{show u'}"
 
       (VU _, VU _) => pure neutral
       -- Lennart.newt cursed type references itself

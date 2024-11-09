@@ -20,6 +20,7 @@ export let newtConfig: monaco.languages.LanguageConfiguration = {
     { open: "(", close: ")" },
     { open: '"', close: '"' },
     { open: "'", close: "'" },
+    { open: "/-", close: "-/" },
   ],
   // symbols that can be used to surround a selection
   surroundingPairs: [

@@ -172,33 +172,39 @@ Eq (Tm) where
 ||| Pretty printer for Tm.
 export
 pprint : List String -> Tm -> String
-pprint names tm = render 80 $ go names tm
+pprint names tm = render 80 $ go 0 names tm
   where
-    go : List String -> Tm -> Doc
-    goAlt : List String -> CaseAlt -> Doc
+    parens : Nat -> Nat -> Doc -> Doc
+    parens a b doc = if a < b
+      then text "(" ++ doc ++ text ")"
+      else doc
 
-    goAlt names (CaseDefault t) = "_" <+> "=>" <+> go ("_" :: names) t
-    goAlt names (CaseCons name args t) = text name <+> spread (map text args) <+> "=>" <+/> go (reverse args ++ names) t
-    goAlt names (CaseLit lit t) = text (show lit) <+> "=>" <+/> go names t
+    go : Nat -> List String -> Tm -> Doc
+    goAlt : Nat -> List String -> CaseAlt -> Doc
 
-    go names (Bnd _ k) = case getAt k names of
+    goAlt p names (CaseDefault t) = "_" <+> "=>" <+> go p ("_" :: names) t
+    goAlt p names (CaseCons name args t) = text name <+> spread (map text args) <+> "=>" <+/> go p (reverse args ++ names) t
+    goAlt p names (CaseLit lit t) = text (show lit) <+> "=>" <+/> go p names t
+
+    go p names (Bnd _ k) = case getAt k names of
+      -- Either a bug or we're printing without names
       Nothing => text "BND:\{show k}"
       Just nm => text "\{nm}:\{show k}"
-    go names (Ref _ str mt) = text str
-    go names (Meta _ k) = text "?m:\{show k}"
-    go names (Lam _ nm t) = text "(\\ \{nm} =>" <+> go (nm :: names) t <+> ")"
-    go names (App _ t u) = text "(" <+> go names t <+> go names u <+> ")"
-    go names (U _) = "U"
-    go names (Pi _ nm Auto t u) =
-      text "({{" <+> text nm <+> ":" <+> go names t <+> "}}" <+> "->" <+> go (nm :: names) u <+> ")"
-    go names (Pi _ nm Implicit t u) =
-      text "({" <+> text nm <+> ":" <+> go names t <+> "}" <+> "->" <+> go (nm :: names) u <+> ")"
-    go names (Pi _ nm Explicit t u) =
-      text "((" <+> text nm <+> ":" <+> go names t <+> ")" <+> "->" <+> go (nm :: names) u <+> ")"
+    go p names (Ref _ str mt) = text str
+    go p names (Meta _ k) = text "?m:\{show k}"
+    go p names (Lam _ nm t) = parens 0 p $ text "\\ \{nm} =>" <+> go 0 (nm :: names) t
+    go p names (App _ t u) = parens 0 p $ go 0 names t <+> go 1 names u
+    go p names (U _) = "U"
+    go p names (Pi _ nm Auto t u) =
+      text "({{" <+> text nm <+> ":" <+> go p names t <+> "}}" <+> "->" <+> go p (nm :: names) u <+> ")"
+    go p names (Pi _ nm Implicit t u) =
+      text "({" <+> text nm <+> ":" <+> go p names t <+> "}" <+> "->" <+> go p (nm :: names) u <+> ")"
+    go p names (Pi _ nm Explicit t u) =
+      text "((" <+> text nm <+> ":" <+> go p names t <+> ")" <+> "->" <+> go p (nm :: names) u <+> ")"
     -- FIXME - probably way wrong on the names here.  There is implicit binding going on
-    go names (Case _ sc alts) = text "case" <+> go names sc <+> text "of" </> (nest 2 (line ++ stack (map (goAlt names) alts)))
-    go names (Lit _ lit) = text (show lit)
-    go names (Let _ nm t u) = text "let" <+> text nm <+> ":=" <+> go names t </> (nest 2 $ go names u)
+    go p names (Case _ sc alts) = parens 0 p $ text "case" <+> go 0 names sc <+> text "of" </> (nest 2 (line ++ stack (map (goAlt 0 names) alts)))
+    go p names (Lit _ lit) = text (show lit)
+    go p names (Let _ nm t u) = parens 0 p $ text "let" <+> text nm <+> ":=" <+> go 0 names t </> (nest 2 $ go 0 names u)
 
 -- public export
 -- data Closure : Nat -> Type
@@ -256,9 +262,11 @@ Show Closure
 
 covering export
 Show Val where
-  show (VVar _ k sp) = "(%var \{show k} \{unwords $ map show (sp <>> [])})"
-  show (VRef _ nm _ sp) = "(%ref \{nm} \{unwords $ map show (sp <>> [])})"
-  show (VMeta _ ix sp) = "(%meta \{show ix} \{show $ length sp})"
+  show (VVar _ k [<]) = "%var\{show k}"
+  show (VVar _ k sp) = "(%var\{show k} \{unwords $ map show (sp <>> [])})"
+  show (VRef _ nm _ [<]) = nm
+  show (VRef _ nm _ sp) = "(\{nm} \{unwords $ map show (sp <>> [])})"
+  show (VMeta _ ix sp) = "(%meta \{show ix} ..\{show $ length sp})"
   show (VLam _ str x) = "(%lam \{str} \{show x})"
   show (VPi fc str Implicit x y) = "(%pi {\{str} : \{show  x}}. \{show  y})"
   show (VPi fc str Explicit x y) = "(%pi (\{str} : \{show  x}). \{show  y})"
