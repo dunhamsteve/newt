@@ -42,6 +42,14 @@ ma >> mb = mb
 pure : {a : U} {m : U -> U} {{_ : Monad m}} -> a -> m a
 pure {_} {_} {{MkMonad _ pure'}} a = pure' a
 
--- IO
+infixl 1 _≡_
+data _≡_ : {A : U} -> A -> A -> U where
+  Refl :  {A : U} -> {a : A} -> a ≡ a
 
+replace : {A : U} {a b : A} -> (P : A -> U) -> a ≡ b -> P a -> P b
+replace p Refl x = x
 
+cong : {A B : U} {a b : A} -> (f : A -> B) -> a ≡ b -> f a ≡ f b
+
+sym : {A : U} -> {a b : A} -> a ≡ b -> b ≡ a
+sym Refl = Refl

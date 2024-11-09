@@ -145,9 +145,10 @@ const SAMPLES = [
   "Tour.newt",
   "Tree.newt",
   // "Prelude.newt",
-  "Lib.newt",
+  "Concat.newt",
   "Day1.newt",
   "Day2.newt",
+  "Lib.newt",
   "TypeClass.newt",
 ];
 
