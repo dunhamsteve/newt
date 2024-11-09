@@ -3,7 +3,9 @@ concurrency:
     group: production
     cancel-in-progress: true
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
 jobs:
   build:
     runs-on: ubuntu-latest
