@@ -21,17 +21,17 @@ S n + m = S (n + m)
 -- A list is empty (Nil) or a value followed by a list (separated by the :: operator)
 infixr 3 _::_
 data List : U -> U where
-    Nil : {A : U} -> List A
-    _::_ : {A : U} -> A -> List A -> List A
+    Nil : ∀ A. List A
+    _::_ : ∀ A. A -> List A -> List A
 
 -- length of a list is defined inductively
-length : {A : U} -> List A -> Nat
+length : ∀ A . List A -> Nat
 length Nil = Z
 length (x :: xs) = S (length xs)
 
 -- List concatenation
 infixl 2 _++_
-_++_ : {A : U} -> List A -> List A -> List A
+_++_ : ∀ A. List A -> List A -> List A
 Nil ++ ys = ys
 x :: xs ++ ys = x :: (xs ++ ys)
 
@@ -40,8 +40,8 @@ x :: xs ++ ys = x :: (xs ++ ys)
 -- Magic happens in the compiler when it tries to make the types
 -- fit into this.
 infixl 1 _≡_
-data _≡_ : {A : U} -> A -> A -> U where
-    Refl : {A : U} {a : A} -> a ≡ a
+data _≡_ : ∀ A . A -> A -> U where
+    Refl : ∀ A . {a : A} -> a ≡ a
 
 -- If a ≡ b then b ≡ a
 sym : {A : U} {a b : A} -> a ≡ b -> b ≡ a
@@ -60,32 +60,32 @@ cong : {A B : U} {a b : A} -> (f : A -> B) -> a ≡ b -> f a ≡ f b
 
 -- if concatenate two lists, the length is the sum of the lengths
 -- of the original lists
-length-++ : {A : U} (xs ys : List A) -> length (xs ++ ys) ≡ length xs + length ys
+length-++ : ∀ A. (xs ys : List A) -> length (xs ++ ys) ≡ length xs + length ys
 length-++ Nil ys = Refl
 length-++ (x :: xs) ys = cong S (length-++ xs ys)
 
 -- a function to reverse a list
-reverse : {A : U} -> List A -> List A
+reverse : ∀ A. List A -> List A
 reverse Nil = Nil
 reverse (x :: xs) = reverse xs ++ (x :: Nil)
 
 -- if we add an empty list to a list, we get the original back
-++-identity : {A : U} -> (xs : List A) -> xs ++ Nil ≡ xs
+++-identity : ∀ A. (xs : List A) -> xs ++ Nil ≡ xs
 ++-identity Nil = Refl
 ++-identity (x :: xs) = cong (_::_ x) (++-identity xs)
 
 -- concatenation is associative
-++-associative : {A : U} (xs ys zs : List A) -> xs ++ (ys ++ zs) ≡ (xs ++ ys) ++ zs
+++-associative : ∀ A. (xs ys zs : List A) -> xs ++ (ys ++ zs) ≡ (xs ++ ys) ++ zs
 
 -- reverse distributes over ++, but switches order
-reverse-++-distrib : {A : U} -> (xs ys : List A) -> reverse (xs ++ ys) ≡ reverse ys ++ reverse xs
+reverse-++-distrib : ∀ A. (xs ys : List A) -> reverse (xs ++ ys) ≡ reverse ys ++ reverse xs
 reverse-++-distrib Nil ys = sym (++-identity (reverse ys))
 reverse-++-distrib (x :: xs) ys =
   trans (cong (\ z => z ++ (x :: Nil)) (reverse-++-distrib xs ys))
         (sym (++-associative (reverse ys) (reverse xs) (x :: Nil)))
 
 -- same thing, but using `replace` in the proof
-reverse-++-distrib' : {A : U} -> (xs ys : List A) -> reverse (xs ++ ys) ≡ reverse ys ++ reverse xs
+reverse-++-distrib' : ∀ A. (xs ys : List A) -> reverse (xs ++ ys) ≡ reverse ys ++ reverse xs
 reverse-++-distrib' Nil ys = sym (++-identity (reverse ys))
 reverse-++-distrib' {A} (x :: xs) ys =
   replace (\ z => (reverse (xs ++ ys) ++ (x :: Nil)) ≡ z)
@@ -93,28 +93,28 @@ reverse-++-distrib' {A} (x :: xs) ys =
           (replace (\ z => (reverse (xs ++ ys)) ++ (x :: Nil) ≡ z ++ (x :: Nil)) (reverse-++-distrib' xs ys) Refl)
 
 -- reverse of reverse gives you the original list
-reverse-involutive : {A : U} -> (xs : List A) -> reverse (reverse xs) ≡ xs
+reverse-involutive : ∀ A. (xs : List A) -> reverse (reverse xs) ≡ xs
 reverse-involutive Nil = Refl
 reverse-involutive (x :: xs) =
   trans (reverse-++-distrib (reverse xs) (x :: Nil))
         (cong (_::_ x) (reverse-involutive xs))
 
 -- helper for a different version of reverse
-shunt : {A : U} -> List A -> List A -> List A
+shunt : ∀ A. List A -> List A -> List A
 shunt Nil ys = ys
 shunt (x :: xs) ys = shunt xs (x :: ys)
 
 -- lemma
-shunt-reverse : {A : U} (xs ys : List A) -> shunt xs ys ≡ reverse xs ++ ys
+shunt-reverse : ∀ A. (xs ys : List A) -> shunt xs ys ≡ reverse xs ++ ys
 shunt-reverse Nil ys = Refl
 shunt-reverse (x :: xs) ys =
   trans (shunt-reverse xs (x :: ys))
         (++-associative (reverse xs) (x :: Nil) ys)
 
 -- an alternative definition of reverse
-reverse' : {A : U} -> List A -> List A
+reverse' : ∀ A. List A -> List A
 reverse' xs = shunt xs Nil
 
 -- proof that the reverse and reverse' give the same results
-reverses : {A : U} → (xs : List A) → reverse' xs ≡ reverse xs
+reverses : ∀ A. (xs : List A) → reverse' xs ≡ reverse xs
 reverses xs = trans (shunt-reverse xs Nil) (++-identity _)

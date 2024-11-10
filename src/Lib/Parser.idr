@@ -252,6 +252,15 @@ arrow : Parser Unit
 arrow = sym "->" <|> sym "→"
 
 -- Collect a bunch of binders (A : U) {y : A} -> ...
+
+forAll : Parser Raw
+forAll = do
+  keyword "forall" <|> keyword "∀"
+  all <- some (withPos varname)
+  keyword "."
+  scope <- typeExpr
+  pure $ foldr (\ (fc, n), sc => RPi fc (Just n) Implicit (RImplicit fc) sc) scope all
+
 binders : Parser Raw
 binders = do
   binds <- many (abind <|> ibind <|> ebind)
@@ -262,7 +271,9 @@ binders = do
     mkBind : FC -> (String, Icit, Raw) -> Raw -> Raw
     mkBind fc (name, icit, ty) scope = RPi fc (Just name) icit ty scope
 
-typeExpr = binders
+typeExpr
+  = binders
+  <|> forAll
   <|> do
         fc <- getPos
         exp <- term

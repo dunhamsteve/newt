@@ -70,6 +70,8 @@ export let newtTokens: monaco.languages.IMonarchLanguage = {
     "case",
     "of",
     "data",
+    "forall",
+    "∀",
     "U",
     "module",
     "ptype",

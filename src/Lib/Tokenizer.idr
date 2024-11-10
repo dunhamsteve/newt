@@ -8,10 +8,8 @@ import Lib.Common
 keywords : List String
 keywords = ["let", "in", "where", "case", "of", "data", "U", "do",
             "ptype", "pfunc", "module", "infixl", "infixr", "infix",
-            "->", "→", ":", "=>", ":=", "=", "<-", "\\", "_"]
-
-specialOps : List String
-specialOps = ["->", ":", "=>", ":=", "=", "<-"]
+            "∀", "forall", ".",
+             "->", "→", ":", "=>", ":=", "=", "<-", "\\", "_"]
 
 checkKW : String -> Token Kind
 checkKW s = if elem s keywords then Tok Keyword s else Tok Ident s
@@ -20,10 +18,10 @@ checkUKW : String -> Token Kind
 checkUKW s = if elem s keywords then Tok Keyword s else Tok UIdent s
 
 identMore : Lexer
-identMore = alphaNum <|> exact "." <|> exact "'" <|> exact "_"
+identMore = alphaNum <|> exact "'" <|> exact "_"
 
 singleton : Lexer
-singleton = oneOf "()\\{}[],?"
+singleton = oneOf "()\\{}[],?."
 
 quo : Recognise True
 quo = is '"'

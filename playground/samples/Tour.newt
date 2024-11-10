@@ -77,13 +77,13 @@ test = Refl
 infixl 7 _+_
 
 -- We don't have records yet, so we define a single constructor
--- inductive type:
+-- inductive type. Here we also use `∀ A.` which is sugar for `{A : _} ->`
 data Plus : U -> U where
-  MkPlus : {A : U} -> (A -> A -> A) -> Plus A
+  MkPlus : ∀ A. (A -> A -> A) -> Plus A
 
 -- and the generic function that uses it
 -- the double brackets indicate an argument that is solved by search
-_+_ : {A : U} {{_ : Plus A}} -> A -> A -> A
+_+_ : ∀ A. {{_ : Plus A}} -> A -> A -> A
 _+_ {{MkPlus f}} x y = f x y
 
 -- The typeclass is now defined, search will look for functions in scope
@@ -150,31 +150,31 @@ data Monad : (U -> U) -> U where
             ({a b : U} -> m a -> (a -> m b) -> m b) ->
             Monad m
 
-pure : {m : U -> U} -> {{_ : Monad m}} -> {a : U} -> a -> m a
+pure : ∀ m . {{_ : Monad m}} -> {a : U} -> a -> m a
 pure {{MkMonad p _}} a = p a
 
 -- we can declare multiple infix operators at once
 infixl 1 _>>=_ _>>_
 
-_>>=_ : {m : U -> U} -> {{_ : Monad m}} -> {a b : U} -> m a -> (a -> m b) -> m b
+_>>=_ : ∀ m a b. {{_ : Monad m}} -> m a -> (a -> m b) -> m b
 _>>=_ {{MkMonad _ b}} ma amb = b ma amb
 
-_>>_ :  {m : U -> U} -> {{_ : Monad m}} -> {a b : U} -> m a -> m b -> m b
+_>>_ :  ∀ m a b. {{_ : Monad m}} -> m a -> m b -> m b
 ma >> mb = ma >>= (λ _ => mb)
 
 -- That's our Monad typeclass, now let's make a List monad
 
 infixr 3 _::_
 data List : U -> U where
-  Nil : {A : U} -> List A
-  _::_ : {A : U} -> A -> List A -> List A
+  Nil : ∀ A.  List A
+  _::_ : ∀ A. A -> List A -> List A
 
 infixr 7 _++_
-_++_ : {a : U} -> List a -> List a -> List a
+_++_ : ∀ a.  List a -> List a -> List a
 Nil ++ ys = ys
 (x :: xs) ++ ys = x :: (xs ++ ys)
 
-bindList : {a b : U} -> List a -> (a -> List b) -> List b
+bindList : ∀ a b. List a -> (a -> List b) -> List b
 bindList Nil f = Nil
 bindList (x :: xs) f = f x ++ bindList xs f
 
@@ -186,11 +186,11 @@ MonadList = MkMonad (λ a => a :: Nil) bindList
 -- Also we see that → can be used in lieu of ->
 infixr 1 _,_ _×_
 data _×_ : U → U → U where
-  _,_ : {A B : U} → A → B → A × B
+  _,_ : ∀ A B. A → B → A × B
 
 -- The _>>=_ operator is used for desugaring do blocks
 
-prod : {A B : U} → List A → List B → List (A × B)
+prod : ∀ A B. List A → List B → List (A × B)
 prod xs ys = do
   x <- xs
   y <- ys
