@@ -74,10 +74,6 @@ export term : (Parser Raw)
 withPos : Parser a -> Parser (FC, a)
 withPos pa = (,) <$> getPos <*> pa
 
-lookup : String -> List OpDef -> Maybe OpDef
-lookup _ [] = Nothing
-lookup name (op :: ops) = if op.name == name then Just op else lookup name ops
-
 -- the inside of Raw
 atom : Parser Raw
 atom = RU <$> getPos <* keyword "U"
@@ -98,22 +94,55 @@ pArg = do
 
 AppSpine = List (Icit,FC,Raw)
 
-pratt : List OpDef -> Int -> Raw -> AppSpine -> Parser (Raw, AppSpine)
-pratt ops prec left [] = pure (left, [])
-pratt ops prec left rest@((Explicit, fc, tm@(RVar x nm)) :: xs) =
-  let op' = ("_" ++ nm ++ "_") in
-  case lookup op' ops of
-    Nothing => pratt ops prec (RApp fc left tm Explicit) xs
-    Just (MkOp name p fix) => if p < prec
-      then pure (left, rest)
-      else
-        let pr = case fix of InfixR => p; _ => p + 1 in
-        case xs of
-          ((_, _, right) :: rest) => do
-            (right, rest) <- pratt ops pr right rest
-            pratt ops prec (RApp fc(RApp fc (RVar fc op') left Explicit) right Explicit) rest
-          _ => fail "trailing operator"
-pratt ops prec left ((icit, fc, tm) :: xs) = pratt ops prec (RApp fc left tm icit) xs
+-- helper for debugging
+traceM : Monad m => String -> m ()
+traceM msg = trace msg $ pure ()
+
+pratt : Operators -> Int -> String -> Raw -> AppSpine -> Parser (Raw, AppSpine)
+pratt ops prec stop left spine = do
+  (left, spine) <- runPrefix stop left spine
+  case spine of
+    [] => pure (left, [])
+    ((Explicit, fc, tm@(RVar x nm)) :: rest) =>
+        if nm == stop then pure (left,spine) else
+        case lookup nm ops of
+          Just (MkOp name p fix False rule) => if p < prec
+            then pure (left, spine)
+            else
+              runRule p fix stop rule (RApp fc (RVar fc name) left Explicit) rest
+          Just _ => fail "expected operator"
+          Nothing => pratt ops prec stop (RApp fc left tm Explicit) rest
+    ((icit, fc, tm) :: rest) => pratt ops prec stop (RApp fc left tm icit) rest
+  where
+    runRule : Int -> Fixity -> String -> List String -> Raw -> AppSpine -> Parser (Raw,AppSpine)
+    runRule p fix stop [] left spine = pure (left,spine)
+    runRule p fix stop [""] left spine = do
+      let pr = case fix of InfixR => p; _ => p + 1
+      case spine of
+                ((_, fc, right) :: rest) => do
+                  (right, rest) <- pratt ops pr stop right rest
+                  pratt ops prec stop (RApp fc left right Explicit) rest
+                _ => fail "trailing operator"
+
+    runRule p fix stop (nm :: rule) left spine = do
+      let ((_,_,right)::rest) = spine | _ => fail "short"
+      (right,rest) <- pratt ops 0 nm right rest -- stop!!
+      let ((_,fc',RVar fc name) :: rest) = rest
+        | _ => fail "expected \{nm}"
+
+      if name == nm
+          then runRule p fix stop rule (RApp fc left right Explicit) rest
+          else fail "expected \{nm}"
+
+
+    runPrefix : String -> Raw -> AppSpine -> Parser (Raw, AppSpine)
+    runPrefix stop (RVar fc nm) spine =
+      case lookup nm ops of
+           -- TODO False should be an error here
+         Just (MkOp name p fix True rule) => do
+            runRule p fix stop rule (RVar fc name) spine
+         _ => pure (left, spine)
+    runPrefix stop left spine = pure (left, spine)
 
 parseOp : Parser Raw
 parseOp = do
@@ -121,7 +150,7 @@ parseOp = do
   ops <- getOps
   hd <- atom
   rest <- many pArg
-  (res, []) <- pratt ops 0 hd rest
+  (res, []) <- pratt ops 0 "" hd rest
     | _ => fail "extra stuff"
   pure res
 

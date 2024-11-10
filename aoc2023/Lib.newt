@@ -157,6 +157,6 @@ map f Nil = Nil
 map f (x :: xs) = f x :: map f xs
 
 
-infixl 9 _._
-_._ : {A B C : U} -> (B -> C) -> (A -> B) -> A -> C
+infixl 9 _∘_
+_∘_ : {A B C : U} -> (B -> C) -> (A -> B) -> A -> C
 (f . g) x = f ( g x)

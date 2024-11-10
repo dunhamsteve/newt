@@ -8,11 +8,14 @@ import Lib.Common
 keywords : List String
 keywords = ["let", "in", "where", "case", "of", "data", "U", "do",
             "ptype", "pfunc", "module", "infixl", "infixr", "infix",
-            "∀", "forall", ".",
+            "∀", "forall",
              "->", "→", ":", "=>", ":=", "=", "<-", "\\", "_"]
 
 checkKW : String -> Token Kind
-checkKW s = if elem s keywords then Tok Keyword s else Tok Ident s
+checkKW s =
+  if s /= "_" && elem '_' (unpack s) then Tok MixFix s else
+  if elem s keywords then Tok Keyword s
+  else Tok Ident s
 
 checkUKW : String -> Token Kind
 checkUKW s = if elem s keywords then Tok Keyword s else Tok UIdent s
@@ -54,7 +57,7 @@ rawTokens
   -- for now, our lambda slash is singleton
   <|> match (singleton) (Tok Symbol)
   -- TODO Drop MixFix token type when we support if_then_else_
-  <|> match (exact "_" <+> (some opMiddle) <+> exact "_") (Tok MixFix)
+  <|> match (exact "_,_" <|> exact "_._") (Tok MixFix)
   -- REVIEW - expect non-alpha after?
   <|> match (some digit) (Tok Number)
   -- for module names and maybe type constructors

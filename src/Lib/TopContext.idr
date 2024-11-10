@@ -23,7 +23,7 @@ Show TopContext where
 
 public export
 empty : HasIO m => m TopContext
-empty = pure $ MkTop [] !(newIORef (MC [] 0)) False !(newIORef []) [] []
+empty = pure $ MkTop [] !(newIORef (MC [] 0)) False !(newIORef []) [] empty
 
 ||| set or replace def. probably need to check types and Axiom on replace
 public export

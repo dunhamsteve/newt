@@ -1,6 +1,7 @@
 module Lib.Common
 
 import Data.String
+import public Data.SortedMap
 
 -- I was going to use a record, but we're peeling this off of bounds at the moment.
 public export
@@ -54,10 +55,19 @@ Show Fixity where
   show InfixR = "infixr"
   show Infix = "infix"
 
+
 public export
 record OpDef where
   constructor MkOp
   name : String
   prec : Int
   fix : Fixity
+  isPrefix : Bool
+  ||| rule is everything after the first part of the operator, splitting on `_`
+  ||| a normal infix operator will have a trailing `""` which will match to
+  ||| prec / prec - 1
+  rule : List String
 
+public export
+Operators : Type
+Operators = SortedMap String OpDef

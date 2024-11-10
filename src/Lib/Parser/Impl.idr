@@ -4,6 +4,7 @@ import Lib.Token
 import Lib.Common
 import Data.String
 import Data.Nat
+import Data.List1
 
 public export
 TokenList : Type
@@ -12,8 +13,8 @@ TokenList = List BTok
 -- Result of a parse
 public export
 data Result : Type -> Type where
-  OK : a -> (toks : TokenList) -> (com : Bool) -> List OpDef -> Result a
-  Fail : Bool -> Error -> (toks : TokenList) -> (com : Bool) -> List OpDef -> Result a
+  OK : a -> (toks : TokenList) -> (com : Bool) -> Operators -> Result a
+  Fail : Bool -> Error -> (toks : TokenList) -> (com : Bool) -> Operators -> Result a
 
 export
 Functor Result where
@@ -34,10 +35,10 @@ Functor Result where
 -- This is a Reader in FC, a State in Operators, Commit flag, TokenList
 
 export
-data Parser a = P (TokenList -> Bool -> List OpDef -> (lc : FC) -> Result a)
+data Parser a = P (TokenList -> Bool -> Operators -> (lc : FC) -> Result a)
 
 export
-runP : Parser a -> TokenList -> Bool -> List OpDef -> FC -> Result a
+runP : Parser a -> TokenList -> Bool -> Operators -> FC -> Result a
 runP (P f) = f
 
 error : TokenList -> String -> Error
@@ -46,14 +47,14 @@ error ((MkBounded val isIrrelevant (MkBounds line col _ _)) :: _) msg = E (line,
 
 export
 parse : Parser a -> TokenList -> Either Error a
-parse pa toks = case runP pa toks False [] (-1,-1) of
+parse pa toks = case runP pa toks False empty (-1,-1) of
   Fail fatal err toks com ops => Left err
   OK a [] _ _ => Right a
   OK a ts _ _ => Left (error ts "Extra toks")
 
 ||| Intended for parsing a top level declaration
 export
-partialParse : Parser a -> List OpDef -> TokenList -> Either Error (a, List OpDef, TokenList)
+partialParse : Parser a -> Operators -> TokenList -> Either Error (a, Operators, TokenList)
 partialParse pa ops toks = case runP pa toks False ops (0,0) of
   Fail fatal err toks com ops => Left err
   OK a ts _ ops => Right (a,ops,ts)
@@ -75,13 +76,18 @@ fatal : String -> Parser a
 fatal msg = P $ \toks,com,ops,col => Fail True (error toks msg) toks com ops
 
 export
-getOps : Parser (List OpDef)
+getOps : Parser (Operators)
 getOps = P $ \ toks, com, ops, col => OK ops toks com ops
 
 export
 addOp : String -> Int -> Fixity -> Parser ()
 addOp nm prec fix = P $ \ toks, com, ops, col =>
-  OK () toks com ((MkOp nm prec fix) :: ops)
+  let parts = split (=='_') nm in
+  case parts of
+    "" ::: key :: rule => OK () toks com (insert key (MkOp nm prec fix False rule) ops)
+    key ::: rule => OK () toks com (insert key (MkOp nm prec fix True rule) ops)
+
+
 
 export
 Functor Parser where

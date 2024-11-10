@@ -59,9 +59,9 @@ runFile fn =
   let text = readFile fn in
   log fn >>
   log "part1" >>
-  log (part1 text (digits1 . unpack)) >>
+  log (part1 text (digits1 ∘  unpack)) >>
   log "part2" >>
-  log (part1 text (digits2 . unpack)) >>
+  log (part1 text (digits2 ∘ unpack)) >>
   log ""
 
 

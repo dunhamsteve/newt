@@ -146,6 +146,7 @@ const SAMPLES = [
   "Tour.newt",
   "Tree.newt",
   // "Prelude.newt",
+  "Reasoning.newt",
   "Lists.newt",
   "Day1.newt",
   "Day2.newt",
