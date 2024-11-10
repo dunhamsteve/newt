@@ -63,13 +63,13 @@ processModule base stk name = do
   let Right toks = tokenise src
     | Left err => fail (showError src err)
 
-  let Right (modName, ops, toks) := partialParse parseModHeader top.ops toks
+  let Right ((nameFC, modName), ops, toks) := partialParse parseModHeader top.ops toks
     | Left err => fail (showError src err)
 
 
   putStrLn "module \{modName}"
   let True = name == modName
-    | _ => fail "ERROR at (0, 0): module name \{show modName} doesn't match file name \{show fn}"
+    | _ => fail "ERROR at \{show nameFC}: module name \{show modName} doesn't match file name \{show fn}"
 
   let Right (imports, ops, toks) := partialParse parseImports ops toks
     | Left err => fail (showError src err)

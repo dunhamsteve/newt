@@ -2,10 +2,10 @@
 ## TODO
 
 - [x] forall / ∀ sugar
-- [ ] Bad module name error has FC 0,0 instead of the module or name
+- [x] Bad module name error has FC 0,0 instead of the module or name
 - [x] I've made `{x}` be `{x : _}` instead of `{_ : x}`. Change this.
 - [ ] Remove context lambdas when printing solutions (show names from context)
-  - build list of names and strip λ, then call pprint with names
+  - maybe build list of names and strip λ, then call pprint with names
 - [ ] Check for shadowing when declaring dcon
 - [ ] Require infix decl before declaring names (helps find bugs)
 - [ ] sugar for typeclasses

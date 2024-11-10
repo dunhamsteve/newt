@@ -44,7 +44,7 @@ data _≡_ : ∀ A . A -> A -> U where
     Refl : ∀ A . {a : A} -> a ≡ a
 
 -- If a ≡ b then b ≡ a
-sym : {A : U} {a b : A} -> a ≡ b -> b ≡ a
+sym : {A} {a b : A} -> a ≡ b -> b ≡ a
 sym Refl = Refl
 
 -- if a ≡ b and b ≡ c then a ≡ c
@@ -52,11 +52,11 @@ trans : {A : U} {a b c : A} -> a ≡ b -> b ≡ c -> a ≡ c
 trans Refl x = x
 
 -- This lets us replace a with b inside an expression if a ≡ b
-replace : {A : U} {a b : A} -> (P : A -> U) -> a ≡ b -> P a -> P b
+replace : ∀ A a b. (P : A -> U) -> a ≡ b -> P a -> P b
 replace p Refl x = x
 
 -- if a ≡ b then f a ≡ f b
-cong : {A B : U} {a b : A} -> (f : A -> B) -> a ≡ b -> f a ≡ f b
+cong : ∀ A B a b. (f : A -> B) -> a ≡ b -> f a ≡ f b
 
 -- if concatenate two lists, the length is the sum of the lengths
 -- of the original lists

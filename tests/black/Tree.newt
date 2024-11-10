@@ -16,8 +16,8 @@ data Void : U where
 infixl 4 _+_
 
 data _+_ : U -> U -> U where
-  inl : {A B : U} -> A -> A + B
-  inr : {A B : U} -> B -> A + B
+  inl : {A B} -> A -> A + B
+  inr : {A B} -> B -> A + B
 
 infix 4 _<=_
 
@@ -47,14 +47,14 @@ _ <<= Top = Unit
 _ <<= _ = Void
 
 data Intv : Bnd -> Bnd -> U where
-  intv : {l u : Bnd} (x : Nat) (lx : l <<= N x) (xu : N x <<= u) -> Intv l u
+  intv : {l u} (x : Nat) (lx : l <<= N x) (xu : N x <<= u) -> Intv l u
 
 data T23 : Bnd -> Bnd -> Nat -> U where
-  leaf : {l u : Bnd} {h : Nat} (lu : l <<= u) -> T23 l u Z
-  node2 : {l u : Bnd} {h : Nat} (x : _)
+  leaf : {l u} (lu : l <<= u) -> T23 l u Z
+  node2 : {l u h} (x : _)
     (tlx : T23 l (N x) h) (txu : T23 (N x) u h) ->
     T23 l u (S h)
-  node3 : {l u : Bnd} {h : Nat} (x y : _)
+  node3 : {l u h} (x y : _)
     (tlx : T23 l (N x) h) (txy : T23 (N x) (N y) h) (tyu : T23 (N y) u h) ->
     T23 l u (S h)
 
@@ -71,10 +71,8 @@ A * B = Sg A (\ _ => B)
 TooBig : Bnd -> Bnd -> Nat -> U
 TooBig l u h = Sg Nat (\ x => T23 l (N x) h * T23 (N x) u h)
 
-insert : {h : Nat} {l u : Bnd} -> Intv l u -> T23 l u h -> TooBig l u h + T23 l u h
--- Agda is yellow here, needs h = x on each leaf
--- The second arg to the second _,_ is unsolved and pi-typed
-insert (intv x lx xu) (leaf lu) = inl (x , (leaf {_} {_} {x} lx , leaf {_} {_} {x} xu))
+insert : {l u h} -> Intv l u -> T23 l u h -> TooBig l u h + T23 l u h
+insert (intv x lx xu) (leaf lu) = inl (x , (leaf lx , leaf xu))
 insert (intv x lx xu) (node2 y tly tyu) = case cmp x y of
   -- u := N y is not solved at this time
   inl xy => case insert (intv {_} {N y} x lx xy) tly of

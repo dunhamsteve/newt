@@ -20,7 +20,7 @@
 
 -/
 
--- One-line comments begin with two hypens
+-- One-line comments begin with two hyphens
 
 -- every file begins with a `module` declaration
 -- it must match the filename
@@ -150,16 +150,16 @@ data Monad : (U -> U) -> U where
             ({a b : U} -> m a -> (a -> m b) -> m b) ->
             Monad m
 
-pure : ∀ m . {{_ : Monad m}} -> {a : U} -> a -> m a
+pure : ∀ m. {{Monad m}} -> {a : U} -> a -> m a
 pure {{MkMonad p _}} a = p a
 
 -- we can declare multiple infix operators at once
 infixl 1 _>>=_ _>>_
 
-_>>=_ : ∀ m a b. {{_ : Monad m}} -> m a -> (a -> m b) -> m b
+_>>=_ : ∀ m a b. {{Monad m}} -> m a -> (a -> m b) -> m b
 _>>=_ {{MkMonad _ b}} ma amb = b ma amb
 
-_>>_ :  ∀ m a b. {{_ : Monad m}} -> m a -> m b -> m b
+_>>_ :  ∀ m a b. {{Monad m}} -> m a -> m b -> m b
 ma >> mb = ma >>= (λ _ => mb)
 
 -- That's our Monad typeclass, now let's make a List monad

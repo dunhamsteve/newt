@@ -233,20 +233,23 @@ ebind = do
 
 ibind : Parser (List (FC, String, Icit, Raw))
 ibind = do
+  -- I've gone back and forth on this, but I think {m a b} is more useful than {Nat}
   sym "{"
-  -- REVIEW - I have name required and type optional, which I think is the opposite of what I expect
-  names <- try (some (withPos varname) <* sym ":")
-  ty <- typeExpr
+  names <- (some (withPos varname))
+  ty <- optional (sym ":" *> typeExpr)
   sym "}"
-  pure $ map (\(pos,name) => (pos, name, Implicit, ty)) names
+  pure $ map (\(pos,name) => (pos, name, Implicit, fromMaybe (RImplicit pos) ty)) names
 
 abind : Parser (List (FC, String, Icit, Raw))
 abind = do
+  -- for this, however, it would be nice to allow {{Monad A}}
   sym "{{"
-  names <- try (some (withPos varname) <* sym ":")
+  name <- optional $ try (withPos varname <* sym ":")
   ty <- typeExpr
   sym "}}"
-  pure $ map (\(pos,name) => (pos, name, Auto, ty)) names
+  case name of
+    Just (pos,name) => pure [(pos, name, Auto, ty)]
+    Nothing => pure [(getFC ty, "_", Auto, ty)]
 
 arrow : Parser Unit
 arrow = sym "->" <|> sym "→"
@@ -371,8 +374,8 @@ parseDecl = parseMixfix <|> parsePType <|> parsePFunc <|> parseNorm <|> parseDat
 
 
 export
-parseModHeader : Parser String
-parseModHeader = sameLevel (keyword "module") >> uident
+parseModHeader : Parser (FC, String)
+parseModHeader = sameLevel (keyword "module") >> withPos uident
 
 export
 parseImports : Parser (List Import)
