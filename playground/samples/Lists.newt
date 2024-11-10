@@ -1,4 +1,7 @@
-module Concat
+module Lists
+
+-- From the "Lists" chapter of Programming Language Foundations in Agda
+-- https://plfa.github.io/Lists/
 
 data Nat : U where
     Z : Nat

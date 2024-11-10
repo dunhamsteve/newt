@@ -24,11 +24,12 @@
   height: 100%;
 }
 .wrapper.vertical .tabPanel.left {
-  flex: .6 .6;
+  /* designed to go down to the keyboard on my phone */
+  flex: .65 .65;
   height: 100px;
 }
 .wrapper.vertical .tabPanel.right {
-  flex: .4 .4;
+  flex: .35 .35;
   height: 100px;
 }
 .tabBar button {
