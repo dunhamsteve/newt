@@ -31,6 +31,9 @@ data _≡_ : {A : U} -> A -> A -> U where
 sym : {A : U} {a b : A} -> a ≡ b -> b ≡ a
 sym Refl = Refl
 
+trans : {A : U} {a b c : A} -> a ≡ b -> b ≡ c -> a ≡ c
+trans Refl x = x
+
 replace : {A : U} {a b : A} -> (P : A -> U) -> a ≡ b -> P a -> P b
 replace p Refl x = x
 
@@ -53,8 +56,37 @@ reverse (x :: xs) = reverse xs ++ (x :: Nil)
 
 -- TODO port equational reasoning
 reverse-++-distrib : {A : U} -> (xs ys : List A) -> reverse (xs ++ ys) ≡ reverse ys ++ reverse xs
-reverse-++-distrib Nil ys = replace (\ z => reverse ys ≡ z) (sym (++-identity (reverse ys))) Refl
-reverse-++-distrib {A} (x :: xs) ys =
+reverse-++-distrib Nil ys = sym (++-identity (reverse ys))
+reverse-++-distrib (x :: xs) ys =
+  trans (cong (\ z => z ++ (x :: Nil)) (reverse-++-distrib xs ys))
+        (sym (++-associative (reverse ys) (reverse xs) (x :: Nil)))
+
+-- rewrite version
+reverse-++-distrib' : {A : U} -> (xs ys : List A) -> reverse (xs ++ ys) ≡ reverse ys ++ reverse xs
+reverse-++-distrib' Nil ys = sym (++-identity (reverse ys))
+reverse-++-distrib' {A} (x :: xs) ys =
   replace (\ z => (reverse (xs ++ ys) ++ (x :: Nil)) ≡ z)
           (sym (++-associative (reverse ys) (reverse xs) (x :: Nil)))
-          (replace (\ z => (reverse (xs ++ ys)) ++ (x :: Nil) ≡ z ++ (x :: Nil)) (reverse-++-distrib xs ys) Refl)
+          (replace (\ z => (reverse (xs ++ ys)) ++ (x :: Nil) ≡ z ++ (x :: Nil)) (reverse-++-distrib' xs ys) Refl)
+
+reverse-involutive : {A : U} -> (xs : List A) -> reverse (reverse xs) ≡ xs
+reverse-involutive Nil = Refl
+reverse-involutive (x :: xs) =
+  trans (reverse-++-distrib (reverse xs) (x :: Nil))
+        (cong (_::_ x) (reverse-involutive xs))
+
+shunt : {A : U} -> List A -> List A -> List A
+shunt Nil ys = ys
+shunt (x :: xs) ys = shunt xs (x :: ys)
+
+shunt-reverse : {A : U} (xs ys : List A) -> shunt xs ys ≡ reverse xs ++ ys
+shunt-reverse Nil ys = Refl
+shunt-reverse (x :: xs) ys =
+  trans (shunt-reverse xs (x :: ys))
+        (++-associative (reverse xs) (x :: Nil) ys)
+
+reverse' : {A : U} -> List A -> List A
+reverse' xs = shunt xs Nil
+
+reverses : {A : U} → (xs : List A) → reverse' xs ≡ reverse xs
+reverses xs = trans (shunt-reverse xs Nil) (++-identity _)
