@@ -19,6 +19,21 @@ import Lib.Syntax
 -- dom gamma ren
 data Pden = PR Nat Nat (List Nat)
 
+showEnv : Context -> M String
+showEnv ctx =
+  unlines . reverse <$> go (names ctx) 0 (reverse $ zip ctx.env (toList ctx.types)) []
+  where
+    isVar : Nat -> Val -> Bool
+    isVar k (VVar _ k' [<]) = k == k'
+    isVar _ _ = False
+
+    go : List String -> Nat -> List (Val, String, Val) -> List String -> M (List String)
+    go _ _ [] acc = pure acc
+    go names k ((v, n, ty) :: xs) acc = if isVar k v
+      -- TODO - use Doc and add <+/> as appropriate to printing
+      then go names (S k) xs ("  \{n} : \{pprint names !(quote ctx.lvl ty)}":: acc)
+      else go names (S k) xs ("  \{n} = \{pprint names !(quote ctx.lvl v)} : \{pprint names !(quote ctx.lvl ty)}":: acc)
+
 dumpCtx : Context -> M String
 dumpCtx ctx = do
   let names = (toList $ map fst ctx.types)
@@ -74,11 +89,12 @@ data UnifyMode = Normal | Pattern
 
 -- We need to switch to SortedMap here
 export
-updateMeta : Context -> Nat -> (MetaEntry -> M MetaEntry) -> M ()
-updateMeta ctx ix f = do
-  mc <- readIORef ctx.metas
+updateMeta : Nat -> (MetaEntry -> M MetaEntry) -> M ()
+updateMeta ix f = do
+  top <- get
+  mc <- readIORef top.metas
   metas <- go mc.metas
-  writeIORef ctx.metas $ {metas := metas} mc
+  writeIORef top.metas $ {metas := metas} mc
   where
     go : List MetaEntry -> M (List MetaEntry)
     go [] = error' "Meta \{show ix} not found"
@@ -86,245 +102,243 @@ updateMeta ctx ix f = do
     go (x@((Solved _ k y)) :: xs) = if k == ix then (::xs) <$> f x else (x ::) <$> go xs
 
 export
-addConstraint : Context -> Nat -> SnocList Val -> Val -> M ()
-addConstraint ctx ix sp tm = do
-  mc <- readIORef ctx.metas
-  updateMeta ctx ix $ \case
+addConstraint : Env -> Nat -> SnocList Val -> Val -> M ()
+addConstraint env ix sp tm = do
+  top <- get
+  mc <- readIORef top.metas
+  updateMeta ix $ \case
     (Unsolved pos k a b c cons) => do
       debug "Add constraint m\{show ix} \{show sp} =?= \{show tm}"
-      pure (Unsolved pos k a b c (MkMc (getFC tm) ctx sp tm :: cons))
+      pure (Unsolved pos k a b c (MkMc (getFC tm) env sp tm :: cons))
     (Solved _ k tm) => error' "Meta \{show k} already solved"
   pure ()
 
-parameters (ctx: Context)
-  -- return renaming, the position is the new VVar
-  invert : Nat -> SnocList Val -> M (List Nat)
-  invert lvl sp = go sp []
-    where
-      go : SnocList Val -> List Nat -> M (List Nat)
-      go [<] acc = pure $ reverse acc
-      go (xs :< VVar fc k [<]) acc = do
-        if elem k acc
-          then do
-            debug "\{show k} \{show acc}"
-            -- when does this happen?
-            error fc "non-linear pattern: \{show sp}"
-          else go xs (k :: acc)
-      go (xs :< v) _ = error emptyFC "non-variable in pattern \{show v}"
 
-  -- REVIEW why am I converting to Tm?
-  -- we have to "lift" the renaming when we go under a lambda
-  -- I think that essentially means our domain ix are one bigger, since we're looking at lvl
-  -- in the codomain, so maybe we can just keep that value
-  rename : Nat -> List Nat -> Nat -> Val  -> M  Tm
-  rename meta ren lvl v = go ren lvl v
-    where
-      go : List Nat -> Nat -> Val  -> M  Tm
-      goSpine : List Nat -> Nat -> Tm -> SnocList Val  -> M Tm
-      goSpine ren lvl tm [<] = pure tm
-      goSpine ren lvl tm (xs :< x) = do
-        xtm <- go ren lvl x
-        pure $ App emptyFC !(goSpine ren lvl tm xs) xtm
-
-      go ren lvl (VVar fc k sp) = case findIndex (== k) ren of
-        Nothing => error fc "scope/skolem thinger VVar \{show k} ren \{show ren}"
-        Just x => goSpine ren lvl (Bnd fc $ cast x) sp
-      go ren lvl (VRef fc nm def sp) = goSpine ren lvl (Ref fc nm def) sp
-      go ren lvl (VMeta fc ix sp) = do
-        -- So sometimes we have an unsolved meta in here which reference vars out of scope.
-        debug "rename Meta \{show ix} spine \{show sp}"
-        if ix == meta
-        -- REVIEW is this the right fc?
-          then error fc "meta occurs check"
-          else case !(lookupMeta ix) of
-            Solved fc _ val => do
-              debug "rename: \{show ix} is solved"
-              go ren lvl !(vappSpine val sp)
-            _ => do
-              debug "rename: \{show ix} is unsolved"
-              catchError {e=Error} (goSpine ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc ix (errorMsg err))
-      go ren lvl (VLam fc n t) = pure (Lam fc n !(go (lvl :: ren) (S lvl) !(t $$ VVar fc lvl [<])))
-      go ren lvl (VPi fc n icit ty tm) = pure (Pi fc n icit !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar emptyFC lvl [<])))
-      go ren lvl (VU fc) = pure (U fc)
-      -- for now, we don't do solutions with case in them.
-      go ren lvl (VCase fc sc alts) = error fc "Case in solution"
-      go ren lvl (VLit fc lit) = pure (Lit fc lit)
-      go ren lvl (VLet fc name val body) =
-        pure $ Let fc name !(go ren lvl val) !(go (lvl :: ren) (S lvl) body)
+-- return renaming, the position is the new VVar
+invert : Nat -> SnocList Val -> M (List Nat)
+invert lvl sp = go sp []
+  where
+    go : SnocList Val -> List Nat -> M (List Nat)
+    go [<] acc = pure $ reverse acc
+    go (xs :< VVar fc k [<]) acc = do
+      if elem k acc
+        then do
+          debug "\{show k} \{show acc}"
+          -- when does this happen?
+          error fc "non-linear pattern: \{show sp}"
+        else go xs (k :: acc)
+    go (xs :< v) _ = error emptyFC "non-variable in pattern \{show v}"
 
 
-  lams : Nat -> Tm -> Tm
-  lams 0 tm = tm
-  -- REVIEW can I get better names in here?
-  lams (S k) tm = Lam emptyFC "arg_\{show k}" (lams k tm)
+-- REVIEW why am I converting to Tm?
+-- we have to "lift" the renaming when we go under a lambda
+-- I think that essentially means our domain ix are one bigger, since we're looking at lvl
+-- in the codomain, so maybe we can just keep that value
+rename : Nat -> List Nat -> Nat -> Val  -> M  Tm
+rename meta ren lvl v = go ren lvl v
+  where
+    go : List Nat -> Nat -> Val  -> M  Tm
+    goSpine : List Nat -> Nat -> Tm -> SnocList Val  -> M Tm
+    goSpine ren lvl tm [<] = pure tm
+    goSpine ren lvl tm (xs :< x) = do
+      xtm <- go ren lvl x
+      pure $ App emptyFC !(goSpine ren lvl tm xs) xtm
+
+    go ren lvl (VVar fc k sp) = case findIndex (== k) ren of
+      Nothing => error fc "scope/skolem thinger VVar \{show k} ren \{show ren}"
+      Just x => goSpine ren lvl (Bnd fc $ cast x) sp
+    go ren lvl (VRef fc nm def sp) = goSpine ren lvl (Ref fc nm def) sp
+    go ren lvl (VMeta fc ix sp) = do
+      -- So sometimes we have an unsolved meta in here which reference vars out of scope.
+      debug "rename Meta \{show ix} spine \{show sp}"
+      if ix == meta
+      -- REVIEW is this the right fc?
+        then error fc "meta occurs check"
+        else case !(lookupMeta ix) of
+          Solved fc _ val => do
+            debug "rename: \{show ix} is solved"
+            go ren lvl !(vappSpine val sp)
+          _ => do
+            debug "rename: \{show ix} is unsolved"
+            catchError {e=Error} (goSpine ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc ix (errorMsg err))
+    go ren lvl (VLam fc n t) = pure (Lam fc n !(go (lvl :: ren) (S lvl) !(t $$ VVar fc lvl [<])))
+    go ren lvl (VPi fc n icit ty tm) = pure (Pi fc n icit !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar emptyFC lvl [<])))
+    go ren lvl (VU fc) = pure (U fc)
+    -- for now, we don't do solutions with case in them.
+    go ren lvl (VCase fc sc alts) = error fc "Case in solution"
+    go ren lvl (VLit fc lit) = pure (Lit fc lit)
+    go ren lvl (VLet fc name val body) =
+      pure $ Let fc name !(go ren lvl val) !(go (lvl :: ren) (S lvl) body)
+
+lams : Nat -> Tm -> Tm
+lams 0 tm = tm
+-- REVIEW can I get better names in here?
+lams (S k) tm = Lam emptyFC "arg_\{show k}" (lams k tm)
+
+export
+unify : Env -> UnifyMode -> Val -> Val  -> M UnifyResult
+
+export
+solve : Env -> (k : Nat) -> SnocList Val -> Val -> M  ()
+solve env m sp t = do
+  meta@(Unsolved metaFC ix ctx_ ty kind cons) <- lookupMeta m
+    | _ => error (getFC t) "Meta \{show m} already solved!"
+  debug "SOLVE \{show m} \{show kind} lvl \{show $ length env} sp \{show sp} is \{show t}"
+  let size = length $ filter (\x => x == Bound) $ toList ctx_.bds
+  debug "\{show m} size is \{show size} sps \{show $ length sp}"
+  let True = length sp == size
+    | _ => do
+      let l = length env
+      debug "meta \{show m} (\{show ix}) applied to \{show $ length sp} args instead of \{show size}"
+      debug "CONSTRAINT m\{show ix} \{show sp} =?= \{show t}"
+      addConstraint env m sp t
+  let l = length env
+  debug "meta \{show meta}"
+  ren <- invert l sp
+  catchError {e=Error} (do
+
+    tm <- rename m ren l t
+
+    let tm = lams (length sp) tm
+    top <- get
+    soln <- eval [] CBN tm
+
+    updateMeta m $ \case
+      (Unsolved pos k _ _ _ cons) => pure $ Solved pos k soln
+      (Solved _ k x) => error' "Meta \{show ix} already solved!"
+    for_ cons $ \case
+      MkMc fc env sp rhs => do
+        val <- vappSpine soln sp
+        debug "discharge l=\{show $ length env} \{(show val)} =?= \{(show rhs)}"
+        unify env Normal val rhs)
+    (\case
+      Postpone fc ix msg => do
+        -- let someone else solve this and then check again.
+        debug "CONSTRAINT2 m\{show ix} \{show sp} =?= \{show t}"
+        addConstraint env m sp t
+      err => do
+        debug "CONSTRAINT3 m\{show ix} \{show sp} =?= \{show t}"
+        debug "because \{showError "" err}"
+        addConstraint env m sp t)
+        --throwError err)
 
 
-  export
-  unify : (l : Nat) -> UnifyMode -> Val -> Val  -> M UnifyResult
+unifySpine : Env -> UnifyMode -> Bool -> SnocList Val -> SnocList Val  -> M UnifyResult
+unifySpine env mode False _ _ = error emptyFC "unify failed at head" -- unreachable now
+unifySpine env mode True [<] [<] = pure (MkResult [])
+unifySpine env mode True (xs :< x) (ys :< y) = [| unify env mode x y <+> (unifySpine env mode True xs ys) |]
+unifySpine env mode True _ _ = error emptyFC "meta spine length mismatch"
 
-  export
-  solve : (lvl : Nat) -> (k : Nat) -> SnocList Val -> Val -> M  ()
-  solve l m sp t = do
-    meta@(Unsolved metaFC ix ctx ty kind cons) <- lookupMeta m
-      | _ => error (getFC t) "Meta \{show m} already solved!"
-    debug "SOLVE \{show m} \{show kind} lvl \{show l} sp \{show sp} is \{show t}"
-    let size = length $ filter (\x => x == Bound) $ toList ctx.bds
-    debug "\{show m} size is \{show size} sps \{show $ length sp}"
-    let True = length sp == size
-      | _ => do
-        debug "meta \{show m} (\{show ix}) applied to \{show $ length sp} args instead of \{show size}"
-        debug "CONSTRAINT m\{show ix} \{show sp} =?= \{show t}"
-        addConstraint ctx m sp t
+unify env mode t u = do
+  debug "Unify lvl \{show $ length env}"
+  debug "  \{show t}"
+  debug "  =?= \{show u}"
+  t' <- forceMeta t >>= unlet env
+  u' <- forceMeta u >>= unlet env
+  debug "forced \{show t'}"
+  debug "  =?= \{show u'}"
+  debug "env \{show env}"
+  -- debug "types \{show $ ctx.types}"
+  let l = length env
+  case (mode,t',u') of
 
-    debug "meta \{show meta}"
-    ren <- invert l sp
-    catchError {e=Error} (do
+    -- flex/flex
+    (_, VMeta fc k sp,  VMeta fc' k' sp' ) =>
+      if k == k' then unifySpine env mode (k == k') sp sp'
+      -- TODO, might want to try the other way, too.
+      else if length sp < length sp'
+        then solve env k' sp' (VMeta fc k sp) >> pure neutral
+        else solve env k sp (VMeta fc' k' sp') >> pure neutral
+    (_, t,           VMeta fc' i' sp') => solve env i' sp' t >> pure neutral
+    (_, VMeta fc i sp, t'           ) => solve env i sp t' >> pure neutral
+    (_, VPi fc _ _ a b, VPi fc' _ _ a' b') => do
+      let fresh = VVar fc l [<]
+      [| unify env mode a a' <+> unify (fresh :: env) mode !(b $$ fresh) !(b' $$ fresh) |]
+    (_, VVar fc k sp,   (VVar fc' k' sp')  ) =>
+      if k == k' then unifySpine env mode (k == k') sp sp'
+      else case (mode, sp, sp') of
+        (Pattern, [<],[<]) => if k < k' then pure $ MkResult [(k,u')] else pure $ MkResult [(k',t')]
+        _ => error fc "Failed to unify \{show t'} and \{show u'}"
 
-      tm <- rename m ren l t
-
-      let tm = lams (length sp) tm
-      top <- get
-      soln <- eval [] CBN tm
-
-      updateMeta ctx m $ \case
-        (Unsolved pos k _ _ _ cons) => pure $ Solved pos k soln
-        (Solved _ k x) => error' "Meta \{show ix} already solved!"
-      for_ cons $ \case
-        MkMc fc ctx sp rhs => do
-          val <- vappSpine soln sp
-          debug "discharge l=\{show ctx.lvl} \{(show val)} =?= \{(show rhs)}"
-          unify ctx.lvl Normal val rhs)
-      (\case
-        Postpone fc ix msg => do
-          -- let someone else solve this and then check again.
-          addConstraint ctx m sp t
-          pure ()
-        err => throwError err)
+    -- we don't eta expand on LHS
+    (Normal, VLam fc _ t,  VLam _ _ t') => do
+      let fresh = VVar fc l [<]
+      unify (fresh :: env) mode !(t $$ fresh) !(t' $$ fresh)
+    (Normal, t,         VLam fc' _ t') => do
+      debug "ETA \{show t}"
+      let fresh = VVar fc' l [<]
+      unify (fresh :: env) mode !(t `vapp` fresh) !(t' $$ fresh)
+    (Normal, VLam fc _ t,  t'       ) => do
+      debug "ETA' \{show t'}"
+      let fresh = VVar fc l [<]
+      unify (fresh :: env) mode !(t $$ fresh) !(t' `vapp` fresh)
 
 
-  unifySpine : Nat -> UnifyMode -> Bool -> SnocList Val -> SnocList Val  -> M UnifyResult
-  unifySpine l mode False _ _ = error emptyFC "unify failed at head" -- unreachable now
-  unifySpine l mode True [<] [<] = pure (MkResult [])
-  unifySpine l mode True (xs :< x) (ys :< y) = [| unify l mode x y <+> (unifySpine l mode True xs ys) |]
-  unifySpine l mode True _ _ = error emptyFC "meta spine length mismatch"
+    -- We only want to do this for LHS pattern vars, otherwise, try expanding
+    (_, VVar fc k [<], u) => case mode of
+      Pattern => pure $ MkResult[(k, u)]
+      Normal => case !(tryEval u) of
+        Just v => unify env mode t' v
+        Nothing => error fc "Failed to unify \{show t'} and \{show u'}"
 
-  lookupVar : Nat -> Maybe Val
-  lookupVar k = let l = length ctx.env in
-    if k > l
-      then Nothing
-      else case getAt ((l `minus` k) `minus` 1) ctx.env of
-        Just v@(VVar fc k' sp) => if k == k' then Nothing else Just v
-        Just v => Just v
-        Nothing => Nothing
+    (_,t, VVar fc k [<]) => case mode of
+      Pattern => pure $ MkResult[(k, t)]
+      Normal => case !(tryEval t) of
+        Just v => unify env mode v u'
+        Nothing => error fc "Failed to unify \{show t'} and \{show u'}"
 
-  -- hoping to apply what we got via pattern matching
-  unlet : Val -> M Val
-  unlet t@(VVar fc k sp) = case lookupVar k of
-        Just tt@(VVar fc' k' sp') => do
-          debug "lookup \{show k} is \{show tt}"
-          if k' == k then pure t else (vappSpine (VVar fc' k' sp') sp >>= unlet)
-        Just t => vappSpine t sp
-        Nothing => do
-          debug "lookup \{show k} is Nothing in env \{show ctx.env}"
-          pure t
-  unlet x = pure x
+    (_, VLam fc _ t,  VLam _ _ t') =>
+      let fresh = VVar fc l [<] in
+      unify (fresh :: env) mode !(t $$ fresh) !(t' $$ fresh)
+    (_, t,         VLam fc' _ t') => do
+      debug "ETA \{show t}"
+      let fresh = VVar fc' l [<]
+      unify (fresh :: env) mode !(t `vapp` fresh) !(t' $$ fresh)
+    (_, VLam fc _ t,  t'       ) => do
+      debug "ETA' \{show t'}"
+      let fresh = VVar fc l [<]
+      unify (fresh :: env) mode !(t $$ fresh) !(t' `vapp` fresh)
 
-  unify l mode t u = do
-    debug "Unify \{show ctx.lvl}"
-    debug "  \{show l} \{show t}"
-    debug "  =?= \{show u}"
-    t' <- forceMeta t >>= unlet
-    u' <- forceMeta u >>= unlet
-    debug "forced \{show t'}"
-    debug "  =?= \{show u'}"
-    debug "env \{show ctx.env}"
-    debug "types \{show $ ctx.types}"
-    case (t',u') of
+    -- REVIEW - consider separate value for DCon/TCon
+    (_, VRef fc k def sp,  VRef fc' k' def' sp') =>
+      -- This is a problem for cmp (S x) (S y) =?= cmp x y, when the
+      -- same is an equation in cmp.
 
-      -- flex/flex
-      (VMeta fc k sp,  VMeta fc' k' sp' ) =>
-        if k == k' then unifySpine l mode (k == k') sp sp'
-        -- TODO, might want to try the other way, too.
-        else if length sp < length sp'
-          then solve l k' sp' (VMeta fc k sp) >> pure neutral
-          else solve l k sp (VMeta fc' k' sp') >> pure neutral
-      (t,           VMeta fc' i' sp') => solve l i' sp' t >> pure neutral
-      (VMeta fc i sp, t'           ) => solve l i sp t' >> pure neutral
-      (VPi fc _ _ a b, VPi fc' _ _ a' b') => [| unify l mode a a' <+> unify (S l) mode !(b $$ VVar emptyFC l [<]) !(b' $$ VVar emptyFC l [<]) |]
-      (VVar fc k sp,   (VVar fc' k' sp')  ) =>
-        if k == k' then unifySpine l mode (k == k') sp sp'
-        else if k < k' then pure $ MkResult [(k,u')] else pure $ MkResult [(k',t')]
+      -- if k == k' then do
+      --   debug "unify \{show l} spine at \{k} \{show sp} \{show sp'}"
+      --   unifySpine l (k == k') sp sp'
+      -- else
+        do
+        Nothing <- tryEval t'
+          | Just v => unify env mode v u'
+        Nothing <- tryEval u'
+          | Just v => unify env mode t' v
+        if k == k'
+          then unifySpine env mode (k == k') sp sp'
+          else error fc "vref mismatch \{show t'} \{show u'}"
 
-      -- We only want to do this for LHS pattern vars, otherwise, try expanding
-      (VVar fc k [<], u) => case mode of
-        Pattern => pure $ MkResult[(k, u)]
-        Normal => case !(tryEval u) of
-          Just v => unify l mode t' v
-          Nothing => error ctx.fc "Failed to unify \{show t'} and \{show u'}"
+    (_, VU _, VU _) => pure neutral
+    -- Lennart.newt cursed type references itself
+    -- We _could_ look up the ref, eval against [] and vappSpine...
+    (_, t,         VRef fc' k' def sp') => do
+      debug "expand \{show t} =?= %ref \{k'}"
+      case lookup k' !(get) of
+        Just (MkEntry name ty (Fn tm)) => unify env mode t !(vappSpine !(eval [] CBN tm) sp')
+        _ => error fc' "unify failed \{show t'} =?= \{show u'} [no Fn]\n  env is \{show env}"
 
-      (t, VVar fc k [<]) => case mode of
-        Pattern => pure $ MkResult[(k, t)]
-        Normal => case !(tryEval t) of
-          Just v => unify l mode v u'
-          Nothing => error ctx.fc "Failed to unify \{show t'} and \{show u'}"
+    (_, VRef fc k def sp, u) => do
+      debug "expand %ref \{k} \{show sp} =?= \{show u}"
+      case lookup k !(get) of
+        Just (MkEntry name ty (Fn tm)) => unify env mode !(vappSpine !(eval [] CBN tm) sp) u
+        _ => error fc "unify failed \{show t'} [no Fn] =?= \{show u'}\n  env is \{show env}"
 
-      (VLam _ _ t,  VLam _ _ t') => unify (l + 1) mode !(t $$ VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
-      (t,         VLam fc' _ t') => do
-        debug "ETA \{show t}"
-        unify (l + 1) mode !(t `vapp` VVar emptyFC l [<]) !(t' $$ VVar emptyFC l [<])
-      (VLam fc _ t,  t'       ) => do
-        debug "ETA' \{show t'}"
-        unify (l + 1) mode !(t $$ VVar emptyFC l [<]) !(t' `vapp` VVar emptyFC l [<])
-
-      -- REVIEW - consider separate value for DCon/TCon
-      (VRef fc k def sp,  VRef fc' k' def' sp') =>
-        -- This is a problem for cmp (S x) (S y) =?= cmp x y, when the
-        -- same is an equation in cmp.
-
-        -- if k == k' then do
-        --   debug "unify \{show l} spine at \{k} \{show sp} \{show sp'}"
-        --   unifySpine l (k == k') sp sp'
-        -- else
-          do
-          Nothing <- tryEval t'
-            | Just v => unify l mode v u'
-          Nothing <- tryEval u'
-            | Just v => unify l mode t' v
-          if k == k'
-            then unifySpine l mode (k == k') sp sp'
-            else error fc "vref mismatch \{show t'} \{show u'}"
-
-      (VU _, VU _) => pure neutral
-      -- Lennart.newt cursed type references itself
-      -- We _could_ look up the ref, eval against [] and vappSpine...
-      (t,         VRef fc' k' def sp') => do
-        debug "expand \{show t} =?= %ref \{k'}"
-        case lookup k' !(get) of
-          Just (MkEntry name ty (Fn tm)) => unify l mode t !(vappSpine !(eval [] CBN tm) sp')
-          _ => error ctx.fc "unify failed \{show t'} =?= \{show u'} [no Fn]\n  env is \{show ctx.env} \{show $ map fst ctx.types}"
-
-      (VRef fc k def sp, u) => do
-        debug "expand %ref \{k} \{show sp} =?= \{show u}"
-        case lookup k !(get) of
-          Just (MkEntry name ty (Fn tm)) => unify l mode !(vappSpine !(eval [] CBN tm) sp) u
-          _ => error ctx.fc "unify failed \{show t'} [no Fn] =?= \{show u'}\n  env is \{show ctx.env} \{show $ map fst ctx.types}"
-
-      -- REVIEW I'd like to quote this back, but we have l that aren't in the environment.
-      _ => error ctx.fc "unify failed \{show t'} =?= \{show u'} \n  env is \{show ctx.env} \{show $ map fst ctx.types}"
-    where
-      lookupVar : Nat -> Maybe Val
-      lookupVar k = let l = length ctx.env in
-        if k > l
-          then Nothing
-          else case getAt ((l `minus` k) `minus` 1) ctx.env of
-            Just (VVar{}) => Nothing
-            Just v => Just v
-            Nothing => Nothing
+    -- REVIEW I'd like to quote this back, but we have l that aren't in the environment.
+    _ => error (getFC t') "unify failed \{show t'} =?= \{show u'} \n  env is \{show env}"
 
 export
 unifyCatch : FC -> Context -> Val -> Val -> M ()
 unifyCatch fc ctx ty' ty = do
-    res <- catchError (unify ctx ctx.lvl Normal ty' ty) $ \err => do
+    res <- catchError (unify ctx.env Normal ty' ty) $ \err => do
       let names = toList $ map fst ctx.types
       debug "fail \{show ty'} \{show ty}"
       a <- quote ctx.lvl ty'
@@ -473,6 +487,9 @@ substVal k v tm = go tm
     go (VMeta fc ix sp) = VMeta fc ix (map go sp)
     go (VRef fc nm y sp) = VRef fc nm y (map go sp)
     go tm = tm
+    -- FIXME - do I need a Val closure like idris?
+    -- or env in unify...
+    -- or quote back
     -- go (VLam fc nm sc) = VLam fc nm sc
     -- go (VCase x sc xs) = ?rhs_2
     -- go (VU x) = ?rhs_7
@@ -521,7 +538,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   -- We get unification constraints from matching the data constructors
   -- codomain with the scrutinee type
   debug "unify dcon cod with scrut\n  \{show ty'}\n  \{show scty}"
-  Just res <- catchError {e = Error} (Just <$> unify ctx' (length ctx'.env) Pattern ty' scty)
+  Just res <- catchError {e = Error} (Just <$> unify ctx'.env Pattern ty' scty)
               (\err => do
                   debug "SKIP \{dcName} because unify error \{errorMsg err}"
                   pure Nothing)
@@ -552,7 +569,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         pure $ Just $ CaseCons dcName (map getName vars) tm
 
     _ => do
-        Right res <- tryError {e = Error} (unify ctx' (length ctx'.env) Pattern ty' scty)
+        Right res <- tryError {e = Error} (unify ctx'.env Pattern ty' scty)
           | Left err => do
             debug "SKIP \{dcName} because unify error \{errorMsg err}"
             pure Nothing
@@ -672,14 +689,27 @@ makeClause top (lhs, rhs) = do
 checkDone : Context -> List (String, Pattern) -> Raw -> Val -> M Tm
 checkDone ctx [] body ty = do
   debug "DONE-> check body \{show body} at \{show ty}"
-  -- TODO dump context function
-  debugM $ dumpCtx ctx
+  -- TODO better dump context function
+  -- debugM $ showEnv ctx
+  -- -- Hack to try to get Combinatory working.
+  -- env' <- for ctx.env $ \ val => do
+  --   ty <- quote (length ctx.env) val
+  --   eval ctx.env CBN ty
+  -- types' <- for ctx.types $ \case
+  --   (nm,ty) =>  do
+  --     nty <- quote (length ctx.env) ty
+  --     ty' <- eval ctx.env CBN nty
+  --     pure (nm, ty')
+  -- let ctx = { env := env', types := types' } ctx
+  -- debug "AFTER"
+  -- debugM $ showEnv ctx
   -- I'm running an eval here to run case statements that are
   -- unblocked by lets in the env. (Tree.newt:cmp)
   -- The case eval code only works in the Tm -> Val case at the moment.
   -- we don't have anything like `vapp` for case
   ty <- quote (length ctx.env) ty
-  ty <- eval ctx.env CBV ty
+  ty <- eval ctx.env CBN ty
+
   debug "check at \{show ty}"
   got <- check ctx body ty
   debug "DONE<- got \{pprint (names ctx) got}"
@@ -795,7 +825,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
   case pat of
     PatCon _ _ _ _ => do
       -- expand vars that may be solved, eval top level functions
-      scty' <- unlet ctx scty >>= forceType
+      scty' <- unlet ctx.env scty >>= forceType
       debug "EXP \{show scty} -> \{show scty'}"
       -- this is per the paper, but it would be nice to coalesce
       -- default cases

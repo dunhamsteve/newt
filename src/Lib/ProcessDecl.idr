@@ -113,7 +113,7 @@ solveAutos mlen ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
       val <- eval ctx.env CBN tm
       debug "SOLUTION \{pprint [] tm} evaled to \{show val}"
       let sp = makeSpine ctx.lvl ctx.bds
-      solve ctx ctx.lvl k sp val
+      solve ctx.env k sp val
       mc <- readIORef top.metas
       solveAutos mlen (take mlen mc.metas)
 solveAutos mlen (_ :: es) = solveAutos mlen es
@@ -151,7 +151,12 @@ logMetas mstart = do
       tm <- quote ctx.lvl !(forceMeta ty)
       -- Now that we're collecting errors, maybe we simply check at the end
       -- TODO - log constraints?
-      addError $ E (l,c) "Unsolved meta \{show k} \{show kind} type \{pprint (names ctx) tm} \{show $ length cons} constraints"
+      -- FIXME in Combinatory, the val doesn't match environment?
+      let msg = "Unsolved meta \{show k} \{show kind} type \{pprint (names ctx) tm} \{show $ length cons} constraints"
+      msgs <- for cons $ \ (MkMc fc env sp val) => do
+            putStrLn "  ENV \{show env}"
+            pure "  (m\{show k} (\{unwords $ map show $ sp <>> []}) =?= \{show val}"
+      addError $ E (l,c) $ unlines ([msg] ++ msgs)
 
 export
 processDecl : Decl -> M ()

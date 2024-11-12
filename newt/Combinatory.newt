@@ -57,16 +57,13 @@ lookup2 (x ::: env) (There i) = lookup2 env i
 -- TODO MixFix - this was ⟦_⟧
 eval : {Γ : Ctx} {σ : Type} → Term Γ σ → (Env Γ → Val σ)
 -- TODO unification error in direct application
-eval (App t u) env = -- (eval t env) (eval u env)
-  let a = (eval t env)
-      b = (eval u env)
-   in a b
+eval (App t u) env = (eval t env) (eval u env)
 eval (Lam t) env = \ x => eval t (x ::: env)
 eval (Var i) env = lookup2 env i
 
 data Comb : (Γ : Ctx) → (u : Type) → (Env Γ → Val u) → U where
   S : {Γ : Ctx} {σ τ τ' : Type} → Comb Γ ((σ ~> τ ~> τ') ~> (σ ~> τ) ~> (σ ~> τ')) (\ env => \ f g x => (f x) (g x))
-  K : {Γ : Ctx} {σ τ : Type} → Comb Γ (σ ~> τ ~> σ) (\ env => \ x y => x)
+  K : {Γ : Ctx} {σ τ : Type} → Comb Γ (σ ~> (τ ~> σ)) (\ env => \ x y => x)
   I : {Γ : Ctx} {σ : Type} → Comb Γ (σ ~> σ) (\ env => \ x => x)
   B : {Γ : Ctx} {σ τ τ' : Type} → Comb Γ ((τ ~> τ') ~> (σ ~> τ) ~> (σ ~> τ')) (\ env => \ f g x => f (g x))
   C : {Γ : Ctx} {σ τ τ' : Type} → Comb Γ ((σ ~> τ ~> τ') ~> τ ~> (σ ~> τ')) (\ env => \ f g x => (f x) g)
@@ -79,9 +76,9 @@ sapp : {Γ : Ctx} {σ τ ρ : Type} {f : _} {x : _} →
   Comb Γ (σ ~> ρ) (\ env y => (f env y) (x env y))
 sapp (CApp K t) I = t
 sapp (CApp K t) (CApp K u) = CApp K (CApp t u)
-sapp (CApp K t) u = CApp (CApp B t) u
-sapp t (CApp K u) = CApp (CApp C t) u
-sapp t u = CApp (CApp S t) u
+sapp (CApp K t) u = ? -- CApp (CApp B t) u
+sapp t (CApp K u) = ? -- CApp (CApp C t) u
+sapp t u = ? -- CApp (CApp S t) u
 
 abs : {Γ : Ctx} {σ τ : Type} {f : _} → Comb (σ :: Γ) τ f → Comb Γ (σ ~> τ) (\ env x => f (x ::: env))
 abs S = CApp K S
@@ -90,6 +87,7 @@ abs I = CApp K I
 abs B = CApp K B
 abs C = CApp K C
 abs (CApp t u) = sapp (abs t) (abs u)
+-- -- TODO lookup2 is getting stuck
 abs (CVar Here) = ? -- I
 abs (CVar (There i)) = ? -- CApp K (Var i)
 

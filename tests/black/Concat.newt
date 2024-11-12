@@ -32,6 +32,7 @@ replace : {A : U} {a b : A} -> (P : A -> U) -> a ≡ b -> P a -> P b
 replace p Refl x = x
 
 cong : {A B : U} {a b : A} -> (f : A -> B) -> a ≡ b -> f a ≡ f b
+cong f Refl = Refl
 
 thm : {A : U} (xs ys : List A) -> length (xs ++ ys) ≡ length xs + length ys
 thm Nil ys = Refl

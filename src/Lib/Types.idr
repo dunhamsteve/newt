@@ -341,7 +341,7 @@ Show MetaKind where
 
 -- constrain meta applied to val to be a val
 public export
-data MConstraint = MkMc FC Context (SnocList Val) Val
+data MConstraint = MkMc FC Env (SnocList Val) Val
 
 public export
 data MetaEntry = Unsolved FC Nat Context Val MetaKind (List MConstraint) | Solved FC Nat Val

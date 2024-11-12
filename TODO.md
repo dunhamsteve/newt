@@ -1,7 +1,7 @@
 
 ## TODO
 
-- [x] forall / ∀ sugar
+- [x] forall / ∀ sugar (Maybe drop this, issues with `.` and `{A}` works fine)
 - [x] Bad module name error has FC 0,0 instead of the module or name
 - [x] I've made `{x}` be `{x : _}` instead of `{_ : x}`. Change this.
 - [ ] Remove context lambdas when printing solutions (show names from context)

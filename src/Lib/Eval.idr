@@ -57,13 +57,37 @@ tryEval (VRef fc k _ sp) =
       _ => pure Nothing
 tryEval _ = pure Nothing
 
+
+
+lookupVar : Env -> Nat -> Maybe Val
+lookupVar env k = let l = length env in
+  if k > l
+    then Nothing
+    else case getAt ((l `minus` k) `minus` 1) env of
+      Just v@(VVar fc k' sp) => if k == k' then Nothing else Just v
+      Just v => Just v
+      Nothing => Nothing
+
+-- hoping to apply what we got via pattern matching
+export
+unlet : Env -> Val -> M Val
+unlet env t@(VVar fc k sp) = case lookupVar env k of
+      Just tt@(VVar fc' k' sp') => do
+        debug "lookup \{show k} is \{show tt}"
+        if k' == k then pure t else (vappSpine (VVar fc' k' sp') sp >>= unlet env)
+      Just t => vappSpine t sp >>= unlet env
+      Nothing => do
+        debug "lookup \{show k} is Nothing in env \{show env}"
+        pure t
+unlet env x = pure x
+
+
 -- Force far enough to compare types
 export
 forceType : Val -> M Val
 forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Unsolved x k xs _ _ _) => pure (VMeta fc ix sp)
   (Solved _ k t) => vappSpine t sp >>= forceType
---forceType x = fromMaybe x <$> tryEval x
 forceType x = do
   Just x' <- tryEval x
     | _ => pure x
@@ -75,13 +99,25 @@ evalCase env mode sc@(VRef _ nm _ sp) (cc@(CaseCons name nms t) :: xs) =
     then do
       debug "ECase \{nm} \{show sp} \{show nms} \{showTm t}"
       go env (sp <>> []) nms
-    else evalCase env mode sc xs
+    else case lookup nm !(get) of
+      (Just (MkEntry str type (DCon k str1))) => evalCase env mode sc xs
+      -- bail for a stuck function
+      _ => pure Nothing
   where
     go : Env -> List Val -> List String -> M (Maybe Val)
     go env (arg :: args) (nm :: nms) = go (arg :: env) args nms
     go env args [] = Just <$> vappSpine !(eval env mode t) ([<] <>< args)
     go env [] rest = pure Nothing
--- FIXME not good if stuck function
+-- This is an attempt to handle unlet for
+evalCase env mode sc@(VVar fc k sp) alts = case lookupVar env k of
+    Just tt@(VVar fc' k' sp') => do
+        debug "lookup \{show k} is \{show tt}"
+        if k' == k then pure Nothing
+          else evalCase env mode !(vappSpine (VVar fc' k' sp') sp) alts
+    Just t => evalCase env mode !(vappSpine t sp) alts
+    Nothing => do
+        debug "lookup \{show k} is Nothing in env \{show env}"
+        pure Nothing
 evalCase env mode sc (CaseDefault u :: xs) = pure $ Just !(eval (sc :: env) mode u)
 evalCase env mode sc cc = do
   debug "CASE BAIL sc \{show sc} vs \{show cc}"
@@ -122,6 +158,7 @@ eval env mode (Lit fc lit) = pure $ VLit fc lit
 eval env mode tm@(Case fc sc alts) = do
   -- TODO we need to be able to tell eval to expand aggressively here.
   sc' <- eval env mode sc
+  sc' <- unlet env sc' -- try to expand lets from pattern matching
   sc' <- forceType sc'
   pure $ fromMaybe (VCase fc !(eval env mode sc) alts)
                              !(evalCase env mode sc' alts)
