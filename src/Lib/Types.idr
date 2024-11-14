@@ -266,7 +266,7 @@ Show Val where
   show (VVar _ k sp) = "(%var\{show k} \{unwords $ map show (sp <>> [])})"
   show (VRef _ nm _ [<]) = nm
   show (VRef _ nm _ sp) = "(\{nm} \{unwords $ map show (sp <>> [])})"
-  show (VMeta _ ix sp) = "(%meta \{show ix} ..\{show $ length sp})"
+  show (VMeta _ ix sp) = "(%meta \{show ix} [\{show $ length sp} sp])"
   show (VLam _ str x) = "(%lam \{str} \{show x})"
   show (VPi fc str Implicit x y) = "(%pi {\{str} : \{show  x}}. \{show  y})"
   show (VPi fc str Explicit x y) = "(%pi (\{str} : \{show  x}). \{show  y})"
@@ -299,7 +299,7 @@ data Closure = MkClosure Env Tm
 
 covering
 Show Closure where
-  show (MkClosure xs t) = "(%cl \{show xs} \{show t})"
+  show (MkClosure xs t) = "(%cl [\{show $ length xs} env] \{show t})"
 {-
 smalltt
 
