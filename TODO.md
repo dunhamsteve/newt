@@ -7,10 +7,15 @@
 - [ ] Remove context lambdas when printing solutions (show names from context)
   - maybe build list of names and strip λ, then call pprint with names
 - [ ] Revisit substitution in case building
-- [ ] Check for shadowing when declaring dcon
+- [x] Check for shadowing when declaring dcon
+  - Handles the forward decl in `Zoo1.newt`, but we'll need different syntax if
+    we have different core terms for TCon/DCon/Function
 - [ ] Require infix decl before declaring names (helps find bugs)
 - [ ] sugar for typeclasses
 - [ ] maybe add implicits in core to help resugar operators?
+  - There is also a bit where kovacs uses the implicit on the type (a value) to decide to insert
+- [ ] consider binders in environment, to better mark let and to provide names
+- [ ] move some top-level chattiness to `debug`
 - [x] Allow unicode operators/names
 - Web playground
   - [x] editor
@@ -19,8 +24,9 @@
   - [ ] run javascript
   - [x] need to shim out Buffer
 - [x] get rid of stray INFO from auto resolution
-- [ ] handle `if_then_else_` style mixfix
-  - [ ] equational reasoning sample (maybe PLFA "Lists")
+- [x] handle `if_then_else_` style mixfix
+  - [x] equational reasoning sample (maybe PLFA "Lists")
+  - actual `if_then_else_` isn't practical because the language is strict
 - [x] Search should look at context
 - [ ] records
 - [ ] copattern matching
@@ -59,10 +65,8 @@
 - [x] matching on operators
   - [x] top level
   - [x] case statements
-- [ ] Lean / Agda ⟨ ⟩
+- [ ] Lean / Agda ⟨ ⟩ (does agda do this or just lean?)
 - [ ] Lean-like .map, etc? (resolve name in namespace of target type, etc)
-- [x] ~~SKIP list syntax~~
-  - Agda doesn't have it, clashes with pair syntax
 - [x] autos / typeclass resolution
   - [x] very primitive version in place, not higher order, search at end
   - [x] monad is now working

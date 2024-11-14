@@ -26,15 +26,42 @@ empty : HasIO m => m TopContext
 empty = pure $ MkTop [] !(newIORef (MC [] 0)) False !(newIORef []) [] empty
 
 ||| set or replace def. probably need to check types and Axiom on replace
+-- public export
+-- setDef : String -> Tm -> Def -> TopContext -> TopContext
+-- setDef name ty def = { defs $= go }
+--   where
+--     go : List TopEntry -> List TopEntry
+--     go [] = [MkEntry name ty def]
+--     go (x@(MkEntry nm ty' def') :: defs) = if nm == name
+--       then MkEntry name ty def :: defs
+--       else x :: go defs
+
 public export
-setDef : String -> Tm -> Def -> TopContext -> TopContext
-setDef name ty def = { defs $= go }
+setDef : String -> FC -> Tm -> Def -> M ()
+setDef name fc ty def = do
+  top <- get
+  defs <- go top.defs
+  put $ { defs := defs } top
   where
-    go : List TopEntry -> List TopEntry
-    go [] = [MkEntry name ty def]
+    go : List TopEntry -> M (List TopEntry)
+    go [] = pure $ [MkEntry name ty def]
     go (x@(MkEntry nm ty' def') :: defs) = if nm == name
-      then MkEntry name ty def :: defs
-      else x :: go defs
+      then error fc "\{name} is already defined"
+      else (x ::) <$> go defs
+
+public export
+updateDef : String -> FC -> Tm -> Def -> M ()
+updateDef name fc ty def = do
+  top <- get
+  defs <- go top.defs
+  put $ { defs := defs } top
+  where
+    go : List TopEntry -> M (List TopEntry)
+    go [] = error fc "\{name} not declared"
+    go (x@(MkEntry nm ty' def') :: defs) = if nm == name
+      then pure $ MkEntry name ty def :: defs
+      else (x ::) <$> go defs
+
 
 public export
 addError : HasIO io => {auto top : TopContext} -> Error -> io ()

@@ -175,25 +175,22 @@ processDecl (TypeSig fc names tm) = do
   putStrLn "-----"
   putStrLn "TypeSig \{unwords names} : \{show tm}"
   ty <- check (mkCtx top.metas fc) tm (VU fc)
-  putStrLn "got \{pprint [] ty}"
-  -- I was doing this previously, but I don't want to over-expand VRefs
-  -- ty' <- nf [] ty
-  -- putStrLn "nf \{pprint [] ty'}"
-  for_ names $ \nm => modify $ setDef nm ty Axiom
+  debug "got \{pprint [] ty}"
+  for_ names $ \nm => setDef nm fc ty Axiom
   -- Zoo4eg has metas in TypeSig, need to decide if I want to support that going forward.
   -- logMetas mstart
 
 processDecl (PType fc nm ty) = do
   top <- get
   ty' <- check (mkCtx top.metas fc) (maybe (RU fc) id ty) (VU fc)
-  modify $ setDef nm ty' PrimTCon
+  setDef nm fc ty' PrimTCon
 
 processDecl (PFunc fc nm ty src) = do
   top <- get
   ty <- check (mkCtx top.metas fc) ty (VU fc)
   ty' <- nf [] ty
   putStrLn "pfunc \{nm} : \{pprint [] ty'} := \{show src}"
-  modify $ setDef nm ty' (PrimFn src)
+  setDef nm fc ty' (PrimFn src)
 
 processDecl (Def fc nm clauses) = do
   putStrLn "-----"
@@ -224,7 +221,7 @@ processDecl (Def fc nm clauses) = do
   tm' <- zonk top 0 [] tm
   putStrLn "NF \{pprint[] tm'}"
   debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
-  modify $ setDef nm ty (Fn tm')
+  updateDef nm fc ty (Fn tm')
   logMetas mstart
 
 processDecl (DCheck fc tm ty) = do
@@ -249,7 +246,11 @@ processDecl (Data fc nm ty cons) = do
   mc <- readIORef top.metas
   let mstart = length mc.metas
   tyty <- check (mkCtx top.metas fc) ty (VU fc)
-  modify $ setDef nm tyty Axiom
+  case lookup nm top of
+    Just (MkEntry name type Axiom) => do
+      unifyCatch fc (mkCtx top.metas fc) !(eval [] CBN tyty) !(eval [] CBN type)
+    Just (MkEntry name type _) => error fc "\{show nm} already declared"
+    Nothing => setDef nm fc tyty Axiom
   cnames <- for cons $ \x => case x of
       (TypeSig fc names tm) => do
           debug "check dcon \{show names} \{show tm}"
@@ -266,11 +267,12 @@ processDecl (Data fc nm ty cons) = do
           when (hn /= nm) $
             error (getFC codomain) "Constructor codomain is \{pprint tnames codomain} rather than \{nm}"
 
-          for_ names $ \ nm' => modify $ setDef nm' dty (DCon (getArity dty) nm)
+          for_ names $ \ nm' => do
+            setDef nm' fc dty (DCon (getArity dty) nm)
           pure names
       _ => throwError $ E (0,0) "expected constructor declaration"
   putStrLn "setDef \{nm}  TCon \{show $ join cnames}"
-  modify $ setDef nm tyty (TCon (join cnames))
+  updateDef nm fc tyty (TCon (join cnames))
   logMetas mstart
   where
     checkDeclType : Tm -> M ()
