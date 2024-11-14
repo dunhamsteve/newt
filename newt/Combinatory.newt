@@ -49,14 +49,13 @@ data Env : Ctx -> U where
 -- lookup Here (x ::: y) = x
 -- lookup (There i) (x ::: env) = lookup i env
 
-
 lookup2 : {σ : Type} {Γ : Ctx} → Env Γ → Ref σ Γ → Val σ
 lookup2 (x ::: y) Here = x
 lookup2 (x ::: env) (There i) = lookup2 env i
 
 -- TODO MixFix - this was ⟦_⟧
 eval : {Γ : Ctx} {σ : Type} → Term Γ σ → (Env Γ → Val σ)
--- TODO unification error in direct application
+-- there was a unification error in direct application
 eval (App t u) env = (eval t env) (eval u env)
 eval (Lam t) env = \ x => eval t (x ::: env)
 eval (Var i) env = lookup2 env i
@@ -76,8 +75,11 @@ sapp : {Γ : Ctx} {σ τ ρ : Type} {f : _} {x : _} →
   Comb Γ (σ ~> ρ) (\ env y => (f env y) (x env y))
 sapp (CApp K t) I = t
 sapp (CApp K t) (CApp K u) = CApp K (CApp t u)
-sapp (CApp K t) u = ? -- CApp (CApp B t) u
+-- was out of pattern because of unexpanded lets.
+sapp (CApp K t) u = CApp (CApp B t) u
+-- TODO unsolved meta, out of pattern fragment
 sapp t (CApp K u) = ? -- CApp (CApp C t) u
+-- TODO unsolved meta, out of pattern fragment
 sapp t u = ? -- CApp (CApp S t) u
 
 abs : {Γ : Ctx} {σ τ : Type} {f : _} → Comb (σ :: Γ) τ f → Comb Γ (σ ~> τ) (\ env x => f (x ::: env))
@@ -87,11 +89,11 @@ abs I = CApp K I
 abs B = CApp K B
 abs C = CApp K C
 abs (CApp t u) = sapp (abs t) (abs u)
--- -- TODO lookup2 is getting stuck
-abs (CVar Here) = ? -- I
-abs (CVar (There i)) = ? -- CApp K (Var i)
+-- -- TODO lookup2 was getting stuck, needed to bounce the types in a rewritten env.
+abs (CVar Here) = I
+abs (CVar (There i)) = CApp K (CVar i)
 
 translate : {Γ : Ctx} {σ : Type} → (tm : Term Γ σ) → Comb Γ σ (eval tm)
-translate (App t u) = ? -- CApp (translate t) (translate u)
+translate (App t u) = CApp (translate t) (translate u)
 translate (Lam t) = abs (translate t)
 translate (Var i) = CVar i

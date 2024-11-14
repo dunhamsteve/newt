@@ -19,8 +19,8 @@ import Lib.Syntax
 -- dom gamma ren
 data Pden = PR Nat Nat (List Nat)
 
-showEnv : Context -> M String
-showEnv ctx =
+showCtx : Context -> M String
+showCtx ctx =
   unlines . reverse <$> go (names ctx) 0 (reverse $ zip ctx.env (toList ctx.types)) []
   where
     isVar : Nat -> Val -> Bool
@@ -195,8 +195,10 @@ solve env m sp t = do
   let l = length env
   debug "meta \{show meta}"
   ren <- invert l sp
+  -- force unlet
+  hack <- quote l t
+  t <- eval env CBN hack
   catchError {e=Error} (do
-
     tm <- rename m ren l t
 
     let tm = lams (length sp) tm
@@ -220,8 +222,6 @@ solve env m sp t = do
         debug "CONSTRAINT3 m\{show ix} \{show sp} =?= \{show t}"
         debug "because \{showError "" err}"
         addConstraint env m sp t)
-        --throwError err)
-
 
 unifySpine : Env -> UnifyMode -> Bool -> SnocList Val -> SnocList Val  -> M UnifyResult
 unifySpine env mode False _ _ = error emptyFC "unify failed at head" -- unreachable now
@@ -277,13 +277,13 @@ unify env mode t u = do
     -- We only want to do this for LHS pattern vars, otherwise, try expanding
     (_, VVar fc k [<], u) => case mode of
       Pattern => pure $ MkResult[(k, u)]
-      Normal => case !(tryEval u) of
+      Normal => case !(tryEval env u) of
         Just v => unify env mode t' v
         Nothing => error fc "Failed to unify \{show t'} and \{show u'}"
 
     (_,t, VVar fc k [<]) => case mode of
       Pattern => pure $ MkResult[(k, t)]
-      Normal => case !(tryEval t) of
+      Normal => case !(tryEval env t) of
         Just v => unify env mode v u'
         Nothing => error fc "Failed to unify \{show t'} and \{show u'}"
 
@@ -301,21 +301,18 @@ unify env mode t u = do
 
     -- REVIEW - consider separate value for DCon/TCon
     (_, VRef fc k def sp,  VRef fc' k' def' sp') =>
-      -- This is a problem for cmp (S x) (S y) =?= cmp x y, when the
-      -- same is an equation in cmp.
-
-      -- if k == k' then do
-      --   debug "unify \{show l} spine at \{k} \{show sp} \{show sp'}"
-      --   unifySpine l (k == k') sp sp'
-      -- else
+      -- unifySpine is a problem for cmp (S x) (S y) =?= cmp x y
         do
-        Nothing <- tryEval t'
-          | Just v => unify env mode v u'
-        Nothing <- tryEval u'
-          | Just v => unify env mode t' v
-        if k == k'
-          then unifySpine env mode (k == k') sp sp'
-          else error fc "vref mismatch \{show t'} \{show u'}"
+        -- catchError {e = Error} (unifySpine env mode (k == k') sp sp') $ \ err => do
+            Nothing <- tryEval env t'
+              | Just v => do
+              debug "tryEval \{show t'} to \{show v}"
+              unify env mode v u'
+            Nothing <- tryEval env u'
+              | Just v => unify env mode t' v
+            if k == k'
+              then unifySpine env mode (k == k') sp sp'
+              else error fc "vref mismatch \{show t'} \{show u'}"
 
     (_, VU _, VU _) => pure neutral
     -- Lennart.newt cursed type references itself
@@ -690,19 +687,21 @@ checkDone : Context -> List (String, Pattern) -> Raw -> Val -> M Tm
 checkDone ctx [] body ty = do
   debug "DONE-> check body \{show body} at \{show ty}"
   -- TODO better dump context function
-  -- debugM $ showEnv ctx
-  -- -- Hack to try to get Combinatory working.
-  -- env' <- for ctx.env $ \ val => do
-  --   ty <- quote (length ctx.env) val
-  --   eval ctx.env CBN ty
-  -- types' <- for ctx.types $ \case
-  --   (nm,ty) =>  do
-  --     nty <- quote (length ctx.env) ty
-  --     ty' <- eval ctx.env CBN nty
-  --     pure (nm, ty')
-  -- let ctx = { env := env', types := types' } ctx
-  -- debug "AFTER"
-  -- debugM $ showEnv ctx
+  debugM $ showCtx ctx
+  -- Hack to try to get Combinatory working
+  -- we're trying to subst in solutions here.
+  env' <- for ctx.env $ \ val => do
+    ty <- quote (length ctx.env) val
+    -- This is not getting vars under lambdas
+    eval ctx.env CBV ty
+  types' <- for ctx.types $ \case
+    (nm,ty) =>  do
+      nty <- quote (length env') ty
+      ty' <- eval env' CBV nty
+      pure (nm, ty')
+  let ctx = { env := env', types := types' } ctx
+  debug "AFTER"
+  debugM $ showCtx ctx
   -- I'm running an eval here to run case statements that are
   -- unblocked by lets in the env. (Tree.newt:cmp)
   -- The case eval code only works in the Tm -> Val case at the moment.
@@ -825,7 +824,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
   case pat of
     PatCon _ _ _ _ => do
       -- expand vars that may be solved, eval top level functions
-      scty' <- unlet ctx.env scty >>= forceType
+      scty' <- unlet ctx.env scty >>= forceType ctx.env
       debug "EXP \{show scty} -> \{show scty'}"
       -- this is per the paper, but it would be nice to coalesce
       -- default cases
@@ -857,7 +856,7 @@ undo ((DoExpr fc tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Expli
 undo ((DoLet fc nm tm) :: xs) = RLet fc nm (RImplicit fc) tm <$> undo xs
 undo ((DoArrow fc nm tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc nm Explicit !(undo xs)) Explicit
 
-check ctx tm ty = case (tm, !(forceType ty)) of
+check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
   (RDo fc stmts, ty) => check ctx !(undo stmts) ty
   (RCase fc rsc alts, ty) => do
     (sc, scty) <- infer ctx rsc

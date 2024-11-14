@@ -38,24 +38,12 @@ vapp (VLam _ _ t) u = t $$ u
 vapp (VVar fc k sp) u = pure $ VVar fc k (sp :< u)
 vapp (VRef fc nm def sp) u = pure $ VRef fc nm def (sp :< u)
 vapp (VMeta fc k sp) u = pure $ VMeta fc k (sp :< u)
-vapp t u = error' "impossible in vapp \{show t} to \{show u}"
+vapp t u = error' "impossible in vapp \{show t} to \{show u}\n"
 
 export
 vappSpine : Val -> SnocList Val -> M Val
 vappSpine t [<] = pure t
 vappSpine t (xs :< x) = vapp !(vappSpine t xs) x
-
-export
-tryEval : Val -> M (Maybe Val)
-tryEval (VRef fc k _ sp) =
-  case lookup k !(get) of
-      Just (MkEntry name ty (Fn tm)) => do
-          vtm <- eval [] CBN tm
-          case !(vappSpine vtm sp) of
-            VCase{} => pure Nothing
-            v => pure $ Just v
-      _ => pure Nothing
-tryEval _ = pure Nothing
 
 
 
@@ -81,17 +69,34 @@ unlet env t@(VVar fc k sp) = case lookupVar env k of
         pure t
 unlet env x = pure x
 
+export
+tryEval : Env -> Val -> M (Maybe Val)
+tryEval env (VRef fc k _ sp) =
+  case lookup k !(get) of
+      Just (MkEntry name ty (Fn tm)) =>
+        catchError {e=Error} (
+            do
+            debug "app \{name} to \{show sp}"
+            vtm <- eval [] CBN tm
+            debug "tm is \{pprint [] tm}"
+            case !(vappSpine vtm sp) of
+              VCase{} => pure Nothing
+              v => pure $ Just v)
+            (\ _ => pure Nothing)
+      _ => pure Nothing
+tryEval _ _ = pure Nothing
+
 
 -- Force far enough to compare types
 export
-forceType : Val -> M Val
-forceType (VMeta fc ix sp) = case !(lookupMeta ix) of
+forceType : Env -> Val -> M Val
+forceType env (VMeta fc ix sp) = case !(lookupMeta ix) of
   (Unsolved x k xs _ _ _) => pure (VMeta fc ix sp)
-  (Solved _ k t) => vappSpine t sp >>= forceType
-forceType x = do
-  Just x' <- tryEval x
+  (Solved _ k t) => vappSpine t sp >>= forceType env
+forceType env x = do
+  Just x' <- tryEval env x
     | _ => pure x
-  forceType x'
+  forceType env x'
 
 evalCase : Env -> Mode -> Val -> List CaseAlt -> M (Maybe Val)
 evalCase env mode sc@(VRef _ nm _ sp) (cc@(CaseCons name nms t) :: xs) =
@@ -108,7 +113,7 @@ evalCase env mode sc@(VRef _ nm _ sp) (cc@(CaseCons name nms t) :: xs) =
     go env (arg :: args) (nm :: nms) = go (arg :: env) args nms
     go env args [] = Just <$> vappSpine !(eval env mode t) ([<] <>< args)
     go env [] rest = pure Nothing
--- This is an attempt to handle unlet for
+-- REVIEW - this is handled in the caller already
 evalCase env mode sc@(VVar fc k sp) alts = case lookupVar env k of
     Just tt@(VVar fc' k' sp') => do
         debug "lookup \{show k} is \{show tt}"
@@ -159,7 +164,7 @@ eval env mode tm@(Case fc sc alts) = do
   -- TODO we need to be able to tell eval to expand aggressively here.
   sc' <- eval env mode sc
   sc' <- unlet env sc' -- try to expand lets from pattern matching
-  sc' <- forceType sc'
+  sc' <- forceType env sc'
   pure $ fromMaybe (VCase fc !(eval env mode sc) alts)
                              !(evalCase env mode sc' alts)
 

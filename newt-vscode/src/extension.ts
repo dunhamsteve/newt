@@ -16,7 +16,7 @@ export function activate(context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration("newt");
     const cmd = config.get<string>("path", "build/exec/newt");
     const command = `${cmd} ${fileName}`;
-    exec(command, { cwd }, (err, stdout, _stderr) => {
+    exec(command, { cwd, maxBuffer: 1024*1024*10 }, (err, stdout, _stderr) => {
       // I think I ignored 1 here because I wanted failure to launch
       if (err && err.code !== 1) {
         vscode.window.showErrorMessage(`newt error: ${err}`);
