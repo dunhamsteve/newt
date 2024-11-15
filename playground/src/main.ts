@@ -144,14 +144,15 @@ function Tabs() {
 
 const SAMPLES = [
   "Tour.newt",
+  "DSL.newt",
   "Tree.newt",
-  // "Prelude.newt",
   "Reasoning.newt",
   "Lists.newt",
   "Day1.newt",
   "Day2.newt",
   "Lib.newt",
   "TypeClass.newt",
+  "Combinatory.newt",
 ];
 
 function EditWrap({vertical, toggle}: {vertical: boolean, toggle: () => void}) {

@@ -385,7 +385,7 @@ parseData : Parser Decl
 parseData = do
   fc <- getPos
   keyword "data"
-  name <- uident <|> token MixFix
+  name <- uident <|> ident <|> token MixFix
   keyword ":"
   ty <- typeExpr
   keyword "where"

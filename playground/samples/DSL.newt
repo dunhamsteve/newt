@@ -1,0 +1,120 @@
+module DSL
+
+-- https://www.youtube.com/watch?v=sFyy9sssK50
+
+data ℕ : U where
+  Z : ℕ
+  S : ℕ → ℕ
+
+infixl 7 _+_
+infixl 8 _*_
+
+_+_ : ℕ → ℕ → ℕ
+Z + m = m
+(S k) + m = S (k + m)
+
+_*_ : ℕ → ℕ → ℕ
+Z * m = Z
+(S k) * m = m + k * m
+
+infixr 4 _::_
+data Vec : U → ℕ → U where
+  Nil : {a} → Vec a Z
+  _::_ : {a k} → a → Vec a k → Vec a (S k)
+
+infixl 5 _++_
+_++_ : {a n m} → Vec a n → Vec a m → Vec a (n + m)
+Nil ++ ys = ys
+(x :: xs) ++ ys = x :: (xs ++ ys)
+
+map : {a b n} → (a → b) → Vec a n → Vec b n
+map f Nil = Nil
+map f (x :: xs) = f x :: map f xs
+
+data E : U where
+  Zero : E
+  One : E
+  Add : E → E → E
+  Mul : E → E → E
+
+two : E
+two = Add One One
+
+four : E
+four = Mul two two
+
+card : E → ℕ
+card Zero = Z
+card One = S Z
+card (Add x y) = card x + card y
+card (Mul x y) = card x * card y
+
+data Empty : U where
+
+data Unit : U where
+  -- unit accepted but case building thinks its a var
+  unit : Unit
+
+data Either : U -> U -> U where
+  Left : {A B} → A → Either A B
+  Right : {A B} → B → Either A B
+
+infixr 4 _,_
+data Both : U → U → U where
+  _,_ : {A B} → A → B → Both A B
+
+typ : E → U
+typ Zero = Empty
+typ One = Unit
+typ (Add x y) = Either (typ x) (typ y)
+typ (Mul x y) = Both (typ x) (typ y)
+
+Bool : U
+Bool = typ two
+
+false : Bool
+false = Left unit
+
+true : Bool
+true = Right unit
+
+BothBoolBool : U
+BothBoolBool = typ four
+
+ex1 : BothBoolBool
+ex1 = (false, true)
+
+enumAdd : {a b m n} → Vec a m → Vec b n → Vec (Either a b) (m + n)
+enumAdd xs ys = map Left xs ++ map Right ys
+
+-- for this I followed the shape of _*_, the lecture was slightly different
+enumMul : {a b m n} → Vec a m → Vec b n → Vec (Both a b) (m * n)
+enumMul Nil ys = Nil
+enumMul (x :: xs) ys = map (_,_ x) ys ++ enumMul xs ys
+
+enumerate : (t : E) → Vec (typ t) (card t)
+enumerate Zero = Nil
+enumerate One = unit :: Nil
+enumerate (Add x y) = enumAdd (enumerate x) (enumerate y)
+enumerate (Mul x y) = enumMul (enumerate x) (enumerate y)
+
+test2 : Vec (typ two) (card two)
+test2 = enumerate two
+
+test4 : Vec (typ four) (card four)
+test4 = enumerate four
+
+-- TODO I need to add #eval, like Lean
+-- #eval enumerate two
+
+-- for now, I'll define ≡ to check
+
+infixl 2 _≡_
+data _≡_ : {A} → A → A → U where
+  Refl : {A} {a : A} → a ≡ a
+
+test2' : test2 ≡ false :: true :: Nil
+test2' = Refl
+
+test4' : test4 ≡ (false, false) :: (false, true) :: (true, false) :: (true, true) :: Nil
+test4' = Refl
