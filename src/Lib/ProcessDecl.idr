@@ -154,9 +154,9 @@ logMetas mstart = do
       -- FIXME in Combinatory, the val doesn't match environment?
       let msg = "Unsolved meta \{show k} \{show kind} type \{pprint (names ctx) tm} \{show $ length cons} constraints"
       msgs <- for cons $ \ (MkMc fc env sp val) => do
-            putStrLn "  ENV \{show env}"
-            pure "  (m\{show k} (\{unwords $ map show $ sp <>> []}) =?= \{show val}"
+            pure "  * (m\{show k} (\{unwords $ map show $ sp <>> []}) =?= \{show val}"
       addError $ E (l,c) $ unlines ([msg] ++ msgs)
+
 
 export
 processDecl : Decl -> M ()

@@ -1,6 +1,8 @@
 
 ## TODO
 
+- [ ] improve test driver
+  - maybe a file listing jobs, whether they are known broken, optional expected output, optional expected JS execution output.
 - [x] forall / ∀ sugar (Maybe drop this, issues with `.` and `{A}` works fine)
 - [x] Bad module name error has FC 0,0 instead of the module or name
 - [x] I've made `{x}` be `{x : _}` instead of `{_ : x}`. Change this.

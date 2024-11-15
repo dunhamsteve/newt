@@ -2,6 +2,9 @@ module Combinatory
 
 -- "A correct-by-construction conversion from lambda calculus to combinatory logic", Wouter Swierstra
 
+-- This does not fully typecheck in newt yet, but is adopted from a working Idris file. It
+-- seems to do a good job exposing bugs.
+
 data Unit : U where
   MkUnit : Unit
 

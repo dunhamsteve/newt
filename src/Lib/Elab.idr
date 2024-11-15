@@ -170,13 +170,16 @@ rename meta ren lvl v = go ren lvl v
     go ren lvl (VLet fc name val body) =
       pure $ Let fc name !(go ren lvl val) !(go (lvl :: ren) (S lvl) body)
 
-lams : Nat -> Tm -> Tm
-lams 0 tm = tm
--- REVIEW can I get better names in here?
-lams (S k) tm = Lam emptyFC "arg_\{show k}" (lams k tm)
+lams : Nat -> List String -> Tm -> Tm
+lams 0 _ tm = tm
+lams (S k) [] tm = Lam emptyFC "arg_\{show k}" (lams k [] tm)
+lams (S k) (x :: xs) tm = Lam emptyFC x (lams k xs tm)
 
 export
 unify : Env -> UnifyMode -> Val -> Val  -> M UnifyResult
+
+(.boundNames) : Context -> List String
+ctx.boundNames = map snd $ filter (\x => fst x == Bound) $ toList $ zip ctx.bds (map fst ctx.types)
 
 export
 solve : Env -> (k : Nat) -> SnocList Val -> Val -> M  ()
@@ -201,7 +204,7 @@ solve env m sp t = do
   catchError {e=Error} (do
     tm <- rename m ren l t
 
-    let tm = lams (length sp) tm
+    let tm = lams (length sp) (reverse ctx_.boundNames) tm
     top <- get
     soln <- eval [] CBN tm
 
