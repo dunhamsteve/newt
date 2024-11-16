@@ -12,14 +12,13 @@
 - [x] Check for shadowing when declaring dcon
   - Handles the forward decl in `Zoo1.newt`, but we'll need different syntax if
     we have different core terms for TCon/DCon/Function
-- [ ] Require infix decl before declaring names (helps find bugs)
+- [ ] Require infix decl before declaring names with `_` (helps find bugs)
 - [ ] sugar for typeclasses
 - [ ] maybe add implicits in core to help resugar operators?
   - There is also a bit where kovacs uses the implicit on the type (a value) to decide to insert
-- [ ] consider binders in environment, to better mark let and to provide names
+- [ ] consider binders in environment, like Idris, to better mark `let` and to provide names
 - [ ] move some top-level chattiness to `debug`
-- [ ] consider optionally compiling to eliminators for a second type-checking pass. This
-      would help catch bugs.
+- [ ] consider optionally compiling to eliminators for a second type-checking pass to help catch bugs.
 - [x] Allow unicode operators/names
 - Web playground
   - [x] editor
@@ -38,7 +37,7 @@
 - [ ] Get `Combinatory.newt` to work
 - [x] Remember operators from imports
 - [ ] Default cases for non-primitives (currently gets expanded to all constructors)
-  - This may need a little care. But I think I could collect all constructors that only match wildcards into a single case. This would lose any information from the individual, unnamed cases though.
+  - This may need a little care. But I think I could collect all constructors that only match wildcards into a single case. This would lose any information from breaking out the individual, unnamed cases though.
   - There are cases where we have  `_` and then `Foo` on the next line, but they should all get collected into the `Foo` case. I think I sorted all of this out for primitives.
 - [x] Case for primitives
 - [ ] aoc2023 translation
@@ -104,6 +103,7 @@
 
 - [ ] Read Ulf Norell thesis
 - [ ] Finish reading dynamic pattern unification paper to see what is missing/wrong with the current implementation
+- [ ] Read "Unifiers as Equivalences" has unification with types.  Look into adapting some of that (or at least read/understand it).  Indexed types are mentioned here.
 
 ### Other issues
 

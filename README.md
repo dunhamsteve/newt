@@ -14,12 +14,21 @@ output, and run code.
 
 The repository is tagging `.newt` files as Agda to convince github to highlight them.
 
+There is a web playground at https://dunhamsteve.github.io/newt. The top left corner
+has a dropdown with some samples. At the moment, it shows generated code, but doesn't
+execute it.
+
 ## Building
 
 There is a `Makefile` that builds both chez and javascript versions.  They end up in
 `build/exec` as usual.  I've also added a `pack.toml`, so `pack build` also works.
 
-There is a vscode extension in `newt-vscode`. Running `make vscode` will build and install it. The extension expects `build/exec/newt` to exist in the workspace. And `make test` will run a few black box tests. Currently it simply checks return codes, since the output is in flux.
+There is a vscode extension in `newt-vscode`. Running `make vscode` will build and install it. The extension expects `build/exec/newt` to exist in the workspace. And `make test` will run a few black box tests. Currently it simply checks return codes, since the output format is in flux.
+
+The web playground is in playground.
+- `npm install` will pull down dependencies.
+- `./build` will build the web workers and install sample files (`make` must be run in root first).
+- `npx vite` will run the dev server.
 
 ## Overview
 
@@ -36,37 +45,32 @@ indices for `Tm` and levels for `Val`.  For compilation, this is converted to `C
 
 I have `Let` in the core language. Partly because I'd like this to make it into javascript (only compute once), but also because it's being leveraged by the casetree stuff.
 
+I also have `Case` in the core language.
+
 ## Case Tree
 
-I've got no idea what I'm doing here. I worked off of Jesper Cockx "Elaborating Dependent (Co)pattern Matching", leaving out codata for now.
+I've got no idea what I'm doing here. I worked off of Jesper Cockx "Elaborating Dependent (Co)pattern Matching", leaving out codata for now.  I've now added matching primitives, requiring a default case. When splitting on inductive types it will break out all of the remaining cases and doesn't emit a default case.
 
-For the dependent thing, I've change unify to return `VVar` constraints. I think such constraints would be an error while typechecking on RHS (meta solutions are handled separately). On the LHS, I'm rewriting the environment to turn the var from a bind to a define. Unification has been tweaked to look up `VVar` in environment. Bind will hand back the same `VVar`.
+I'm essentially putting the constraints into the environment like `let`. This is a problem when stuff is already in `Val` form. Substitution into types in the context is done via quote/eval. I plan to revisit this.
 
-Some of this I could probably do with subst, but the RHS is `Raw`, it takes typechecking to turn it into a clean `Tm`, and I need this information for the typechecking.  To substitute into the goal type for the RHS, I am now
-doing a quote and eval to get case to expand. This is a bit of a stopgap because case is only eval'd when going
-from `Tm` to `Val`. I think I'll need a way to eval a VCase during unification, as we do with function applications.
+I intend to add the codata / copatterns from the paper, but haven't gotten to that yet.
 
 ## Evaluation
 
-Following kovacs, I'm putting `VVar` into context env when I go under binders. This avoids substitution.
+Following kovacs, I'm putting `VVar` into context env when I go under binders in type-checking. This avoids substitution.
 
 ## Autos
 
 Newt has primitive auto implicits. They are denoted by double braces `{{}}` as in Agda. Newt will search for a function that returns a type in the same family, only has implicit and auto-implicit arguments, and unifies (satisfying any relevant constraints).
 
-## Issues
-
-- I should do some erasure of values unused at runtime
-- I'm a little fuzzy on the "right way" to deal with constraints from unification
-- I'm a little fuzzy on how much to evaluate and when
-- I'm not postponing anything, and I suspect I will need to
+This search can be used to manually create typeclasses.  `do` blocks are supported, desugaring to `>>=`, which it expects to be the `bind` of a Monad typeclass.
 
 ## References
 
-"Elaborating Dependent (Co)pattern Matching" describes building case trees. Section 5.2 has the algorithm.
+"Elaborating Dependent (Co)pattern Matching" by Jesper Cockx and Andreas Abel describes building case trees. Section 5.2 describes the algorithm.
 
-"A prettier printer" was the basis of the pretty printer.
+"A prettier printer" by Philip Wadler was the basis of the pretty printer.
 
-"Elaboration Zoo" was a resource for typechecking and elaboration. In particular pattern unification and handling of implicits is based on that.
+"Elaboration Zoo" by András Kovács was my primary resource for typechecking and elaboration. In particular pattern unification and handling of implicits is based on it.
 
-"Unifiers as Equivalences" has unification with types.  Look into adapting some of that (or at least read/understand it).  Indexed types are mentioned here.
+There were many other resources and papers that I used to learn how dependent typed languages are built.
