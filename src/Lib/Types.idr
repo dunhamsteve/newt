@@ -202,9 +202,9 @@ pprint names tm = render 80 $ go 0 names tm
     go p names (Pi _ nm Explicit t u) =
       text "((" <+> text nm <+> ":" <+> go p names t <+> ")" <+> "->" <+> go p (nm :: names) u <+> ")"
     -- FIXME - probably way wrong on the names here.  There is implicit binding going on
-    go p names (Case _ sc alts) = parens 0 p $ text "case" <+> go 0 names sc <+> text "of" </> (nest 2 (line ++ stack (map (goAlt 0 names) alts)))
+    go p names (Case _ sc alts) = parens 0 p $ text "case" <+> go 0 names sc <+> text "of" ++ (nest 2 (line ++ stack (map (goAlt 0 names) alts)))
     go p names (Lit _ lit) = text (show lit)
-    go p names (Let _ nm t u) = parens 0 p $ text "let" <+> text nm <+> ":=" <+> go 0 names t </> (nest 2 $ go 0 names u)
+    go p names (Let _ nm t u) = parens 0 p $ text "let" <+> text nm <+> ":=" <+> go 0 names t </> (nest 2 $ go 0 (nm :: names) u)
 
 -- public export
 -- data Closure : Nat -> Type

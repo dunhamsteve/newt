@@ -18,6 +18,8 @@
   - There is also a bit where kovacs uses the implicit on the type (a value) to decide to insert
 - [ ] consider binders in environment, to better mark let and to provide names
 - [ ] move some top-level chattiness to `debug`
+- [ ] consider optionally compiling to eliminators for a second type-checking pass. This
+      would help catch bugs.
 - [x] Allow unicode operators/names
 - Web playground
   - [x] editor

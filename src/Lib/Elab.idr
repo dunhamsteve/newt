@@ -871,6 +871,7 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
     top <- get
     clauses <- traverse (\(MkAlt pat rawRHS) => pure $ MkClause (getFC pat) [(scnm, !(mkPat top (pat, Explicit)))] [] rawRHS ) alts
     -- buildCase expects scrutinee to be a name in the context, so we need to let it.
+    -- if it's a Bnd and not shadowed we could skip the let, but that's messy.
     let ctx' = extend ctx scnm scty
     pure $ Let fc scnm sc !(buildTree ctx' $ MkProb clauses ty)
 

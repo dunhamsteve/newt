@@ -165,6 +165,8 @@ processDecl : Decl -> M ()
 processDecl (PMixFix{})  = pure ()
 
 processDecl (TypeSig fc names tm) = do
+  putStrLn "-----"
+  putStrLn "TypeSig \{unwords names} : \{show tm}"
   top <- get
   mc <- readIORef top.metas
   let mstart = length mc.metas
@@ -172,12 +174,10 @@ processDecl (TypeSig fc names tm) = do
     let Nothing := lookup nm top
       | _ => error fc "\{show nm} is already defined"
     pure ()
-  putStrLn "-----"
-  putStrLn "TypeSig \{unwords names} : \{show tm}"
   ty <- check (mkCtx top.metas fc) tm (VU fc)
   debug "got \{pprint [] ty}"
   for_ names $ \nm => setDef nm fc ty Axiom
-  -- Zoo4eg has metas in TypeSig, need to decide if I want to support that going forward.
+  -- Zoo4eg has metas in TypeSig, need to decide if I want to support leaving them unsolved here
   -- logMetas mstart
 
 processDecl (PType fc nm ty) = do
@@ -194,7 +194,7 @@ processDecl (PFunc fc nm ty src) = do
 
 processDecl (Def fc nm clauses) = do
   putStrLn "-----"
-  putStrLn "def \{show nm}"
+  putStrLn "Def \{show nm}"
   top <- get
   mc <- readIORef top.metas
   let mstart = length mc.metas
@@ -203,23 +203,24 @@ processDecl (Def fc nm clauses) = do
   let (MkEntry name ty Axiom) := entry
     | _ => throwError $ E fc "\{nm} already defined"
 
-  putStrLn "check \{nm} ... at \{pprint [] ty}"
+  putStrLn "check \{nm} at \{pprint [] ty}"
   vty <- eval empty CBN ty
-  putStrLn "vty is \{show vty}"
+  debug "\{nm} vty is \{show vty}"
 
   -- I can take LHS apart syntactically or elaborate it with an infer
   clauses' <- traverse (makeClause top) clauses
   tm <- buildTree (mkCtx top.metas fc) (MkProb clauses' vty)
-  putStrLn "Ok \{pprint [] tm}"
+  -- putStrLn "Ok \{pprint [] tm}"
 
   mc <- readIORef top.metas
   let mlen = length mc.metas `minus` mstart
   solveAutos mlen (take mlen mc.metas)
 
-  -- Expand metas
-  -- tm' <- nf [] tm  -- TODO - make nf that expands all metas, Day1.newt is a test case
+  -- TODO - make nf that expands all metas and drop zonk
+  -- Day1.newt is a test case
+  -- tm' <- nf [] tm
   tm' <- zonk top 0 [] tm
-  putStrLn "NF \{pprint[] tm'}"
+  putStrLn "NF\n\{pprint[] tm'}"
   debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
   updateDef nm fc ty (Fn tm')
   logMetas mstart
@@ -241,7 +242,7 @@ processDecl (DCheck fc tm ty) = do
 
 processDecl (Data fc nm ty cons) = do
   putStrLn "-----"
-  putStrLn "process data \{nm}"
+  putStrLn "Data \{nm}"
   top <- get
   mc <- readIORef top.metas
   let mstart = length mc.metas

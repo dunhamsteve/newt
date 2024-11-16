@@ -54,7 +54,7 @@ plus (S n) m = S (plus n m)
 plus' : Nat -> Nat -> Nat
 plus' = \ n m => case n of
     Z => m
-    S n => S (plus n m)
+    S n => S (plus' n m)
 
 -- We can define operators, currently only infix
 -- and we allow unicode and letters in operators

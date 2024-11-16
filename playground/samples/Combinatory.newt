@@ -39,7 +39,6 @@ data Term : Ctx -> Type -> U where
   Lam : {Γ : Ctx} {σ τ : Type} -> Term (σ :: Γ) τ -> Term Γ (σ ~> τ)
   Var : {Γ : Ctx} {σ : Type} -> Ref σ Γ → Term Γ σ
 
--- FIXME, I wasn't getting an error when I had Nil shadowing Nil
 infixr 7 _:::_
 data Env : Ctx -> U where
   ENil : Env Nil
