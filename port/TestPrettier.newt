@@ -1,0 +1,19 @@
+module TestPrettier
+
+import Prettier
+
+five : Nat
+five = S (S (S (S (S Z))))
+
+fifty : Nat
+fifty = five * five * S (S Z)
+
+doc : Doc
+doc = text "x" <+> text "+" <+> text "y"
+
+foo : String
+foo = render fifty doc
+
+main : IO Unit
+main = do
+  putStrLn foo

@@ -1013,5 +1013,6 @@ infer ctx (RImplicit fc) = do
 
 infer ctx (RLit fc (LString str)) = pure (Lit fc (LString str), !(primType fc "String"))
 infer ctx (RLit fc (LInt i)) = pure (Lit fc (LInt i), !(primType fc "Int"))
+infer ctx (RLit fc (LChar c)) = pure (Lit fc (LChar c), !(primType fc "Char"))
 
 infer ctx tm = error (getFC tm) "Implement infer \{show tm}"
