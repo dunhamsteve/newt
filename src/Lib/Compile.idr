@@ -188,10 +188,6 @@ jsIdent id = if elem id keywords then text ("$" ++ id) else text $ pack $ fix (u
 
 stmtToDoc : JSStmt e -> Doc
 
-||| separate with space
-export
-commaSep : List Doc -> Doc
-commaSep = folddoc (\a, b => a ++ "," <+/> b)
 
 expToDoc : JSExp -> Doc
 expToDoc (LitArray xs) = ?expToDoc_rhs_0

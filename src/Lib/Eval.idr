@@ -204,7 +204,7 @@ nfv env t = quote (length env) !(eval env CBV t)
 
 export
 prvalCtx : {auto ctx : Context} -> Val -> M String
-prvalCtx v = pure $ pprint (toList $ map fst ctx.types) !(quote ctx.lvl v)
+prvalCtx v = pure $ interpolate $ pprint (toList $ map fst ctx.types) !(quote ctx.lvl v)
 
 -- REVIEW - might be easier if we inserted the meta without a bunch of explicit App
 -- I believe Kovacs is doing that.

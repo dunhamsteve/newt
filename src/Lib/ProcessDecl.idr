@@ -106,7 +106,7 @@ solveAutos mlen ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
             [] => findMatches ctx ty top.defs
             xs => pure xs
         | res => do
-          debug "FAILED to solve \{show ty}, matches: \{show $ map (pprint [] . fst) res}"
+          debug "FAILED to solve \{show ty}, matches: \{commaSep $ map (pprint [] . fst) res}"
           solveAutos mlen es
         -- | res => error fc "FAILED to solve \{show ty}, matches: \{show $ map (pprint [] . fst) res}"
       writeIORef top.metas mc
@@ -166,7 +166,7 @@ processDecl (PMixFix{})  = pure ()
 
 processDecl (TypeSig fc names tm) = do
   putStrLn "-----"
-  putStrLn "TypeSig \{unwords names} : \{show tm}"
+
   top <- get
   mc <- readIORef top.metas
   let mstart = length mc.metas
@@ -175,6 +175,7 @@ processDecl (TypeSig fc names tm) = do
       | _ => error fc "\{show nm} is already defined"
     pure ()
   ty <- check (mkCtx top.metas fc) tm (VU fc)
+  putStrLn "TypeSig \{unwords names} : \{pprint [] ty}"
   debug "got \{pprint [] ty}"
   for_ names $ \nm => setDef nm fc ty Axiom
   -- Zoo4eg has metas in TypeSig, need to decide if I want to support leaving them unsolved here
@@ -220,7 +221,7 @@ processDecl (Def fc nm clauses) = do
   -- Day1.newt is a test case
   -- tm' <- nf [] tm
   tm' <- zonk top 0 [] tm
-  putStrLn "NF\n\{pprint[] tm'}"
+  putStrLn "NF\n\{render 80 $ pprint[] tm'}"
   debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
   updateDef nm fc ty (Fn tm')
   logMetas mstart

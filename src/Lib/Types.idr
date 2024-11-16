@@ -2,7 +2,7 @@ module Lib.Types
 
 -- For FC, Error
 import public Lib.Common
-import Lib.Prettier
+import public Lib.Prettier
 
 import public Control.Monad.Error.Either
 import public Control.Monad.Error.Interface
@@ -169,10 +169,16 @@ Eq (Tm) where
   _ == _ = False
 
 
+
+-- TODO App and Lam should have <+/> but we need to fix
+-- INFO pprint to `nest 2 ...`
+-- maybe return Doc and have an Interpolation..
+-- If we need to flatten, case is going to get in the way.
+
 ||| Pretty printer for Tm.
 export
-pprint : List String -> Tm -> String
-pprint names tm = render 80 $ go 0 names tm
+pprint : List String -> Tm -> Doc
+pprint names tm = go 0 names tm
   where
     parens : Nat -> Nat -> Doc -> Doc
     parens a b doc = if a < b
@@ -183,8 +189,9 @@ pprint names tm = render 80 $ go 0 names tm
     goAlt : Nat -> List String -> CaseAlt -> Doc
 
     goAlt p names (CaseDefault t) = "_" <+> "=>" <+> go p ("_" :: names) t
-    goAlt p names (CaseCons name args t) = text name <+> spread (map text args) <+> "=>" <+/> go p (reverse args ++ names) t
-    goAlt p names (CaseLit lit t) = text (show lit) <+> "=>" <+/> go p names t
+    goAlt p names (CaseCons name args t) = text name <+> spread (map text args) <+> (nest 2 $ "=>" <+/> go p (reverse args ++ names) t)
+    -- `;` is not in surface syntax, but sometimes we print on one line
+    goAlt p names (CaseLit lit t) = text (show lit) <+> (nest 2 $ "=>" <+/> go p names t ++ ";")
 
     go p names (Bnd _ k) = case getAt k names of
       -- Either a bug or we're printing without names
@@ -192,22 +199,22 @@ pprint names tm = render 80 $ go 0 names tm
       Just nm => text "\{nm}:\{show k}"
     go p names (Ref _ str mt) = text str
     go p names (Meta _ k) = text "?m:\{show k}"
-    go p names (Lam _ nm t) = parens 0 p $ text "\\ \{nm} =>" <+> go 0 (nm :: names) t
+    go p names (Lam _ nm t) = parens 0 p $ nest 2 $ text "\\ \{nm} =>" <+/> go 0 (nm :: names) t
     go p names (App _ t u) = parens 0 p $ go 0 names t <+> go 1 names u
     go p names (U _) = "U"
-    go p names (Pi _ nm Auto t u) =
-      text "({{" <+> text nm <+> ":" <+> go p names t <+> "}}" <+> "->" <+> go p (nm :: names) u <+> ")"
-    go p names (Pi _ nm Implicit t u) =
-      text "({" <+> text nm <+> ":" <+> go p names t <+> "}" <+> "->" <+> go p (nm :: names) u <+> ")"
-    go p names (Pi _ nm Explicit t u) =
-      text "((" <+> text nm <+> ":" <+> go p names t <+> ")" <+> "->" <+> go p (nm :: names) u <+> ")"
+    go p names (Pi _ nm Auto t u) = parens 0 p $
+      text "{{" <+> text nm <+> ":" <+> go 0 names t <+> "}}" <+> "->" <+> go 0 (nm :: names) u
+    go p names (Pi _ nm Implicit t u) = parens 0 p $
+      text "{" <+> text nm <+> ":" <+> go 0 names t <+> "}" <+> "->" <+> go 0 (nm :: names) u
+    go p names (Pi _ "_" Explicit t u) =
+      parens 0 p $ go 1 names t <+> "->" <+> go 0 ("_" :: names) u
+    go p names (Pi _ nm Explicit t u) = parens 0 p $
+      text "(" ++ text nm <+> ":" <+> go 0 names t ++ ")" <+> "->" <+> go 0 (nm :: names) u
     -- FIXME - probably way wrong on the names here.  There is implicit binding going on
     go p names (Case _ sc alts) = parens 0 p $ text "case" <+> go 0 names sc <+> text "of" ++ (nest 2 (line ++ stack (map (goAlt 0 names) alts)))
     go p names (Lit _ lit) = text (show lit)
-    go p names (Let _ nm t u) = parens 0 p $ text "let" <+> text nm <+> ":=" <+> go 0 names t </> (nest 2 $ go 0 (nm :: names) u)
+    go p names (Let _ nm t u) = parens 0 p $ text "let" <+> text nm <+> ":=" <+> go 0 names t <+> "in" </> (nest 2 $ go 0 (nm :: names) u)
 
--- public export
--- data Closure : Nat -> Type
 data Val : Type
 
 

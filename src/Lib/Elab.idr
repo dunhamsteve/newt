@@ -43,7 +43,7 @@ dumpCtx ctx = do
   pure msg
 
 
-pprint : Context -> Val -> M String
+pprint : Context -> Val -> M Doc
 pprint ctx v = pure $ pprint (names ctx) !(quote (length ctx.env) v)
 
 ||| return Bnd and type for name

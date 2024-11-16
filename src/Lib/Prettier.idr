@@ -138,6 +138,16 @@ fill [] = Empty
 fill [x] = x
 fill (x :: y :: xs) = (flatten x <+> fill (flatten y :: xs)) `Alt` (x </> fill (y :: xs))
 
+||| separate with space
+export
+commaSep : List Doc -> Doc
+commaSep = folddoc (\a, b => a ++ text "," <+/> b)
+
 public export
 FromString Doc where
   fromString = text
+
+||| If we stick Doc into a String, try to avoid line-breaks via `flatten`
+public export
+Interpolation Doc where
+  interpolate = render 80 . flatten

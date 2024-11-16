@@ -8,6 +8,7 @@ import Data.List
 
 import Lib.Types -- Name / Tm
 import Lib.TopContext
+import Lib.Prettier
 import Lib.Eval -- lookupMeta
 import Lib.Util
 
