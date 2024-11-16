@@ -16,7 +16,7 @@
     },
     {
       "name": "keyword.newt",
-      "match": "\\b(data|where|case|of|let|forall|∀|in|U|module|import|ptype|pfunc|infix|infixl|infixr)\\b"
+      "match": "\\b(data|where|case|of|let|if|then|else|forall|∀|in|U|module|import|ptype|pfunc|infix|infixl|infixr)\\b"
     },
     {
       "name": "string.js",

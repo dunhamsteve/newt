@@ -7,7 +7,6 @@
   - maybe a file listing jobs, whether they are known broken, optional expected output, optional expected JS execution output.
 - [x] forall / ∀ sugar (Maybe drop this, issues with `.` and `{A}` works fine)
 - [x] Bad module name error has FC 0,0 instead of the module or name
-- [x] I've made `{x}` be `{x : _}` instead of `{_ : x}`. Change this.
 - [ ] Remove context lambdas when printing solutions (show names from context)
   - maybe build list of names and strip λ, then call pprint with names
 - [ ] Revisit substitution in case building
@@ -46,12 +45,18 @@
   - [x] day1
   - [x] day2
   - some "real world" examples
+- [ ] Translate newt to newt
+  - [x] Prettier
+  - [x] if / then / else sugar
+  - [ ] `data Foo = A | B` sugar
+  - [ ] records
+  - [ ] where
 - [x] Maybe Eq and stuff would work for typeclass without dealing with unification issues yet
 - [x] unsolved meta errors repeat (need to freeze or only report at end)
 - [x] Sanitize JS idents, e.g. `_+_`
 - [x] Generate some programs that do stuff
 - [x] import
-- [ ] consider making meta application implicit in term, so its more readable when printed
+- [ ] consider making meta application implicit in term, so it's more readable when printed
   - Currently we have explicit `App` surrounding `Meta` when inserting metas. Some people
     leave that implicit for efficiency. I think it would also make printing more readable.
   - When printing `Value`, I now print the spine size instead of spine.

@@ -78,6 +78,7 @@ data Raw : Type where
   RImplicit : (fc : FC) -> Raw
   RHole : (fc : FC) -> Raw
   RDo : (fc : FC) -> List DoStmt -> Raw
+  RIf : (fc : FC) -> Raw -> Raw -> Raw -> Raw
 
 
 %name Raw tm
@@ -96,6 +97,8 @@ HasFC Raw where
   getFC (RImplicit fc) = fc
   getFC (RHole fc) = fc
   getFC (RDo fc stmts) = fc
+  getFC (RIf fc _ _ _) = fc
+
 -- derive some stuff - I'd like json, eq, show, ...
 
 
@@ -189,6 +192,7 @@ Show Raw where
   show (RCase _ x xs) = foo [ "Case", show x, show xs]
   show (RDo _ stmts) = foo [ "DO", "FIXME"]
   show (RU _) = "U"
+  show (RIf _ x y z) = foo [ "If", show x, show y, show z]
 
 export
 Pretty Literal where
@@ -240,6 +244,7 @@ Pretty Raw where
     asDoc p (RImplicit _) = text "_"
     asDoc p (RHole _) = text "?"
     asDoc p (RDo _ stmts) = text "TODO - RDo"
+    asDoc p (RIf _ x y z) = par p 0 $ text "if" <+> asDoc 0 x <+/> "then" <+> asDoc 0 y <+/> "else" <+> asDoc 0 z
 
 export
 Pretty Module where

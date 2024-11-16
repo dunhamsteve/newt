@@ -860,6 +860,9 @@ undo ((DoLet fc nm tm) :: xs) = RLet fc nm (RImplicit fc) tm <$> undo xs
 undo ((DoArrow fc nm tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc nm Explicit !(undo xs)) Explicit
 
 check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
+  (RIf fc a b c, ty) =>
+    let tm' = RCase fc a [ MkAlt (RVar (getFC b) "True") b, MkAlt (RVar (getFC c) "False") c ] in
+    check ctx tm' ty
   (RDo fc stmts, ty) => check ctx !(undo stmts) ty
   (RCase fc rsc alts, ty) => do
     (sc, scty) <- infer ctx rsc

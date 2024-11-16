@@ -240,6 +240,16 @@ doStmt
 doExpr : Parser Raw
 doExpr = RDo <$> getPos <* keyword "do" <*> (startBlock $ someSame doStmt)
 
+ifThenElse : Parser Raw
+ifThenElse = do
+  fc <- getPos
+  keyword "if"
+  a <- term
+  keyword "then"
+  b <- term
+  keyword "else"
+  c <- term
+  pure $ RIf fc a b c
 
 -- This hits an idris codegen bug if parseOp is last and Lazy
 term =  caseExpr
@@ -247,6 +257,7 @@ term =  caseExpr
     <|> lamExpr
     <|> doExpr
     <|> parseOp
+    <|> ifThenElse
 
 varname : Parser String
 varname = (ident <|> uident <|> keyword "_" *> pure "_")
