@@ -1,42 +1,35 @@
 module TypeClass
 
-data Monad : (U -> U) -> U where
-  MkMonad : { M : U -> U } ->
-            (bind : {A B : U} -> (M A) -> (A -> M B) -> M B) ->
-            (pure : ∀ A. A -> M A) ->
-            Monad M
+class Monad (m : U → U) where
+  bind : {a b} → m a → (a → m b) → m b
+  pure : {a} → a → m a
 
 infixl 1 _>>=_ _>>_
-_>>=_ : ∀ m a b. {{Monad m}} -> (m a) -> (a -> m b) -> m b
-_>>=_ {{MkMonad bind' _}}  ma amb = bind' ma amb
+_>>=_ : {m} {{Monad m}} {a b} -> (m a) -> (a -> m b) -> m b
+ma >>= amb = bind ma amb
 
 _>>_ : ∀ m a b. {{Monad m}} -> m a -> m b -> m b
 ma >> mb = mb
-
-pure : ∀ m a. {{Monad m}} -> a -> m a
-pure {{MkMonad _ pure'}} a = pure' a
 
 data Either : U -> U -> U where
   Left : ∀ A B. A -> Either A B
   Right : ∀ A B. B -> Either A B
 
-bindEither : ∀ A B C. (Either A B) -> (B -> Either A C) -> Either A C
-bindEither (Left a) amb = Left a
-bindEither (Right b) amb = amb b
+instance {a} → Monad (Either a) where
+  bind (Left a) amb = Left a
+  bind (Right b) amb = amb b
 
-EitherMonad : ∀ A. Monad (Either A)
-EitherMonad = MkMonad {Either A} bindEither Right
+  pure a = Right a
 
 data Maybe : U -> U where
   Just    : ∀ A. A -> Maybe A
   Nothing : ∀ A. Maybe A
 
-bindMaybe : ∀ A B. Maybe A -> (A -> Maybe B) -> Maybe B
-bindMaybe Nothing amb = Nothing
-bindMaybe (Just a) amb = amb a
+instance Monad Maybe where
+  bind Nothing amb = Nothing
+  bind (Just a) amb = amb a
 
-MaybeMonad : Monad Maybe
-MaybeMonad = MkMonad bindMaybe Just
+  pure a = Just a
 
 infixr 7 _::_
 data List : U -> U where
@@ -48,16 +41,11 @@ _++_ : ∀ A. List A -> List A -> List A
 Nil ++ ys = ys
 (x :: xs) ++ ys = x :: (xs ++ ys)
 
-bindList : ∀ A B. List A -> (A -> List B) -> List B
-bindList Nil f = Nil
-bindList (x :: xs) f = f x ++ bindList xs f
+instance Monad List where
+  bind Nil f = Nil
+  bind (x :: xs) f = f x ++ bind xs f
 
-singleton : ∀ A. A -> List A
-singleton a = a :: Nil
-
--- TODO need better error when the monad is not defined
-ListMonad : Monad List
-ListMonad = MkMonad bindList singleton
+  pure x = x :: Nil
 
 infixr 1 _,_
 data Pair : U -> U -> U where

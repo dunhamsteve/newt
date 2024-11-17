@@ -406,7 +406,7 @@ parseData = do
 nakedBind : Parser Telescope
 nakedBind = do
   names <- some (withPos varname)
-  pure $ map (\(pos,name) => (pos, name, Implicit,  RImplicit pos)) names
+  pure $ map (\(pos,name) => (pos, name, Explicit,  RImplicit pos)) names
 
 export
 parseClass : Parser Decl
@@ -419,6 +419,16 @@ parseClass = do
   decls <- startBlock $ manySame $ parseSig
   pure $ Class fc name (join teles) decls
 
+export
+parseInstance : Parser Decl
+parseInstance = do
+  fc <- getPos
+  keyword "instance"
+  ty <- typeExpr
+  keyword "where"
+  decls <- startBlock $ manySame $ parseDef
+  pure $ Instance fc ty decls
+
 -- Not sure what I want here.
 -- I can't get a Tm without a type, and then we're covered by the other stuff
 parseNorm : Parser Decl
@@ -427,7 +437,8 @@ parseNorm = DCheck <$> getPos <* keyword "#check" <*> typeExpr <* keyword ":" <*
 export
 parseDecl : Parser Decl
 parseDecl = parseMixfix <|> parsePType <|> parsePFunc
-  <|> parseNorm <|> parseData <|> parseSig <|> parseDef <|> parseClass
+  <|> parseNorm <|> parseData <|> parseSig <|> parseDef
+  <|> parseClass <|> parseInstance
 
 
 export

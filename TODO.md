@@ -1,8 +1,11 @@
 
 ## TODO
 
+NOW - sorting out instance sugar for `Monad {a} -> (Either a)`.
+
 - [ ] accepting DCon for another type (skipping case, but should be an error)
 - [ ] don't allow (or dot) duplicate names on LHS
+- [ ] remove metas from context, M has TopContext
 - [ ] improve test driver
   - maybe a file listing jobs, whether they are known broken, optional expected output, optional expected JS execution output.
 - [x] forall / ∀ sugar (Maybe drop this, issues with `.` and `{A}` works fine)

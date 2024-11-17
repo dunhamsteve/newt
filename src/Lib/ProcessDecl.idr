@@ -3,6 +3,7 @@ module Lib.ProcessDecl
 import Data.IORef
 import Data.String
 import Data.Vect
+import Data.List
 import Data.Maybe
 
 import Lib.Elab
@@ -27,7 +28,7 @@ isCandidate _ _ = False
 -- TODO consider ctx
 findMatches : Context -> Val -> List TopEntry -> M (List (Tm, MetaContext))
 findMatches ctx ty [] = pure []
-findMatches ctx ty ((MkEntry name type def@(Fn t)) :: xs) = do
+findMatches ctx ty ((MkEntry name type def) :: xs) = do
   let True = isCandidate ty type | False => findMatches ctx ty xs
   top <- get
   -- let ctx = mkCtx top.metas (getFC ty)
@@ -207,7 +208,9 @@ processDecl (Def fc nm clauses) = do
 
   putStrLn "check \{nm} at \{pprint [] ty}"
   vty <- eval empty CBN ty
+
   debug "\{nm} vty is \{show vty}"
+
 
   -- I can take LHS apart syntactically or elaborate it with an infer
   clauses' <- traverse (makeClause top) clauses
@@ -217,7 +220,6 @@ processDecl (Def fc nm clauses) = do
   mc <- readIORef top.metas
   let mlen = length mc.metas `minus` mstart
   solveAutos mlen (take mlen mc.metas)
-
   -- TODO - make nf that expands all metas and drop zonk
   -- Day1.newt is a test case
   -- tm' <- nf [] tm
@@ -261,16 +263,14 @@ processDecl (Class classFC nm tele decls) = do
   processDecl decl
   for_ fields $ \ (fc,name,ty) => do
       let funType = teleToPi impTele $ RPi fc Nothing Auto tail ty
-
-      putStrLn "\{name} : \{pretty funType}"
-      processDecl $ TypeSig fc [name] funType
-
       let autoPat = foldl (\acc, (fc,nm,ty) => RApp fc acc (RVar fc nm) Explicit) (RVar classFC dcName) fields
-      putStrLn "\{pretty autoPat}"
       let lhs = foldl (\acc, (fc', nm, _, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc name) tele
       let lhs = RApp classFC lhs autoPat Auto
       let decl = Def fc name [(lhs, (RVar fc name))]
+
+      putStrLn "\{name} : \{pretty funType}"
       putStrLn "\{pretty decl}"
+      processDecl $ TypeSig fc [name] funType
       processDecl decl
   where
 
@@ -286,6 +286,99 @@ processDecl (Class classFC nm tele decls) = do
     teleToPi : Telescope -> Raw -> Raw
     teleToPi [] end = end
     teleToPi ((fc, nm, icit, ty) :: tele) end = RPi fc (Just nm) icit ty (teleToPi tele end)
+
+processDecl (Instance instfc ty decls) = do
+  let decls = collectDecl decls
+  putStrLn "-----"
+  putStrLn "Instance \{pretty ty}"
+  top <- get
+  let tyFC = getFC ty
+
+  vty <- check (mkCtx top.metas instfc) ty (VU instfc)
+  -- Here `tele` holds arguments to the instance
+  let (codomain, tele) = splitTele vty
+  -- env represents the environment of those arguments
+  let env = tenv (length tele)
+  debug "codomain \{pprint [] codomain}"
+  debug "tele is \{show tele}"
+
+  -- ok so we need a name, a hack for now.
+  -- Maybe we need to ask the user (e.g. `instance someName : Monad Foo where`)
+  -- or use "Monad\{show $ length defs}"
+  let instname = interpolate $ pprint [] codomain
+  let sigDecl = TypeSig instfc [instname] ty
+
+  let (Ref _ tconName _, args) := funArgs codomain
+    | (tm, _) => error tyFC "\{pprint [] codomain} doesn't appear to be a TCon application"
+  let (Just (MkEntry name type (TCon cons))) = lookup tconName top
+    | _ => error tyFC "\{tconName} is not a type constructor"
+  let [con] = cons
+    | _ => error tyFC "\{tconName} has multiple constructors \{show cons}"
+  let (Just (MkEntry _ dcty (DCon _ _))) = lookup con top
+    | _ => error tyFC "can't find constructor \{show con}"
+  vdcty@(VPi _ nm icit a b) <- eval [] CBN dcty
+    | x => error (getFC x) "dcty not Pi"
+  debug "dcty \{pprint [] dcty}"
+  let (_,args) = funArgs codomain
+
+  debug "traverse \{show $ map showTm args}"
+  -- This is a little painful because we're reverse engineering the
+  -- individual types back out from the composite type
+  args' <- traverse (eval env CBN) args
+  debug "args' is \{show args'}"
+  conTele <- getFields !(apply vdcty args') env []
+  -- declare individual functions, collect their defs
+  defs <- for conTele $ \case
+     (MkBind fc nm Explicit ty) => do
+       let ty' = foldr (\(MkBind fc nm' icit ty'), acc => Pi fc nm' icit ty' acc) ty tele
+       let nm' = "\{instname},\{nm}"
+       -- we're working with a Tm, so we define directly instead of processDecl
+       setDef nm' fc ty' Axiom
+       let Just (Def fc name xs) = find (\case (Def y name xs) => name == nm; _ => False) decls
+          | _ => error instfc "no definition for \{nm}"
+
+       let decl = (Def fc nm' xs)
+       putStrLn "***"
+       putStrLn "«\{nm'}» : \{pprint [] ty'}"
+       putStrLn $ render 80 $ pretty decl
+       pure $ Just decl
+     _ => pure Nothing
+  -- This needs to be declared before processing the defs, but the defs need to be
+  -- declared before this
+  processDecl sigDecl
+  for_ (mapMaybe id defs) $ \decl => do
+    -- debug because already printed above, but nice to have it near processing
+    debug $ render 80 $ pretty decl
+    processDecl decl
+
+  let decl = Def instfc instname [(RVar instfc instname, mkRHS instname conTele (RVar instfc con))]
+  putStrLn "SIGDECL"
+  putStrLn "\{pretty sigDecl}"
+  putStrLn $ render 80 $ pretty decl
+  processDecl decl
+  where
+    -- try to extract types of individual fields from the typeclass dcon
+    -- We're assuming they don't depend on each other.
+    getFields : Val -> Env -> List Binder -> M (List Binder)
+    getFields tm@(VPi fc nm Explicit ty sc) env bnds = do
+      bnd <- MkBind fc nm Explicit <$> quote (length env) ty
+      getFields !(sc $$ VVar fc (length env) [<]) env (bnd :: bnds)
+    getFields tm@(VPi fc nm _ ty sc) env bnds = getFields !(sc $$ VVar fc (length env) [<]) env bnds
+    getFields tm xs bnds = pure $ reverse bnds
+
+    tenv : Nat -> Env
+    tenv Z = []
+    tenv (S k) = (VVar emptyFC k [<] :: tenv k)
+
+    mkRHS : String -> List Binder -> Raw -> Raw
+    mkRHS instName (MkBind fc nm Explicit ty :: bs) tm = mkRHS instName bs (RApp fc tm (RVar fc "\{instName},\{nm}") Explicit)
+    mkRHS instName (b :: bs) tm = mkRHS instName bs tm
+    mkRHS instName [] tm = tm
+
+    apply : Val -> List Val -> M Val
+    apply x [] = pure x
+    apply (VPi fc nm icit a b) (x :: xs) = apply !(b $$ x) xs
+    apply x (y :: xs) = error instfc "expected pi type \{show x}"
 
 processDecl (Data fc nm ty cons) = do
   putStrLn "-----"

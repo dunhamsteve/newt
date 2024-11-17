@@ -1,6 +1,9 @@
 SRCS=$(shell find src -name "*.idr")
 
-all: build/exec/newt build/exec/newt.js build/exec/newt.min.js
+.PHONY:
+
+all: build/exec/newt build/exec/newt.js
+# build/exec/newt.min.js
 
 build/exec/newt: ${SRCS}
 	idris2 --build newt.ipkg
@@ -17,3 +20,5 @@ test: build/exec/newt
 vscode:
 	cd newt-vscode && vsce package && code --install-extension *.vsix
 
+playground: .PHONY
+	cd playground && ./build

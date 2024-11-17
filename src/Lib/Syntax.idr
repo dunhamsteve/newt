@@ -121,6 +121,7 @@ data Decl
   | PFunc FC Name Raw String
   | PMixFix FC (List Name) Nat Fixity
   | Class FC Name Telescope (List Decl)
+  | Instance FC Raw (List Decl)
 
 
 public export
@@ -154,6 +155,7 @@ Show Clause where
 Show Import where
   show (MkImport _ str) = foo ["MkImport", show str]
 
+-- this is for debugging, use pretty when possible
 covering
 Show Decl where
   show (TypeSig _ str x) = foo ["TypeSig", show str, show x]
@@ -163,7 +165,8 @@ Show Decl where
   show (PType _ name ty) = foo ["PType", name, show ty]
   show (PFunc _ nm ty src) = foo ["PFunc", nm, show ty, show src]
   show (PMixFix _ nms prec fix) = foo ["PMixFix", show nms, show prec, show fix]
-  show (Class _ nm _ _) = foo ["Class", "FIXME"]
+  show (Class _ nm tele decls) = foo ["Class",  nm, "...", show $ map show decls]
+  show (Instance _ nm decls) = foo ["Instance",  show nm, show $ map show decls]
 
 export covering
 Show Module where
@@ -261,7 +264,8 @@ Pretty Decl where
   pretty (PType _ nm ty) = text "ptype" <+> text nm <+> (maybe empty (\ty => ":" <+> pretty ty) ty)
   pretty (PFunc _ nm ty src) = "pfunc" <+> text nm <+> ":" <+> nest 2 (pretty ty <+> ":=" <+/> text (show src))
   pretty (PMixFix _ names prec fix) = text (show fix) <+> text (show prec) <+> spread (map text names)
-  pretty (Class _ _ _ _) = text "TODO pretty PClass"
+  pretty (Class _ _ _ _) = text "TODO pretty Class"
+  pretty (Instance _ _ _) = text "TODO pretty Instance"
 
 export
 Pretty Module where

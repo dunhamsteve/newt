@@ -157,7 +157,7 @@ eval env mode (Let fc nm t u) = pure $ VLet fc nm !(eval env mode t) !(eval (VVa
 -- translate to a level
 eval env mode (Bnd fc i) = case getAt i env of
   Just rval => pure rval
-  Nothing => error' "Bad deBruin index \{show i}"
+  Nothing => error fc "Bad deBruin index \{show i}"
 eval env mode (Lit fc lit) = pure $ VLit fc lit
 
 eval env mode tm@(Case fc sc alts) = do

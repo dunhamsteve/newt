@@ -56,8 +56,9 @@ plus' = \ n m => case n of
     Z => m
     S n => S (plus' n m)
 
--- We can define operators, currently only infix
--- and we allow unicode and letters in operators
+-- We can define operators. Mixfix is supported, but we don't
+-- allow ambiguity (so you can't have both [_] and [_,_]). See
+-- the Reasoning.newt sample for a mixfix example.
 infixl 2 _≡_
 
 -- Here is an equality, like Idris, everything goes to the right of the colon
@@ -70,29 +71,18 @@ data _≡_ : {A : U} -> A -> A -> U where
 test : plus (S Z) (S Z) ≡ S (S Z)
 test = Refl
 
--- Ok now we do typeclasses.  There isn't any sugar, but we have
--- search for implicits marked with double brackets.
+-- Ok now we do typeclasses. `class` and `instance` are sugar for
+-- ordinary data and functions:
 
 -- Let's say we want a generic `_+_` operator
 infixl 7 _+_
 
--- We don't have records yet, so we define a single constructor
--- inductive type. Here we also use `∀ A.` which is sugar for `{A : _} ->`
-data Plus : U -> U where
-  MkPlus : ∀ A. (A -> A -> A) -> Plus A
+class Add a where
+  _+_ : a -> a -> a
 
--- and the generic function that uses it
--- the double brackets indicate an argument that is solved by search
-_+_ : ∀ A. {{_ : Plus A}} -> A -> A -> A
-_+_ {{MkPlus f}} x y = f x y
-
--- The typeclass is now defined, search will look for functions in scope
--- that return a type matching (same type constructor) the implicit
--- and only have implicit arguments (inspired by Agda).
-
--- We make an instance `Plus Nat`
-PlusNat : Plus Nat
-PlusNat = MkPlus plus
+instance Add Nat where
+  Z + m = m
+  (S n) + m = S (n + m)
 
 -- and it now finds the implicits, you'll see the solutions to the
 -- implicits if you hover over the `+`.
@@ -108,7 +98,7 @@ foo a b = ?
 -- javascript output. It is not doing erasure (or inlining) yet, so the
 -- code is a little verbose.
 
--- We can define native types:
+-- We can define native types, if the type is left off, it defaults to U
 
 ptype Int : U
 ptype String : U
@@ -133,36 +123,49 @@ pfunc plusString : String -> String -> String := "(x,y) => x + y"
 
 -- We can make them Plus instances:
 
-PlusInt : Plus Int
-PlusInt = MkPlus plusInt
 
-PlusString : Plus String
-PlusString = MkPlus plusString
+instance Add Int where
+  _+_ = plusInt
+
+instance Add String where
+  _+_ = plusString
 
 concat : String -> String -> String
 concat a b = a + b
 
 -- Now we define Monad
+class Monad (m : U -> U) where
+  pure : {a} -> a -> m a
+  bind : {a b} -> m a -> (a -> m b) -> m b
 
-data Monad : (U -> U) -> U where
+/-
+This desugars to:
+
+data Monad : (m : U -> U) -> U where
   MkMonad : {m : U -> U} ->
-            ({a : U} -> a -> m a) ->
-            ({a b : U} -> m a -> (a -> m b) -> m b) ->
+            (pure : {a : _} -> a -> m a) ->
+            (bind : {a : _} -> {b : _} -> m a -> a -> m b -> m b) ->
             Monad m
 
-pure : ∀ m. {{Monad m}} -> {a : U} -> a -> m a
-pure {{MkMonad p _}} a = p a
+pure : {m : U -> U} -> {{_ : Monad m}} -> {a : _} -> a -> m a
+pure {m} {{MkMonad pure bind}} = pure
+
+bind : {m : U -> U} -> {{_ : Monad m}} -> {a : _} -> {b : _} -> m a -> a -> m b -> m b
+bind {m} {{MkMonad pure bind}} = bind
+
+-/
 
 -- we can declare multiple infix operators at once
 infixl 1 _>>=_ _>>_
 
-_>>=_ : ∀ m a b. {{Monad m}} -> m a -> (a -> m b) -> m b
-_>>=_ {{MkMonad _ b}} ma amb = b ma amb
+_>>=_ : {m} {{Monad m}} {a b} -> m a -> (a -> m b) -> m b
+_>>=_ ma amb = bind ma amb
 
-_>>_ :  ∀ m a b. {{Monad m}} -> m a -> m b -> m b
+_>>_ :  {m} {{Monad m}} {a b} -> m a -> m b -> m b
 ma >> mb = ma >>= (λ _ => mb)
 
--- That's our Monad typeclass, now let's make a List monad
+-- Now we define list and show it is a monad. At the moment, I don't
+-- have sugar for Lists,
 
 infixr 3 _::_
 data List : U -> U where
@@ -174,15 +177,26 @@ _++_ : ∀ a.  List a -> List a -> List a
 Nil ++ ys = ys
 (x :: xs) ++ ys = x :: (xs ++ ys)
 
-bindList : ∀ a b. List a -> (a -> List b) -> List b
-bindList Nil f = Nil
-bindList (x :: xs) f = f x ++ bindList xs f
+instance Monad List where
+  pure a = a :: Nil
+  bind Nil f = Nil
+  bind (x :: xs) f = f x ++ bind xs f
 
--- Both `\` and `λ` work for lambda expressions:
-MonadList : Monad List
-MonadList = MkMonad (λ a => a :: Nil) bindList
+/-
+This desugars to: (the names in guillemots are not user-accessible)
 
--- We'll want Pair below too.  `,` has been left for use as an operator.
+«Monad List,pure» : { a : U } -> a:0 -> List a:1
+pure a = _::_ a Nil
+
+«Monad List,bind» : { a : U } -> { b : U } -> (List a) -> (a -> List b) -> List b
+bind Nil f = Nil bind (_::_ x xs) f = _++_ (f x) (bind xs f)
+
+«Monad List» : Monad List
+«Monad List» = MkMonad «Monad List,pure» «Monad List,bind»
+
+-/
+
+-- We'll want Pair below.  `,` has been left for use as an operator.
 -- Also we see that → can be used in lieu of ->
 infixr 1 _,_ _×_
 data _×_ : U → U → U where
