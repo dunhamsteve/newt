@@ -79,6 +79,8 @@ export let newtTokens: monaco.languages.IMonarchLanguage = {
     "if",
     "then",
     "else",
+    "class",
+    "instance",
     "module",
     "infixl",
     "infixr",

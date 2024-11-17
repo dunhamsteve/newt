@@ -3,6 +3,7 @@ module Lib.ProcessDecl
 import Data.IORef
 import Data.String
 import Data.Vect
+import Data.Maybe
 
 import Lib.Elab
 import Lib.Parser
@@ -240,6 +241,51 @@ processDecl (DCheck fc tm ty) = do
   putStrLn "  NF \{pprint [] norm}"
   norm <- nfv [] res
   putStrLn "  NFV \{pprint [] norm}"
+
+processDecl (Class classFC nm tele decls) = do
+  putStrLn "-----"
+  putStrLn "Class \{nm}"
+  let fields = getSigs decls
+  -- We'll need names for the telescope
+  let dcName = "Mk\{nm}"
+  let tcType = teleToPi tele (RU classFC)
+  let tail = foldl (\ acc, (fc, nm, icit, _) => RApp fc acc (RVar fc nm) icit) (RVar classFC nm) tele
+  let dcType = teleToPi impTele $
+    foldr (\(fc, nm, ty), acc =>  RPi fc (Just nm) Explicit ty acc  ) tail fields
+
+  putStrLn "tcon type \{pretty tcType}"
+  putStrLn "dcon type \{pretty dcType}"
+  let decl = Data classFC nm tcType [TypeSig classFC [dcName] dcType]
+  putStrLn "Decl:"
+  putStrLn $ render 90 $ pretty decl
+  processDecl decl
+  for_ fields $ \ (fc,name,ty) => do
+      let funType = teleToPi impTele $ RPi fc Nothing Auto tail ty
+
+      putStrLn "\{name} : \{pretty funType}"
+      processDecl $ TypeSig fc [name] funType
+
+      let autoPat = foldl (\acc, (fc,nm,ty) => RApp fc acc (RVar fc nm) Explicit) (RVar classFC dcName) fields
+      putStrLn "\{pretty autoPat}"
+      let lhs = foldl (\acc, (fc', nm, _, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc name) tele
+      let lhs = RApp classFC lhs autoPat Auto
+      let decl = Def fc name [(lhs, (RVar fc name))]
+      putStrLn "\{pretty decl}"
+      processDecl decl
+  where
+
+    getSigs : List Decl -> List (FC, String, Raw)
+    getSigs [] = []
+    getSigs ((TypeSig _ [] _) :: xs) = getSigs xs
+    getSigs ((TypeSig fc (nm :: nms) ty) :: xs) = (fc, nm, ty) :: getSigs xs
+    getSigs (_:: xs) = getSigs xs
+
+    impTele : Telescope
+    impTele = map (\(fc, nm, _, ty) => (fc, nm, Implicit, ty)) tele
+
+    teleToPi : Telescope -> Raw -> Raw
+    teleToPi [] end = end
+    teleToPi ((fc, nm, icit, ty) :: tele) end = RPi fc (Just nm) icit ty (teleToPi tele end)
 
 processDecl (Data fc nm ty cons) = do
   putStrLn "-----"

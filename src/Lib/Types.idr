@@ -282,18 +282,6 @@ Show Val where
   show (VLit _ lit) = show lit
   show (VLet _ nm a b) = "(%let \{show nm} = \{show a} in \{show b}"
 
--- Not used - I was going to change context to have a List Binder
--- instead of env, types, bds
--- But when we get down into eval, we don't have types to put into the env
--- It looks like Idris has a separate LocalEnv in eval, Kovacs peels off
--- env from context and extends it.
-data Binder : Type where
-  Bind : (nm : String) -> (bd : BD) -> (val : Val) -> (ty : Val) -> Binder
-
-covering
-Show Binder where
-  show (Bind nm bd val ty) = "(\{show bd} \{show nm} \{show val} : \{show ty})"
-
 public export
 Env : Type
 Env = List Val

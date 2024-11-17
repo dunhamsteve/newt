@@ -9,6 +9,7 @@ keywords : List String
 keywords = ["let", "in", "where", "case", "of", "data", "U", "do",
             "ptype", "pfunc", "module", "infixl", "infixr", "infix",
             "∀", "forall",
+            "class", "instance",
             "if", "then", "else",
              "->", "→", ":", "=>", ":=", "=", "<-", "\\", "_"]
 

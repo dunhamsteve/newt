@@ -666,8 +666,9 @@ mkPat top (tm, icit) = do
                 (Just (MkEntry name type (DCon k str))) =>
                   -- TODO check arity, also figure out why we need reverse
                   pure $ PatCon fc icit nm !(traverse (mkPat top) b)
-                Just _ => error (getFC tm) "not a data constructor"
-                Nothing => case b of
+                -- This fires when a global is shadowed by a pattern var
+                -- Just _ => error (getFC tm) "\{show nm} is not a data constructor"
+                _ => case b of
                                 [] => pure $ PatVar fc icit nm
                                 _ => error (getFC tm) "patvar applied to args"
     ((RImplicit fc), []) => pure $ PatWild fc icit

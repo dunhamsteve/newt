@@ -106,7 +106,11 @@ HasFC Raw where
 public export
 data Import = MkImport FC Name
 
--- FIXME - I think I don't want "where" here, but the parser has an issue
+
+public export
+Telescope : Type
+Telescope = (List (FC, String, Icit, Raw))
+
 public export
 data Decl
   = TypeSig FC (List Name) Raw
@@ -116,6 +120,7 @@ data Decl
   | PType FC Name (Maybe Raw)
   | PFunc FC Name Raw String
   | PMixFix FC (List Name) Nat Fixity
+  | Class FC Name Telescope (List Decl)
 
 
 public export
@@ -158,6 +163,7 @@ Show Decl where
   show (PType _ name ty) = foo ["PType", name, show ty]
   show (PFunc _ nm ty src) = foo ["PFunc", nm, show ty, show src]
   show (PMixFix _ nms prec fix) = foo ["PMixFix", show nms, show prec, show fix]
+  show (Class _ nm _ _) = foo ["Class", "FIXME"]
 
 export covering
 Show Module where
@@ -215,7 +221,7 @@ Pretty Raw where
   pretty = asDoc 0
     where
     wrap : Icit -> Doc -> Doc
-    wrap Explicit x = x
+    wrap Explicit x = text "(" ++ x ++ text ")"
     wrap Implicit x = text "{" ++ x ++ text "}"
     wrap Auto x = text "{{" ++ x ++ text "}}"
 
@@ -247,21 +253,23 @@ Pretty Raw where
     asDoc p (RIf _ x y z) = par p 0 $ text "if" <+> asDoc 0 x <+/> "then" <+> asDoc 0 y <+/> "else" <+> asDoc 0 z
 
 export
+Pretty Decl where
+  pretty (TypeSig _ nm ty) = spread (map text nm) <+> text ":" <+> nest 2 (pretty ty)
+  pretty (Def _ nm clauses) = stack $ map (\(a,b) => pretty a <+> "=" <+> pretty b) clauses
+  pretty (Data _ nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map pretty xs))
+  pretty (DCheck _ x y) = text "#check" <+> pretty x <+> ":" <+> pretty y
+  pretty (PType _ nm ty) = text "ptype" <+> text nm <+> (maybe empty (\ty => ":" <+> pretty ty) ty)
+  pretty (PFunc _ nm ty src) = "pfunc" <+> text nm <+> ":" <+> nest 2 (pretty ty <+> ":=" <+/> text (show src))
+  pretty (PMixFix _ names prec fix) = text (show fix) <+> text (show prec) <+> spread (map text names)
+  pretty (Class _ _ _ _) = text "TODO pretty PClass"
+
+export
 Pretty Module where
   pretty (MkModule name imports decls) =
     text "module" <+> text name
       </> stack (map doImport imports)
-      </> stack (map doDecl decls)
+      </> stack (map pretty decls)
       where
         doImport : Import -> Doc
         doImport (MkImport _ nm) = text "import" <+> text nm ++ line
 
-        doDecl : Decl -> Doc
-        doDecl (TypeSig _ nm ty) = spread (map text nm) <+> text ":" <+> nest 2 (pretty ty)
-        doDecl (Def _ nm clauses) = stack $ map (\(a,b) => pretty a <+> "=" <+> pretty b) clauses
-        -- the behavior of nest is kinda weird, I have to do the nest before/around the </>.
-        doDecl (Data _ nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map doDecl xs))
-        doDecl (DCheck _ x y) = text "#check" <+> pretty x <+> ":" <+> pretty y
-        doDecl (PType _ nm ty) = text "ptype" <+> text nm <+> (maybe empty (\ty => ":" <+> pretty ty) ty)
-        doDecl (PFunc _ nm ty src) = "pfunc" <+> text nm <+> ":" <+> nest 2 (pretty ty <+> ":=" <+/> text (show src))
-        doDecl (PMixFix _ names prec fix) = text (show fix) <+> text (show prec) <+> spread (map text names)

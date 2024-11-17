@@ -262,7 +262,7 @@ term =  caseExpr
 varname : Parser String
 varname = (ident <|> uident <|> keyword "_" *> pure "_")
 
-ebind : Parser (List (FC, String, Icit, Raw))
+ebind : Parser Telescope
 ebind = do
   -- don't commit until we see the ":"
   sym "("
@@ -271,7 +271,7 @@ ebind = do
   sym ")"
   pure $ map (\(pos, name) => (pos, name, Explicit, ty)) names
 
-ibind : Parser (List (FC, String, Icit, Raw))
+ibind : Parser Telescope
 ibind = do
   -- I've gone back and forth on this, but I think {m a b} is more useful than {Nat}
   sym "{"
@@ -280,7 +280,7 @@ ibind = do
   sym "}"
   pure $ map (\(pos,name) => (pos, name, Implicit, fromMaybe (RImplicit pos) ty)) names
 
-abind : Parser (List (FC, String, Icit, Raw))
+abind : Parser Telescope
 abind = do
   -- for this, however, it would be nice to allow {{Monad A}}
   sym "{{"
@@ -403,6 +403,22 @@ parseData = do
   decls <- startBlock $ manySame $ parseSig
   pure $ Data fc name ty decls
 
+nakedBind : Parser Telescope
+nakedBind = do
+  names <- some (withPos varname)
+  pure $ map (\(pos,name) => (pos, name, Implicit,  RImplicit pos)) names
+
+export
+parseClass : Parser Decl
+parseClass = do
+  fc <- getPos
+  keyword "class"
+  name <- uident
+  teles <- many $ ebind <|> nakedBind
+  keyword "where"
+  decls <- startBlock $ manySame $ parseSig
+  pure $ Class fc name (join teles) decls
+
 -- Not sure what I want here.
 -- I can't get a Tm without a type, and then we're covered by the other stuff
 parseNorm : Parser Decl
@@ -410,7 +426,8 @@ parseNorm = DCheck <$> getPos <* keyword "#check" <*> typeExpr <* keyword ":" <*
 
 export
 parseDecl : Parser Decl
-parseDecl = parseMixfix <|> parsePType <|> parsePFunc <|> parseNorm <|> parseData <|> parseSig <|> parseDef
+parseDecl = parseMixfix <|> parsePType <|> parsePFunc
+  <|> parseNorm <|> parseData <|> parseSig <|> parseDef <|> parseClass
 
 
 export
