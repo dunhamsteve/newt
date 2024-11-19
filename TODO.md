@@ -1,8 +1,6 @@
 
 ## TODO
 
-NOW - sorting out instance sugar for `Monad {a} -> (Either a)`.
-
 - [ ] accepting DCon for another type (skipping case, but should be an error)
 - [ ] don't allow (or dot) duplicate names on LHS
 - [ ] remove metas from context, M has TopContext
@@ -17,11 +15,11 @@ NOW - sorting out instance sugar for `Monad {a} -> (Either a)`.
   - Handles the forward decl in `Zoo1.newt`, but we'll need different syntax if
     we have different core terms for TCon/DCon/Function
 - [ ] Require infix decl before declaring names with `_` (helps find bugs)
-- [ ] sugar for typeclasses
+- [x] sugar for typeclasses
 - [ ] maybe add implicits in core to help resugar operators?
   - There is also a bit where kovacs uses the implicit on the type (a value) to decide to insert
 - [ ] consider binders in environment, like Idris, to better mark `let` and to provide names
-- [ ] move some top-level chattiness to `debug`
+- [x] move some top-level chattiness to `debug`
 - [ ] consider optionally compiling to eliminators for a second type-checking pass to help catch bugs.
 - [x] Allow unicode operators/names
 - Web playground

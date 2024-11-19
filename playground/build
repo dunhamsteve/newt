@@ -1,9 +1,9 @@
 #!/bin/sh
-echo monaco worker
+echo build monaco worker
 esbuild --bundle node_modules/monaco-editor/esm/vs/editor/editor.worker.js > public/workerMain.js
-echo newt worker
+echo build newt worker
 esbuild src/worker.ts > public/worker.js
-echo newt
+echo copy newt
 cat ../build/exec/newt.js |grep -v '^#'>> public/worker.js
 cp samples/* public
 # esbuild --minify ../build/exec/newt.min.js > public/newt.js
