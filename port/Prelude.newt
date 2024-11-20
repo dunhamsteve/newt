@@ -109,6 +109,13 @@ instance Functor Maybe where
   map f Nothing = Nothing
   map f (Just a) = Just (f a)
 
+-- TODO this probably should depend on / entail Functor
+infixl 3 _<*>_
+class Applicative (f : U → U) where
+  -- appIsFunctor : Functor f
+  return : {a} → a → f a
+  _<*>_ : {a b} -> f (a → b) → f a → f b
+
 infixr 2 _<|>_
 class Alternative (m : U → U) where
   _<|>_ : {a} → m a → m a → m a
@@ -185,9 +192,17 @@ pfunc alen : {a : U} -> Array a -> Int := "(a,arr) => arr.length"
 pfunc aget : {a : U} -> Array a -> Int -> a := "(a, arr, ix) => arr[ix]"
 pfunc aempty : {a : U} -> Unit -> Array a := "() => []"
 
-
+-- TODO represent Nat as number at runtime
+pfunc natToInt : Nat -> Int := "(n) => {
+  let rval = 0
+  while (n.tag === 'S') {
+    n = n.h0
+    rval++
+  }
+  return rval
+}"
 pfunc fastConcat : List String → String := "(xs) => listToArray(undefined, xs).join('')"
-pfunc replicate : Nat -> Char → String := "() => abort('FIXME replicate')"
+pfunc replicate : Nat -> Char → String := "(n,c) => c.repeat(natToInt(n))"
 
 -- I don't want to use an empty type because it would be a proof of void
 ptype World
@@ -203,7 +218,10 @@ instance Monad IO where
     MkIORes a w => mab a w
   pure a = \ w => MkIORes a w
 
-pfunc putStrLn : String -> IO Unit := "(s) => (w) => console.log(s)"
+pfunc putStrLn : String -> IO Unit := "(s) => (w) => {
+  console.log(s)
+  return MkIORes(Unit,MkUnit,w)
+}"
 
 class Show a where
   show : a → String

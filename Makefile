@@ -2,8 +2,7 @@ SRCS=$(shell find src -name "*.idr")
 
 .PHONY:
 
-all: build/exec/newt build/exec/newt.js
-# build/exec/newt.min.js
+all: build/exec/newt build/exec/newt.js build/exec/newt.min.js
 
 build/exec/newt: ${SRCS}
 	idris2 --build newt.ipkg

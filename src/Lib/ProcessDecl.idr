@@ -50,7 +50,6 @@ findMatches ctx ty ((MkEntry name type def) :: xs) = do
       debug "No match \{show ty} \{pprint [] type} \{showError "" err}"
       writeIORef top.metas mc
       findMatches ctx ty xs)
-findMatches ctx ty (y :: xs) = findMatches ctx ty xs
 
 contextMatches : Context -> Val -> M (List (Tm, MetaContext))
 contextMatches ctx ty = go (zip ctx.env (toList ctx.types))

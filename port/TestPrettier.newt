@@ -17,3 +17,4 @@ foo = render fifty doc
 main : IO Unit
 main = do
   putStrLn foo
+  putStrLn $ replicate five 'x'

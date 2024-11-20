@@ -232,6 +232,10 @@ unifySpine env mode True [<] [<] = pure (MkResult [])
 unifySpine env mode True (xs :< x) (ys :< y) = [| unify env mode x y <+> (unifySpine env mode True xs ys) |]
 unifySpine env mode True _ _ = error emptyFC "meta spine length mismatch"
 
+
+
+
+
 unify env mode t u = do
   debug "Unify lvl \{show $ length env}"
   debug "  \{show t}"
@@ -243,67 +247,55 @@ unify env mode t u = do
   debug "env \{show env}"
   -- debug "types \{show $ ctx.types}"
   let l = length env
-  case (mode,t',u') of
+  -- On the LHS, variable matching is yields constraints/substitutions
+  -- We want this to happen before VRefs are expanded, and mixing mode
+  -- into the case tree explodes it further.
+  case mode of
+    Pattern => unifyPattern t' u'
+    Normal => unify' t' u'
 
+  where
+    unify' : Val -> Val -> M UnifyResult
     -- flex/flex
-    (_, VMeta fc k sp,  VMeta fc' k' sp' ) =>
+    unify' (VMeta fc k sp) (VMeta fc' k' sp') =
       if k == k' then unifySpine env mode (k == k') sp sp'
       -- TODO, might want to try the other way, too.
       else if length sp < length sp'
         then solve env k' sp' (VMeta fc k sp) >> pure neutral
         else solve env k sp (VMeta fc' k' sp') >> pure neutral
-    (_, t,           VMeta fc' i' sp') => solve env i' sp' t >> pure neutral
-    (_, VMeta fc i sp, t'           ) => solve env i sp t' >> pure neutral
-    (_, VPi fc _ _ a b, VPi fc' _ _ a' b') => do
-      let fresh = VVar fc l [<]
+    unify' t (VMeta fc' i' sp') = solve env i' sp' t >> pure neutral
+    unify' (VMeta fc i sp) t' = solve env i sp t' >> pure neutral
+    unify' (VPi fc _ _ a b) (VPi fc' _ _ a' b') = do
+      let fresh = VVar fc (length env) [<]
       [| unify env mode a a' <+> unify (fresh :: env) mode !(b $$ fresh) !(b' $$ fresh) |]
-    (_, VVar fc k sp,   (VVar fc' k' sp')  ) =>
+    unify' t'@(VVar fc k sp)  u'@(VVar fc' k' sp')  =
       if k == k' then unifySpine env mode (k == k') sp sp'
-      else case (mode, sp, sp') of
-        (Pattern, [<],[<]) => if k < k' then pure $ MkResult [(k,u')] else pure $ MkResult [(k',t')]
-        _ => error fc "Failed to unify \{show t'} and \{show u'}"
+      else error fc "Failed to unify \{show t'} and \{show u'}"
 
     -- we don't eta expand on LHS
-    (Normal, VLam fc _ t,  VLam _ _ t') => do
-      let fresh = VVar fc l [<]
+    unify' (VLam fc _ t)  (VLam _ _ t') = do
+      let fresh = VVar fc (length env) [<]
       unify (fresh :: env) mode !(t $$ fresh) !(t' $$ fresh)
-    (Normal, t,         VLam fc' _ t') => do
+    unify' t         (VLam fc' _ t') = do
       debug "ETA \{show t}"
-      let fresh = VVar fc' l [<]
+      let fresh = VVar fc' (length env) [<]
       unify (fresh :: env) mode !(t `vapp` fresh) !(t' $$ fresh)
-    (Normal, VLam fc _ t,  t'       ) => do
+    unify' (VLam fc _ t)  t'     = do
       debug "ETA' \{show t'}"
-      let fresh = VVar fc l [<]
+      let fresh = VVar fc (length env) [<]
       unify (fresh :: env) mode !(t $$ fresh) !(t' `vapp` fresh)
-
 
     -- We only want to do this for LHS pattern vars, otherwise, try expanding
-    (_, VVar fc k [<], u) => case mode of
-      Pattern => pure $ MkResult[(k, u)]
-      Normal => case !(tryEval env u) of
+    unify' t'@(VVar fc k [<]) u = case !(tryEval env u) of
         Just v => unify env mode t' v
-        Nothing => error fc "Failed to unify \{show t'} and \{show u'}"
+        Nothing => error fc "Failed to unify \{show t'} and \{show u}"
 
-    (_,t, VVar fc k [<]) => case mode of
-      Pattern => pure $ MkResult[(k, t)]
-      Normal => case !(tryEval env t) of
+    unify' t u'@(VVar fc k [<]) = case !(tryEval env t) of
         Just v => unify env mode v u'
-        Nothing => error fc "Failed to unify \{show t'} and \{show u'}"
-
-    (_, VLam fc _ t,  VLam _ _ t') =>
-      let fresh = VVar fc l [<] in
-      unify (fresh :: env) mode !(t $$ fresh) !(t' $$ fresh)
-    (_, t,         VLam fc' _ t') => do
-      debug "ETA \{show t}"
-      let fresh = VVar fc' l [<]
-      unify (fresh :: env) mode !(t `vapp` fresh) !(t' $$ fresh)
-    (_, VLam fc _ t,  t'       ) => do
-      debug "ETA' \{show t'}"
-      let fresh = VVar fc l [<]
-      unify (fresh :: env) mode !(t $$ fresh) !(t' `vapp` fresh)
+        Nothing => error fc "Failed to unify \{show t} and \{show u'}"
 
     -- REVIEW - consider separate value for DCon/TCon
-    (_, VRef fc k def sp,  VRef fc' k' def' sp') =>
+    unify' t'@(VRef fc k def sp)  u'@(VRef fc' k' def' sp') =
       -- unifySpine is a problem for cmp (S x) (S y) =?= cmp x y
         do
         -- catchError {e = Error} (unifySpine env mode (k == k') sp sp') $ \ err => do
@@ -317,23 +309,34 @@ unify env mode t u = do
               then unifySpine env mode (k == k') sp sp'
               else error fc "vref mismatch \{show t'} \{show u'}"
 
-    (_, VU _, VU _) => pure neutral
+    unify' (VU _) (VU _) = pure neutral
     -- Lennart.newt cursed type references itself
     -- We _could_ look up the ref, eval against [] and vappSpine...
-    (_, t,         VRef fc' k' def sp') => do
+    unify' t         u@(VRef fc' k' def sp') = do
       debug "expand \{show t} =?= %ref \{k'}"
       case lookup k' !(get) of
         Just (MkEntry name ty (Fn tm)) => unify env mode t !(vappSpine !(eval [] CBN tm) sp')
-        _ => error fc' "unify failed \{show t'} =?= \{show u'} [no Fn]\n  env is \{show env}"
+        _ => error fc' "unify failed \{show t} =?= \{show u} [no Fn]\n  env is \{show env}"
 
-    (_, VRef fc k def sp, u) => do
+    unify' t@(VRef fc k def sp) u = do
       debug "expand %ref \{k} \{show sp} =?= \{show u}"
       case lookup k !(get) of
         Just (MkEntry name ty (Fn tm)) => unify env mode !(vappSpine !(eval [] CBN tm) sp) u
-        _ => error fc "unify failed \{show t'} [no Fn] =?= \{show u'}\n  env is \{show env}"
+        _ => error fc "unify failed \{show t} [no Fn] =?= \{show u}\n  env is \{show env}"
 
     -- REVIEW I'd like to quote this back, but we have l that aren't in the environment.
-    _ => error (getFC t') "unify failed \{show t'} =?= \{show u'} \n  env is \{show env}"
+    unify' t' u' = error (getFC t') "unify failed \{show t'} =?= \{show u'} \n  env is \{show env}"
+
+    unifyPattern : Val -> Val -> M UnifyResult
+    unifyPattern t'@(VVar fc k sp)  u'@(VVar fc' k' sp')  =
+      if k == k' then unifySpine env mode (k == k') sp sp'
+      else case (sp, sp') of
+        ([<],[<]) => if k < k' then pure $ MkResult [(k,u')] else pure $ MkResult [(k',t')]
+        _ => error fc "Failed to unify \{show t'} and \{show u'}"
+
+    unifyPattern (VVar fc k [<]) u = pure $ MkResult[(k, u)]
+    unifyPattern t (VVar fc k [<]) = pure $ MkResult [(k, t)]
+    unifyPattern t u = unify' t u
 
 export
 unifyCatch : FC -> Context -> Val -> Val -> M ()

@@ -86,8 +86,8 @@ pretty {{MkPretty p}} x = p x
 render : Nat -> Doc -> String
 render w x = layout (best w Z x) Lin
 
-SemigroupDoc : Semigroup Doc
-SemigroupDoc = MkSemi (\ x y => Seq x (Seq (Text " ") y))
+instance Semigroup Doc where
+  x <+> y = Seq x (Seq (Text " ") y)
 
 -- Match System.File so we don't get warnings
 
@@ -100,9 +100,8 @@ text = Text
 nest : Nat -> Doc -> Doc
 nest = Nest
 
-infixl 7 _++_
-_++_ : Doc -> Doc -> Doc
-x ++ y = Seq x y
+instance Concat Doc where
+  x ++ y = Seq x y
 
 infixl 5 _</>_
 _</>_ : Doc -> Doc -> Doc

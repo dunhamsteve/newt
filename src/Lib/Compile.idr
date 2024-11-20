@@ -155,7 +155,7 @@ termToJS env (CCase t alts) f =
           (JCase (Dot (Var nm) "tag") (map (termToJSAlt env nm) alts))
 
 
--- REVIEW the escaping in show might not match JS
+-- FIXME escaping is wrong, e.g. \215 instead of \xd7
 jsString : String -> Doc
 jsString str = text (show str)
 

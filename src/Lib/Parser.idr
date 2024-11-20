@@ -366,6 +366,10 @@ parseDef = do
   pats <- many patAtom
   keyword "="
   body <- typeExpr
+  w <- optional $ do
+    keyword "where"
+    startBlock $ manySame $ (parseSig <|> parseDef)
+
   -- these get collected later
   pure $ Def fc nm [(t, body)] -- [MkClause fc [] t body]
 
