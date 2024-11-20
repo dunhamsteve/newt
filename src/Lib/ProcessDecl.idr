@@ -81,14 +81,7 @@ getArity _ = Z
 -- Can metas live in context for now?
 -- We'll have to be able to add them, which might put gamma in a ref
 
-||| collectDecl collects multiple Def for one function into one
-export
-collectDecl : List Decl -> List Decl
-collectDecl [] = []
-collectDecl ((Def fc nm cl) :: rest@(Def _ nm' cl' :: xs)) =
-  if nm == nm' then collectDecl (Def fc nm (cl ++ cl') :: xs)
-  else (Def fc nm cl :: collectDecl rest)
-collectDecl (x :: xs) = x :: collectDecl xs
+
 
 -- Makes the arg for `solve` when we solve an auto
 makeSpine : Nat -> Vect k BD -> SnocList Val

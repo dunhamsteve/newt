@@ -366,10 +366,11 @@ parseDef = do
   pats <- many patAtom
   keyword "="
   body <- typeExpr
+  wfc <- getPos
   w <- optional $ do
     keyword "where"
     startBlock $ manySame $ (parseSig <|> parseDef)
-
+  let body = maybe body (\ decls => RWhere wfc decls body) w
   -- these get collected later
   pure $ Def fc nm [(t, body)] -- [MkClause fc [] t body]
 

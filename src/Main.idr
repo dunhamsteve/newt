@@ -11,6 +11,7 @@ import Data.IORef
 -- import Lib.Elab
 import Lib.Compile
 import Lib.Parser
+import Lib.Elab
 import Lib.Parser.Impl
 import Lib.Prettier
 import Lib.ProcessDecl

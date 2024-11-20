@@ -65,6 +65,8 @@ data DoStmt : Type where
   DoLet : (fc : FC) -> String -> Raw -> DoStmt
   DoArrow : (fc: FC) -> String -> Raw -> DoStmt
 
+
+data Decl : Type
 data Raw : Type where
   RVar : (fc : FC) -> (nm : Name) -> Raw
   RLam : (fc : FC) -> (nm : String) -> (icit : Icit) -> (ty : Raw) -> Raw
@@ -79,9 +81,10 @@ data Raw : Type where
   RHole : (fc : FC) -> Raw
   RDo : (fc : FC) -> List DoStmt -> Raw
   RIf : (fc : FC) -> Raw -> Raw -> Raw -> Raw
-
+  RWhere : (fc : FC) -> (List Decl) -> Raw -> Raw
 
 %name Raw tm
+
 
 export
 HasFC Raw where
@@ -98,6 +101,8 @@ HasFC Raw where
   getFC (RHole fc) = fc
   getFC (RDo fc stmts) = fc
   getFC (RIf fc _ _ _) = fc
+  getFC (RWhere fc _ _) = fc
+
 
 -- derive some stuff - I'd like json, eq, show, ...
 
@@ -123,6 +128,17 @@ data Decl
   | Class FC Name Telescope (List Decl)
   | Instance FC Raw (List Decl)
 
+public export
+HasFC Decl where
+  getFC (TypeSig x strs tm) = x
+  getFC (Def x str xs) = x
+  getFC (DCheck x tm tm1) = x
+  getFC (Data x str tm xs) = x
+  getFC (PType x str mtm) = x
+  getFC (PFunc x str tm str1) = x
+  getFC (PMixFix x strs k y) = x
+  getFC (Class x str xs ys) = x
+  getFC (Instance x tm xs) = x
 
 public export
 record Module where
@@ -202,6 +218,7 @@ Show Raw where
   show (RDo _ stmts) = foo [ "DO", "FIXME"]
   show (RU _) = "U"
   show (RIf _ x y z) = foo [ "If", show x, show y, show z]
+  show (RWhere _ _ _) = foo [ "Where", "FIXME"]
 
 export
 Pretty Literal where
@@ -254,6 +271,7 @@ Pretty Raw where
     asDoc p (RHole _) = text "?"
     asDoc p (RDo _ stmts) = text "TODO - RDo"
     asDoc p (RIf _ x y z) = par p 0 $ text "if" <+> asDoc 0 x <+/> "then" <+> asDoc 0 y <+/> "else" <+> asDoc 0 z
+    asDoc p (RWhere _ dd b) = text "TODO pretty where"
 
 export
 Pretty Decl where
