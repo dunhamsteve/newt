@@ -74,6 +74,7 @@ function Editor({ initialValue }: EditorProps) {
       value,
       language: "newt",
       theme: "vs",
+      fontFamily: "Comic Code, Menlo, Monaco, Courier New, sans",
       automaticLayout: true,
       acceptSuggestionOnEnter: "off",
       unicodeHighlight: { ambiguousCharacters: false },

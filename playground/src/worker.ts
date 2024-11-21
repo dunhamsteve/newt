@@ -153,3 +153,4 @@ onmessage = async function (e) {
   let output = stdout
   postMessage({javascript, output, duration})
 }
+importScripts('newt.js')
