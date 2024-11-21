@@ -15,9 +15,18 @@ _||_ : Bool → Bool → Bool
 True || _ = True
 False || b = b
 
+infixl 6 _==_
+class Eq a where
+  _==_ : a → a → Bool
+
 data Nat : U where
   Z : Nat
   S : Nat -> Nat
+
+instance Eq Nat where
+  Z == Z = True
+  S n == S m = n == m
+  x == y = False
 
 data Maybe : U -> U where
   Just : {a : U} -> a -> Maybe a
@@ -146,12 +155,15 @@ instance Mul Nat where
   Z * _ = Z
   S n * m = m + n * m
 
--- TODO Sub
+
 infixl 7 _-_
-_-_ : Nat -> Nat -> Nat
-Z - m = Z
-n - Z = n
-S n - S m = n - m
+class Sub a where
+  _-_ : a → a → a
+
+instance Sub Nat where
+  Z - m = Z
+  n - Z = n
+  S n - S m = n - m
 
 infixr 7 _++_
 class Concat a where
@@ -167,8 +179,6 @@ pfunc length : String → Nat := "(s) => {
   for (let i = 0; i < s.length; s++) rval = S(rval)
   return rval
 }"
-
-
 
 pfunc sconcat : String → String → String := "(x,y) => x + y"
 instance Concat String where
@@ -188,9 +198,21 @@ pfunc listToArray : {a : U} -> List a -> Array a := "
   return rval
 }
 "
+
 pfunc alen : {a : U} -> Array a -> Int := "(a,arr) => arr.length"
 pfunc aget : {a : U} -> Array a -> Int -> a := "(a, arr, ix) => arr[ix]"
 pfunc aempty : {a : U} -> Unit -> Array a := "() => []"
+
+pfunc arrayToList : {a} → Array a → List a := "(a,arr) => {
+  let rval = Nil(a)
+  for (let i = arr.length - 1;i >= 0; i--) {
+    rval = Cons(a, arr[i], rval)
+  }
+  return rval
+}"
+
+-- for now I'll run this in JS
+pfunc lines : String → List String := "(s) => arrayToList(s.split('\n'))"
 
 -- TODO represent Nat as number at runtime
 pfunc natToInt : Nat -> Int := "(n) => {

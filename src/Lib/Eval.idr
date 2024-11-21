@@ -152,6 +152,7 @@ eval env mode (Meta fc i) =
 eval env mode (Lam fc x t) = pure $ VLam fc x (MkClosure env t)
 eval env mode (Pi fc x icit a b) = pure $ VPi fc x icit !(eval env mode a) (MkClosure env b)
 eval env mode (Let fc nm t u) = pure $ VLet fc nm !(eval env mode t) !(eval (VVar fc (length env) [<] :: env) mode u)
+eval env mode (LetRec fc nm t u) = pure $ VLetRec fc nm !(eval (VVar fc (length env) [<] :: env) mode t) !(eval (VVar fc (length env) [<] :: env) mode u)
 -- Here, we assume env has everything. We push levels onto it during type checking.
 -- I think we could pass in an l and assume everything outside env is free and
 -- translate to a level
@@ -187,6 +188,7 @@ quote l (VMeta fc i sp) =
 quote l (VLam fc x t) = pure $ Lam fc x !(quote (S l) !(t $$ VVar emptyFC l [<]))
 quote l (VPi fc x icit a b) = pure $ Pi fc x icit !(quote l a) !(quote (S l) !(b $$ VVar emptyFC l [<]))
 quote l (VLet fc nm t u) = pure $ Let fc nm !(quote l t) !(quote (S l) u)
+quote l (VLetRec fc nm t u) = pure $ LetRec fc nm !(quote (S l) t) !(quote (S l) u)
 quote l (VU fc) = pure (U fc)
 quote l (VRef fc n def sp) = quoteSp l (Ref fc n def) sp
 quote l (VCase fc sc alts) = pure $ Case fc !(quote l sc) alts
@@ -260,5 +262,9 @@ zonk top l env t = case t of
   (App fc t u) => zonkApp top l env t [!(zonk top l env u)]
   (Pi fc nm icit a b) => Pi fc nm icit <$> zonk top l env a <*> zonkBind top l env b
   (Let fc nm t u) => Let fc nm <$> zonk top l env t <*> zonkBind top l env u
+  (LetRec fc nm t u) => LetRec fc nm <$> zonkBind top l env t <*> zonkBind top l env u
   (Case fc sc alts) => Case fc <$> zonk top l env sc <*> traverse (zonkAlt top l env) alts
-  _ => pure t
+  U fc => pure $ U fc
+  Lit fc lit => pure $ Lit fc lit
+  Bnd fc ix => pure $ Bnd fc ix
+  Ref fc ix def => pure $ Ref fc ix def

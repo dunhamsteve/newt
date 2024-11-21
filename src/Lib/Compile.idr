@@ -116,6 +116,13 @@ termToJS env (CLet nm t u) f =
   in case termToJS env t (JAssign nm') of
     (JAssign _ exp) => JSnoc (JConst nm' exp) (termToJS env' u f)
     t' => JSnoc (JLet nm' t') (termToJS env' u f)
+termToJS env (CLetRec nm t u) f =
+  let nm' = fresh nm env
+      env' = push env (Var nm')
+  -- If it's a simple term, use const
+  in case termToJS env' t (JAssign nm') of
+    (JAssign _ exp) => JSnoc (JConst nm' exp) (termToJS env' u f)
+    t' => JSnoc (JLet nm' t') (termToJS env' u f)
 
 termToJS env (CApp t args) f = termToJS env t (\ t' => argsToJS args [<] (\ args' => f (Apply t' args')))
   where

@@ -180,6 +180,8 @@ rename meta ren lvl v = go ren lvl v
     go ren lvl (VLit fc lit) = pure (Lit fc lit)
     go ren lvl (VLet fc name val body) =
       pure $ Let fc name !(go ren lvl val) !(go (lvl :: ren) (S lvl) body)
+    go ren lvl (VLetRec fc name val body) =
+      pure $ Let fc name !(go (lvl :: ren) (S lvl) val) !(go (lvl :: ren) (S lvl) body)
 
 lams : Nat -> List String -> Tm -> Tm
 lams 0 _ tm = tm
@@ -357,7 +359,7 @@ unifyCatch fc ctx ty' ty = do
       debug "fail \{show ty'} \{show ty}"
       a <- quote ctx.lvl ty'
       b <- quote ctx.lvl ty
-      let msg = "unification failure: \{errorMsg err}\n  failed to unify \{pprint names a}\n    with \{pprint names b}\n  "
+      let msg = "unification failure: \{errorMsg err}\n  failed to unify \{pprint names a}\n             with \{pprint names b}\n  "
       throwError (E fc msg)
     case res of
       MkResult [] => pure ()
@@ -368,7 +370,7 @@ unifyCatch fc ctx ty' ty = do
         a <- quote ctx.lvl ty'
         b <- quote ctx.lvl ty
         let names = toList $ map fst ctx.types
-        let msg = "unification failure\n  failed to unify \{pprint names a}\n    with \{pprint names b}"
+        let msg = "unification failure\n  failed to unify \{pprint names a}\n             with \{pprint names b}"
         let msg = msg ++ "\nconstraints \{show cs.constraints}"
         throwError (E fc msg)
         -- error fc "Unification yields constraints \{show cs.constraints}"
@@ -721,10 +723,19 @@ checkWhere ctx decls body ty = do
   clauses' <- traverse (makeClause top) clauses
   vty <- eval ctx.env CBN funTy
   debug "\{name} vty is \{show vty}"
-  tm <- buildTree ctx (MkProb clauses' vty)
-  vtm <- eval ctx.env CBN tm
-  let ctx' = define ctx name vtm vty
-  pure $ Let sigFC name tm !(checkWhere ctx' decls' body ty)
+  let ctx' = extend ctx name vty
+
+  -- if I lift, I need to namespace it, add args, and add args when
+  -- calling locally
+  -- context could hold a Name -> Val (not Tm because levels) to help with that
+  -- e.g. "go" -> (VApp ... (VApp (VRef "ns.go") ...)
+  -- But I'll attempt letrec first
+  tm <- buildTree ctx' (MkProb clauses' vty)
+  vtm <- eval ctx'.env CBN tm
+  -- Should we run the rest with the definition in place?
+  -- I'm wondering if switching from bind to define will mess with metas
+  -- let ctx' = define ctx name vtm vty
+  pure $ LetRec sigFC name tm !(checkWhere ctx' decls' body ty)
 
 
 checkDone : Context -> List (String, Pattern) -> Raw -> Val -> M Tm
