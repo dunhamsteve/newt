@@ -117,22 +117,27 @@ process.stdout.write = (s) => {
   stdout += s
 };
 // hack for now
-const preload = ["Lib.newt"]
+const preload = [
+  "Lib.newt",
+  "Prelude.newt",
+  "aoc2023/day1/eg.txt",
+  "aoc2023/day1/eg2.txt",
+]
 onmessage = async function (e) {
   for (let fn of preload) {
 
-    if (!files['src/'+fn]) {
+    if (!files[fn]) {
       console.log('preload', fn)
       let res = await fetch(fn)
       let text = await res.text()
-      files['src/'+fn] = text
+      files[fn] = text
     }
   }
   let {src} = e.data
   let module = 'Main'
   let m = src.match(/module (\w+)/)
   if (m) module = m[1]
-  let fn = `src/${module}.newt`
+  let fn = `${module}.newt`
   process.argv = ["", "", fn, "-o", "out.js"];
   console.log("args", process.argv);
   files[fn] = src;

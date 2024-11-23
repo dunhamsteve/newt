@@ -1,6 +1,7 @@
+-- Doesn't run in playground because it's using the node `fs` module
 module Day1
 
-import Lib
+import Prelude
 
 digits1 : List Char -> List Int
 digits1 Nil = Nil
@@ -48,27 +49,22 @@ part1 text digits =
   let nums = map combine $ map digits lines in
   foldl _+_ 0 nums
 
--- Hack from before I had support for typeclasses
-infixl 1 _>>_
-_>>_ : {A B : U} -> A -> B -> B
-a >> b = b
+#check digits1 ∘ unpack : String -> List Int
 
-
-runFile : String -> Dummy
-runFile fn =
-  let text = readFile fn in
-  log fn >>
-  log "part1" >>
-  log (part1 text (digits1 ∘ unpack)) >>
-  log "part2" >>
-  log (part1 text (digits2 ∘ unpack)) >>
-  log ""
+runFile : String -> IO Unit
+runFile fn = do
+  text <- readFile fn
+  putStrLn fn
+  putStrLn "part1"
+  putStrLn $ show (part1 text (digits1 ∘ unpack))
+  putStrLn "part2"
+  putStrLn $ show (part1 text (digits2 ∘ unpack))
+  putStrLn ""
 
 
 -- Argument is a hack to keep it from running at startup.  Need to add IO
-main : Int -> Dummy
-main _ =
-  runFile "aoc2023/day1/eg.txt" >>
-  runFile "aoc2023/day1/eg2.txt" >>
+main : IO Unit
+main = do
+  runFile "aoc2023/day1/eg.txt"
+  runFile "aoc2023/day1/eg2.txt"
   runFile "aoc2023/day1/input.txt"
-

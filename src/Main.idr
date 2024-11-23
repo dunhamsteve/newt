@@ -58,7 +58,7 @@ processModule base stk name = do
   top <- get
   let False := elem name top.loaded | _ => pure ""
   modify { loaded $= (name::) }
-  let fn = base ++ "/" ++ name ++ ".newt"
+  let fn = if base == "" then name ++ ".newt" else base ++ "/" ++ name ++ ".newt"
   Right src <- readFile $ fn
     | Left err => fail (show err)
   let Right toks = tokenise src

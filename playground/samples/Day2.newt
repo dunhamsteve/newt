@@ -1,9 +1,9 @@
 module Day2
 
-import Lib
+import Prelude
 
 Draw : U
-Draw = Pair Int (Pair Int Int)
+Draw = Int × Int × Int
 
 data Game : U where
   MkGame : Int -> List Draw -> Game
@@ -68,11 +68,6 @@ parseGame line =
       _ => Left "No Game"
     _ => Left $ "No colon in " ++ line
 
-infixl 1 _>>_
-
-_>>_ : {A B : U} -> A -> B -> B
-a >> b = b
-
 part1 : List Game -> Int
 part1 Nil = 0
 part1 (MkGame n parts :: rest) =
@@ -87,18 +82,18 @@ part2 (MkGame n parts :: rest) =
   case foldl maxd (0,0,0) parts of
     (a,b,c) => a * b * c + part2 rest
 
-run : String -> Dummy
-run fn =
-  let text = readFile fn in
+run : String -> IO Unit
+run fn = do
+  text <- readFile fn
   case mapM parseGame (split (trim text) "\n") of
-    Left err => log $ "fail " ++ err
-    Right games =>
-      log "part1" >>
-      log (part1 games) >>
-      log "part2" >>
-      log (part2 games)
+    Left err => putStrLn $ "fail " ++ err
+    Right games => do
+      putStrLn "part1"
+      printLn (part1 games)
+      putStrLn "part2"
+      printLn (part2 games)
 
-main : Dummy -> Dummy
-main _ =
-  run "aoc2023/day2/eg.txt" >>
+main : IO Unit
+main = do
+  run "aoc2023/day2/eg.txt"
   run "aoc2023/day2/input.txt"

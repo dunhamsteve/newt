@@ -1,6 +1,9 @@
 
 ## TODO
 
+- [ ] imported files leak info messages everywhere
+  - For now, take the start ix for the file and report at end starting there
+- [ ] update node shim to include idris2-playground changes
 - [ ] accepting DCon for another type (skipping case, but should be an error)
 - [ ] don't allow (or dot) duplicate names on LHS
 - [ ] remove metas from context, M has TopContext

@@ -118,6 +118,14 @@ instance Functor Maybe where
   map f Nothing = Nothing
   map f (Just a) = Just (f a)
 
+instance Functor List where
+  map f Nil = Nil
+  map f (x :: xs) = f x :: map f xs
+
+instance Functor SnocList where
+  map f Lin = Lin
+  map f (xs :< x) = map f xs :< f x
+
 -- TODO this probably should depend on / entail Functor
 infixl 3 _<*>_
 class Applicative (f : U → U) where
@@ -206,13 +214,31 @@ pfunc aempty : {a : U} -> Unit -> Array a := "() => []"
 pfunc arrayToList : {a} → Array a → List a := "(a,arr) => {
   let rval = Nil(a)
   for (let i = arr.length - 1;i >= 0; i--) {
-    rval = Cons(a, arr[i], rval)
+    rval = _$3A$3A_(a, arr[i], rval)
   }
   return rval
 }"
 
+
+pfunc getArgs : List String := "arrayToList(String, process.argv)"
+
 -- for now I'll run this in JS
-pfunc lines : String → List String := "(s) => arrayToList(s.split('\n'))"
+pfunc lines : String → List String := "(s) => arrayToList(s.split('\\n'))"
+
+pfunc p_strHead : (s : String) -> Char := "(s) => s[0]"
+pfunc p_strTail : (s : String) -> String := "(s) => s[0]"
+
+pfunc trim : String -> String := "s => s.trim()"
+pfunc split : String -> String -> List String := "(s, by) => {
+  let parts = s.split(by)
+  let rval = Nil(String)
+  parts.reverse()
+  parts.forEach(p => { rval = _$3A$3A_(List(String), p, rval) })
+  return rval
+}"
+
+pfunc slen : String -> Int := "s => s.length"
+pfunc sindex : String -> Int -> Char := "(s,i) => s[i]"
 
 -- TODO represent Nat as number at runtime
 pfunc natToInt : Nat -> Int := "(n) => {
@@ -223,6 +249,7 @@ pfunc natToInt : Nat -> Int := "(n) => {
   }
   return rval
 }"
+
 pfunc fastConcat : List String → String := "(xs) => listToArray(undefined, xs).join('')"
 pfunc replicate : Nat -> Char → String := "(n,c) => c.repeat(natToInt(n))"
 
@@ -245,8 +272,60 @@ pfunc putStrLn : String -> IO Unit := "(s) => (w) => {
   return MkIORes(Unit,MkUnit,w)
 }"
 
+pfunc showInt : Int -> String := "(i) => String(i)"
+
 class Show a where
   show : a → String
 
 instance Show String where
   show a = a
+
+instance Show Int where
+  show = showInt
+
+pfunc ord : Char -> Int := "(c) => c.charCodeAt(0)"
+
+infix 6 _<=_
+pfunc _<=_ : Int -> Int -> Bool := "(x,y) => (x <= y) ? True : False"
+
+
+pfunc unpack : String -> List Char
+  := "(s) => {
+    let acc = Nil(Char)
+    for (let i = s.length - 1; 0 <= i; i--) acc = _$3A$3A_(Char, s[i], acc)
+    return acc
+}"
+
+
+ptype Dummy
+pfunc fs : Dummy := "require('fs')"
+pfunc readFile : (fn : String) -> IO String := "(fn) => (w) => MkIORes(Unit, fs.readFileSync(fn, 'utf8'), w)"
+
+foldl : {A B : U} -> (B -> A -> B) -> B -> List A -> B
+foldl f acc Nil = acc
+foldl f acc (x :: xs) = foldl f (f acc x) xs
+
+infixl 9 _∘_
+_∘_ : {A B C : U} -> (B -> C) -> (A -> B) -> A -> C
+(f ∘ g) x = f (g x)
+
+
+pfunc addInt : Int → Int → Int := "(x,y) => x + y"
+pfunc mulInt : Int → Int → Int := "(x,y) => x * y"
+pfunc subInt : Int → Int → Int := "(x,y) => x - y"
+pfunc ltInt : Int → Int → Bool := "(x,y) => x < y ? True : False"
+
+instance Mul Int where
+  x * y = mulInt x y
+
+instance Add Int where
+  x + y = addInt x y
+
+instance Sub Int where
+  x - y = subInt x y
+
+instance Ord Int where
+  x < y = ltInt x y
+
+printLn : {a} {{Show a}} → a → IO Unit
+printLn a = putStrLn $ show a
