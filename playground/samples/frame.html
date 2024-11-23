@@ -1,0 +1,29 @@
+<html>
+    <head>
+        <script>
+realLog = console.log
+messages = []
+console.log = (...args) => {
+    messages.push(args.join(' '))
+    realLog(...args)
+}
+window.addEventListener('message', (ev) => {
+    realLog('got', ev)
+    let {cmd, src} = ev.data
+    if (cmd === 'exec') {
+        try {
+            eval(src)
+        } catch (e) {
+            console.log(e)
+        }
+    }
+    window.parent.postMessage({messages}, '*')
+    messages = []
+})            
+realLog('IFRAME INITIALIZED')
+        </script>
+    </head>
+    <body>
+        
+    </body>
+</html>

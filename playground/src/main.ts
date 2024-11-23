@@ -10,10 +10,30 @@ monaco.languages.setMonarchTokensProvider("newt", newtTokens);
 monaco.languages.setLanguageConfiguration("newt", newtConfig);
 
 const newtWorker = new Worker("worker.js"); //new URL("worker.js", import.meta.url))
+const iframe = document.createElement("iframe");
+iframe.src = "frame.html";
+iframe.style.display = "none";
+document.body.appendChild(iframe);
 
 function run(src: string) {
   newtWorker.postMessage({ src });
 }
+
+function runOutput() {
+  const src = state.javascript.value
+  console.log("RUN", iframe.contentWindow);
+  try {
+    iframe.contentWindow?.postMessage({ cmd: "exec", src }, "*");
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+window.onmessage = (ev) => {
+  console.log("window got", ev.data);
+  if (ev.data.messages)
+    state.messages.value = ev.data.messages;
+};
 
 newtWorker.onmessage = (ev) => {
   state.output.value = ev.data.output;
@@ -30,6 +50,7 @@ self.MonacoEnvironment = {
 const state = {
   output: signal(""),
   javascript: signal(""),
+  messages: signal<string[]>([]),
   editor: signal<monaco.editor.IStandaloneCodeEditor | null>(null),
 };
 
@@ -110,18 +131,34 @@ function Result() {
   return h("div", { id: "result" }, text);
 }
 
+function Console() {
+  const messages = state.messages.value ?? []
+  return h(
+    "div",
+    { id: "console" },
+    messages.map((msg) => h("div", { className: "message" }, msg))
+  );
+}
+
 const RESULTS = "Output";
 const JAVASCRIPT = "JS";
+const CONSOLE = "Console";
 
 function Tabs() {
-  const [selected, setSelected] = useState(RESULTS);
-
+  const [selected, setSelected] = useState(localStorage.tab ?? RESULTS);
   const Tab = (label: string) => {
-    let onClick = () => setSelected(label);
+    let onClick = () => {
+      setSelected(label);
+      localStorage.tab = label
+    }
     let className = "tab";
     if (label == selected) className += " selected";
     return h("div", { className, onClick }, label);
   };
+
+  useEffect(() => {
+    if (state.messages.value) setSelected(CONSOLE)
+  }, [state.messages.value])
 
   let body;
   switch (selected) {
@@ -131,6 +168,9 @@ function Tabs() {
     case JAVASCRIPT:
       body = h(JavaScript, {});
       break;
+    case CONSOLE:
+      body = h(Console, {});
+      break;
     default:
       body = h("div", {});
   }
@@ -138,13 +178,14 @@ function Tabs() {
   return h(
     "div",
     { className: "tabPanel right" },
-    h("div", { className: "tabBar" }, Tab(RESULTS), Tab(JAVASCRIPT)),
+    h("div", { className: "tabBar" }, Tab(RESULTS), Tab(JAVASCRIPT), Tab(CONSOLE)),
     h("div", { className: "tabBody" }, body)
   );
 }
 
 const SAMPLES = [
   "Tour.newt",
+  "Hello.newt",
   "DSL.newt",
   "Tree.newt",
   "Reasoning.newt",
@@ -180,12 +221,18 @@ function EditWrap({vertical, toggle}: {vertical: boolean, toggle: () => void}) {
         h("option", { value: "" }, "choose sample"),
         options
       ),
-      h('div', {style: {flex: '1 1'}}),
-      h('button', {onClick: toggle},
-          h('svg', {width:20, height: 20},
-            h('path',{d,fill:'none',stroke:'black'})
-          )
+      h("div", { style: { flex: "1 1" } }),
+      h("button", { onClick: runOutput
+       }, "⏵"),
+      h(
+        "button",
+        { onClick: toggle },
+        h(
+          "svg",
+          { width: 20, height: 20 },
+          h("path", { d, fill: "none", stroke: "black" })
         )
+      )
     ),
     h("div", { className: "tabBody" }, h(Editor, { initialValue: value }))
   );
