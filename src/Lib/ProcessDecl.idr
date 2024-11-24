@@ -31,7 +31,7 @@ findMatches ctx ty [] = pure []
 findMatches ctx ty ((MkEntry name type def) :: xs) = do
   let True = isCandidate ty type | False => findMatches ctx ty xs
   top <- get
-  -- let ctx = mkCtx top.metas (getFC ty)
+  -- let ctx = mkCtx (getFC ty)
   -- FIXME we're restoring state, but the INFO logs have already been emitted
   -- Also redo this whole thing to run during elab, recheck constraints, etc.
   mc <- readIORef top.metas
@@ -40,7 +40,7 @@ findMatches ctx ty ((MkEntry name type def) :: xs) = do
       let fc = getFC ty
       debug "TRY \{name} : \{pprint [] type} for \{show ty}"
       -- This check is solving metas, so we save mc below in case we want this solution
-      -- tm <- check (mkCtx top.metas fc) (RVar fc name) ty
+      -- tm <- check (mkCtx fc) (RVar fc name) ty
       tm <- check ctx (RVar fc name) ty
       debug "Found \{pprint [] tm} for \{show ty}"
       mc' <- readIORef top.metas
@@ -127,6 +127,7 @@ dumpEnv ctx =
       then go names (S k) xs ("  \{n} : \{pprint names !(quote ctx.lvl ty)}":: acc)
       else go names (S k) xs ("  \{n} = \{pprint names !(quote ctx.lvl v)} : \{pprint names !(quote ctx.lvl ty)}":: acc)
 
+export
 logMetas : Nat -> M ()
 logMetas mstart = do
   -- FIXME, now this isn't logged for Sig / Data.
@@ -168,7 +169,7 @@ processDecl (TypeSig fc names tm) = do
     let Nothing := lookup nm top
       | _ => error fc "\{show nm} is already defined"
     pure ()
-  ty <- check (mkCtx top.metas fc) tm (VU fc)
+  ty <- check (mkCtx fc) tm (VU fc)
   putStrLn "TypeSig \{unwords names} : \{pprint [] ty}"
   debug "got \{pprint [] ty}"
   for_ names $ \nm => setDef nm fc ty Axiom
@@ -177,12 +178,12 @@ processDecl (TypeSig fc names tm) = do
 
 processDecl (PType fc nm ty) = do
   top <- get
-  ty' <- check (mkCtx top.metas fc) (maybe (RU fc) id ty) (VU fc)
+  ty' <- check (mkCtx fc) (maybe (RU fc) id ty) (VU fc)
   setDef nm fc ty' PrimTCon
 
 processDecl (PFunc fc nm ty src) = do
   top <- get
-  ty <- check (mkCtx top.metas fc) ty (VU fc)
+  ty <- check (mkCtx fc) ty (VU fc)
   ty' <- nf [] ty
   putStrLn "pfunc \{nm} : \{pprint [] ty'} := \{show src}"
   setDef nm fc ty' (PrimFn src)
@@ -206,7 +207,7 @@ processDecl (Def fc nm clauses) = do
 
   -- I can take LHS apart syntactically or elaborate it with an infer
   clauses' <- traverse (makeClause top) clauses
-  tm <- buildTree (mkCtx top.metas fc) (MkProb clauses' vty)
+  tm <- buildTree (mkCtx fc) (MkProb clauses' vty)
   -- putStrLn "Ok \{pprint [] tm}"
 
   mc <- readIORef top.metas
@@ -219,17 +220,17 @@ processDecl (Def fc nm clauses) = do
   putStrLn "NF\n\{render 80 $ pprint[] tm'}"
   debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
   updateDef nm fc ty (Fn tm')
-  logMetas mstart
+  -- logMetas mstart
 
 processDecl (DCheck fc tm ty) = do
   putStrLn "----- DCheck"
   top <- get
 
   putStrLn "INFO at \{show fc}: check \{show tm} at \{show ty}"
-  ty' <- check (mkCtx top.metas fc) ty (VU fc)
+  ty' <- check (mkCtx fc) ty (VU fc)
   putStrLn "  got type \{pprint [] ty'}"
   vty <- eval [] CBN ty'
-  res <- check (mkCtx top.metas fc) tm vty
+  res <- check (mkCtx fc) tm vty
   putStrLn "  got \{pprint [] res}"
   norm <- nf [] res
   putStrLn "  NF \{pprint [] norm}"
@@ -286,7 +287,7 @@ processDecl (Instance instfc ty decls) = do
   top <- get
   let tyFC = getFC ty
 
-  vty <- check (mkCtx top.metas instfc) ty (VU instfc)
+  vty <- check (mkCtx instfc) ty (VU instfc)
   -- Here `tele` holds arguments to the instance
   let (codomain, tele) = splitTele vty
   -- env represents the environment of those arguments
@@ -378,16 +379,16 @@ processDecl (Data fc nm ty cons) = do
   top <- get
   mc <- readIORef top.metas
   let mstart = length mc.metas
-  tyty <- check (mkCtx top.metas fc) ty (VU fc)
+  tyty <- check (mkCtx fc) ty (VU fc)
   case lookup nm top of
     Just (MkEntry name type Axiom) => do
-      unifyCatch fc (mkCtx top.metas fc) !(eval [] CBN tyty) !(eval [] CBN type)
+      unifyCatch fc (mkCtx fc) !(eval [] CBN tyty) !(eval [] CBN type)
     Just (MkEntry name type _) => error fc "\{show nm} already declared"
     Nothing => setDef nm fc tyty Axiom
   cnames <- for cons $ \x => case x of
       (TypeSig fc names tm) => do
           debug "check dcon \{show names} \{show tm}"
-          dty <- check (mkCtx top.metas fc) tm (VU fc)
+          dty <- check (mkCtx fc) tm (VU fc)
           debug "dty \{show names} is \{pprint [] dty}"
 
           -- We only check that codomain uses the right type constructor
@@ -406,7 +407,7 @@ processDecl (Data fc nm ty cons) = do
       _ => throwError $ E (0,0) "expected constructor declaration"
   putStrLn "setDef \{nm}  TCon \{show $ join cnames}"
   updateDef nm fc tyty (TCon (join cnames))
-  logMetas mstart
+  -- logMetas mstart
   where
     checkDeclType : Tm -> M ()
     checkDeclType (U _) = pure ()

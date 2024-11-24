@@ -82,6 +82,8 @@ processModule base stk name = do
     processModule base (name :: stk) name'
 
   top <- get
+  mc <- readIORef top.metas
+  let mstart = length mc.metas
   let Right (decls, ops, toks) := partialParse (manySame parseDecl) top.ops toks
     | Left err => fail (showError src err)
   let [] := toks
@@ -92,7 +94,7 @@ processModule base stk name = do
   putStrLn "process Decls"
   Right _ <- tryError $ traverse_ processDecl (collectDecl decls)
     | Left y => fail (showError src y)
-
+  if (stk == []) then logMetas mstart else pure ()
   pure src
 
 processFile : String -> M ()
@@ -136,10 +138,10 @@ main' = do
     | _ => error emptyFC "error reading args"
   (out, files) <- cmdLine args
   traverse_ processFile files
+
   case out of
     Nothing => pure ()
     Just name => writeSource name
-  -- traverse_ processFile (filter (".newt" `isSuffixOf`) files) out
 
 %export "javascript:newtMain"
 main : IO ()

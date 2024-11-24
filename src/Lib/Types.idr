@@ -415,9 +415,7 @@ record Context where
   -- so we'll try "bds" determines length of local context
   bds : Vect lvl BD          -- bound or defined
 
-  -- We only need this here if we don't pass TopContext
-  -- top : TopContext
-  metas : IORef MetaContext
+  -- FC to use if we don't have a better option
   fc : FC
 
 %name Context ctx
@@ -495,9 +493,10 @@ error' msg = throwError $ E (0,0) msg
 export
 freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
 freshMeta ctx fc ty kind = do
-  mc <- readIORef ctx.metas
+  top <- get
+  mc <- readIORef top.metas
   debug "fresh meta \{show mc.next} : \{show ty}"
-  writeIORef ctx.metas $ { next $= S, metas $= (Unsolved fc mc.next ctx ty kind [] ::) } mc
+  writeIORef top.metas $ { next $= S, metas $= (Unsolved fc mc.next ctx ty kind [] ::) } mc
   pure $ applyBDs 0 (Meta emptyFC mc.next) ctx.bds
   where
     -- hope I got the right order here :)
@@ -506,11 +505,6 @@ freshMeta ctx fc ty kind = do
     -- review the order here
     applyBDs k t (Bound :: xs) = App emptyFC (applyBDs (S k) t xs) (Bnd emptyFC k)
     applyBDs k t (Defined :: xs) = applyBDs (S k) t xs
-
-    -- makeType : Vect k (String, Val) -> Vect k BD -> Val
-    -- makeType [] [] = ?makeType_rhs_2
-    -- makeType ((nm, ty) :: types) (Defined :: bds) = makeType types bds
-    -- makeType ((nm, ty) :: types) (Bound :: bds) = VPi emptyFC nm Explicit ty
 
 export
 lookupMeta : Nat -> M MetaEntry
@@ -527,5 +521,5 @@ lookupMeta ix = do
 -- we need more of topcontext later - Maybe switch it up so we're not passing
 -- around top
 export
-mkCtx : IORef MetaContext -> FC -> Context
-mkCtx metas fc = MkCtx 0 [] [] [] metas fc
+mkCtx : FC -> Context
+mkCtx fc = MkCtx 0 [] [] [] fc
