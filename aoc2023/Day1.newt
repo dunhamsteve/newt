@@ -1,6 +1,7 @@
 module Day1
 
 import Prelude
+import Node
 
 digits1 : List Char -> List Int
 digits1 Nil = Nil

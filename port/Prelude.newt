@@ -220,7 +220,6 @@ pfunc arrayToList : {a} → Array a → List a := "(a,arr) => {
 }"
 
 
-pfunc getArgs : List String := "arrayToList(String, process.argv)"
 
 -- for now I'll run this in JS
 pfunc lines : String → List String := "(s) => arrayToList(s.split('\\n'))"
@@ -297,9 +296,6 @@ pfunc unpack : String -> List Char
 }"
 
 
-ptype Dummy
-pfunc fs : Dummy := "require('fs')"
-pfunc readFile : (fn : String) -> IO String := "(fn) => (w) => MkIORes(Unit, fs.readFileSync(fn, 'utf8'), w)"
 
 foldl : {A B : U} -> (B -> A -> B) -> B -> List A -> B
 foldl f acc Nil = acc
@@ -329,3 +325,7 @@ instance Ord Int where
 
 printLn : {a} {{Show a}} → a → IO Unit
 printLn a = putStrLn $ show a
+
+-- opaque JSObject
+ptype JSObject
+

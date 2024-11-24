@@ -1,6 +1,7 @@
 module Day2
 
 import Prelude
+import Node
 
 Draw : U
 Draw = Int × Int × Int
@@ -84,6 +85,7 @@ part2 (MkGame n parts :: rest) =
 
 run : String -> IO Unit
 run fn = do
+  putStrLn fn
   text <- readFile fn
   case mapM parseGame (split (trim text) "\n") of
     Left err => putStrLn $ "fail " ++ err

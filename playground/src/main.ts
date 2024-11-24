@@ -192,7 +192,7 @@ const SAMPLES = [
   "Lists.newt",
   "Day1.newt",
   "Day2.newt",
-  "Lib.newt",
+  "Prelude.newt",
   "TypeClass.newt",
   "Combinatory.newt",
 ];
