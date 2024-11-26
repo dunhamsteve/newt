@@ -9,7 +9,7 @@ monaco.languages.register({ id: "newt" });
 monaco.languages.setMonarchTokensProvider("newt", newtTokens);
 monaco.languages.setLanguageConfiguration("newt", newtConfig);
 
-const newtWorker = new Worker("worker.js"); //new URL("worker.js", import.meta.url))
+const newtWorker = new Worker("worker.js");
 const iframe = document.createElement("iframe");
 iframe.src = "frame.html";
 iframe.style.display = "none";
@@ -20,7 +20,7 @@ function run(src: string) {
 }
 
 function runOutput() {
-  const src = state.javascript.value
+  const src = state.javascript.value;
   console.log("RUN", iframe.contentWindow);
   try {
     iframe.contentWindow?.postMessage({ cmd: "exec", src }, "*");
@@ -31,8 +31,7 @@ function runOutput() {
 
 window.onmessage = (ev) => {
   console.log("window got", ev.data);
-  if (ev.data.messages)
-    state.messages.value = ev.data.messages;
+  if (ev.data.messages) state.messages.value = ev.data.messages;
 };
 
 newtWorker.onmessage = (ev) => {
@@ -52,7 +51,26 @@ const state = {
   javascript: signal(""),
   messages: signal<string[]>([]),
   editor: signal<monaco.editor.IStandaloneCodeEditor | null>(null),
+  dark: signal(false),
 };
+
+if (window.matchMedia) {
+  function checkDark(ev: { matches: boolean }) {
+    console.log("CHANGE", ev);
+    if (ev.matches) {
+      monaco.editor.setTheme("vs-dark");
+      document.body.className = "dark";
+      state.dark.value = true;
+    } else {
+      monaco.editor.setTheme("vs");
+      document.body.className = "light";
+      state.dark.value = false;
+    }
+  }
+  let query = window.matchMedia("(prefers-color-scheme: dark)");
+  query.addEventListener("change", checkDark);
+  checkDark(query);
+}
 
 async function loadFile(fn: string) {
   if (fn) {
@@ -69,10 +87,10 @@ document.addEventListener("keydown", (ev) => {
   if (ev.metaKey && ev.code == "KeyS") ev.preventDefault();
 });
 
-const LOADING = "module Loading\n"
+const LOADING = "module Loading\n";
 
 let value = localStorage.code || LOADING;
-let initialVertical = localStorage.vertical == 'true'
+let initialVertical = localStorage.vertical == "true";
 
 // let result = document.getElementById("result")!;
 
@@ -94,7 +112,6 @@ function Editor({ initialValue }: EditorProps) {
     const editor = monaco.editor.create(container, {
       value,
       language: "newt",
-      theme: "vs",
       fontFamily: "Comic Code, Menlo, Monaco, Courier New, sans",
       automaticLayout: true,
       acceptSuggestionOnEnter: "off",
@@ -111,10 +128,8 @@ function Editor({ initialValue }: EditorProps) {
         localStorage.code = value;
       }, 1000);
     });
-    if (initialValue === LOADING)
-      loadFile("Tour.newt")
-    else
-      run(initialValue);
+    if (initialValue === LOADING) loadFile("Tour.newt");
+    else run(initialValue);
   }, []);
 
   return h("div", { id: "editor", ref });
@@ -132,7 +147,7 @@ function Result() {
 }
 
 function Console() {
-  const messages = state.messages.value ?? []
+  const messages = state.messages.value ?? [];
   return h(
     "div",
     { id: "console" },
@@ -149,16 +164,16 @@ function Tabs() {
   const Tab = (label: string) => {
     let onClick = () => {
       setSelected(label);
-      localStorage.tab = label
-    }
+      localStorage.tab = label;
+    };
     let className = "tab";
     if (label == selected) className += " selected";
     return h("div", { className, onClick }, label);
   };
 
   useEffect(() => {
-    if (state.messages.value) setSelected(CONSOLE)
-  }, [state.messages.value])
+    if (state.messages.value) setSelected(CONSOLE);
+  }, [state.messages.value]);
 
   let body;
   switch (selected) {
@@ -178,7 +193,13 @@ function Tabs() {
   return h(
     "div",
     { className: "tabPanel right" },
-    h("div", { className: "tabBar" }, Tab(RESULTS), Tab(JAVASCRIPT), Tab(CONSOLE)),
+    h(
+      "div",
+      { className: "tabBar" },
+      Tab(RESULTS),
+      Tab(JAVASCRIPT),
+      Tab(CONSOLE)
+    ),
     h("div", { className: "tabBody" }, body)
   );
 }
@@ -197,18 +218,28 @@ const SAMPLES = [
   "Combinatory.newt",
 ];
 
-function EditWrap({vertical, toggle}: {vertical: boolean, toggle: () => void}) {
+function EditWrap({
+  vertical,
+  toggle,
+}: {
+  vertical: boolean;
+  toggle: () => void;
+}) {
   const options = SAMPLES.map((value) => h("option", { value }, value));
 
   const onChange = async (ev: ChangeEvent) => {
     if (ev.target instanceof HTMLSelectElement) {
       let fn = ev.target.value;
       ev.target.value = "";
-      loadFile(fn)
-
+      loadFile(fn);
     }
   };
-  let d = vertical ?  "M0 0 h20 v20 h-20 z M0 10 h20" : "M0 0 h20 v20 h-20 z M10 0 v20"
+  let d = vertical
+    ? "M0 0 h20 v20 h-20 z M0 10 h20"
+    : "M0 0 h20 v20 h-20 z M10 0 v20";
+  let play = "M0 0 L20 10 L0 20 z";
+  let svg = (d: string) =>
+    h("svg", { width: 20, height: 20, className: "icon" }, h("path", { d }));
   return h(
     "div",
     { className: "tabPanel left" },
@@ -222,33 +253,24 @@ function EditWrap({vertical, toggle}: {vertical: boolean, toggle: () => void}) {
         options
       ),
       h("div", { style: { flex: "1 1" } }),
-      h("button", { onClick: runOutput
-       }, "⏵"),
-      h(
-        "button",
-        { onClick: toggle },
-        h(
-          "svg",
-          { width: 20, height: 20 },
-          h("path", { d, fill: "none", stroke: "black" })
-        )
-      )
+      h("button", { onClick: runOutput }, svg(play)),
+      h("button", { onClick: toggle }, svg(d))
     ),
     h("div", { className: "tabBody" }, h(Editor, { initialValue: value }))
   );
 }
 
 function App() {
-  let [vertical,setVertical] = useState(initialVertical)
+  let [vertical, setVertical] = useState(initialVertical);
   let toggle = () => {
-    setVertical(!vertical)
-    localStorage.vertical = !vertical
-  }
-  let className = `wrapper ${vertical?"vertical":"horizontal"}`
+    setVertical(!vertical);
+    localStorage.vertical = !vertical;
+  };
+  let className = `wrapper ${vertical ? "vertical" : "horizontal"}`;
   return h(
     "div",
     { className },
-    h(EditWrap, {vertical, toggle}),
+    h(EditWrap, { vertical, toggle }),
     h(Tabs, {})
   );
 }

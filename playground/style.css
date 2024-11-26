@@ -1,3 +1,20 @@
+
+svg.icon path {
+  stroke: black;
+  fill: none;
+}
+
+@media (prefers-color-scheme: dark) {
+	body {
+    color: white;
+    background-color: black;
+  }
+  svg.icon path {
+    stroke: white;
+    fill: none;
+  }
+}
+
 #app {
   top: 0;
   bottom: 0;
