@@ -1,6 +1,8 @@
 
 ## TODO
 
+- [ ] add filenames to FC
+- [ ] add namespaces
 - [ ] imported files leak info messages everywhere
   - For now, take the start ix for the file and report at end starting there
 - [ ] update node shim to include idris2-playground changes

@@ -51,20 +51,21 @@ part1 text digits =
 
 #check digits1 ∘ unpack : String -> List Int
 
-runFile : String -> IO Unit
-runFile fn = do
-  text <- readFile fn
-  putStrLn fn
-  putStrLn "part1"
-  putStrLn $ show (part1 text (digits1 ∘ unpack))
-  putStrLn "part2"
-  putStrLn $ show (part1 text (digits2 ∘ unpack))
-  putStrLn ""
+-- readFile not in browser / playground
 
+-- runFile : String -> IO Unit
+-- runFile fn = do
+--   text <- readFile fn
+--   putStrLn fn
+--   putStrLn "part1"
+--   putStrLn $ show (part1 text (digits1 ∘ unpack))
+--   putStrLn "part2"
+--   putStrLn $ show (part1 text (digits2 ∘ unpack))
+--   putStrLn ""
 
--- Argument is a hack to keep it from running at startup.  Need to add IO
-main : IO Unit
-main = do
-  runFile "aoc2023/day1/eg.txt"
-  runFile "aoc2023/day1/eg2.txt"
-  runFile "aoc2023/day1/input.txt"
+-- -- Argument is a hack to keep it from running at startup.  Need to add IO
+-- main : IO Unit
+-- main = do
+--   runFile "aoc2023/day1/eg.txt"
+--   runFile "aoc2023/day1/eg2.txt"
+--   runFile "aoc2023/day1/input.txt"

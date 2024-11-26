@@ -1,42 +1,6 @@
-module Main
+module Hello
 
--- Monad
-
-class Monad (m : U → U) where
-  bind : {a b} → m a → (a → m b) → m b
-  pure : {a} → a → m a
-
-infixl 1 _>>=_ _>>_
-_>>=_ : {m} {{Monad m}} {a b} -> (m a) -> (a -> m b) -> m b
-ma >>= amb = bind ma amb
-
-_>>_ :  {m} {{Monad m}} {a b} -> m a -> m b -> m b
-ma >> mb = mb
-
--- I don't want to use an empty type because it would be a proof of void
-ptype World
-
-data IORes : U -> U where
-  MkIORes : {a : U} -> a -> World -> IORes a
-
-IO : U -> U
-IO a = World -> IORes a
-
-
-data Unit : U where
-  MkUnit : Unit
-
-
-instance Monad IO where
-  bind ma mab = \ w => case ma w of
-    MkIORes a w => mab a w
-  pure a = \ w => MkIORes a w
-
-ptype String
-pfunc putStrLn : String -> IO Unit := "(s) => (w) => {
-  console.log(s)
-  return MkIORes(Unit,MkUnit,w)
-}"
+import Prelude
 
 main : IO Unit
 main = do

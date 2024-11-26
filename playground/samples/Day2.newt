@@ -82,18 +82,20 @@ part2 (MkGame n parts :: rest) =
   case foldl maxd (0,0,0) parts of
     (a,b,c) => a * b * c + part2 rest
 
-run : String -> IO Unit
-run fn = do
-  text <- readFile fn
-  case mapM parseGame (split (trim text) "\n") of
-    Left err => putStrLn $ "fail " ++ err
-    Right games => do
-      putStrLn "part1"
-      printLn (part1 games)
-      putStrLn "part2"
-      printLn (part2 games)
+-- readFile not in browser / playground
 
-main : IO Unit
-main = do
-  run "aoc2023/day2/eg.txt"
-  run "aoc2023/day2/input.txt"
+-- run : String -> IO Unit
+-- run fn = do
+--   text <- readFile fn
+--   case mapM parseGame (split (trim text) "\n") of
+--     Left err => putStrLn $ "fail " ++ err
+--     Right games => do
+--       putStrLn "part1"
+--       printLn (part1 games)
+--       putStrLn "part2"
+--       printLn (part2 games)
+
+-- main : IO Unit
+-- main = do
+--   run "aoc2023/day2/eg.txt"
+--   run "aoc2023/day2/input.txt"
