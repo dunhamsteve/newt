@@ -120,7 +120,7 @@ data Decl
   | DCheck FC Raw Raw
   | Data FC Name Raw (List Decl)
   | PType FC Name (Maybe Raw)
-  | PFunc FC Name Raw String
+  | PFunc FC Name (List String) Raw String
   | PMixFix FC (List Name) Nat Fixity
   | Class FC Name Telescope (List Decl)
   | Instance FC Raw (List Decl)
@@ -132,7 +132,7 @@ HasFC Decl where
   getFC (DCheck x tm tm1) = x
   getFC (Data x str tm xs) = x
   getFC (PType x str mtm) = x
-  getFC (PFunc x str tm str1) = x
+  getFC (PFunc x str _ tm str1) = x
   getFC (PMixFix x strs k y) = x
   getFC (Class x str xs ys) = x
   getFC (Instance x tm xs) = x
@@ -176,7 +176,7 @@ Show Decl where
   show (Data _ str xs ys) = foo ["Data", show str, show xs, show ys]
   show (DCheck _ x y) = foo ["DCheck", show x, show y]
   show (PType _ name ty) = foo ["PType", name, show ty]
-  show (PFunc _ nm ty src) = foo ["PFunc", nm, show ty, show src]
+  show (PFunc _ nm uses ty src) = foo ["PFunc", nm, show uses, show ty, show src]
   show (PMixFix _ nms prec fix) = foo ["PMixFix", show nms, show prec, show fix]
   show (Class _ nm tele decls) = foo ["Class",  nm, "...", show $ map show decls]
   show (Instance _ nm decls) = foo ["Instance",  show nm, show $ map show decls]
@@ -278,7 +278,8 @@ Pretty Decl where
   pretty (Data _ nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map pretty xs))
   pretty (DCheck _ x y) = text "#check" <+> pretty x <+> ":" <+> pretty y
   pretty (PType _ nm ty) = text "ptype" <+> text nm <+> (maybe empty (\ty => ":" <+> pretty ty) ty)
-  pretty (PFunc _ nm ty src) = "pfunc" <+> text nm <+> ":" <+> nest 2 (pretty ty <+> ":=" <+/> text (show src))
+  pretty (PFunc _ nm [] ty src) = "pfunc" <+> text nm <+> ":" <+> nest 2 (pretty ty <+> ":=" <+/> text (show src))
+  pretty (PFunc _ nm uses ty src) = "pfunc" <+> text nm <+> "uses" <+> spread (map text uses) <+> ":" <+> nest 2 (pretty ty <+> ":=" <+/> text (show src))
   pretty (PMixFix _ names prec fix) = text (show fix) <+> text (show prec) <+> spread (map text names)
   pretty (Class _ _ _ _) = text "TODO pretty Class"
   pretty (Instance _ _ _) = text "TODO pretty Instance"

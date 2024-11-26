@@ -18,8 +18,8 @@ import Lib.Util
 -- Later we will build a table of codomain type, and maybe make the user tag the candidates
 -- like Idris does with %hint
 isCandidate : Val -> Tm -> Bool
-isCandidate ty (Pi fc nm Explicit t u) = False
-isCandidate ty (Pi fc nm icit t u) = isCandidate ty u
+isCandidate ty (Pi fc nm Explicit rig t u) = False
+isCandidate ty (Pi fc nm icit rig t u) = isCandidate ty u
 isCandidate (VRef _ nm _ _) (Ref fc nm' def) = nm == nm'
 isCandidate ty (App fc t u) = isCandidate ty t
 isCandidate _ _ = False
@@ -73,8 +73,9 @@ contextMatches ctx ty = go (zip ctx.env (toList ctx.types))
           writeIORef top.metas mc
           go xs)
 
+-- FIXME - decide if we want to count Zero here
 getArity : Tm -> Nat
-getArity (Pi x str icit t u) = S (getArity u)
+getArity (Pi x str icit rig t u) = S (getArity u)
 -- Ref or App (of type constructor) are valid
 getArity _ = Z
 
@@ -181,12 +182,16 @@ processDecl (PType fc nm ty) = do
   ty' <- check (mkCtx fc) (maybe (RU fc) id ty) (VU fc)
   setDef nm fc ty' PrimTCon
 
-processDecl (PFunc fc nm ty src) = do
+processDecl (PFunc fc nm uses ty src) = do
   top <- get
   ty <- check (mkCtx fc) ty (VU fc)
   ty' <- nf [] ty
   putStrLn "pfunc \{nm} : \{pprint [] ty'} := \{show src}"
-  setDef nm fc ty' (PrimFn src)
+  -- TODO wire through fc?
+  for_ uses $ \ name => case lookup name top of
+    Nothing => error fc "\{name} not in scope"
+    _ => pure ()
+  setDef nm fc ty' (PrimFn src uses)
 
 processDecl (Def fc nm clauses) = do
   putStrLn "-----"
@@ -274,7 +279,7 @@ processDecl (Class classFC nm tele decls) = do
     getSigs (_:: xs) = getSigs xs
 
     impTele : Telescope
-    impTele = map (\(BI fc nm _ quant, ty) => (BI fc nm Implicit quant, ty)) tele
+    impTele = map (\(BI fc nm _ quant, ty) => (BI fc nm Implicit Zero, ty)) tele
 
     teleToPi : Telescope -> Raw -> Raw
     teleToPi [] end = end
@@ -309,7 +314,7 @@ processDecl (Instance instfc ty decls) = do
     | _ => error tyFC "\{tconName} has multiple constructors \{show cons}"
   let (Just (MkEntry _ dcty (DCon _ _))) = lookup con top
     | _ => error tyFC "can't find constructor \{show con}"
-  vdcty@(VPi _ nm icit a b) <- eval [] CBN dcty
+  vdcty@(VPi _ nm icit rig a b) <- eval [] CBN dcty
     | x => error (getFC x) "dcty not Pi"
   debug "dcty \{pprint [] dcty}"
   let (_,args) = funArgs codomain
@@ -322,8 +327,8 @@ processDecl (Instance instfc ty decls) = do
   conTele <- getFields !(apply vdcty args') env []
   -- declare individual functions, collect their defs
   defs <- for conTele $ \case
-     (MkBind fc nm Explicit ty) => do
-       let ty' = foldr (\(MkBind fc nm' icit ty'), acc => Pi fc nm' icit ty' acc) ty tele
+     (MkBind fc nm Explicit rig ty) => do
+       let ty' = foldr (\(MkBind fc nm' icit rig ty'), acc => Pi fc nm' icit rig ty' acc) ty tele
        let nm' = "\{instname},\{nm}"
        -- we're working with a Tm, so we define directly instead of processDecl
        setDef nm' fc ty' Axiom
@@ -353,10 +358,10 @@ processDecl (Instance instfc ty decls) = do
     -- try to extract types of individual fields from the typeclass dcon
     -- We're assuming they don't depend on each other.
     getFields : Val -> Env -> List Binder -> M (List Binder)
-    getFields tm@(VPi fc nm Explicit ty sc) env bnds = do
-      bnd <- MkBind fc nm Explicit <$> quote (length env) ty
+    getFields tm@(VPi fc nm Explicit rig ty sc) env bnds = do
+      bnd <- MkBind fc nm Explicit rig <$> quote (length env) ty
       getFields !(sc $$ VVar fc (length env) [<]) env (bnd :: bnds)
-    getFields tm@(VPi fc nm _ ty sc) env bnds = getFields !(sc $$ VVar fc (length env) [<]) env bnds
+    getFields tm@(VPi fc nm _ rig ty sc) env bnds = getFields !(sc $$ VVar fc (length env) [<]) env bnds
     getFields tm xs bnds = pure $ reverse bnds
 
     tenv : Nat -> Env
@@ -364,13 +369,13 @@ processDecl (Instance instfc ty decls) = do
     tenv (S k) = (VVar emptyFC k [<] :: tenv k)
 
     mkRHS : String -> List Binder -> Raw -> Raw
-    mkRHS instName (MkBind fc nm Explicit ty :: bs) tm = mkRHS instName bs (RApp fc tm (RVar fc "\{instName},\{nm}") Explicit)
+    mkRHS instName (MkBind fc nm Explicit rig ty :: bs) tm = mkRHS instName bs (RApp fc tm (RVar fc "\{instName},\{nm}") Explicit)
     mkRHS instName (b :: bs) tm = mkRHS instName bs tm
     mkRHS instName [] tm = tm
 
     apply : Val -> List Val -> M Val
     apply x [] = pure x
-    apply (VPi fc nm icit a b) (x :: xs) = apply !(b $$ x) xs
+    apply (VPi fc nm icit rig a b) (x :: xs) = apply !(b $$ x) xs
     apply x (y :: xs) = error instfc "expected pi type \{show x}"
 
 processDecl (Data fc nm ty cons) = do
@@ -395,7 +400,7 @@ processDecl (Data fc nm ty cons) = do
           -- We know it's in U because it's part of a checked Pi type
           let (codomain, tele) = splitTele dty
           -- for printing
-          let tnames = reverse $ map (\(MkBind _ nm _ _) => nm) tele
+          let tnames = reverse $ map (\(MkBind _ nm _ _ _) => nm) tele
           let (Ref _ hn _, args) := funArgs codomain
             | (tm, _) => error (getFC tm) "expected \{nm} got \{pprint tnames tm}"
           when (hn /= nm) $
@@ -411,5 +416,5 @@ processDecl (Data fc nm ty cons) = do
   where
     checkDeclType : Tm -> M ()
     checkDeclType (U _) = pure ()
-    checkDeclType (Pi _ str icit t u) = checkDeclType u
+    checkDeclType (Pi _ str icit rig t u) = checkDeclType u
     checkDeclType _ = error fc "data type doesn't return U"

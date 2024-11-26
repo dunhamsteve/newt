@@ -396,11 +396,12 @@ parsePFunc = do
   fc <- getPos
   keyword "pfunc"
   nm <- ident
+  uses <- optional (keyword "uses" >> parens (many $ uident <|> ident <|> token MixFix))
   keyword ":"
   ty <- typeExpr
   keyword ":="
   src <- cast <$> token JSLit
-  pure $ PFunc fc nm ty src
+  pure $ PFunc fc nm (fromMaybe [] uses) ty src
 
 export
 parseData : Parser Decl

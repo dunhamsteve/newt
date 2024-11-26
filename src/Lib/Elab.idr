@@ -173,7 +173,7 @@ rename meta ren lvl v = go ren lvl v
             debug "rename: \{show ix} is unsolved"
             catchError {e=Error} (goSpine ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc ix (errorMsg err))
     go ren lvl (VLam fc n t) = pure (Lam fc n !(go (lvl :: ren) (S lvl) !(t $$ VVar fc lvl [<])))
-    go ren lvl (VPi fc n icit ty tm) = pure (Pi fc n icit !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar emptyFC lvl [<])))
+    go ren lvl (VPi fc n icit rig ty tm) = pure (Pi fc n icit rig !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar emptyFC lvl [<])))
     go ren lvl (VU fc) = pure (U fc)
     -- for now, we don't do solutions with case in them.
     go ren lvl (VCase fc sc alts) = error fc "Case in solution"
@@ -278,7 +278,7 @@ unify env mode t u = do
         else solve env k sp (VMeta fc' k' sp') >> pure neutral
     unify' t (VMeta fc' i' sp') = solve env i' sp' t >> pure neutral
     unify' (VMeta fc i sp) t' = solve env i sp t' >> pure neutral
-    unify' (VPi fc _ _ a b) (VPi fc' _ _ a' b') = do
+    unify' (VPi fc _ _ _ a b) (VPi fc' _ _ _ a' b') = do
       let fresh = VVar fc (length env) [<]
       [| unify env mode a a' <+> unify (fresh :: env) mode !(b $$ fresh) !(b' $$ fresh) |]
 
@@ -378,14 +378,14 @@ unifyCatch fc ctx ty' ty = do
 insert : (ctx : Context) -> Tm -> Val -> M (Tm, Val)
 insert ctx tm ty = do
   case !(forceMeta ty) of
-    VPi fc x Auto a b => do
+    VPi fc x Auto rig a b => do
       -- FIXME mark meta as auto, maybe try to solve here?
       m <- freshMeta ctx (getFC tm) a AutoSolve
       debug "INSERT Auto \{pprint (names ctx) m} : \{show a}"
       debug "TM \{pprint (names ctx) tm}"
       mv <- eval ctx.env CBN m
       insert ctx (App (getFC tm) tm m) !(b $$ mv)
-    VPi fc x Implicit a b => do
+    VPi fc x Implicit rig a b => do
       m <- freshMeta ctx (getFC tm) a Normal
       debug "INSERT \{pprint (names ctx) m} : \{show a}"
       debug "TM \{pprint (names ctx) tm}"
@@ -482,7 +482,7 @@ getConstructors ctx scfc tm = error scfc "Can't split - not VRef: \{!(pprint ctx
 -- the pi-type here is the telescope of a constructor
 -- return context, remaining type, and list of names
 extendPi : Context -> Val -> SnocList Bind -> SnocList Val -> M (Context, Val, List Bind, SnocList Val)
-extendPi ctx (VPi x str icit a b) nms sc = do
+extendPi ctx (VPi x str icit rig a b) nms sc = do
     let nm = fresh str -- "pat"
     let ctx' = extend ctx nm a
     let v = VVar emptyFC (length ctx.env) [<]
@@ -499,7 +499,7 @@ substVal k v tm = go tm
     go : Val -> Val
     go (VVar fc j sp) = if j == k then v else (VVar fc j (map go sp))
     go (VLet fc nm a b) = VLet fc nm (go a) b
-    go (VPi fc nm icit a b) = VPi fc nm icit (go a) b
+    go (VPi fc nm icit rig a b) = VPi fc nm icit rig (go a) b
     go (VMeta fc ix sp) = VMeta fc ix (map go sp)
     go (VRef fc nm y sp) = VRef fc nm y (map go sp)
     go tm = tm
@@ -850,7 +850,7 @@ buildLitCases ctx prob fc scnm scty = do
 -- This process is similar to extendPi, but we need to stop
 -- if one clause is short on patterns.
 buildTree ctx (MkProb [] ty) = error emptyFC "no clauses"
-buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ str icit a b)) = do
+buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ str icit rig a b)) = do
   let l = length ctx.env
   let nm = fresh str -- "pat"
   let ctx' = extend ctx nm a
@@ -934,7 +934,7 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
   -- rendered in ProcessDecl
   (RHole fc, ty) => freshMeta ctx fc ty User
 
-  (t@(RLam fc (BI _ nm icit _) tm), ty@(VPi fc' nm' icit' a b)) => do
+  (t@(RLam fc (BI _ nm icit _) tm), ty@(VPi fc' nm' icit' rig a b)) => do
           debug "icits \{nm} \{show icit} \{nm'} \{show icit'}"
           if icit == icit' then do
               let var = VVar fc (length ctx.env) [<]
@@ -952,7 +952,7 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
   (t@(RLam _ (BI fc nm icit quant) tm), ty) =>
             error fc "Expected pi type, got \{!(prvalCtx ty)}"
 
-  (tm, ty@(VPi fc nm' Implicit a b)) => do
+  (tm, ty@(VPi fc nm' Implicit rig a b)) => do
     let names = toList $ map fst ctx.types
     debug "XXX edge case add implicit lambda {\{nm'} : \{show a}} to \{show tm} "
     let var = VVar fc (length ctx.env) [<]
@@ -980,8 +980,8 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
       -- Kovacs doesn't insert on tm = Implicit Lam, we don't have Plicity in Lam
       -- so I'll check the inferred type for an implicit pi
       -- This seems wrong, the ty' is what insert runs on, so we're just short circuiting here
-      (tm'@(Lam{}), ty'@(VPi _ _ Implicit _ _)) => do debug "CheckMe 1"; pure (tm', ty')
-      (tm'@(Lam{}), ty'@(VPi _ _ Auto _ _)) => do debug "CheckMe 2"; pure (tm', ty')
+      (tm'@(Lam{}), ty'@(VPi _ _ Implicit rig _ _)) => do debug "CheckMe 1"; pure (tm', ty')
+      (tm'@(Lam{}), ty'@(VPi _ _ Auto rig _ _)) => do debug "CheckMe 2"; pure (tm', ty')
       (tm', ty') => do
         debug "RUN INSERT ON \{pprint names tm'} at \{show ty'}"
         insert ctx tm' ty'
@@ -1016,7 +1016,7 @@ infer ctx (RApp fc t u icit) = do
         pure (Auto, t, tty)
 
   (a,b) <- case !(forceMeta tty) of
-    (VPi fc str icit' a b) => if icit' == icit then pure (a,b)
+    (VPi fc str icit' rig a b) => if icit' == icit then pure (a,b)
         else error fc "IcitMismatch \{show icit} \{show icit'}"
 
     -- If it's not a VPi, try to unify it with a VPi
@@ -1025,7 +1025,8 @@ infer ctx (RApp fc t u icit) = do
       debug "unify PI for \{show tty}"
       a <- eval ctx.env CBN !(freshMeta ctx fc (VU emptyFC) Normal)
       b <- MkClosure ctx.env <$> freshMeta (extend ctx ":ins" a) fc (VU emptyFC) Normal
-      unifyCatch fc ctx tty (VPi fc ":ins" icit a b)
+      -- FIXME - I had to guess Many here.  What are the side effects?
+      unifyCatch fc ctx tty (VPi fc ":ins" icit Many a b)
       pure (a,b)
 
   u <- check ctx u a
@@ -1036,7 +1037,7 @@ infer ctx (RPi _ (BI fc nm icit quant) ty ty2) = do
   ty' <- check ctx ty (VU fc)
   vty' <- eval ctx.env CBN ty'
   ty2' <- check (extend ctx nm vty') ty2 (VU fc)
-  pure (Pi fc nm icit ty' ty2', (VU fc))
+  pure (Pi fc nm icit quant ty' ty2', (VU fc))
 infer ctx (RLet fc nm ty v sc) = do
   ty' <- check ctx ty (VU emptyFC)
   vty <- eval ctx.env CBN ty'
@@ -1057,8 +1058,7 @@ infer ctx (RLam _ (BI fc nm icit quant) tm) = do
   let ctx' = extend ctx nm a
   (tm', b) <- infer ctx' tm
   debug "make lam for \{show nm} scope \{pprint (names ctx) tm'} : \{show b}"
-  pure $ (Lam fc nm tm', VPi fc nm icit a $ MkClosure ctx.env !(quote (S ctx.lvl) b))
-  -- error {ctx} [DS "can't infer lambda"]
+  pure $ (Lam fc nm tm', VPi fc nm icit quant a $ MkClosure ctx.env !(quote (S ctx.lvl) b))
 
 infer ctx (RImplicit fc) = do
   ty <- freshMeta ctx fc (VU emptyFC) Normal

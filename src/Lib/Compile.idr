@@ -4,6 +4,7 @@ module Lib.Compile
 import Lib.Types
 import Lib.Prettier
 import Lib.CompileExp
+import Lib.TopContext
 import Data.String
 import Data.Maybe
 import Data.Nat
@@ -94,6 +95,7 @@ termToJS : JSEnv -> CExp -> Cont e -> JSStmt e
 termToJS env (CBnd k) f = case getAt k env.env of
   (Just e) => f e
   Nothing => ?bad_bounds
+termToJS env CErased f = f JUndefined
 termToJS env (CLam nm t) f =
   let nm' = fresh nm env -- "\{nm}$\{show $ length env}"
       env' = push env (Var nm')
@@ -206,6 +208,8 @@ expToDoc (LitObject xs) = text "{" <+> folddoc (\ a, e => a ++ ", " <+/> e) (map
 
 expToDoc (LitString str) = jsString str
 expToDoc (LitInt i) = text $ show i
+-- TODO add precedence
+expToDoc (Apply x@(JLam{}) xs) = text "(" ++ expToDoc x ++ ")" ++ "(" ++ nest 2 (commaSep (map expToDoc xs)) ++ ")"
 expToDoc (Apply x xs) = expToDoc x ++ "(" ++ nest 2 (commaSep (map expToDoc xs)) ++ ")"
 expToDoc (Var nm) = jsIdent nm
 expToDoc (JLam nms (JReturn exp)) = text "(" <+> commaSep (map jsIdent nms) <+> ") =>" <+> "(" ++ expToDoc exp ++ ")"
@@ -247,25 +251,64 @@ dcon nm arity =
       obj := ("tag", LitString nm) :: map (\x => (x, Var x)) args
   in stmtToDoc $ JConst nm (JLam args (JReturn (LitObject obj)))
 
+-- use iife to turn stmts into expr
+maybeWrap : JSStmt Return -> JSExp
+maybeWrap (JReturn exp) = exp
+maybeWrap stmt = Apply (JLam [] stmt) []
 
 entryToDoc : TopEntry -> M Doc
 entryToDoc (MkEntry name ty (Fn tm)) = do
-  -- so this has a bunch of lambdas on it now, which we want to consolidate
-  -- and we might need betas? It seems like a mirror of what happens in CExp
   debug "compileFun \{pprint [] tm}"
   ct <- compileFun tm
-  -- If ct has zero arity and is a compount expression, this fails..
-  let body@(JPlain {}) = termToJS empty ct JPlain
-    | js => error (getFC tm) "Not a plain expression: \{render 80 $ stmtToDoc js}"
-  pure (text "const" <+> jsIdent name <+> text "=" <+/> stmtToDoc body)
+  let exp = maybeWrap $ termToJS empty ct JReturn
+  pure $ text "const" <+> jsIdent name <+> text "=" <+/> expToDoc exp ++ ";"
 entryToDoc (MkEntry name type Axiom) = pure ""
 entryToDoc (MkEntry name type (TCon strs)) = pure $ dcon name (piArity type)
 entryToDoc (MkEntry name type (DCon arity str)) = pure $ dcon name arity
 entryToDoc (MkEntry name type PrimTCon) = pure $ dcon name (piArity type)
-entryToDoc (MkEntry name _ (PrimFn src)) = pure $ text "const" <+> jsIdent name <+> "=" <+> text src
+entryToDoc (MkEntry name _ (PrimFn src _)) = pure $ text "const" <+> jsIdent name <+> "=" <+> text src
+
+||| This version (call `reverse . snd <$> process "main" ([],[])`) will do dead
+||| code elimination, but the Prelude js primitives are reaching for
+||| stuff like True, False, MkUnit, fs which get eliminated
+process : (List String, List Doc) -> String -> M (List String, List Doc)
+process (done,docs) nm = do
+  let False = nm `elem` done | _ => pure (done,docs)
+  top <- get
+  case TopContext.lookup nm top of
+    Nothing => error emptyFC "\{nm} not in scope"
+    Just entry@(MkEntry name ty (PrimFn src uses)) => do
+      (done,docs) <- foldlM process (nm :: done, docs) uses
+      pure (done, !(entryToDoc entry) :: docs)
+    Just (MkEntry name ty (Fn tm)) => do
+                debug "compileFun \{pprint [] tm}"
+                ct <- compileFun tm
+                -- If ct has zero arity and is a compount expression, this fails..
+                let exp = maybeWrap $ termToJS empty ct JReturn
+                let doc = text "const" <+> jsIdent name <+> text "=" <+/> expToDoc exp ++ ";"
+                (done,docs) <- walkTm tm (nm :: done, docs)
+                pure (done, doc :: docs)
+
+    Just entry => pure (nm :: done, !(entryToDoc entry) :: docs)
+  where
+    walkTm : Tm -> (List String, List Doc) -> M (List String, List Doc)
+    walkAlt : (List String, List Doc) -> CaseAlt -> M (List String, List Doc)
+    walkAlt acc (CaseDefault t) = pure acc
+    walkAlt acc (CaseCons name args t) = walkTm t acc
+    walkAlt acc (CaseLit lit t) = walkTm t acc
+
+    walkTm (Ref x nm y) acc = process acc nm
+    walkTm (Lam x str t) acc = walkTm t acc
+    walkTm (App x t u) acc = walkTm t !(walkTm u acc)
+    walkTm (Pi x str icit y t u) acc = walkTm t !(walkTm u acc)
+    walkTm (Let x str t u) acc = walkTm t !(walkTm u acc)
+    walkTm (LetRec x str t u) acc = walkTm t !(walkTm u acc)
+    walkTm (Case x t alts) acc = foldlM walkAlt acc alts
+    walkTm _ acc = pure acc
 
 export
 compile : M (List Doc)
-compile = do
-  top <- get
-  traverse entryToDoc top.defs
+-- compile = do
+--   top <- get
+--   traverse entryToDoc top.defs
+compile = reverse . snd <$> process ([],[]) "main"

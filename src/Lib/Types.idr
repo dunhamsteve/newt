@@ -50,9 +50,15 @@ data Quant = Zero | Many
 
 public export
 Show Quant where
-  show Zero = "0"
+  show Zero = "0 "
   show Many = ""
 
+Eq Quant where
+  Zero == Zero = True
+  Many == Many = True
+  _ == _ = False
+
+-- We could make this polymorphic and use for environment...
 public export
 data BindInfo : Type where
   BI : (fc : FC) -> (name : Name) -> (icit : Icit) -> (quant : Quant) -> BindInfo
@@ -114,7 +120,7 @@ data Tm : Type where
   Lam : FC -> Name -> Tm -> Tm
   App : FC -> Tm -> Tm -> Tm
   U   : FC -> Tm
-  Pi  : FC -> Name -> Icit -> Tm -> Tm -> Tm
+  Pi  : FC -> Name -> Icit -> Quant -> Tm -> Tm -> Tm
   Case : FC -> Tm -> List CaseAlt -> Tm
   -- need type?
   Let : FC -> Name -> Tm -> Tm -> Tm
@@ -132,7 +138,7 @@ HasFC Tm where
   getFC (Lam fc str t) = fc
   getFC (App fc t u) = fc
   getFC (U fc) = fc
-  getFC (Pi fc str icit t u) = fc
+  getFC (Pi fc str icit quant t u) = fc
   getFC (Case fc t xs) = fc
   getFC (Lit fc _) = fc
   getFC (Let fc _ _ _) = fc
@@ -156,9 +162,9 @@ Show Tm where
   show (Meta _ i) = "(Meta \{show i})"
   show (Lit _ l) = "(Lit \{show l})"
   show (U _) = "U"
-  show (Pi _ str Explicit t u) = "(Pi (\{str} : \{show t}) => \{show u})"
-  show (Pi _ str Implicit t u) = "(Pi {\{str} : \{show t}} => \{show u})"
-  show (Pi _ str Auto t u) = "(Pi {{\{str} : \{show t}}} => \{show u})"
+  show (Pi _ str Explicit rig t u) = "(Pi (\{show rig} \{str} : \{show t}) => \{show u})"
+  show (Pi _ str Implicit rig t u) = "(Pi {\{show rig} \{str} : \{show t}} => \{show u})"
+  show (Pi _ str Auto rig t u) = "(Pi {{\{show rig} \{str} : \{show t}}} => \{show u})"
   show (Case _ sc alts) = "(Case \{show sc} \{show alts})"
   show (Let _ nm t u) = "(Let \{nm} \{show t} \{show u})"
   show (LetRec _ nm t u) = "(LetRec \{nm} \{show t} \{show u})"
@@ -186,7 +192,7 @@ Eq (Tm) where
   (Lam _ n t) == Lam _ n' t' = t == t'
   (App _ t u) == App _ t' u' = t == t' && u == u'
   (U _) == (U _) = True
-  (Pi _ n icit t u) == (Pi _ n' icit' t' u') = icit == icit' && t == t' && u == u'
+  (Pi _ n icit rig t u) == (Pi _ n' icit' rig' t' u') = icit == icit' && rig == rig' && t == t' && u == u'
   _ == _ = False
 
 
@@ -223,14 +229,14 @@ pprint names tm = go 0 names tm
     go p names (Lam _ nm t) = parens 0 p $ nest 2 $ text "\\ \{nm} =>" <+/> go 0 (nm :: names) t
     go p names (App _ t u) = parens 0 p $ go 0 names t <+> go 1 names u
     go p names (U _) = "U"
-    go p names (Pi _ nm Auto t u) = parens 0 p $
-      text "{{" <+> text nm <+> ":" <+> go 0 names t <+> "}}" <+> "->" <+> go 0 (nm :: names) u
-    go p names (Pi _ nm Implicit t u) = parens 0 p $
-      text "{" <+> text nm <+> ":" <+> go 0 names t <+> "}" <+> "->" <+> go 0 (nm :: names) u
-    go p names (Pi _ "_" Explicit t u) =
+    go p names (Pi _ nm Auto rig t u) = parens 0 p $
+      text "{{" ++ text (show rig) <+> text nm <+> ":" <+> go 0 names t <+> "}}" <+> "->" <+> go 0 (nm :: names) u
+    go p names (Pi _ nm Implicit rig t u) = parens 0 p $
+      text "{" ++ text (show rig) <+> text nm <+> ":" <+> go 0 names t <+> "}" <+> "->" <+> go 0 (nm :: names) u
+    go p names (Pi _ "_" Explicit Many t u) =
       parens 0 p $ go 1 names t <+> "->" <+> go 0 ("_" :: names) u
-    go p names (Pi _ nm Explicit t u) = parens 0 p $
-      text "(" ++ text nm <+> ":" <+> go 0 names t ++ ")" <+> "->" <+> go 0 (nm :: names) u
+    go p names (Pi _ nm Explicit rig t u) = parens 0 p $
+      text "(" ++  text (show rig) <+> text nm <+> ":" <+> go 0 names t ++ ")" <+> "->" <+> go 0 (nm :: names) u
     -- FIXME - probably way wrong on the names here.  There is implicit binding going on
     go p names (Case _ sc alts) = parens 0 p $ text "case" <+> go 0 names sc <+> text "of" ++ (nest 2 (line ++ stack (map (goAlt 0 names) alts)))
     go p names (Lit _ lit) = text (show lit)
@@ -266,7 +272,7 @@ data Val : Type where
   -- we'll need to look this up in ctx with IO
   VMeta : FC -> (ix : Nat) -> (sp : SnocList Val) -> Val
   VLam : FC -> Name -> Closure -> Val
-  VPi : FC -> Name -> Icit -> (a : Lazy Val) -> (b : Closure) -> Val
+  VPi : FC -> Name -> Icit -> Quant -> (a : Lazy Val) -> (b : Closure) -> Val
   VLet : FC -> Name -> Val -> Val -> Val
   VLetRec : FC -> Name -> Val -> Val -> Val
   VU : FC -> Val
@@ -279,7 +285,7 @@ getValFC (VRef fc _ _ _) = fc
 getValFC (VCase fc _ _) = fc
 getValFC (VMeta fc _ _) = fc
 getValFC (VLam fc _ _) = fc
-getValFC (VPi fc _ _ a b) = fc
+getValFC (VPi fc _ _ _ a b) = fc
 getValFC (VU fc) = fc
 getValFC (VLit fc _) = fc
 getValFC (VLet fc _ _ _) = fc
@@ -299,8 +305,8 @@ Show Val where
   show (VRef _ nm _ sp) = "(\{nm} \{unwords $ map show (sp <>> [])})"
   show (VMeta _ ix sp) = "(%meta \{show ix} [\{show $ length sp} sp])"
   show (VLam _ str x) = "(%lam \{str} \{show x})"
-  show (VPi fc str Implicit x y) = "(%pi {\{str} : \{show  x}}. \{show  y})"
-  show (VPi fc str Explicit x y) = "(%pi (\{str} : \{show  x}). \{show  y})"
+  show (VPi fc str Implicit rig x y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{show  y})"
+  show (VPi fc str Explicit rig x y) = "(%pi (\{show rig} \{str} : \{show  x}). \{show  y})"
   show (VCase fc sc alts) = "(%case \{show sc} ...)"
   show (VU _) = "U"
   show (VLit _ lit) = show lit
@@ -375,7 +381,8 @@ record MetaContext where
 
 
 public export
-data Def = Axiom | TCon (List String) | DCon Nat String | Fn Tm | PrimTCon | PrimFn String
+data Def = Axiom | TCon (List String) | DCon Nat String | Fn Tm | PrimTCon
+         | PrimFn String (List String)
 
 public export
 covering
@@ -385,7 +392,7 @@ Show Def where
   show (DCon k tyname) = "DCon \{show k} \{show tyname}"
   show (Fn t) = "Fn \{show t}"
   show (PrimTCon) = "PrimTCon"
-  show (PrimFn src) = "PrimFn \{show src}"
+  show (PrimFn src uses) = "PrimFn \{show src} \{show uses}"
 
 ||| entry in the top level context
 public export

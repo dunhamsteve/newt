@@ -13,12 +13,12 @@ funArgs tm = go tm []
 
 public export
 data Binder : Type where
-  MkBind : FC -> String -> Icit -> Tm -> Binder
+  MkBind : FC -> String -> Icit -> Quant -> Tm -> Binder
 
 -- I don't have a show for terms without a name list
 export
 Show Binder where
-  show (MkBind _ nm icit t) = "[\{nm} \{show icit} : ...]"
+  show (MkBind _ nm icit quant t) = "[\{show quant}\{nm} \{show icit} : ...]"
 
 data Foo : Type -> Type where
   MkFoo : Nat -> Foo a
@@ -28,5 +28,5 @@ splitTele : Tm -> (Tm, List Binder)
 splitTele = go []
   where
     go : List Binder -> Tm -> (Tm, List Binder)
-    go ts (Pi fc nm icit t u) = go (MkBind fc nm icit t :: ts) u
+    go ts (Pi fc nm icit quant t u) = go (MkBind fc nm icit quant t :: ts) u
     go ts tm = (tm, reverse ts)

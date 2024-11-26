@@ -2,9 +2,10 @@
 ## TODO
 
 - [ ] add filenames to FC
-- [ ] maybe use backtick for javascript so we don't highlight strings as JS
+- [x] maybe use backtick for javascript so we don't highlight strings as JS
 - [ ] add namespaces
-- [ ] imported files leak info messages everywhere
+- [x] dead code elimination
+- [x] imported files leak info messages everywhere
   - For now, take the start ix for the file and report at end starting there
 - [ ] update node shim to include idris2-playground changes
 - [ ] accepting DCon for another type (skipping case, but should be an error)
@@ -97,9 +98,10 @@
 - [ ] decide what to do for erasure
   - I'm going to try explicit annotation, forall/∀ is erased
   - [x] Parser side
-  - [ ] push down to value/term
-  - [ ] check quantity
-  - [ ] erase in output
+  - [x] push down to value/term
+  - [ ] check quantity!!
+  - [x] erase in output
+  - [ ] remove erased top level arguments
 - [ ] type at point in vscode
 - [ ] repl
 - [ ] LSP

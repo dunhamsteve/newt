@@ -77,6 +77,7 @@ export let newtTokens: monaco.languages.IMonarchLanguage = {
     "ptype",
     "pfunc",
     "if",
+    "uses",
     "then",
     "else",
     "class",
