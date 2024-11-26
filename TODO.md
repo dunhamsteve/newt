@@ -2,6 +2,7 @@
 ## TODO
 
 - [ ] add filenames to FC
+- [ ] maybe use backtick for javascript so we don't highlight strings as JS
 - [ ] add namespaces
 - [ ] imported files leak info messages everywhere
   - For now, take the start ix for the file and report at end starting there
@@ -94,6 +95,11 @@
 - [ ] detect extra clauses in case statements
 - [ ] add test framework
 - [ ] decide what to do for erasure
+  - I'm going to try explicit annotation, forall/∀ is erased
+  - [x] Parser side
+  - [ ] push down to value/term
+  - [ ] check quantity
+  - [ ] erase in output
 - [ ] type at point in vscode
 - [ ] repl
 - [ ] LSP

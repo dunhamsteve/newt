@@ -244,9 +244,9 @@ processDecl (Class classFC nm tele decls) = do
   -- We'll need names for the telescope
   let dcName = "Mk\{nm}"
   let tcType = teleToPi tele (RU classFC)
-  let tail = foldl (\ acc, (fc, nm, icit, _) => RApp fc acc (RVar fc nm) icit) (RVar classFC nm) tele
+  let tail = foldl (\ acc, (BI fc nm icit _, _) => RApp fc acc (RVar fc nm) icit) (RVar classFC nm) tele
   let dcType = teleToPi impTele $
-    foldr (\(fc, nm, ty), acc =>  RPi fc (Just nm) Explicit ty acc  ) tail fields
+    foldr (\(fc, nm, ty), acc =>  RPi fc (BI fc nm Explicit Many) ty acc  ) tail fields
 
   putStrLn "tcon type \{pretty tcType}"
   putStrLn "dcon type \{pretty dcType}"
@@ -255,9 +255,9 @@ processDecl (Class classFC nm tele decls) = do
   putStrLn $ render 90 $ pretty decl
   processDecl decl
   for_ fields $ \ (fc,name,ty) => do
-      let funType = teleToPi impTele $ RPi fc Nothing Auto tail ty
+      let funType = teleToPi impTele $ RPi fc (BI fc "_" Auto Many) tail ty
       let autoPat = foldl (\acc, (fc,nm,ty) => RApp fc acc (RVar fc nm) Explicit) (RVar classFC dcName) fields
-      let lhs = foldl (\acc, (fc', nm, _, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc name) tele
+      let lhs = foldl (\acc, (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc name) tele
       let lhs = RApp classFC lhs autoPat Auto
       let decl = Def fc name [(lhs, (RVar fc name))]
 
@@ -274,11 +274,11 @@ processDecl (Class classFC nm tele decls) = do
     getSigs (_:: xs) = getSigs xs
 
     impTele : Telescope
-    impTele = map (\(fc, nm, _, ty) => (fc, nm, Implicit, ty)) tele
+    impTele = map (\(BI fc nm _ quant, ty) => (BI fc nm Implicit quant, ty)) tele
 
     teleToPi : Telescope -> Raw -> Raw
     teleToPi [] end = end
-    teleToPi ((fc, nm, icit, ty) :: tele) end = RPi fc (Just nm) icit ty (teleToPi tele end)
+    teleToPi ((info, ty) :: tele) end = RPi (getFC info) info ty (teleToPi tele end)
 
 processDecl (Instance instfc ty decls) = do
   let decls = collectDecl decls

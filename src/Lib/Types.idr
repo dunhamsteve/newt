@@ -45,6 +45,23 @@ Show BD where
   show Bound = "bnd"
   show Defined = "def"
 
+public export
+data Quant = Zero | Many
+
+public export
+Show Quant where
+  show Zero = "0"
+  show Many = ""
+
+public export
+data BindInfo : Type where
+  BI : (fc : FC) -> (name : Name) -> (icit : Icit) -> (quant : Quant) -> BindInfo
+
+%name BindInfo bi
+
+public export
+HasFC BindInfo where
+  getFC (BI fc _ _ _) = fc
 
 -- do we just admit string names for these and let the prim functions
 -- sort it out?

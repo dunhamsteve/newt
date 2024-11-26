@@ -207,11 +207,11 @@ pfunc listToArray : {a : U} -> List a -> Array a := "
 }
 "
 
-pfunc alen : {a : U} -> Array a -> Int := "(a,arr) => arr.length"
-pfunc aget : {a : U} -> Array a -> Int -> a := "(a, arr, ix) => arr[ix]"
-pfunc aempty : {a : U} -> Unit -> Array a := "() => []"
+pfunc alen : {0 a : U} -> Array a -> Int := "(a,arr) => arr.length"
+pfunc aget : {0 a : U} -> Array a -> Int -> a := "(a, arr, ix) => arr[ix]"
+pfunc aempty : {0 a : U} -> Unit -> Array a := "() => []"
 
-pfunc arrayToList : {a} → Array a → List a := "(a,arr) => {
+pfunc arrayToList : {0 a} → Array a → List a := "(a,arr) => {
   let rval = Nil(a)
   for (let i = arr.length - 1;i >= 0; i--) {
     rval = _$3A$3A_(a, arr[i], rval)

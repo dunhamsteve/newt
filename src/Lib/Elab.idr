@@ -906,10 +906,10 @@ undo : List DoStmt -> M Raw
 undo [] = error emptyFC "do block must end in expression"
 undo ((DoExpr fc tm) :: Nil) = pure tm
 -- TODO decide if we want to use >> or just >>=
-undo ((DoExpr fc tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc "_" Explicit !(undo xs)) Explicit
+undo ((DoExpr fc tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc (BI fc "_" Explicit Many) !(undo xs)) Explicit
 -- undo ((DoExpr fc tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>_") tm Explicit) !(undo xs) Explicit
 undo ((DoLet fc nm tm) :: xs) = RLet fc nm (RImplicit fc) tm <$> undo xs
-undo ((DoArrow fc nm tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc nm Explicit !(undo xs)) Explicit
+undo ((DoArrow fc nm tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc (BI fc nm Explicit Many) !(undo xs)) Explicit
 
 check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
   (RWhere fc decls body, ty) => checkWhere ctx (collectDecl decls) body ty
@@ -934,7 +934,7 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
   -- rendered in ProcessDecl
   (RHole fc, ty) => freshMeta ctx fc ty User
 
-  (t@(RLam fc nm icit tm), ty@(VPi fc' nm' icit' a b)) => do
+  (t@(RLam fc (BI _ nm icit _) tm), ty@(VPi fc' nm' icit' a b)) => do
           debug "icits \{nm} \{show icit} \{nm'} \{show icit'}"
           if icit == icit' then do
               let var = VVar fc (length ctx.env) [<]
@@ -949,7 +949,7 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
               pure $ Lam fc nm' sc
             else
               error fc "Icity issue checking \{show t} at \{show ty}"
-  (t@(RLam fc nm icit tm), ty) =>
+  (t@(RLam _ (BI fc nm icit quant) tm), ty) =>
             error fc "Expected pi type, got \{!(prvalCtx ty)}"
 
   (tm, ty@(VPi fc nm' Implicit a b)) => do
@@ -1032,10 +1032,9 @@ infer ctx (RApp fc t u icit) = do
   pure (App fc t u, !(b $$ !(eval ctx.env CBN u)))
 
 infer ctx (RU fc) = pure (U fc, VU fc) -- YOLO
-infer ctx (RPi fc nm icit ty ty2) = do
+infer ctx (RPi _ (BI fc nm icit quant) ty ty2) = do
   ty' <- check ctx ty (VU fc)
   vty' <- eval ctx.env CBN ty'
-  let nm := fromMaybe "_" nm
   ty2' <- check (extend ctx nm vty') ty2 (VU fc)
   pure (Pi fc nm icit ty' ty2', (VU fc))
 infer ctx (RLet fc nm ty v sc) = do
@@ -1053,7 +1052,7 @@ infer ctx (RAnn fc tm rty) = do
   tm <- check ctx tm vty
   pure (tm, vty)
 
-infer ctx (RLam fc nm icit tm) = do
+infer ctx (RLam _ (BI fc nm icit quant) tm) = do
   a <- freshMeta ctx fc (VU emptyFC) Normal >>= eval ctx.env CBN
   let ctx' = extend ctx nm a
   (tm', b) <- infer ctx' tm

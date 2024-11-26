@@ -10,9 +10,6 @@ public export
 data Raw : Type where
 
 public export
-data RigCount = Rig0 | RigW
-
-public export
 data Pattern
   = PatVar FC Icit Name
   | PatCon FC Icit Name (List Pattern)
@@ -69,10 +66,10 @@ data DoStmt : Type where
 data Decl : Type
 data Raw : Type where
   RVar : (fc : FC) -> (nm : Name) -> Raw
-  RLam : (fc : FC) -> (nm : String) -> (icit : Icit) -> (ty : Raw) -> Raw
+  RLam : (fc : FC) -> BindInfo -> (ty : Raw) -> Raw
   RApp : (fc : FC) -> (t : Raw) -> (u : Raw) -> (icit : Icit) -> Raw
   RU   : (fc : FC) -> Raw
-  RPi  : (fc : FC) -> (nm : Maybe Name) -> (icit : Icit) -> (ty : Raw) -> (sc : Raw) -> Raw
+  RPi  : (fc : FC) -> BindInfo -> (ty : Raw) -> (sc : Raw) -> Raw
   RLet : (fc : FC) -> (nm : Name) -> (ty : Raw) -> (v : Raw) -> (sc : Raw) -> Raw
   RAnn : (fc : FC) -> (tm : Raw) -> (ty : Raw) -> Raw
   RLit : (fc : FC) -> Literal -> Raw
@@ -89,10 +86,10 @@ data Raw : Type where
 export
 HasFC Raw where
   getFC (RVar fc nm) = fc
-  getFC (RLam fc nm icit ty) = fc
+  getFC (RLam fc _ ty) = fc
   getFC (RApp fc t u icit) = fc
   getFC (RU fc) = fc
-  getFC (RPi fc nm icit ty sc) = fc
+  getFC (RPi fc _ ty sc) = fc
   getFC (RLet fc nm ty v sc) = fc
   getFC (RAnn fc tm ty) = fc
   getFC (RLit fc y) = fc
@@ -114,12 +111,12 @@ data Import = MkImport FC Name
 
 public export
 Telescope : Type
-Telescope = (List (FC, String, Icit, Raw))
+Telescope = List (BindInfo, Raw)
 
 public export
 data Decl
   = TypeSig FC (List Name) Raw
-  | Def FC Name (List (Raw,Raw)) -- (List Clause)
+  | Def FC Name (List (Raw, Raw)) -- (List Clause)
   | DCheck FC Raw Raw
   | Data FC Name Raw (List Decl)
   | PType FC Name (Maybe Raw)
@@ -188,10 +185,6 @@ export covering
 Show Module where
   show (MkModule name imports decls) = foo ["MkModule", show name, show imports, show decls]
 
-Show RigCount where
-  show Rig0 = "Rig0"
-  show RigW = "RigW"
-
 export
 Show Pattern where
   show (PatVar _ icit str) = foo ["PatVar", show icit, show str]
@@ -203,6 +196,9 @@ covering
 Show RCaseAlt where
   show (MkAlt x y)= foo ["MkAlt", show x, assert_total $ show y]
 
+Show BindInfo where
+  show (BI _ name icit quant) = foo ["BI", show name, show icit, show quant]
+
 covering
 Show Raw where
   show (RImplicit _) = "_"
@@ -211,9 +207,9 @@ Show Raw where
   show (RAnn _ t ty) = foo [ "RAnn", show t, show ty]
   show (RLit _ x) = foo [ "RLit", show x]
   show (RLet _ x ty v scope) = foo [ "Let", show x, " : ", show ty, " = ", show v, " in ", show scope]
-  show (RPi _ str x y z) = foo [ "Pi", show str, show x, show y, show z]
+  show (RPi _ bi y z) = foo [ "Pi", show bi, show y, show z]
   show (RApp _ x y z) = foo [ "App", show x, show y, show z]
-  show (RLam _ x i y) = foo [ "Lam", show x, show i, show y]
+  show (RLam _ bi y) = foo [ "Lam", show bi, show y]
   show (RCase _ x xs) = foo [ "Case", show x, show xs]
   show (RDo _ stmts) = foo [ "DO", "FIXME"]
   show (RU _) = "U"
@@ -240,6 +236,8 @@ export
 Pretty Raw where
   pretty = asDoc 0
     where
+    bindDoc : BindInfo -> Doc
+    bindDoc (BI _ nm icit quant) = ?rhs_0
     wrap : Icit -> Doc -> Doc
     wrap Explicit x = text "(" ++ x ++ text ")"
     wrap Implicit x = text "{" ++ x ++ text "}"
@@ -250,15 +248,15 @@ Pretty Raw where
 
     asDoc : Nat -> Raw -> Doc
     asDoc p (RVar _ str) = text str
-    asDoc p (RLam _ str icit x) = par p 0 $ text "\\" ++ wrap icit (text str) <+> text "=>" <+> asDoc 0 x
+    asDoc p (RLam _ (BI _ nm icit q) x) = par p 0 $ text "\\" ++ wrap icit (text nm) <+> text "=>" <+> asDoc 0 x
     -- This needs precedence and operators...
     asDoc p (RApp _ x y Explicit) = par p 2 $ asDoc 2 x <+> asDoc 3 y
     asDoc p (RApp _ x y Implicit) = par p 2 $ asDoc 2 x <+> text "{" ++ asDoc 0 y ++ text "}"
     asDoc p (RApp _ x y Auto) = par p 2 $ asDoc 2 x <+> text "{{" ++ asDoc 0 y ++ text "}}"
     asDoc p (RU _) = text "U"
-    asDoc p (RPi _ Nothing Explicit ty scope) = par p 1 $ asDoc p ty <+> text "->" <+/> asDoc p scope
-    asDoc p (RPi _ nm icit ty scope) =
-      par p 1 $ wrap icit (text (fromMaybe "_" nm) <+> text ":" <+> asDoc p ty ) <+> text "->" <+/> asDoc 1 scope
+    asDoc p (RPi _ (BI _ "_" Explicit Many) ty scope) = par p 1 $ asDoc p ty <+> text "->" <+/> asDoc p scope
+    asDoc p (RPi _ (BI _ nm icit quant) ty scope) =
+      par p 1 $ wrap icit (text "_" <+> text ":" <+> asDoc p ty ) <+> text "->" <+/> asDoc 1 scope
     asDoc p (RLet _ x v ty scope) =
       par p 0 $ text "let" <+> text x <+> text ":" <+> asDoc p ty
           <+> text "=" <+> asDoc p v

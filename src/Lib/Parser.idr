@@ -172,8 +172,8 @@ letExpr = do
       t <- typeExpr
       pure (name,fc,t)
 
-pLetArg : Parser (Icit, String, Maybe Raw)
-pLetArg = (Implicit,,) <$> braces (ident <|> uident) <*> optional (sym ":" >> typeExpr)
+pLamArg : Parser (Icit, String, Maybe Raw)
+pLamArg = (Implicit,,) <$> braces (ident <|> uident) <*> optional (sym ":" >> typeExpr)
        <|> (Auto,,) <$> dbraces (ident <|> uident) <*> optional (sym ":" >> typeExpr)
        <|> (Explicit,,) <$> parens (ident <|> uident) <*> optional (sym ":" >> typeExpr)
        <|> (Explicit,,Nothing) <$> (ident <|> uident)
@@ -183,11 +183,12 @@ pLetArg = (Implicit,,) <$> braces (ident <|> uident) <*> optional (sym ":" >> ty
 export
 lamExpr : Parser Raw
 lamExpr = do
+  pos <- getPos
   keyword "\\" <|> keyword "λ"
-  args <- some $ withPos pLetArg
+  args <- some $ withPos pLamArg
   keyword "=>"
   scope <- typeExpr
-  pure $ foldr (\(fc, icit, name, ty), sc => RLam fc name icit sc) scope args
+  pure $ foldr (\(fc, icit, name, ty), sc => RLam pos (BI fc name icit Many) sc) scope args
 
 
 -- Idris just has a term on the LHS and sorts it out later..
@@ -262,23 +263,28 @@ term =  caseExpr
 varname : Parser String
 varname = (ident <|> uident <|> keyword "_" *> pure "_")
 
+quantity : Parser Quant
+quantity = fromMaybe Many <$> optional (Zero <$ keyword "0")
+
 ebind : Parser Telescope
 ebind = do
   -- don't commit until we see the ":"
   sym "("
+  quant <- quantity
   names <- try (some (withPos varname) <* sym ":")
   ty <- typeExpr
   sym ")"
-  pure $ map (\(pos, name) => (pos, name, Explicit, ty)) names
+  pure $ map (\(pos, name) => (BI pos name Explicit quant, ty)) names
 
 ibind : Parser Telescope
 ibind = do
   -- I've gone back and forth on this, but I think {m a b} is more useful than {Nat}
   sym "{"
+  quant <- quantity
   names <- (some (withPos varname))
   ty <- optional (sym ":" *> typeExpr)
   sym "}"
-  pure $ map (\(pos,name) => (pos, name, Implicit, fromMaybe (RImplicit pos) ty)) names
+  pure $ map (\(pos,name) => (BI pos name Implicit quant, fromMaybe (RImplicit pos) ty)) names
 
 abind : Parser Telescope
 abind = do
@@ -288,8 +294,8 @@ abind = do
   ty <- typeExpr
   sym "}}"
   case name of
-    Just (pos,name) => pure [(pos, name, Auto, ty)]
-    Nothing => pure [(getFC ty, "_", Auto, ty)]
+    Just (pos,name) => pure [(BI pos name Auto Many, ty)]
+    Nothing => pure [(BI (getFC ty) "_" Auto Many, ty)]
 
 arrow : Parser Unit
 arrow = sym "->" <|> sym "→"
@@ -302,17 +308,17 @@ forAll = do
   all <- some (withPos varname)
   keyword "."
   scope <- typeExpr
-  pure $ foldr (\ (fc, n), sc => RPi fc (Just n) Implicit (RImplicit fc) sc) scope all
+  pure $ foldr (\ (fc, n), sc => RPi fc (BI fc n Implicit Zero) (RImplicit fc) sc) scope all
 
 binders : Parser Raw
 binders = do
   binds <- many (abind <|> ibind <|> ebind)
   arrow
   scope <- typeExpr
-  pure $ foldr (uncurry mkBind) scope (join binds)
+  pure $ foldr mkBind scope (join binds)
   where
-    mkBind : FC -> (String, Icit, Raw) -> Raw -> Raw
-    mkBind fc (name, icit, ty) scope = RPi fc (Just name) icit ty scope
+    mkBind : (BindInfo, Raw) -> Raw -> Raw
+    mkBind (info, ty) scope = RPi (getFC info) info ty scope
 
 typeExpr
   = binders
@@ -324,7 +330,7 @@ typeExpr
         case scope of
           Nothing      => pure exp
           -- consider Maybe String to represent missing
-          (Just scope) => pure $ RPi fc Nothing Explicit exp scope
+          (Just scope) => pure $ RPi fc (BI fc "_" Explicit Many) exp scope
 
 
 -- And top level stuff
@@ -411,7 +417,7 @@ parseData = do
 nakedBind : Parser Telescope
 nakedBind = do
   names <- some (withPos varname)
-  pure $ map (\(pos,name) => (pos, name, Explicit,  RImplicit pos)) names
+  pure $ map (\(pos,name) => (BI pos name Explicit Many, RImplicit pos)) names
 
 export
 parseClass : Parser Decl
