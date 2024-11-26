@@ -3,8 +3,8 @@ module Auto
 ptype String
 ptype Int
 
-pfunc i2s : Int -> String := "(i) => ''+i"
-pfunc _++_ : String -> String -> String := "(a,b) => a + b"
+pfunc i2s : Int -> String := `(i) => ''+i`
+pfunc _++_ : String -> String -> String := `(a,b) => a + b`
 
 infixl 4 _++_
 
@@ -21,7 +21,7 @@ showInt : Show Int
 showInt = MkShow i2s
 
 ptype World
-pfunc log : {A : U} -> A -> World := "(_, a) => console.log(a)"
+pfunc log : {A : U} -> A -> World := `(_, a) => console.log(a)`
 
 main : Int -> World
 main _ = log ("answer: " ++ show 42)

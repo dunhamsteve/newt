@@ -20,9 +20,9 @@ ptype JVoid
 
 -- If we had a different quote here, we could tell vscode it's javascript.
 -- or actually just switch modes inside pfunc
-pfunc log : String -> JVoid := "(x) => console.log(x)"
-pfunc plus : Int -> Int -> Int := "(x,y) => x + y"
-pfunc _*_ : Int -> Int -> Int := "(x,y) => x * y"
+pfunc log : String -> JVoid := `(x) => console.log(x)`
+pfunc plus : Int -> Int -> Int := `(x,y) => x + y`
+pfunc _*_ : Int -> Int -> Int := `(x,y) => x * y`
 
 -- We now have to clean JS identifiers
 _+_ : Int -> Int -> Int

@@ -7,7 +7,7 @@ module TestPrim
 ptype String
 ptype Int
 
-pfunc strlen : String -> Int := "(x) => x.length()"
+pfunc strlen : String -> Int := `(x) => x.length()`
 
 -- why is there an eta in here?
 foo : String -> Int
@@ -16,12 +16,12 @@ foo = \ x => strlen x
 bar : String -> String -> Int
 bar = \ x y => strlen x
 
-pfunc append : String -> String -> String := "(a,b) => a + b"
+pfunc append : String -> String -> String := `(a,b) => a + b`
 
 blah : String
 blah = append "hello" "world"
 
-pfunc plus : Int -> Int -> Int := "(a,b) => a + b"
+pfunc plus : Int -> Int -> Int := `(a,b) => a + b`
 
 answer : Int
 answer = plus 40 2
@@ -30,7 +30,7 @@ answer = plus 40 2
 
 -- codegen test cases
 -- works, but two looks like () => (eta1) => (eta0) => one(eta1, eta0)
-pfunc one : Int -> Int -> Int := "(x,y) => x + y"
+pfunc one : Int -> Int -> Int := `(x,y) => x + y`
 
 two : Int -> Int -> Int
 two = one

@@ -399,7 +399,7 @@ parsePFunc = do
   keyword ":"
   ty <- typeExpr
   keyword ":="
-  src <- cast <$> token StringKind
+  src <- cast <$> token JSLit
   pure $ PFunc fc nm ty src
 
 export

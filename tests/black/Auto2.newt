@@ -1,10 +1,10 @@
 module Auto2
 
 ptype World
-pfunc log : {A : U} -> A -> World := "(_, a) => console.log(a)"
+pfunc log : {A : U} -> A -> World := `(_, a) => console.log(a)`
 
 ptype Int
-pfunc i_plus : Int -> Int -> Int := "(x,y) => x + y"
+pfunc i_plus : Int -> Int -> Int := `(x,y) => x + y`
 
 data Nat : U where
   Z : Nat

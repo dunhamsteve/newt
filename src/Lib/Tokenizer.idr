@@ -49,6 +49,18 @@ unquote str = case unpack str of
 
 opMiddle = pred (\c => not (isSpace c || c == '_'))
 
+btick = is '`'
+
+trimJS : String -> String
+trimJS str = case unpack str of
+  ('`' :: xs) => pack $ go xs
+  bug => pack $ go bug
+  where
+    go : List Char -> List Char
+    go [] = []
+    go ['`'] = []
+    go (x :: xs) = x :: go xs
+
 rawTokens : Tokenizer (Token Kind)
 rawTokens
   = match spaces (Tok Space)
@@ -68,6 +80,7 @@ rawTokens
   <|> match (lineComment (exact "--")) (Tok Space)
   <|> match (blockComment (exact "/-") (exact "-/")) (Tok Space)
   <|> match (upper <+> many identMore) checkUKW
+  <|> match (btick <+> manyUntil btick any <+> btick) (Tok JSLit . trimJS)
   <|> match (quo <+> manyUntil quo (esc any <|> any) <+> quo) (Tok StringKind . unquote)
   -- accept almost everything, but
   <|> match (some (non (space <|> singleton))) checkKW

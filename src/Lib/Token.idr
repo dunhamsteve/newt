@@ -13,6 +13,7 @@ data Kind
   | Number
   | Character
   | StringKind
+  | JSLit
   | Symbol
   | Space
   | Comment
@@ -40,6 +41,7 @@ Show Kind where
   show EOI     = "EOI"
   show Pragma  = "Pragma"
   show StringKind = "String"
+  show JSLit = "JSLit"
 export
 Eq Kind where
   Ident   == Ident = True
@@ -54,6 +56,7 @@ Eq Kind where
   Semi    == Semi   = True
   RBrace  == RBrace = True
   StringKind == StringKind = True
+  JSLit == JSLit = True
   _ == _ = False
 
 export

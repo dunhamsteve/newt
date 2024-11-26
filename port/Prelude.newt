@@ -182,13 +182,13 @@ ptype Int
 ptype Char
 
 -- probably want to switch to Int or implement magic Nat
-pfunc length : String → Nat := "(s) => {
+pfunc length : String → Nat := `(s) => {
   let rval = Z
   for (let i = 0; i < s.length; s++) rval = S(rval)
   return rval
-}"
+}`
 
-pfunc sconcat : String → String → String := "(x,y) => x + y"
+pfunc sconcat : String → String → String := `(x,y) => x + y`
 instance Concat String where
   _++_ = sconcat
 
@@ -196,7 +196,7 @@ data Unit : U where
   MkUnit : Unit
 
 ptype Array : U → U
-pfunc listToArray : {a : U} -> List a -> Array a := "
+pfunc listToArray : {a : U} -> List a -> Array a := `
 (a, l) => {
   let rval = []
   while (l.tag !== 'Nil') {
@@ -205,52 +205,52 @@ pfunc listToArray : {a : U} -> List a -> Array a := "
   }
   return rval
 }
-"
+`
 
-pfunc alen : {0 a : U} -> Array a -> Int := "(a,arr) => arr.length"
-pfunc aget : {0 a : U} -> Array a -> Int -> a := "(a, arr, ix) => arr[ix]"
-pfunc aempty : {0 a : U} -> Unit -> Array a := "() => []"
+pfunc alen : {0 a : U} -> Array a -> Int := `(a,arr) => arr.length`
+pfunc aget : {0 a : U} -> Array a -> Int -> a := `(a, arr, ix) => arr[ix]`
+pfunc aempty : {0 a : U} -> Unit -> Array a := `() => []`
 
-pfunc arrayToList : {0 a} → Array a → List a := "(a,arr) => {
+pfunc arrayToList : {0 a} → Array a → List a := `(a,arr) => {
   let rval = Nil(a)
   for (let i = arr.length - 1;i >= 0; i--) {
     rval = _$3A$3A_(a, arr[i], rval)
   }
   return rval
-}"
+}`
 
 
 
 -- for now I'll run this in JS
-pfunc lines : String → List String := "(s) => arrayToList(s.split('\\n'))"
+pfunc lines : String → List String := `(s) => arrayToList(s.split('\n'))`
 
-pfunc p_strHead : (s : String) -> Char := "(s) => s[0]"
-pfunc p_strTail : (s : String) -> String := "(s) => s[0]"
+pfunc p_strHead : (s : String) -> Char := `(s) => s[0]`
+pfunc p_strTail : (s : String) -> String := `(s) => s[0]`
 
-pfunc trim : String -> String := "s => s.trim()"
-pfunc split : String -> String -> List String := "(s, by) => {
+pfunc trim : String -> String := `s => s.trim()`
+pfunc split : String -> String -> List String := `(s, by) => {
   let parts = s.split(by)
   let rval = Nil(String)
   parts.reverse()
   parts.forEach(p => { rval = _$3A$3A_(List(String), p, rval) })
   return rval
-}"
+}`
 
-pfunc slen : String -> Int := "s => s.length"
-pfunc sindex : String -> Int -> Char := "(s,i) => s[i]"
+pfunc slen : String -> Int := `s => s.length`
+pfunc sindex : String -> Int -> Char := `(s,i) => s[i]`
 
 -- TODO represent Nat as number at runtime
-pfunc natToInt : Nat -> Int := "(n) => {
+pfunc natToInt : Nat -> Int := `(n) => {
   let rval = 0
   while (n.tag === 'S') {
     n = n.h0
     rval++
   }
   return rval
-}"
+}`
 
-pfunc fastConcat : List String → String := "(xs) => listToArray(undefined, xs).join('')"
-pfunc replicate : Nat -> Char → String := "(n,c) => c.repeat(natToInt(n))"
+pfunc fastConcat : List String → String := `(xs) => listToArray(undefined, xs).join('')`
+pfunc replicate : Nat -> Char → String := `(n,c) => c.repeat(natToInt(n))`
 
 -- I don't want to use an empty type because it would be a proof of void
 ptype World
@@ -266,12 +266,12 @@ instance Monad IO where
     MkIORes a w => mab a w
   pure a = \ w => MkIORes a w
 
-pfunc putStrLn : String -> IO Unit := "(s) => (w) => {
+pfunc putStrLn : String -> IO Unit := `(s) => (w) => {
   console.log(s)
   return MkIORes(Unit,MkUnit,w)
-}"
+}`
 
-pfunc showInt : Int -> String := "(i) => String(i)"
+pfunc showInt : Int -> String := `(i) => String(i)`
 
 class Show a where
   show : a → String
@@ -282,18 +282,18 @@ instance Show String where
 instance Show Int where
   show = showInt
 
-pfunc ord : Char -> Int := "(c) => c.charCodeAt(0)"
+pfunc ord : Char -> Int := `(c) => c.charCodeAt(0)`
 
 infix 6 _<=_
-pfunc _<=_ : Int -> Int -> Bool := "(x,y) => (x <= y) ? True : False"
+pfunc _<=_ : Int -> Int -> Bool := `(x,y) => (x <= y) ? True : False`
 
 
 pfunc unpack : String -> List Char
-  := "(s) => {
+  := `(s) => {
     let acc = Nil(Char)
     for (let i = s.length - 1; 0 <= i; i--) acc = _$3A$3A_(Char, s[i], acc)
     return acc
-}"
+}`
 
 
 
@@ -306,10 +306,10 @@ _∘_ : {A B C : U} -> (B -> C) -> (A -> B) -> A -> C
 (f ∘ g) x = f (g x)
 
 
-pfunc addInt : Int → Int → Int := "(x,y) => x + y"
-pfunc mulInt : Int → Int → Int := "(x,y) => x * y"
-pfunc subInt : Int → Int → Int := "(x,y) => x - y"
-pfunc ltInt : Int → Int → Bool := "(x,y) => x < y ? True : False"
+pfunc addInt : Int → Int → Int := `(x,y) => x + y`
+pfunc mulInt : Int → Int → Int := `(x,y) => x * y`
+pfunc subInt : Int → Int → Int := `(x,y) => x - y`
+pfunc ltInt : Int → Int → Bool := `(x,y) => x < y ? True : False`
 
 instance Mul Int where
   x * y = mulInt x y

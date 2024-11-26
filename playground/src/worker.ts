@@ -118,7 +118,6 @@ process.stdout.write = (s) => {
 };
 // hack for now
 const preload = [
-  "Lib.newt",
   "Prelude.newt",
   "aoc2023/day1/eg.txt",
   "aoc2023/day1/eg2.txt",

@@ -231,13 +231,13 @@ pfunc listToArray : {a : U} -> List a -> Array a := "
   return rval
 }
 "
-pfunc alen : {a : U} -> Array a -> Int := "(a,arr) => arr.length"
-pfunc aget : {a : U} -> Array a -> Int -> a := "(a, arr, ix) => arr[ix]"
-pfunc aempty : {a : U} -> Unit -> Array a := "() => []"
+pfunc alen : {a : U} -> Array a -> Int := `(a,arr) => arr.length`
+pfunc aget : {a : U} -> Array a -> Int -> a := `(a, arr, ix) => arr[ix]`
+pfunc aempty : {a : U} -> Unit -> Array a := `() => []`
 
 
-pfunc fastConcat : List String → String := "(xs) => listToArray(undefined, xs).join('')"
-pfunc replicate : Nat -> Char → String := "() => abort('FIXME replicate')"
+pfunc fastConcat : List String → String := `(xs) => listToArray(undefined, xs).join('')`
+pfunc replicate : Nat -> Char → String := `() => abort('FIXME replicate')`
 
 
 
@@ -261,4 +261,4 @@ iopure a = \ w => MkIORes a w
 IOMonad : Monad IO
 IOMonad = MkMonad iobind iopure
 
-pfunc putStrLn : String -> IO Unit := "(s) => (w) => console.log(s)"
+pfunc putStrLn : String -> IO Unit := `(s) => (w) => console.log(s)`

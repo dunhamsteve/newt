@@ -20,8 +20,8 @@
     },
     {
       "name": "string.js",
-      "begin": ":=\\s*\"",
-      "end": "\"",
+      "begin": "`",
+      "end": "`",
       "patterns": [
         { "include": "source.js" }
       ]

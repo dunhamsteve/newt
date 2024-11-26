@@ -10,7 +10,7 @@ _+_ : {A : U} {{_ : Plus A}} -> A -> A -> A
 _+_ {{MkPlus plus}} x y = plus x y
 
 ptype Int
-pfunc plusInt : Int -> Int -> Int := "(x,y) => x + y"
+pfunc plusInt : Int -> Int -> Int := `(x,y) => x + y`
 
 PlusInt : Plus Int
 PlusInt = MkPlus plusInt

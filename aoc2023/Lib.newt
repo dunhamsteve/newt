@@ -89,22 +89,22 @@ pfunc listToArray : {a : U} -> List a -> Array a := "
   return rval
 }
 "
-pfunc alen : {a : U} -> Array a -> Int := "(a,arr) => arr.length"
-pfunc aget : {a : U} -> Array a -> Int -> a := "(a, arr, ix) => arr[ix]"
-pfunc aempty : {a : U} -> Unit -> Array a := "() => []"
+pfunc alen : {a : U} -> Array a -> Int := `(a,arr) => arr.length`
+pfunc aget : {a : U} -> Array a -> Int -> a := `(a, arr, ix) => arr[ix]`
+pfunc aempty : {a : U} -> Unit -> Array a := `() => []`
 
-pfunc getArgs : List String := "arrayToList(String, process.argv)"
+pfunc getArgs : List String := `arrayToList(String, process.argv)`
 -- Maybe integrate promises?
 
 
-pfunc ord : Char -> Int := "(c) => c.charCodeAt(0)"
+pfunc ord : Char -> Int := `(c) => c.charCodeAt(0)`
 
-pfunc _<_ : Int -> Int -> Bool := "(x,y) => (x < y) ? True : False"
-pfunc _<=_ : Int -> Int -> Bool := "(x,y) => (x <= y) ? True : False"
-pfunc _+_ : Int -> Int -> Int := "(x,y) => x + y"
-pfunc _-_ : Int -> Int -> Int := "(x,y) => x - y"
-pfunc _*_ : Int -> Int -> Int := "(x,y) => x * y"
-pfunc _/_ : Int -> Int -> Int := "(x,y) => x / y"
+pfunc _<_ : Int -> Int -> Bool := `(x,y) => (x < y) ? True : False`
+pfunc _<=_ : Int -> Int -> Bool := `(x,y) => (x <= y) ? True : False`
+pfunc _+_ : Int -> Int -> Int := `(x,y) => x + y`
+pfunc _-_ : Int -> Int -> Int := `(x,y) => x - y`
+pfunc _*_ : Int -> Int -> Int := `(x,y) => x * y`
+pfunc _/_ : Int -> Int -> Int := `(x,y) => x / y`
 
 infix 6 _<_ _<=_
 infixl 8 _+_ _-_
@@ -112,14 +112,14 @@ infixl 9 _*_ _/_
 
 -- Ideally we'd have newt write the arrows for us to keep things correct
 -- We'd still have difficulty with callbacks...
-pfunc fs : Dummy := "require('fs')"
-pfunc readFile : (fn : String) -> String := "(fn) => fs.readFileSync(fn, 'utf8')"
-pfunc log : {a : U} -> a -> Dummy := "(a, obj) => console.log(obj)"
+pfunc fs : Dummy := `require('fs')`
+pfunc readFile : (fn : String) -> String := `(fn) => fs.readFileSync(fn, 'utf8')`
+pfunc log : {a : U} -> a -> Dummy := `(a, obj) => console.log(obj)`
 
-pfunc p_strHead : (s : String) -> Char := "(s) => s[0]"
-pfunc p_strTail : (s : String) -> String := "(s) => s[0]"
+pfunc p_strHead : (s : String) -> Char := `(s) => s[0]`
+pfunc p_strTail : (s : String) -> String := `(s) => s[0]`
 
-pfunc trim : String -> String := "s => s.trim()"
+pfunc trim : String -> String := `s => s.trim()`
 pfunc split : String -> String -> List String := "(s, by) => {
   let parts = s.split(by)
   let rval = Nil(String)
@@ -128,12 +128,12 @@ pfunc split : String -> String -> List String := "(s, by) => {
   return rval
 }"
 
-pfunc slen : String -> Int := "s => s.length"
-pfunc sindex : String -> Int -> Char := "(s,i) => s[i]"
+pfunc slen : String -> Int := `s => s.length`
+pfunc sindex : String -> Int -> Char := `(s,i) => s[i]`
 
 
 infixl 7 _++_
-pfunc _++_ : String -> String -> String := "(a,b) => a + b"
+pfunc _++_ : String -> String -> String := `(a,b) => a + b`
 
 
 pfunc trace : {a : U} -> String -> a -> a := "(_, lab, a) => {

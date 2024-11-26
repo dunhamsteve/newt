@@ -11,5 +11,5 @@ ptype Int
 ptype Array : U -> U
 
 -- declare a primitive function
-pfunc alength : {a : U} -> Array a -> Int := "(x) => x.length"
+pfunc alength : {a : U} -> Array a -> Int := `(x) => x.length`
 

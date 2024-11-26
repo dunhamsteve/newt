@@ -118,8 +118,8 @@ isVowel _ = False
 
 -- And primitive functions have a type and a javascript definition:
 
-pfunc plusInt : Int -> Int -> Int := "(x,y) => x + y"
-pfunc plusString : String -> String -> String := "(x,y) => x + y"
+pfunc plusInt : Int -> Int -> Int := `(x,y) => x + y`
+pfunc plusString : String -> String -> String := `(x,y) => x + y`
 
 -- We can make them Plus instances:
 
