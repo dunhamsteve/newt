@@ -209,3 +209,33 @@ prod xs ys = do
   x <- xs
   y <- ys
   pure (x, y)
+
+-- The playground is compiling to javascript and will give an error if
+-- main isn't implemented, so I'll crib the definition of IO from
+-- Prelude:
+
+data Unit : U where
+  MkUnit : Unit
+
+ptype World
+
+data IORes : U -> U where
+  MkIORes : ∀ a. a -> World -> IORes a
+
+IO : U -> U
+IO a = World -> IORes a
+
+instance Monad IO where
+  bind ma mab = \ w => case ma w of
+    MkIORes a w => mab a w
+  pure a = \ w => MkIORes a w
+
+-- Here we declare `uses` to let the dead code elimination know we're poking
+-- at MKIORes and MkUnit behind the compiler's back.
+pfunc putStrLn uses (MkIORes MkUnit) : String -> IO Unit := `(s) => (w) => {
+  console.log(s)
+  return MkIORes(undefined,MkUnit,w)
+}`
+
+main : IO Unit
+main = putStrLn "hello, world"

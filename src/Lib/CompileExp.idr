@@ -110,20 +110,8 @@ compileTerm (Meta _ k) = pure $ CRef "meta$\{show k}" -- FIXME
 compileTerm (Lam _ nm t) = pure $ CLam nm !(compileTerm t)
 compileTerm tm@(App _ _ _) with (funArgs tm)
   _ | (Meta _ k, args) = do
-        -- FIXME get arity or zonk?
-        -- let's see if this happens after zonking
-        error (getFC tm) "Lambda in CompileExp"
-        -- Maybe we should be storing the Term without the lambdas...
-        -- we don't have a lot here, but JS has an "environment" with names and
-        -- we can assume fully applied.
-        -- meta <- lookupMeta k
-        -- args' <- traverse compileTerm args
-        -- -- apply (CRef "Meta\{show k}") args' [<] 0
-        -- arity <- case meta of
-        --         -- maybe throw
-        --         (Unsolved x j ctx _ _ _) => pure 0 -- FIXME # of Bound in ctx.bds
-        --         (Solved _ j tm) => pure $ lamArity !(quote 0 tm)
-        -- apply (CRef "Meta\{show k}") args' [<] arity
+        -- this will be undefined, should only happen for use metas
+        pure $ CApp (CRef "Meta\{show k}") []
   _ | (t@(Ref fc nm _), args) = do
         args' <- traverse compileTerm args
         arity <- arityForName fc nm
@@ -158,6 +146,5 @@ compileFun tm = go tm [<]
     go (Lam _ nm t) acc = go t (acc :< nm)
     go tm [<] = compileTerm tm
     go tm args = pure $ CFun (args <>> []) !(compileTerm tm)
-
 
 

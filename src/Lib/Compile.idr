@@ -308,7 +308,12 @@ process (done,docs) nm = do
 
 export
 compile : M (List Doc)
--- compile = do
---   top <- get
---   traverse entryToDoc top.defs
-compile = reverse . snd <$> process ([],[]) "main"
+compile = do
+  top <- get
+  case lookup "main" top of
+    Just _ => reverse . snd <$> process ([],[]) "main"
+    -- If there is no main, compile everything for the benefit of the playground
+    Nothing => do
+      top <- get
+      traverse entryToDoc top.defs
+
