@@ -32,6 +32,9 @@ function runOutput() {
 window.onmessage = (ev) => {
   console.log("window got", ev.data);
   if (ev.data.messages) state.messages.value = ev.data.messages;
+  if (ev.data.message) {
+    state.messages.value = [...state.messages.value, ev.data.message]
+  }
 };
 
 newtWorker.onmessage = (ev) => {
@@ -213,6 +216,7 @@ const SAMPLES = [
   "Lists.newt",
   "Day1.newt",
   "Day2.newt",
+  "Node.newt",
   "Prelude.newt",
   "TypeClass.newt",
   "Combinatory.newt",

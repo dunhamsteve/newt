@@ -1,7 +1,12 @@
--- Doesn't run in playground because it's using the node `fs` module
 module Day1
+/-
+ I ported a couple of Advent of Code 2023 solutions from Lean4
+ as an early test case. Here I've adapted them to the web playground
+ by replacing `readFile` with an async `fetchText`.
+-/
 
-import Prelude
+
+import Web
 
 digits1 : List Char -> List Int
 digits1 Nil = Nil
@@ -51,21 +56,20 @@ part1 text digits =
 
 #check digits1 ∘ unpack : String -> List Int
 
--- readFile not in browser / playground
+runFile : String -> Async Unit
+runFile fn = do
+  text <- fetchText fn
+  putStrLn fn
+  putStrLn "part1"
+  putStrLn $ show (part1 text (digits1 ∘ unpack))
+  putStrLn "part2"
+  putStrLn $ show (part1 text (digits2 ∘ unpack))
+  putStrLn ""
 
--- runFile : String -> IO Unit
--- runFile fn = do
---   text <- readFile fn
---   putStrLn fn
---   putStrLn "part1"
---   putStrLn $ show (part1 text (digits1 ∘ unpack))
---   putStrLn "part2"
---   putStrLn $ show (part1 text (digits2 ∘ unpack))
---   putStrLn ""
-
--- -- Argument is a hack to keep it from running at startup.  Need to add IO
--- main : IO Unit
--- main = do
---   runFile "aoc2023/day1/eg.txt"
---   runFile "aoc2023/day1/eg2.txt"
---   runFile "aoc2023/day1/input.txt"
+-- Argument is a hack to keep it from running at startup.  Need to add IO
+main : IO Unit
+main = runAsync (do
+  runFile "aoc2023/day1/eg.txt"
+  runFile "aoc2023/day1/eg2.txt"
+  -- runFile "aoc2023/day1/input.txt"
+  )

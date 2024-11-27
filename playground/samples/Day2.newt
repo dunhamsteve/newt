@@ -1,6 +1,12 @@
 module Day2
 
-import Prelude
+/-
+ I ported a couple of Advent of Code 2023 solutions from Lean4
+ as an early test case. Here I've adapted them to the web playground
+ by replacing `readFile` with an async `fetchText`.
+-/
+
+import Web
 
 Draw : U
 Draw = Int × Int × Int
@@ -84,18 +90,19 @@ part2 (MkGame n parts :: rest) =
 
 -- readFile not in browser / playground
 
--- run : String -> IO Unit
--- run fn = do
---   text <- readFile fn
---   case mapM parseGame (split (trim text) "\n") of
---     Left err => putStrLn $ "fail " ++ err
---     Right games => do
---       putStrLn "part1"
---       printLn (part1 games)
---       putStrLn "part2"
---       printLn (part2 games)
+run : String -> Async Unit
+run fn = do
+  text <- fetchText fn
+  case mapM parseGame (split (trim text) "\n") of
+    Left err => putStrLn $ "fail " ++ err
+    Right games => do
+      putStrLn "part1"
+      printLn (part1 games)
+      putStrLn "part2"
+      printLn (part2 games)
 
--- main : IO Unit
--- main = do
---   run "aoc2023/day2/eg.txt"
---   run "aoc2023/day2/input.txt"
+main : IO Unit
+main = runAsync (do
+  run "aoc2023/day2/eg.txt"
+  run "aoc2023/day2/input.txt"
+  )

@@ -266,10 +266,19 @@ instance Monad IO where
     MkIORes a w => mab a w
   pure a = \ w => MkIORes a w
 
-pfunc putStrLn uses (MkIORes MkUnit) : String -> IO Unit := `(s) => (w) => {
+class HasIO (m : U -> U) where
+  liftIO : ∀ a. IO a → m a
+
+instance HasIO IO where
+  liftIO a = a
+
+pfunc primPutStrLn uses (MkIORes MkUnit) : String -> IO Unit := `(s) => (w) => {
   console.log(s)
   return MkIORes(undefined,MkUnit,w)
 }`
+
+putStrLn : ∀ io. {{HasIO io}} -> String -> io Unit
+putStrLn s = liftIO (primPutStrLn s)
 
 pfunc showInt : Int -> String := `(i) => String(i)`
 
@@ -322,8 +331,8 @@ instance Sub Int where
 instance Ord Int where
   x < y = ltInt x y
 
-printLn : {a} {{Show a}} → a → IO Unit
-printLn a = putStrLn $ show a
+printLn : {m} {{HasIO m}} {a} {{Show a}} → a → m Unit
+printLn a = putStrLn (show a)
 
 -- opaque JSObject
 ptype JSObject
