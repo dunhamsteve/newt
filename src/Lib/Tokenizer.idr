@@ -90,8 +90,8 @@ notSpace (MkBounded (Tok Space _) _ _) = False
 notSpace _ = True
 
 export
-tokenise : String -> Either Error (List BTok)
-tokenise s = case lex rawTokens s of
+tokenise : String -> String -> Either Error (List BTok)
+tokenise fn s = case lex rawTokens s of
   (toks, EndInput, l, c, what) => Right (filter notSpace toks)
-  (toks, reason, l, c, what) => Left (E (l,c) "\{show reason}")
+  (toks, reason, l, c, what) => Left (E (MkFC fn (l,c)) "\{show reason}")
 

@@ -143,7 +143,7 @@ logMetas mstart = do
       env <- dumpEnv ctx
       let msg = "\{env}  -----------\n  \{pprint names ty'}"
       info fc "User Hole\n\{msg}"
-    (Unsolved (l,c) k ctx ty kind cons) => do
+    (Unsolved fc k ctx ty kind cons) => do
       tm <- quote ctx.lvl !(forceMeta ty)
       -- Now that we're collecting errors, maybe we simply check at the end
       -- TODO - log constraints?
@@ -151,7 +151,7 @@ logMetas mstart = do
       let msg = "Unsolved meta \{show k} \{show kind} type \{pprint (names ctx) tm} \{show $ length cons} constraints"
       msgs <- for cons $ \ (MkMc fc env sp val) => do
             pure "  * (m\{show k} (\{unwords $ map show $ sp <>> []}) =?= \{show val}"
-      addError $ E (l,c) $ unlines ([msg] ++ msgs)
+      addError $ E fc $ unlines ([msg] ++ msgs)
 
 
 export
@@ -409,7 +409,7 @@ processDecl (Data fc nm ty cons) = do
           for_ names $ \ nm' => do
             setDef nm' fc dty (DCon (getArity dty) nm)
           pure names
-      _ => throwError $ E (0,0) "expected constructor declaration"
+      decl => throwError $ E (getFC decl) "expected constructor declaration"
   putStrLn "setDef \{nm}  TCon \{show $ join cnames}"
   updateDef nm fc tyty (TCon (join cnames))
   -- logMetas mstart

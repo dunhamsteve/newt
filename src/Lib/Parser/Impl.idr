@@ -41,21 +41,22 @@ export
 runP : Parser a -> TokenList -> Bool -> Operators -> FC -> Result a
 runP (P f) = f
 
-error : TokenList -> String -> Error
-error [] msg = E emptyFC msg
-error ((MkBounded val isIrrelevant (MkBounds line col _ _)) :: _) msg = E (line, col) msg
+-- FIXME no filename, also half the time it is pointing at the token after the error
+error : String -> TokenList -> String -> Error
+error fn [] msg = E (MkFC fn (0,0)) msg
+error fn ((MkBounded val isIrrelevant (MkBounds line col _ _)) :: _) msg = E (MkFC fn (line,col)) msg
 
 export
-parse : Parser a -> TokenList -> Either Error a
-parse pa toks = case runP pa toks False empty (-1,-1) of
+parse : String -> Parser a -> TokenList -> Either Error a
+parse fn pa toks = case runP pa toks False empty (MkFC fn (-1,-1)) of
   Fail fatal err toks com ops => Left err
   OK a [] _ _ => Right a
-  OK a ts _ _ => Left (error ts "Extra toks")
+  OK a ts _ _ => Left (error fn ts "Extra toks")
 
 ||| Intended for parsing a top level declaration
 export
-partialParse : Parser a -> Operators -> TokenList -> Either Error (a, Operators, TokenList)
-partialParse pa ops toks = case runP pa toks False ops (0,0) of
+partialParse : String -> Parser a -> Operators -> TokenList -> Either Error (a, Operators, TokenList)
+partialParse fn pa ops toks = case runP pa toks False ops (MkFC fn (0,0)) of
   Fail fatal err toks com ops => Left err
   OK a ts _ ops => Right (a,ops,ts)
 
@@ -69,11 +70,11 @@ try (P pa) = P $ \toks,com,ops,col => case pa toks com ops col of
 
 export
 fail : String -> Parser a
-fail msg = P $ \toks,com,ops,col => Fail False (error toks msg) toks com ops
+fail msg = P $ \toks,com,ops,col => Fail False (error col.file toks msg) toks com ops
 
 export
 fatal : String -> Parser a
-fatal msg = P $ \toks,com,ops,col => Fail True (error toks msg) toks com ops
+fatal msg = P $ \toks,com,ops,col => Fail True (error col.file toks msg) toks com ops
 
 export
 getOps : Parser (Operators)
@@ -125,8 +126,8 @@ Monad Parser where
 pred : (BTok -> Bool) -> String -> Parser String
 pred f msg = P $ \toks,com,ops,col =>
   case toks of
-    (t :: ts) => if f t then OK (value t) ts True ops else Fail False (error toks "\{msg} at \{show $ kind t}:\{value t}") toks com ops
-    [] => Fail False (error toks "\{msg} at EOF") toks com ops
+    (t :: ts) => if f t then OK (value t) ts True ops else Fail False (error col.file toks "\{msg} at \{show $ kind t}:\{value t}") toks com ops
+    [] => Fail False (error col.file toks "\{msg} at EOF") toks com ops
 
 export
 commit : Parser ()
@@ -141,31 +142,33 @@ mutual
 
 export
 getPos : Parser FC
-getPos = P $ \toks,com, ops, (l,c) => case toks of
+getPos = P $ \toks, com, ops, indent => case toks of
   [] => OK emptyFC toks com ops
-  (t :: ts) => OK (start t) toks com ops
+  (t :: ts) => OK (MkFC indent.file (start t)) toks com ops
 
 ||| Start an indented block and run parser in it
 export
 startBlock : Parser a -> Parser a
-startBlock (P p) = P $ \toks,com,ops,(l,c) => case toks of
-  [] => p toks com ops (l,c)
+startBlock (P p) = P $ \toks,com,ops,indent => case toks of
+  [] => p toks com ops indent
   (t :: _) =>
     -- If next token is at or before the current level, we've got an empty block
     let (tl,tc) = start t
-    in p toks com ops (tl,ifThenElse (tc <= c) (c + 1) tc)
+        (MkFC file (line,col)) = indent
+    in p toks com ops (MkFC file (tl, ifThenElse (tc <= col) (col + 1) tc))
 
 ||| Assert that parser starts at our current column by
 ||| checking column and then updating line to match the current
 export
 sameLevel : Parser a -> Parser a
-sameLevel (P p) = P $ \toks,com,ops,(l,c) => case toks of
-  [] => p toks com ops (l,c)
+sameLevel (P p) = P $ \toks,com,ops,indent => case toks of
+  [] => p toks com ops indent
   (t :: _) =>
     let (tl,tc) = start t
-    in if tc == c then p toks com ops (tl, c)
-    else if c < tc then Fail False (error toks "unexpected indent") toks com ops
-    else Fail False (error toks "unexpected indent") toks com ops
+        (MkFC file (line,col)) = indent
+    in if tc == col then p toks com ops ({start := (tl, col)} indent)
+    else if col < tc then Fail False (error file toks "unexpected indent") toks com ops
+    else Fail False (error file toks "unexpected indent") toks com ops
 
 export
 someSame : Parser a -> Parser (List a)
@@ -178,12 +181,12 @@ manySame pa = many $ sameLevel pa
 ||| check indent on next token and run parser
 export
 indented : Parser a -> Parser a
-indented (P p) = P $ \toks,com,ops,(l,c) => case toks of
-  [] => p toks com ops (l,c)
+indented (P p) = P $ \toks,com,ops,indent => case toks of
+  [] => p toks com ops indent
   (t::_) =>
     let (tl,tc) = start t
-    in if tc > c || tl == l then p toks com ops (l,c)
-    else Fail False (error toks "unexpected outdent") toks com ops
+    in if tc > indent.col || tl == indent.line then p toks com ops indent
+    else Fail False (error indent.file toks "unexpected outdent") toks com ops
 
 ||| expect token of given kind
 export

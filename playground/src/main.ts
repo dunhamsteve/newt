@@ -292,13 +292,19 @@ const processOutput = (
   let model = editor.getModel()!;
   let markers: monaco.editor.IMarkerData[] = [];
   let lines = output.split("\n");
+  let m = lines[0].match(/.*Process (.*)/)
+  let fn = ''
+  if (m) fn = m[1]
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const match = line.match(/(INFO|ERROR) at \((\d+), (\d+)\):\s*(.*)/);
+    const match = line.match(/(INFO|ERROR) at (.*):\((\d+), (\d+)\):\s*(.*)/);
     if (match) {
-      let [_full, kind, line, col, message] = match;
+      let [_full, kind, file, line, col, message] = match;
       let lineNumber = +line + 1;
       let column = +col + 1;
+      if (fn && file !== fn) {
+        lineNumber = column = 0
+      }
       let start = { column, lineNumber };
       // we don't have the full range, so grab the surrounding word
       let endColumn = column + 1;
@@ -316,7 +322,7 @@ const processOutput = (
         kind === "ERROR"
           ? monaco.MarkerSeverity.Error
           : monaco.MarkerSeverity.Info;
-
+      if (kind === 'ERROR' || lineNumber)
       markers.push({
         severity,
         message,

@@ -1,7 +1,7 @@
 
 ## TODO
 
-- [ ] add filenames to FC
+- [x] add filenames to FC
 - [x] maybe use backtick for javascript so we don't highlight strings as JS
 - [ ] add namespaces
 - [x] dead code elimination

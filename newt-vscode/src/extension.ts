@@ -36,11 +36,15 @@ export function activate(context: vscode.ExtensionContext) {
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        const match = line.match(/(INFO|ERROR) at \((\d+), (\d+)\):\s*(.*)/);
+        const match = line.match(/(INFO|ERROR) at (.*):\((\d+), (\d+)\):\s*(.*)/);
         if (match) {
-          let [_full, kind, line, column, message] = match;
+          let [_full, kind, file, line, column, message] = match;
+          // FIXME - check filename against current
+          console.log('********', file, fileName);
+
           let lnum = Number(line);
           let cnum = Number(column);
+          if (file !== fileName) { lnum = cnum = 0; }
           let start = new vscode.Position(lnum, cnum);
           // we don't have the full range, so grab the surrounding word
           let end = new vscode.Position(lnum, cnum+1);
@@ -58,7 +62,7 @@ export function activate(context: vscode.ExtensionContext) {
           }
           const severity = kind === 'ERROR' ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Information;
           const diag = new vscode.Diagnostic(range, message, severity);
-          diagnostics.push(diag);
+          if (kind === 'ERROR' || lnum > 0) { diagnostics.push(diag); }
         }
       }
       diagnosticCollection.set(vscode.Uri.file(fileName), diagnostics);

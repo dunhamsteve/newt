@@ -61,10 +61,10 @@ processModule base stk name = do
   let fn = if base == "" then name ++ ".newt" else base ++ "/" ++ name ++ ".newt"
   Right src <- readFile $ fn
     | Left err => fail (show err)
-  let Right toks = tokenise src
+  let Right toks = tokenise fn src
     | Left err => fail (showError src err)
 
-  let Right ((nameFC, modName), ops, toks) := partialParse parseModHeader top.ops toks
+  let Right ((nameFC, modName), ops, toks) := partialParse fn parseModHeader top.ops toks
     | Left err => fail (showError src err)
 
 
@@ -72,7 +72,7 @@ processModule base stk name = do
   let True = name == modName
     | _ => fail "ERROR at \{show nameFC}: module name \{show modName} doesn't match file name \{show fn}"
 
-  let Right (imports, ops, toks) := partialParse parseImports ops toks
+  let Right (imports, ops, toks) := partialParse fn parseImports ops toks
     | Left err => fail (showError src err)
 
   for_ imports $ \ (MkImport fc name') => do
@@ -83,12 +83,14 @@ processModule base stk name = do
 
   top <- get
   mc <- readIORef top.metas
+  -- REVIEW suppressing unsolved and solved metas from previous files
+  -- I may want to know about (or fail early on) unsolved
   let mstart = length mc.metas
-  let Right (decls, ops, toks) := partialParse (manySame parseDecl) top.ops toks
+  let Right (decls, ops, toks) := partialParse fn (manySame parseDecl) top.ops toks
     | Left err => fail (showError src err)
   let [] := toks
     | (x :: xs) =>
-        fail (showError src (E (startBounds x.bounds) "extra toks")) -- FIXME FC from xs
+        fail (showError src (E (MkFC fn (startBounds x.bounds)) "extra toks"))
   modify { ops := ops }
 
   putStrLn "process Decls"

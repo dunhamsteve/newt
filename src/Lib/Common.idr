@@ -3,10 +3,20 @@ module Lib.Common
 import Data.String
 import public Data.SortedMap
 
--- I was going to use a record, but we're peeling this off of bounds at the moment.
+
 public export
-FC : Type
-FC = (Int,Int)
+record FC where
+  constructor MkFC
+  file : String
+  start : (Int,Int)
+
+export
+(.line) : FC -> Int
+fc.line = fst fc.start
+
+export
+(.col) : FC -> Int
+fc.col = snd fc.start
 
 public export
 interface HasFC a where
@@ -16,7 +26,7 @@ interface HasFC a where
 
 export
 emptyFC : FC
-emptyFC = (0,0)
+emptyFC = MkFC "" (0,0)
 
 -- Error of a parse
 public export
@@ -25,25 +35,29 @@ data Error
   | Postpone FC Nat String
 %name Error err
 
+export
+Show FC where
+  show fc = "\{fc.file}:\{show fc.start}"
+
 public export
 showError : String -> Error -> String
-showError src (E (line, col) msg) = "ERROR at \{show (line,col)}: \{msg}\n" ++ go 0 (lines src)
+showError src (E fc msg) = "ERROR at \{show fc}: \{msg}\n" ++ go 0 (lines src)
   where
     go : Int -> List String -> String
     go l [] = ""
     go l (x :: xs) =
-      if l == line then
-        "  \{x}\n  \{replicate (cast col) ' '}^\n"
-      else if line - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
+      if l == fc.line then
+        "  \{x}\n  \{replicate (cast fc.col) ' '}^\n"
+      else if fc.line - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
       else go (l + 1) xs
-showError src (Postpone (line, col) ix msg) = "ERROR at \{show (line,col)}: Postpone \{show ix} \{msg}\n" ++ go 0 (lines src)
+showError src (Postpone fc ix msg) = "ERROR at \{show fc}: Postpone \{show ix} \{msg}\n" ++ go 0 (lines src)
   where
     go : Int -> List String -> String
     go l [] = ""
     go l (x :: xs) =
-      if l == line then
-        "  \{x}\n  \{replicate (cast col) ' '}^\n"
-      else if line - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
+      if l == fc.line then
+        "  \{x}\n  \{replicate (cast fc.col) ' '}^\n"
+      else if fc.line - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
       else go (l + 1) xs
 
 public export

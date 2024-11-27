@@ -512,7 +512,7 @@ error fc msg = throwError $ E fc msg
 
 export
 error' : String -> M a
-error' msg = throwError $ E (0,0) msg
+error' msg = throwError $ E emptyFC msg
 
 export
 freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
