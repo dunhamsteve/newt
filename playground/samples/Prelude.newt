@@ -29,10 +29,10 @@ instance Eq Nat where
   x == y = False
 
 data Maybe : U -> U where
-  Just : {a : U} -> a -> Maybe a
-  Nothing : {a : U} -> Maybe a
+  Just : ∀ a. a -> Maybe a
+  Nothing : ∀ a. Maybe a
 
-fromMaybe : {a} → a → Maybe a → a
+fromMaybe : ∀ a. a → Maybe a → a
 fromMaybe a Nothing = a
 fromMaybe _ (Just a) = a
 
@@ -44,6 +44,10 @@ infixr 7 _::_
 data List : U -> U where
   Nil : ∀ A. List A
   _::_ : ∀ A. A → List A → List A
+
+length : ∀ a. List a → Nat
+length Nil = Z
+length (x :: xs) = S (length xs)
 
 
 infixl 7 _:<_
@@ -61,7 +65,7 @@ Lin <>> ys = ys
 -- inference? Figure out why.
 -- Currently very noisy in generated code (if nothing else, optimize it out?)
 infixr 0 _$_
-_$_ : {a b : U} -> (a -> b) -> a -> b
+_$_ : ∀ a b. (a -> b) -> a -> b
 f $ a = f a
 
 infixr 8 _×_
@@ -181,13 +185,6 @@ ptype String
 ptype Int
 ptype Char
 
--- probably want to switch to Int or implement magic Nat
-pfunc length : String → Nat := `(s) => {
-  let rval = Z
-  for (let i = 0; i < s.length; s++) rval = S(rval)
-  return rval
-}`
-
 pfunc sconcat : String → String → String := `(x,y) => x + y`
 instance Concat String where
   _++_ = sconcat
@@ -211,7 +208,7 @@ pfunc alen : {0 a : U} -> Array a -> Int := `(a,arr) => arr.length`
 pfunc aget : {0 a : U} -> Array a -> Int -> a := `(a, arr, ix) => arr[ix]`
 pfunc aempty : {0 a : U} -> Unit -> Array a := `() => []`
 
-pfunc arrayToList : {0 a} → Array a → List a := `(a,arr) => {
+pfunc arrayToList uses (Nil _::_) : {0 a} → Array a → List a := `(a,arr) => {
   let rval = Nil(a)
   for (let i = arr.length - 1;i >= 0; i--) {
     rval = _$3A$3A_(a, arr[i], rval)
@@ -228,11 +225,11 @@ pfunc p_strHead : (s : String) -> Char := `(s) => s[0]`
 pfunc p_strTail : (s : String) -> String := `(s) => s[0]`
 
 pfunc trim : String -> String := `s => s.trim()`
-pfunc split : String -> String -> List String := `(s, by) => {
+pfunc split uses (Nil _::_) : String -> String -> List String := `(s, by) => {
   let parts = s.split(by)
   let rval = Nil(String)
   parts.reverse()
-  parts.forEach(p => { rval = _$3A$3A_(List(String), p, rval) })
+  parts.forEach(p => { rval = _$3A$3A_(undefined, p, rval) })
   return rval
 }`
 
@@ -266,11 +263,27 @@ instance Monad IO where
     MkIORes a w => mab a w
   pure a = \ w => MkIORes a w
 
+bindList : ∀ a b. List a → (a → List b) → List b
+
+instance ∀ a. Concat (List a) where
+  Nil ++ ys = ys
+  (x :: xs) ++ ys = x :: (xs ++ ys)
+
+instance Monad List where
+  pure a = a :: Nil
+  bind Nil amb = Nil
+  bind (x :: xs) amb = amb x ++ bind xs amb
+
 class HasIO (m : U -> U) where
   liftIO : ∀ a. IO a → m a
 
 instance HasIO IO where
   liftIO a = a
+
+pfunc debugLog uses (MkIORes MkUnit) : ∀ a. a -> IO Unit := `(_,s) => (w) => {
+  console.log(s)
+  return MkIORes(undefined,MkUnit,w)
+}`
 
 pfunc primPutStrLn uses (MkIORes MkUnit) : String -> IO Unit := `(s) => (w) => {
   console.log(s)
@@ -303,9 +316,41 @@ pfunc unpack : String -> List Char
     return acc
 }`
 
+pfunc pack : List Char → String := `(cs) => {
+  let rval = ''
+  while (cs.tag === '_::_') {
+    rval += cs.h1
+    cs = cs.h2
+  }
 
+  return rval
+}
+`
 
-foldl : {A B : U} -> (B -> A -> B) -> B -> List A -> B
+pfunc debugStr : ∀ a. a → String := `(_, obj) => {
+  const go = (obj) => {
+    if (obj?.tag) {
+      let rval = '('+obj.tag
+      for(let i=0;;i++) {
+        let key = 'h'+i
+        if (!(key in obj)) break
+        rval += ' ' + go(obj[key])
+      }
+      return rval+')'
+    } else {
+      return JSON.stringify(obj)
+    }
+  }
+  return go(obj)
+}`
+
+pfunc stringToInt : String → Int := `(s) => {
+  let rval = Number(s)
+  if (isNaN(rval)) throw new Error(s + " is NaN")
+  return rval
+}`
+
+foldl : ∀ A B. (B -> A -> B) -> B -> List A -> B
 foldl f acc Nil = acc
 foldl f acc (x :: xs) = foldl f (f acc x) xs
 
@@ -337,3 +382,19 @@ printLn a = putStrLn (show a)
 -- opaque JSObject
 ptype JSObject
 
+reverse : ∀ a. List a → List a
+reverse {a} = go Nil
+  where
+    go : List a → List a → List a
+    go acc Nil = acc
+    go acc (x :: xs) = go (x :: acc) xs
+
+-- Like Idris1, but not idris2, we need {a} to put a in scope.
+span : ∀ a. (a -> Bool) -> List a -> List a × List a
+span {a} f xs = go xs Nil
+  where
+    go : List a -> List a -> List a × List a
+    go Nil left = (reverse left, Nil)
+    go (x :: xs) left = if f x
+      then go xs (x :: left)
+      else (reverse left, x :: xs)

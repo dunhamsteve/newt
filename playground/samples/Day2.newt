@@ -34,7 +34,7 @@ pfunc repr : {a : U} -> a -> String := `(a,o) => ''+o`
 pfunc jrepr : {a : U} -> a -> String := `(a,o) => JSON.stringify(o, null, '  ')`
 pfunc toInt : String -> Int := `s => Number(s)`
 
-mapM : {a b c : U} -> (a -> Either b c) -> List a -> Either b (List c)
+mapM : ∀ a b c. (a -> Either b c) -> List a -> Either b (List c)
 mapM f Nil = Right Nil
 mapM f (x :: xs) = case f x of
   Left msg => Left msg

@@ -175,6 +175,7 @@ rename meta ren lvl v = go ren lvl v
     go ren lvl (VLam fc n t) = pure (Lam fc n !(go (lvl :: ren) (S lvl) !(t $$ VVar fc lvl [<])))
     go ren lvl (VPi fc n icit rig ty tm) = pure (Pi fc n icit rig !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar emptyFC lvl [<])))
     go ren lvl (VU fc) = pure (U fc)
+    go ren lvl (VErased fc) = pure (Erased fc)
     -- for now, we don't do solutions with case in them.
     go ren lvl (VCase fc sc alts) = error fc "Case in solution"
     go ren lvl (VLit fc lit) = pure (Lit fc lit)
@@ -379,7 +380,6 @@ insert : (ctx : Context) -> Tm -> Val -> M (Tm, Val)
 insert ctx tm ty = do
   case !(forceMeta ty) of
     VPi fc x Auto rig a b => do
-      -- FIXME mark meta as auto, maybe try to solve here?
       m <- freshMeta ctx (getFC tm) a AutoSolve
       debug "INSERT Auto \{pprint (names ctx) m} : \{show a}"
       debug "TM \{pprint (names ctx) tm}"
@@ -527,14 +527,6 @@ updateContext ctx ((k, val) :: cs) = let ix = (length ctx.env `minus` k) `minus`
     replaceV k x [] = []
     replaceV 0 x (y :: xs) = x :: xs
     replaceV (S k) x (y :: xs) = y :: replaceV k x xs
-
-forcedName : Context -> String -> Maybe Name
-forcedName ctx nm = case lookupName ctx nm of
-  Just (Bnd fc ix, ty) => case getAt ix ctx.env of
-    (Just (VRef x nm y sp)) => -- TODO verify is constructor?
-      Just nm
-    _ => Nothing
-  _ => Nothing
 
 -- ok, so this is a single constructor, CaseAlt
 -- return Nothing if dcon doesn't unify with scrut
@@ -1000,7 +992,8 @@ infer ctx (RVar fc nm) = go 0 ctx.types
       Nothing => error fc "\{show nm} not in scope"
     go i ((x, ty) :: xs) = if x == nm then pure $ (Bnd fc i, ty)
       else go (i + 1) xs
-  -- need environment of name -> type..
+-- FIXME tightens up output but hardcodes a name
+-- infer ctx (RApp fc (RVar _ "_$_") u icit) = infer ctx u
 infer ctx (RApp fc t u icit) = do
   -- If the app is explicit, add any necessary metas
   (icit, t, tty) <- case the Icit icit of

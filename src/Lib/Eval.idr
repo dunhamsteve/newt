@@ -145,6 +145,7 @@ bind v env = v :: env
 eval env mode (Ref fc x def) = pure $ VRef fc x def [<]
 eval env mode (App _ t u) = vapp !(eval env mode t) !(eval env mode u)
 eval env mode (U fc) = pure (VU fc)
+eval env mode (Erased fc) = pure (VErased fc)
 eval env mode (Meta fc i) =
   case !(lookupMeta i) of
         (Unsolved _ k xs _ _ _) => pure $ VMeta fc i [<]
@@ -179,7 +180,7 @@ quoteSp lvl t (xs :< x) =
   pure $ App emptyFC !(quoteSp lvl t xs) !(quote lvl x)
 
 quote l (VVar fc k sp) = if k < l
-  then quoteSp l (Bnd emptyFC ((l `minus` k) `minus` 1)) sp -- level to index
+  then quoteSp l (Bnd fc ((l `minus` k) `minus` 1)) sp -- level to index
   else ?borken
 quote l (VMeta fc i sp) =
   case !(lookupMeta i) of
@@ -193,6 +194,7 @@ quote l (VU fc) = pure (U fc)
 quote l (VRef fc n def sp) = quoteSp l (Ref fc n def) sp
 quote l (VCase fc sc alts) = pure $ Case fc !(quote l sc) alts
 quote l (VLit fc lit) = pure $ Lit fc lit
+quote l (VErased fc) = pure $ Erased fc
 
 -- Can we assume closed terms?
 -- ezoo only seems to use it at [], but essentially does this:
@@ -234,6 +236,23 @@ appSpine : Tm -> List Tm -> Tm
 appSpine t [] = t
 appSpine t (x :: xs) = appSpine (App (getFC t) t x) xs
 
+-- REVIEW When metas are subst in, the fc point elsewhere
+-- We might want to update when it is solved and update recursively?
+-- For errors, I think we want to pretend the code has been typed in place
+tweakFC : FC -> Tm -> Tm
+tweakFC fc (Bnd fc1 k) = Bnd fc k
+tweakFC fc (Ref fc1 nm x) = Ref fc nm x
+tweakFC fc (U fc1) = U fc
+tweakFC fc (Meta fc1 k) = Meta fc k
+tweakFC fc (Lam fc1 nm t) = Lam fc nm t
+tweakFC fc (App fc1 t u) = App fc t u
+tweakFC fc (Pi fc1 nm icit x t u) = Pi fc nm icit x t u
+tweakFC fc (Case fc1 t xs) = Case fc t xs
+tweakFC fc (Let fc1 nm t u) = Let fc nm t u
+tweakFC fc (LetRec fc1 nm t u) = LetRec fc nm t u
+tweakFC fc (Lit fc1 lit) = Lit fc lit
+tweakFC fc (Erased fc1) = Erased fc
+
 -- TODO replace this with a variant on nf
 zonkApp : TopContext -> Nat -> Env -> Tm -> List Tm -> M Tm
 zonkApp top l env (App fc t u) sp = zonkApp top l env t (!(zonk top l env u) :: sp)
@@ -243,7 +262,8 @@ zonkApp top l env t@(Meta fc k) sp = case !(lookupMeta k) of
     debug "zonk \{show k} -> \{show v} spine \{show sp'}"
     foo <- vappSpine v ([<] <>< sp')
     debug "-> result is \{show foo}"
-    quote l foo
+    tweakFC fc <$> quote l foo
+
   (Unsolved x j xs _ _ _) => pure $ appSpine t sp
 zonkApp top l env t sp = pure $ appSpine !(zonk top l env t) sp
 
@@ -268,3 +288,4 @@ zonk top l env t = case t of
   Lit fc lit => pure $ Lit fc lit
   Bnd fc ix => pure $ Bnd fc ix
   Ref fc ix def => pure $ Ref fc ix def
+  Erased fc => pure $ Erased fc

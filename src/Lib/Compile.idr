@@ -126,11 +126,19 @@ termToJS env (CLetRec nm t u) f =
     (JAssign _ exp) => JSnoc (JConst nm' exp) (termToJS env' u f)
     t' => JSnoc (JLet nm' t') (termToJS env' u f)
 
-termToJS env (CApp t args) f = termToJS env t (\ t' => argsToJS args [<] (\ args' => f (Apply t' args')))
+termToJS env (CApp t args etas) f = termToJS env t (\ t' => (argsToJS t' args [<] f)) --  (f (Apply t' args'))))
   where
-    argsToJS : List CExp -> SnocList JSExp -> (List JSExp -> JSStmt e) -> JSStmt e
-    argsToJS [] acc k = k (acc <>> [])
-    argsToJS (x :: xs) acc k = termToJS env x (\ x' => argsToJS xs (acc :< x') k)
+    etaExpand : JSEnv -> Nat -> SnocList JSExp -> JSExp -> JSExp
+    etaExpand env Z args tm = Apply tm (args <>> [])
+    etaExpand env (S etas) args tm =
+      let nm' = fresh "eta" env
+          env' = push env (Var nm')
+       in JLam [nm'] $ JReturn $ etaExpand (push env (Var nm')) etas (args :< Var nm') tm
+
+    argsToJS : JSExp -> List CExp -> SnocList JSExp -> (JSExp -> JSStmt e) -> JSStmt e
+    argsToJS tm [] acc k = k (etaExpand env etas acc tm)
+    -- k (acc <>> [])
+    argsToJS tm (x :: xs) acc k = termToJS env x (\ x' => argsToJS tm xs (acc :< x') k)
 
 
 termToJS env (CCase t alts) f =
@@ -171,7 +179,8 @@ jsString str = text (show str)
 keywords : List String
 keywords = [
   "var", "true", "false", "let", "case", "switch", "if", "then", "else", "String",
-  "function", "void", "undefined", "null", "await", "async", "return", "const"
+  "function", "void", "undefined", "null", "await", "async", "return", "const",
+  "Number"
 ]
 
 ||| escape identifiers for js
@@ -293,7 +302,7 @@ process (done,docs) nm = do
   where
     walkTm : Tm -> (List String, List Doc) -> M (List String, List Doc)
     walkAlt : (List String, List Doc) -> CaseAlt -> M (List String, List Doc)
-    walkAlt acc (CaseDefault t) = pure acc
+    walkAlt acc (CaseDefault t) = walkTm t acc
     walkAlt acc (CaseCons name args t) = walkTm t acc
     walkAlt acc (CaseLit lit t) = walkTm t acc
 

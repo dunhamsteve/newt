@@ -136,8 +136,8 @@ concat a b = a + b
 
 -- Now we define Monad
 class Monad (m : U -> U) where
-  pure : {a} -> a -> m a
-  bind : {a b} -> m a -> (a -> m b) -> m b
+  pure : ∀ a. a -> m a
+  bind : ∀ a b. m a -> (a -> m b) -> m b
 
 /-
 This desugars to:

@@ -1,6 +1,9 @@
 ||| First pass of compilation
 ||| - work out arities and fully apply functions / constructors (currying)
-||| - expand metas
+|||     currying is problemmatic because we need to insert lambdas (η-expand) and
+|||     it breaks all of the de Bruijn indices
+||| - expand metas (this is happening earlier)
+||| - erase stuff (there is another copy that essentially does the same thing)
 ||| I could make names unique (e.q. on lambdas), but I might want that to vary per backend?
 module Lib.CompileExp
 
@@ -27,7 +30,9 @@ data CExp : Type where
   CBnd : Nat -> CExp
   CLam : Name -> CExp -> CExp
   CFun : List Name -> CExp -> CExp
-  CApp : CExp -> List CExp -> CExp
+  -- REVIEW This feels like a hack, but if we put CLam here, the
+  -- deBruijn gets messed up in code gen
+  CApp : CExp -> List CExp -> Nat -> CExp
   -- TODO make DCon/TCon app separate so we can specialize
   -- U / Pi are compiled to type constructors
   CCase : CExp -> List CAlt -> CExp
@@ -71,19 +76,21 @@ compileTerm : Tm -> M CExp
 -- need to eta out extra args, fill in the rest of the apps
 apply : CExp -> List CExp -> SnocList CExp -> Nat -> Tm -> M CExp
 -- out of args, make one up (fix that last arg)
-apply t [] acc (S k) ty = pure $
-  CLam "eta\{show k}" !(apply t [] (acc :< CBnd k) k ty)
+apply t [] acc (S k) ty = pure $ CApp t (acc <>> []) (S k)
+  -- inserting Clam, index wrong?
+  -- CLam "eta\{show k}" !(apply t [] (acc :< CBnd k) k ty)
 apply t (x :: xs) acc (S k) (Pi y str icit Zero a b) =  apply t xs (acc :< CErased) k b
 apply t (x :: xs) acc (S k) (Pi y str icit Many a b) =  apply t xs (acc :< x) k b
 -- see if there is anything we have to handle here
-apply t (x :: xs) acc (S k) ty = error (getFC ty) "Expected pi \{showTm ty}"
-apply t ts acc 0 ty = go (CApp t (acc <>> [])) ts
+apply t (x :: xs) acc (S k) ty = error (getFC ty) "Expected pi \{showTm ty}. Overapplied function that escaped type checking?"
+-- once we hit zero, we fold the rest
+apply t ts acc 0 ty = go (CApp t (acc <>> []) Z) ts
   where
     go : CExp -> List CExp -> M CExp
     -- drop zero arg call
-    go (CApp t []) args = go t args
+    go (CApp t [] Z) args = go t args
     go t [] = pure t
-    go t (arg :: args) = go (CApp t [arg]) args
+    go t (arg :: args) = go (CApp t [arg] 0) args
 
 -- apply : CExp -> List CExp -> SnocList CExp -> Nat -> M CExp
 -- -- out of args, make one up
@@ -111,7 +118,7 @@ compileTerm (Lam _ nm t) = pure $ CLam nm !(compileTerm t)
 compileTerm tm@(App _ _ _) with (funArgs tm)
   _ | (Meta _ k, args) = do
         -- this will be undefined, should only happen for use metas
-        pure $ CApp (CRef "Meta\{show k}") []
+        pure $ CApp (CRef "Meta\{show k}") [] Z
   _ | (t@(Ref fc nm _), args) = do
         args' <- traverse compileTerm args
         arity <- arityForName fc nm
@@ -126,7 +133,7 @@ compileTerm tm@(App _ _ _) with (funArgs tm)
         apply t' args' [<] 0 (U emptyFC)
         -- error (getFC t) "Don't know how to apply \{showTm t}"
 compileTerm (U _) = pure $ CRef "U"
-compileTerm (Pi _ nm icit rig t u) = pure $ CApp (CRef "PiType") [ !(compileTerm t), CLam nm !(compileTerm u)]
+compileTerm (Pi _ nm icit rig t u) = pure $ CApp (CRef "PiType") [ !(compileTerm t), CLam nm !(compileTerm u)] Z
 compileTerm (Case _ t alts) = do
   t' <- compileTerm t
   alts' <- traverse (\case
@@ -137,6 +144,7 @@ compileTerm (Case _ t alts) = do
 compileTerm (Lit _ lit) = pure $ CLit lit
 compileTerm (Let _ nm t u) = pure $ CLet nm !(compileTerm t) !(compileTerm u)
 compileTerm (LetRec _ nm t u) = pure $ CLetRec nm !(compileTerm t) !(compileTerm u)
+compileTerm (Erased _) = pure CErased
 
 export
 compileFun : Tm -> M CExp

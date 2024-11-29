@@ -13,6 +13,7 @@ import Lib.TopContext
 import Lib.Eval
 import Lib.Types
 import Lib.Util
+import Lib.Erasure
 
 -- Check that the arguments are not explicit and the type constructor in codomain matches
 -- Later we will build a table of codomain type, and maybe make the user tag the candidates
@@ -223,6 +224,12 @@ processDecl (Def fc nm clauses) = do
   -- tm' <- nf [] tm
   tm' <- zonk top 0 [] tm
   putStrLn "NF\n\{render 80 $ pprint[] tm'}"
+  -- TODO we want to keep both versions, but this is checking in addition to erasing
+  -- currently CompileExp is also doing erasure.
+  -- TODO we need erasure info on the lambdas or to fake up an appropriate environment
+  -- and erase inside. Currently the checking is imprecise
+  tm'' <- erase [] tm' []
+  putStrLn "ERASED\n\{render 80 $ pprint[] tm'}"
   debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
   updateDef nm fc ty (Fn tm')
   -- logMetas mstart

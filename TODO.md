@@ -1,6 +1,14 @@
 
 ## TODO
 
+- [ ] make $ special
+  - Makes inference easier, cleaner output, and allows `foo $ \ x => ...`
+  - remove hack from Elab.infer
+- [ ] Support @ on the LHS
+- [ ] records
+- [ ] rework unify case tree
+  - Idris needs help with the case tree to keep code size down, do it in stages, one dcon at a time.
+- [ ] Strategy to avoid three copies of `Prelude.newt` in this source tree
 - [x] add filenames to FC
 - [x] maybe use backtick for javascript so we don't highlight strings as JS
 - [ ] add namespaces
@@ -8,6 +16,7 @@
 - [x] imported files leak info messages everywhere
   - For now, take the start ix for the file and report at end starting there
 - [ ] update node shim to include idris2-playground changes
+- [ ] refactor playground to better share code with idris2-playground
 - [ ] accepting DCon for another type (skipping case, but should be an error)
 - [ ] don't allow (or dot) duplicate names on LHS
 - [ ] remove metas from context, M has TopContext
@@ -40,9 +49,7 @@
   - [x] equational reasoning sample (maybe PLFA "Lists")
   - actual `if_then_else_` isn't practical because the language is strict
 - [x] Search should look at context
-- [ ] records
 - [ ] copattern matching
-- [ ] Support @ on the LHS
 - [ ] Get `Combinatory.newt` to work
 - [x] Remember operators from imports
 - [ ] Default cases for non-primitives (currently gets expanded to all constructors)

@@ -44,11 +44,11 @@ data _≡_ : ∀ A . A -> A -> U where
     Refl : ∀ A . {a : A} -> a ≡ a
 
 -- If a ≡ b then b ≡ a
-sym : {A} {a b : A} -> a ≡ b -> b ≡ a
+sym : ∀ A. {0 a b : A} -> a ≡ b -> b ≡ a
 sym Refl = Refl
 
 -- if a ≡ b and b ≡ c then a ≡ c
-trans : {A : U} {a b c : A} -> a ≡ b -> b ≡ c -> a ≡ c
+trans : ∀ A. {0 a b c : A} -> a ≡ b -> b ≡ c -> a ≡ c
 trans Refl x = x
 
 -- This lets us replace a with b inside an expression if a ≡ b

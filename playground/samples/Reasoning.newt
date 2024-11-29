@@ -2,20 +2,20 @@ module Reasoning
 
 infix 4 _≡_
 data _≡_ : {A : U} → A → A → U where
-  Refl : {A} {x : A} → x ≡ x
+  Refl : ∀ A. {x : A} → x ≡ x
 
-sym : {A} {x y : A} → x ≡ y → y ≡ x
+sym : ∀ A. {x y : A} → x ≡ y → y ≡ x
 sym Refl = Refl
 
-trans : {A} {x y z : A} → x ≡ y → y ≡ z → x ≡ z
+trans : ∀ A. {x y z : A} → x ≡ y → y ≡ z → x ≡ z
 trans Refl eq = eq
 
-cong : {A B} (f : A → B) {x y : A}
+cong : ∀ A B. (f : A → B) {x y : A}
   → x ≡ y
   → f x ≡ f y
 cong f Refl = Refl
 
-cong-app : {A B} {f g : A → B}
+cong-app : ∀ A B. {f g : A → B}
   → f ≡ g
   → (x : A) →  f x ≡ g x
 cong-app Refl = λ y => Refl
@@ -24,16 +24,16 @@ infixl 1 begin_
 infixr 2 _≡⟨⟩_ _≡⟨_⟩_
 infixl 3 _∎
 
-begin_ : {A} {x y : A} → x ≡ y → x ≡ y
-begin_ x≡y = x≡y
+begin_ : ∀ A. {x y : A} → x ≡ y → x ≡ y
+begin x≡y = x≡y
 
-_≡⟨⟩_  : {A} (x : A) {y : A} → x ≡ y → x ≡ y
+_≡⟨⟩_  : ∀ A. (x : A) {y : A} → x ≡ y → x ≡ y
 x ≡⟨⟩ x≡y = x≡y
 
-_≡⟨_⟩_ : {A} (x : A) {y z : A} → x ≡ y → y ≡ z → x ≡ z
+_≡⟨_⟩_ : ∀ A. (x : A) {y z : A} → x ≡ y → y ≡ z → x ≡ z
 x ≡⟨ x≡y ⟩ y≡z = trans x≡y y≡z
 
-_∎ : {A} → (x : A) → x ≡ x
+_∎ : ∀ A. (x : A) → x ≡ x
 x ∎ = Refl
 
 

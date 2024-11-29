@@ -127,6 +127,7 @@ data Tm : Type where
   -- for desugaring where
   LetRec : FC -> Name -> Tm -> Tm -> Tm
   Lit : FC -> Literal -> Tm
+  Erased : FC -> Tm
 
 %name Tm t, u, v
 
@@ -143,6 +144,7 @@ HasFC Tm where
   getFC (Lit fc _) = fc
   getFC (Let fc _ _ _) = fc
   getFC (LetRec fc _ _ _) = fc
+  getFC (Erased fc) = fc
 
 covering
 Show Tm
@@ -168,6 +170,7 @@ Show Tm where
   show (Case _ sc alts) = "(Case \{show sc} \{show alts})"
   show (Let _ nm t u) = "(Let \{nm} \{show t} \{show u})"
   show (LetRec _ nm t u) = "(LetRec \{nm} \{show t} \{show u})"
+  show (Erased _) = "ERASED"
 
 public export
 showTm : Tm -> String
@@ -242,7 +245,7 @@ pprint names tm = go 0 names tm
     go p names (Lit _ lit) = text (show lit)
     go p names (Let _ nm t u) = parens 0 p $ text "let" <+> text nm <+> ":=" <+> go 0 names t <+> "in" </> (nest 2 $ go 0 (nm :: names) u)
     go p names (LetRec _ nm t u) = parens 0 p $ text "letrec" <+> text nm <+> ":=" <+> go 0 names t <+> "in" </> (nest 2 $ go 0 (nm :: names) u)
-
+    go p names (Erased _) = "ERASED"
 data Val : Type
 
 
@@ -276,6 +279,7 @@ data Val : Type where
   VLet : FC -> Name -> Val -> Val -> Val
   VLetRec : FC -> Name -> Val -> Val -> Val
   VU : FC -> Val
+  VErased : FC -> Val
   VLit : FC -> Literal -> Val
 
 public export
@@ -287,6 +291,7 @@ getValFC (VMeta fc _ _) = fc
 getValFC (VLam fc _ _) = fc
 getValFC (VPi fc _ _ _ a b) = fc
 getValFC (VU fc) = fc
+getValFC (VErased fc) = fc
 getValFC (VLit fc _) = fc
 getValFC (VLet fc _ _ _) = fc
 getValFC (VLetRec fc _ _ _) = fc
@@ -312,6 +317,7 @@ Show Val where
   show (VLit _ lit) = show lit
   show (VLet _ nm a b) = "(%let \{show nm} = \{show a} in \{show b}"
   show (VLetRec _ nm a b) = "(%letrec \{show nm} = \{show a} in \{show b}"
+  show (VErased _) = "ERASED"
 
 public export
 Env : Type
@@ -521,7 +527,7 @@ freshMeta ctx fc ty kind = do
   mc <- readIORef top.metas
   debug "fresh meta \{show mc.next} : \{show ty}"
   writeIORef top.metas $ { next $= S, metas $= (Unsolved fc mc.next ctx ty kind [] ::) } mc
-  pure $ applyBDs 0 (Meta emptyFC mc.next) ctx.bds
+  pure $ applyBDs 0 (Meta fc mc.next) ctx.bds
   where
     -- hope I got the right order here :)
     applyBDs : Nat -> Tm -> Vect k BD -> Tm

@@ -111,8 +111,8 @@ pratt ops prec stop left spine = do
             else
               runRule p fix stop rule (RApp fc (RVar fc name) left Explicit) rest
           Just _ => fail "expected operator"
-          Nothing => pratt ops prec stop (RApp fc left tm Explicit) rest
-    ((icit, fc, tm) :: rest) => pratt ops prec stop (RApp fc left tm icit) rest
+          Nothing => pratt ops prec stop (RApp (getFC left) left tm Explicit) rest
+    ((icit, fc, tm) :: rest) => pratt ops prec stop (RApp (getFC left) left tm icit) rest
   where
     runRule : Int -> Fixity -> String -> List String -> Raw -> AppSpine -> Parser (Raw,AppSpine)
     runRule p fix stop [] left spine = pure (left,spine)
@@ -121,7 +121,7 @@ pratt ops prec stop left spine = do
       case spine of
                 ((_, fc, right) :: rest) => do
                   (right, rest) <- pratt ops pr stop right rest
-                  pratt ops prec stop (RApp fc left right Explicit) rest
+                  pratt ops prec stop (RApp (getFC left) left right Explicit) rest
                 _ => fail "trailing operator"
 
     runRule p fix stop (nm :: rule) left spine = do
@@ -131,7 +131,7 @@ pratt ops prec stop left spine = do
         | _ => fail "expected \{nm}"
 
       if name == nm
-          then runRule p fix stop rule (RApp fc left right Explicit) rest
+          then runRule p fix stop rule (RApp (getFC left) left right Explicit) rest
           else fail "expected \{nm}"
 
 
@@ -257,8 +257,9 @@ term =  caseExpr
     <|> letExpr
     <|> lamExpr
     <|> doExpr
-    <|> parseOp
     <|> ifThenElse
+    -- Make this last for better error messages
+    <|> parseOp
 
 varname : Parser String
 varname = (ident <|> uident <|> keyword "_" *> pure "_")

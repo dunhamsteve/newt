@@ -1,11 +1,11 @@
 module TypeClass
 
 class Monad (m : U → U) where
-  bind : {a b} → m a → (a → m b) → m b
-  pure : {a} → a → m a
+  bind : ∀ a b. m a → (a → m b) → m b
+  pure : ∀ a. a → m a
 
 infixl 1 _>>=_ _>>_
-_>>=_ : {m} {{Monad m}} {a b} -> (m a) -> (a -> m b) -> m b
+_>>=_ : {0 m} {{Monad m}} {0 a b} -> (m a) -> (a -> m b) -> m b
 ma >>= amb = bind ma amb
 
 _>>_ : ∀ m a b. {{Monad m}} -> m a -> m b -> m b
@@ -15,7 +15,7 @@ data Either : U -> U -> U where
   Left : ∀ A B. A -> Either A B
   Right : ∀ A B. B -> Either A B
 
-instance {a} → Monad (Either a) where
+instance {a} -> Monad (Either a) where
   bind (Left a) amb = Left a
   bind (Right b) amb = amb b
 
