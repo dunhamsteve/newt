@@ -26,14 +26,6 @@ pfunc repr : {a : U} -> a -> String := `(a,o) => ''+o`
 pfunc jrepr : {a : U} -> a -> String := `(a,o) => JSON.stringify(o, null, '  ')`
 pfunc toInt : String -> Int := `s => Number(s)`
 
-mapM : ∀ a b c. (a -> Either b c) -> List a -> Either b (List c)
-mapM f Nil = Right Nil
-mapM f (x :: xs) = case f x of
-  Left msg => Left msg
-  Right v => case mapM f xs of
-    Left msg => Left msg
-    Right vs => Right $ v :: vs
-
 maxd : Draw -> Draw -> Draw
 maxd (a,b,c) (d,e,f) = (max a d, max b e, max c f)
 
@@ -48,7 +40,7 @@ parseColor line = case split line " " of
   x => Left $ "Bad draw" ++ repr x
 
 parseDraw : String -> Either String Draw
-parseDraw line = case mapM parseColor $ split line ", " of
+parseDraw line = case mapM {Either String} parseColor $ split line ", " of
   Right parts => Right $ foldl maxd (0,0,0) parts
   Left err => Left err
 
@@ -60,7 +52,7 @@ parseGame line =
     (a :: b :: Nil) => case split a " " of
       ("Game" :: ns :: Nil) =>
         let num = toInt ns in
-        case mapM parseDraw $ split b "; " of
+        case mapM {Either String} parseDraw $ split b "; " of
           Right parts => Right $ MkGame num parts
           Left err => Left err
       _ => Left "No Game"
@@ -85,7 +77,7 @@ part2 (MkGame n parts :: rest) =
 run : String -> Async Unit
 run fn = do
   text <- fetchText fn
-  case mapM parseGame (split (trim text) "\n") of
+  case mapM {Either String} parseGame (split (trim text) "\n") of
     Left err => putStrLn $ "fail " ++ err
     Right games => do
       putStrLn "part1"

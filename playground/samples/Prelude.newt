@@ -26,6 +26,10 @@ infixl 6 _==_
 class Eq a where
   _==_ : a → a → Bool
 
+infixl 6 _/=_
+_/=_ : ∀ a. {{Eq a}} → a → a → Bool
+a /= b = not (a == b)
+
 data Nat : U where
   Z : Nat
   S : Nat -> Nat
@@ -158,6 +162,14 @@ class Applicative (f : U → U) where
   -- appIsFunctor : Functor f
   return : {0 a} → a → f a
   _<*>_ : {0 a b} -> f (a → b) → f a → f b
+
+class Traversable (t : U → U) where
+  traverse : {f : U → U} → {{appf : Applicative f}} → {a : U} → {b : U} → (a → f b) → t a → f (t b)
+
+instance Applicative Maybe where
+  return a = Just a
+  Nothing <*> _ = Nothing
+  Just f <*> fa = f <$> fa
 
 infixr 2 _<|>_
 class Alternative (m : U → U) where
@@ -305,6 +317,21 @@ instance Monad List where
   pure a = a :: Nil
   bind Nil amb = Nil
   bind (x :: xs) amb = amb x ++ bind xs amb
+
+
+
+-- This is traverse, but we haven't defined Traversable yet
+mapA : ∀ m. {{Applicative m}} {0 a b} → (a → m b) → List a → m (List b)
+mapA f Nil = return Nil
+mapA f (x :: xs) = return _::_ <*> f x <*> mapA f xs
+
+
+mapM : ∀ m. {{Monad m}} {0 a b} → (a → m b) → List a → m (List b)
+mapM f Nil = pure Nil
+mapM f (x :: xs) = do
+  b <- f x
+  bs <- mapM f xs
+  pure (b :: bs)
 
 class HasIO (m : U -> U) where
   liftIO : ∀ a. IO a → m a
@@ -483,3 +510,30 @@ getAt! : ∀ a. {{Inhabited a}} → Nat → List a → a
 getAt! _ Nil = default
 getAt! Z (x :: xs) = x
 getAt! (S k) (x :: xs) = getAt! k xs
+
+
+instance ∀ a. Applicative (Either a) where
+  return b = Right b
+  Right x <*> Right y = Right (x y)
+  Left x <*> _ = Left x
+  Right x <*> Left y = Left y
+
+instance ∀ a. Monad (Either a) where
+  pure x = Right x
+  bind (Right x) mab = mab x
+  bind (Left x) mab = Left x
+
+instance Monad Maybe where
+  pure x = Just x
+  bind Nothing mab = Nothing
+  bind (Just x) mab = mab x
+
+
+elem : ∀ a. {{Eq a}} → a → List a → Bool
+elem v Nil = False
+elem v (x :: xs) = if v == x then True else elem v xs
+
+-- TODO no empty value on my `Add`, I need a group..
+-- sum : ∀ a. {{Add a}} → List a → a
+-- sum xs = foldl _+_
+pfunc trace uses (debugStr) : ∀ a. String -> a -> a := `(_, msg, a) => { console.log(msg,debugStr(_,a)); return a }`

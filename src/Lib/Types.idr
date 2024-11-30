@@ -525,7 +525,7 @@ freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
 freshMeta ctx fc ty kind = do
   top <- get
   mc <- readIORef top.metas
-  debug "fresh meta \{show mc.next} : \{show ty}"
+  debug "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
   writeIORef top.metas $ { next $= S, metas $= (Unsolved fc mc.next ctx ty kind [] ::) } mc
   pure $ applyBDs 0 (Meta fc mc.next) ctx.bds
   where

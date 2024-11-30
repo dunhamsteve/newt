@@ -944,16 +944,6 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
   (t@(RLam _ (BI fc nm icit quant) tm), ty) =>
             error fc "Expected pi type, got \{!(prvalCtx ty)}"
 
-  (tm, ty@(VPi fc nm' Implicit rig a b)) => do
-    let names = toList $ map fst ctx.types
-    debug "XXX edge case add implicit lambda {\{nm'} : \{show a}} to \{show tm} "
-    let var = VVar fc (length ctx.env) [<]
-    ty' <- b $$ var
-    debugM $ pure "XXX ty' is \{!(prvalCtx {ctx=(extend ctx nm' a)} ty')}"
-    sc <- check (extend ctx nm' a) tm ty'
-    pure $ Lam (getFC tm) nm' sc
-
-  (RImplicit fc, ty) => freshMeta ctx fc ty Normal
 
   (RLet fc nm ty v sc, rty) => do
     ty' <- check ctx ty (VU emptyFC)
@@ -964,6 +954,26 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
     sc' <- check ctx' sc rty
     pure $ Let fc nm v' sc'
 
+  (RImplicit fc, ty) => freshMeta ctx fc ty Normal
+
+  (tm, ty@(VPi fc nm' Implicit rig a b)) => do
+    let names = toList $ map fst ctx.types
+    debug "XXX edge case add implicit lambda {\{nm'} : \{show a}} to \{show tm} "
+    let var = VVar fc (length ctx.env) [<]
+    ty' <- b $$ var
+    debugM $ pure "XXX ty' is \{!(prvalCtx {ctx=(extend ctx nm' a)} ty')}"
+    sc <- check (extend ctx nm' a) tm ty'
+    pure $ Lam (getFC tm) nm' sc
+
+  (tm, ty@(VPi fc nm' Auto rig a b)) => do
+    let names = toList $ map fst ctx.types
+    debug "XXX edge case add auto lambda {\{nm'} : \{show a}} to \{show tm} "
+    let var = VVar fc (length ctx.env) [<]
+    ty' <- b $$ var
+    debugM $ pure "XXX ty' is \{!(prvalCtx {ctx=(extend ctx nm' a)} ty')}"
+    sc <- check (extend ctx nm' a) tm ty'
+    pure $ Lam (getFC tm) nm' sc
+
   (tm,ty) => do
     -- We need to insert if tm is not an Implicit Lam
     -- assuming all of the implicit ty have been handled above
@@ -972,8 +982,10 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
       -- Kovacs doesn't insert on tm = Implicit Lam, we don't have Plicity in Lam
       -- so I'll check the inferred type for an implicit pi
       -- This seems wrong, the ty' is what insert runs on, so we're just short circuiting here
-      (tm'@(Lam{}), ty'@(VPi _ _ Implicit rig _ _)) => do debug "CheckMe 1"; pure (tm', ty')
-      (tm'@(Lam{}), ty'@(VPi _ _ Auto rig _ _)) => do debug "CheckMe 2"; pure (tm', ty')
+
+      -- REVIEW - I think we need icit on Lam, check that they match and drop the two "edge" above?
+      -- (tm'@(Lam{}), ty'@(VPi _ _ Implicit rig _ _)) => do debug "CheckMe 1"; pure (tm', ty')
+      -- (tm'@(Lam{}), ty'@(VPi _ _ Auto rig _ _)) => do debug "CheckMe 2"; pure (tm', ty')
       (tm', ty') => do
         debug "RUN INSERT ON \{pprint names tm'} at \{show ty'}"
         insert ctx tm' ty'
@@ -1009,7 +1021,7 @@ infer ctx (RApp fc t u icit) = do
         pure (Auto, t, tty)
 
   (a,b) <- case !(forceMeta tty) of
-    (VPi fc str icit' rig a b) => if icit' == icit then pure (a,b)
+    (VPi fc' str icit' rig a b) => if icit' == icit then pure (a,b)
         else error fc "IcitMismatch \{show icit} \{show icit'}"
 
     -- If it's not a VPi, try to unify it with a VPi

@@ -6,7 +6,6 @@ import Node
 pfunc repr : {a : U} -> a -> String := `(a,o) => ''+o`
 pfunc jrepr : {a : U} -> a -> String := `(a,o) => JSON.stringify(o, null, '  ')`
 
-pfunc trace : ∀ a. String -> a -> a := `(_, msg, a) => { console.log(msg,debugStr(_,a)); return a }`
 
 maybe : ∀ a b. b → (a → b) → Maybe a → b
 maybe def f Nothing = def

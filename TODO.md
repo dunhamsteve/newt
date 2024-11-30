@@ -1,17 +1,19 @@
 
 ## TODO
 
+- [ ] Add icit to Lam (see `check` for details)
 - [ ] TCO? Probably needed in browser, since v8 doesn't do it. bun and JavaScriptCore do support it.
-- [ ] Fix string printing to be js instead of weird Idris strings
+- [x] Fix string printing to be js instead of weird Idris strings
 - [ ] make $ special
   - Makes inference easier, cleaner output, and allows `foo $ \ x => ...`
   - remove hack from Elab.infer
 - [ ] Support @ on the LHS
 - [ ] records
-- [ ] `Inhabited (List a)` isn't solving if I have `instance ∀ a. Inhabited (List a)`
 - [ ] rework unify case tree
   - Idris needs help with the case tree to keep code size down, do it in stages, one dcon at a time.
 - [ ] Strategy to avoid three copies of `Prelude.newt` in this source tree
+- [ ] `mapM` needs inference help when scrutinee (see Day2.newt)
+- [ ] Can't skip an auto. We need `{{_}}` to be auto or `%search` syntax.
 - [x] add filenames to FC
 - [x] maybe use backtick for javascript so we don't highlight strings as JS
 - [ ] add namespaces
@@ -85,6 +87,7 @@
 - [x] there is some zero argument application in generated code
 - [x] get equality.newt to work
   - [x] broken again because I added J, probably need to constrain scrutinee to value
+- [ ] Bad FC for missing case in where clause (probably from ctx)
 - [x] inline metas.  Maybe zonk after TC/elab
 - [x] implicit patterns
 - [x] operators
@@ -139,4 +142,16 @@
 ### Other issues
 
 - [ ] Name space flattening makes it a bit more subtle when a misspelled (or shadowed) constructor turns into a variable.
+
+### Error Messages
+
+Missing `Monad Maybe` looks like:
+```
+Unsolved meta 358 Normal type U 0 constraints
+Unsolved meta 356 Auto type Monad (?m:355 s:0) 0 constraints
+Unsolved meta 355 Normal type U -> U 2 constraints
+  * (m355 (%var0 (List (%meta 358 [1 sp]))) =?= (Maybe (List Card))
+  * (m355 (%var0 (%meta 358 [1 sp])) =?= (Maybe Card)
+```
+There is some information here, but it's obtuse.  One issue is that I'm taking an Agda-inspired approach to search (try every option and see if exactly one works with our constraints) rather than Idris (assume the determinant on an interface is injective and solve `m344 %var0` with `Maybe`).
 

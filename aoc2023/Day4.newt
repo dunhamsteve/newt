@@ -1,0 +1,67 @@
+module Day4
+
+import Prelude
+import Node
+
+Round : U
+Round = List Int × List Int
+
+parseRound : String → Maybe Round
+parseRound s =
+  case split s ": " of
+    (a :: b :: Nil) => case split b " | " of
+      (l :: r :: Nil) => Just (nums l, nums r)
+      _ => Nothing
+    _ => Nothing
+  where
+    -- Nat or Int here?
+    nums : String → List Int
+    -- catch - split returns empty strings that become zeros
+    nums s = map stringToInt $ filter (_/=_ "") $ split (trim s) " "
+
+parse : String -> Maybe (List Round)
+parse s = mapM parseRound (split (trim s) "\n")
+
+pfunc pow : Int → Int → Int := `(x,y) => x ** y`
+
+part1 : List Round → Int
+part1 rounds = foldl _+_ 0 $ map score rounds
+  where
+    -- TODO we'll keep the math in Int land until we have magic Nat
+    score : Round → Int
+    score (a,b) = let count = natToInt $ length $ filter (\ n => elem n b) a
+      in if count == 0 then 0 else pow 2 (count - 1)
+
+part2 : List Round → Int
+part2 rounds = go 0 $ map (_,_ 1) rounds
+  where
+    mark : Int -> Nat → List (Int × Round) → List (Int × Round)
+    mark _ _ Nil = Nil
+    mark v Z rounds = rounds
+    mark v (S k) ((cnt, round) :: rounds) = (cnt + v, round) :: mark v k rounds
+
+    go : Int → List (Int × Round) → Int
+    go acc Nil = acc
+    go acc ((cnt, a, b) :: rounds) =
+      let n = length $ filter (\ n => elem n b) a
+      in go (acc + cnt) $ mark cnt n rounds
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+
+  case parse text of
+    Nothing => putStrLn "fail"
+    Just cards => do
+      putStrLn "part1"
+      printLn (part1 cards)
+      putStrLn "part2"
+      printLn (part2 cards)
+
+-- 13/30
+-- 25004/14427616
+main : IO Unit
+main = do
+  run "aoc2023/day4/eg.txt"
+  run "aoc2023/day4/input.txt"
