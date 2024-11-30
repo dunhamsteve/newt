@@ -43,43 +43,38 @@ parseDraw line =
 
 parseGame : String -> Either String Game
 parseGame line =
-  -- Need the Idris | sugar...
-  case split line ": " of
-    -- this is splitting on the Nil instead of the a
-    (a :: b :: Nil) => case split a " " of
-      ("Game" :: ns :: Nil) =>
-        let num = toInt ns in
-        case mapM {Either String} parseDraw $ split b "; " of
-          Right parts => Right $ MkGame num parts
-          Left err => Left err
-      _ => Left "No Game"
-    _ => Left $ "No colon in " ++ line
+  let (a :: b :: Nil) = split line ": "
+    | _ => Left $ "No colon in " ++ line in
+  let ("Game" :: ns :: Nil) = split a " "
+    | _ => Left $ "No Game" in
+  let (Right parts) = mapM {Either String} parseDraw $ split b "; "
+    | Left err => Left err in
+  Right $ MkGame (toInt ns) parts
 
 part1 : List Game -> Int
 part1 Nil = 0
 part1 (MkGame n parts :: rest) =
   let total = foldl maxd (0,0,0) parts in
-  case lte total (12,13,14) of
-    True => n + part1 rest
-    False => part1 rest
+  if lte total (12,13,14)
+    then n + part1 rest
+    else part1 rest
 
 part2 : List Game -> Int
 part2 Nil = 0
 part2 (MkGame n parts :: rest) =
-  case foldl maxd (0,0,0) parts of
-    (a,b,c) => a * b * c + part2 rest
+  let (a,b,c) = foldl maxd (0,0,0) parts
+   in a * b * c + part2 rest
 
 run : String -> IO Unit
 run fn = do
   putStrLn fn
   text <- readFile fn
-  case mapM {Either String} parseGame (split (trim text) "\n") of
-    Left err => putStrLn $ "fail " ++ err
-    Right games => do
-      putStrLn "part1"
-      printLn (part1 games)
-      putStrLn "part2"
-      printLn (part2 games)
+  let (Right games) = mapM {Either String} parseGame (split (trim text) "\n")
+    | Left err => putStrLn $ "fail " ++ err
+  putStrLn "part1"
+  printLn (part1 games)
+  putStrLn "part2"
+  printLn (part2 games)
 
 main : IO Unit
 main = do

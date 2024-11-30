@@ -154,6 +154,9 @@ parseOp = do
     | _ => fail "extra stuff"
   pure res
 
+
+
+
 export
 letExpr : Parser Raw
 letExpr = do
@@ -232,13 +235,54 @@ caseExpr = do
   alts <- startBlock $ someSame $ caseAlt
   pure $ RCase fc sc alts
 
-doStmt : Parser DoStmt
-doStmt
-  = DoArrow <$> getPos <*> (try $ ident <* keyword "<-") <*> term
-  <|> DoLet <$> getPos <* keyword "let" <*> ident <* keyword "=" <*> term
-  <|> DoExpr <$> getPos <*> term
-
 doExpr : Parser Raw
+doStmt : Parser DoStmt
+
+caseLet : Parser Raw
+caseLet = do
+  -- look ahead so we can fall back to normal let
+  fc <- getPos
+  try (keyword "let" >> sym "(")
+  pat <- typeExpr
+  sym ")"
+  keyword "="
+  sc <- typeExpr
+  alts <- startBlock $ manySame $ sym "|" *> caseAlt
+  keyword "in"
+  body <- term
+  pure $ RCase fc sc (MkAlt pat body :: alts)
+
+doCaseLet : Parser DoStmt
+doCaseLet = do
+  -- look ahead so we can fall back to normal let
+  -- Maybe make it work like arrow?
+  fc <- getPos
+  try (keyword "let" >> sym "(")
+  pat <- typeExpr
+  sym ")"
+  keyword "="
+  -- arrow <- (False <$ keyword "=" <|> True <$ keyword "<-")
+  sc <- typeExpr
+  alts <- startBlock $ manySame $ sym "|" *> caseAlt
+  bodyFC <- getPos
+  body <- RDo <$> getPos <*> someSame doStmt
+  pure $ DoExpr fc (RCase fc sc (MkAlt pat body :: alts))
+
+doArrow : Parser DoStmt
+doArrow = do
+  fc <- getPos
+  left <- typeExpr
+  Just _ <- optional $ keyword "<-"
+    | _ => pure $ DoExpr fc left
+  right <- term
+  alts <- startBlock $ manySame $ sym "|" *> caseAlt
+  pure $ DoArrow fc left right alts
+
+doStmt
+  = doCaseLet
+  <|> DoLet <$> getPos <* keyword "let" <*> ident <* keyword "=" <*> term
+  <|> doArrow
+
 doExpr = RDo <$> getPos <* keyword "do" <*> (startBlock $ someSame doStmt)
 
 ifThenElse : Parser Raw
@@ -254,6 +298,7 @@ ifThenElse = do
 
 -- This hits an idris codegen bug if parseOp is last and Lazy
 term =  caseExpr
+    <|> caseLet
     <|> letExpr
     <|> lamExpr
     <|> doExpr

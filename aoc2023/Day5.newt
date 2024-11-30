@@ -33,14 +33,14 @@ parseFile : String → Either String Problem
 parseFile content = do
   let parts = split (trim content) "\n\n"
   -- TODO deconstructing let
-  case parts of
-    (first :: rest) => case split first ": " of
-      (_ :: x :: Nil) => do
-        let seeds = nums x
-        maps <- mapA (λ part => parseMap (split part "\n")) rest
-        Right $ MkProb seeds maps
-      _ => Left $ "expected ': ' in " ++ first
-    _ => Left $ "expected some parts"
+  let (first :: rest) = parts
+    | _ => Left "expected some parts"
+  let (_ :: x :: Nil) = split first ": "
+    | _ => Left $ "expected ': ' in " ++ first
+
+  let seeds = nums x
+  maps <- mapA (λ part => parseMap (split part "\n")) rest
+  Right $ MkProb seeds maps
 
 applyEntry : Int → MapEntry → Int
 applyEntry n (MkEntry dest src len) =
@@ -96,26 +96,23 @@ mkRanges Nil = Just Nil
 mkRanges _ = Nothing
 
 part2 : Problem → IO Unit
-part2 (MkProb seeds maps) =
-  case mkRanges seeds of
-    Nothing => printLn "odd seeds!"
-    Just ranges => do
-      let results = foldl apply ranges maps
-      -- putStrLn $ debugStr results
-      let answer = foldl min 99999999 $ map fst results
-      putStrLn $ "part2 " ++ show answer
+part2 (MkProb seeds maps) = do
+  let (Just ranges) = mkRanges seeds
+    | Nothing => printLn "odd seeds!"
+  let results = foldl apply ranges maps
+  -- putStrLn $ debugStr results
+  let answer = foldl min 99999999 $ map fst results
+  putStrLn $ "part2 " ++ show answer
 
 run : String -> IO Unit
 run fn = do
   putStrLn fn
   text <- readFile fn
-  case parseFile text of
-    Left err => putStrLn err
-    Right prob => do
-      putStrLn $ debugStr prob
-      part1 prob
-      -- putStrLn "part2"
-      part2 prob
+  let (Right prob) = parseFile text
+    | Left err => putStrLn err
+  putStrLn $ debugStr prob
+  part1 prob
+  part2 prob
 
 -- 35 / 46
 -- 282277027 / 11554135

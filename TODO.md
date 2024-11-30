@@ -3,7 +3,7 @@
 
 - [ ] Add icit to Lam (see `check` for details)
 - [ ] TCO? Probably needed in browser, since v8 doesn't do it. bun and JavaScriptCore do support it.
-- [ ] deconstructing `let`
+- [x] deconstructing `let` (and do arrows)
 - [x] Fix string printing to be js instead of weird Idris strings
 - [ ] make $ special
   - Makes inference easier, cleaner output, and allows `foo $ \ x => ...`
@@ -14,6 +14,7 @@
   - Idris needs help with the case tree to keep code size down, do it in stages, one dcon at a time.
 - [ ] Strategy to avoid three copies of `Prelude.newt` in this source tree
 - [ ] `mapM` needs inference help when scrutinee (see Day2.newt)
+  - Meta hasn't been solved yet. It's Normal, but maybe our delayed solving of Auto plays into it. Idris will peek at LHS of CaseAlts to guess the type if it doesn't have one.
 - [ ] Can't skip an auto. We need `{{_}}` to be auto or `%search` syntax.
 - [x] add filenames to FC
 - [x] maybe use backtick for javascript so we don't highlight strings as JS

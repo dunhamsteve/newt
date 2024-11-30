@@ -6,11 +6,9 @@ import Node
 digits1 : List Char -> List Int
 digits1 Nil = Nil
 digits1 (c :: cs) = let x = ord c in
-  case x < 58 of
-    True => case 48 < x of
-      True => x - 48 :: digits1 cs
-      False => digits1 cs
-    False => digits1 cs
+  if 48 < x && x < 58
+    then x - 48 :: digits1 cs
+    else digits1 cs
 
 tail : {a : U} -> List a -> List a
 tail Nil = Nil

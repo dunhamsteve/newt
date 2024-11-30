@@ -8,11 +8,9 @@ Round = List Int × List Int
 
 parseRound : String → Maybe Round
 parseRound s =
-  case split s ": " of
-    (a :: b :: Nil) => case split b " | " of
-      (l :: r :: Nil) => Just (nums l, nums r)
-      _ => Nothing
-    _ => Nothing
+  let (a :: b :: Nil) = split s ": "   | _ => Nothing in
+  let (l :: r :: Nil) = split b " | "  | _ => Nothing in
+  Just (nums l, nums r)
   where
     -- Nat or Int here?
     nums : String → List Int
@@ -50,14 +48,12 @@ run : String -> IO Unit
 run fn = do
   putStrLn fn
   text <- readFile fn
-
-  case parse text of
-    Nothing => putStrLn "fail"
-    Just cards => do
-      putStrLn "part1"
-      printLn (part1 cards)
-      putStrLn "part2"
-      printLn (part2 cards)
+  let (Just cards) = parse text
+    | _ => putStrLn "fail"
+  putStrLn "part1"
+  printLn (part1 cards)
+  putStrLn "part2"
+  printLn (part2 cards)
 
 -- 13/30
 -- 25004/14427616

@@ -901,7 +901,18 @@ undo ((DoExpr fc tm) :: Nil) = pure tm
 undo ((DoExpr fc tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc (BI fc "_" Explicit Many) !(undo xs)) Explicit
 -- undo ((DoExpr fc tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>_") tm Explicit) !(undo xs) Explicit
 undo ((DoLet fc nm tm) :: xs) = RLet fc nm (RImplicit fc) tm <$> undo xs
-undo ((DoArrow fc nm tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc (BI fc nm Explicit Many) !(undo xs)) Explicit
+undo ((DoArrow fc (RVar fc' nm) right []) :: xs) =
+  case lookup nm !get of
+    Just _ => ?todo
+    Nothing =>
+      pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
+        (RLam fc (BI fc' nm Explicit Many) !(undo xs)) Explicit
+
+undo ((DoArrow fc left right alts) :: xs) = do
+  let nm = "$sc"
+  rest <- pure $ RCase fc (RVar fc nm) (MkAlt left !(undo xs) :: alts)
+  pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
+    (RLam fc (BI fc nm Explicit Many) rest) Explicit
 
 check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
   (RWhere fc decls body, ty) => checkWhere ctx (collectDecl decls) body ty

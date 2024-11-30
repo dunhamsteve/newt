@@ -60,8 +60,7 @@ public export
 data DoStmt : Type where
   DoExpr : (fc : FC) -> Raw -> DoStmt
   DoLet : (fc : FC) -> String -> Raw -> DoStmt
-  DoArrow : (fc: FC) -> String -> Raw -> DoStmt
-
+  DoArrow : (fc: FC) -> Raw -> Raw -> List RCaseAlt -> DoStmt
 
 data Decl : Type
 data Raw : Type where
