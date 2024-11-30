@@ -43,7 +43,7 @@ writeSource : String -> M ()
 writeSource fn = do
   docs <- compile
   let src = unlines $
-        [ "#!/usr/bin/env node"
+        [ "\"use strict\";"
         ,  "const PiType = (h0, h1) => ({ tag: \"PiType\", h0, h1 })" ]
         ++ map (render 90) docs
         ++ [ "main();" ]

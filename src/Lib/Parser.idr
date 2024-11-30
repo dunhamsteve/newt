@@ -61,7 +61,7 @@ charLit : Parser Raw
 charLit = do
   fc <- getPos
   v <- token Character
-  pure $ RLit fc (LChar $ assert_total $ strIndex v 1)
+  pure $ RLit fc (LChar $ assert_total $ strIndex v 0)
 
 lit : Parser Raw
 lit = intLit <|> stringLit <|> charLit

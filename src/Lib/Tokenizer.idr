@@ -47,6 +47,17 @@ unquote str = case unpack str of
     go ('\\' :: (x :: xs)) = x :: go xs
     go (x :: xs) = x :: go xs
 
+unquoteChar : String -> String
+unquoteChar str = pack $ case unpack str of
+  ('\'' :: xs) => go xs
+  imp => go imp -- shouldn't happen
+  where
+    go : List Char -> List Char
+    go [] = ['\''] -- shouldn't happen
+    go ('\\' :: ('n' :: xs)) = ['\n']
+    go ('\\' :: (x :: xs)) = [x]
+    go (x :: xs) = [x]
+
 opMiddle = pred (\c => not (isSpace c || c == '_'))
 
 btick = is '`'
@@ -60,6 +71,11 @@ trimJS str = case unpack str of
     go [] = []
     go ['`'] = []
     go (x :: xs) = x :: go xs
+
+%hide charLit
+charLit : Lexer
+charLit = is '\'' <+> (is '\\' <+> any <|> any) <+> is '\''
+
 
 rawTokens : Tokenizer (Token Kind)
 rawTokens
@@ -75,7 +91,7 @@ rawTokens
   -- REVIEW - expect non-alpha after?
   <|> match (some digit) (Tok Number)
   -- for module names and maybe type constructors
-  <|> match (charLit) (Tok Character)
+  <|> match (charLit) (Tok Character . unquoteChar)
   <|> match (is '#' <+> many alpha) (Tok Pragma)
   <|> match (lineComment (exact "--")) (Tok Space)
   <|> match (blockComment (exact "/-") (exact "-/")) (Tok Space)

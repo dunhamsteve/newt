@@ -12,14 +12,6 @@ data Game : U where
 -- Original had class and instance...
 -- Add, Sub, Mul, Neg
 
--- NB this is not lazy!
-infixl 5 _&&_
-
-_&&_ : Bool -> Bool -> Bool
-a && b = case a of
-  False => False
-  True => b
-
 max : Int -> Int -> Int
 max x y = case x < y of
   True => y

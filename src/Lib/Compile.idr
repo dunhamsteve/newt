@@ -171,28 +171,45 @@ termToJS env (CCase t alts) f =
     maybeCaseStmt env nm alts =
           (JCase (Dot (Var nm) "tag") (map (termToJSAlt env nm) alts))
 
+chars : List Char
+chars = unpack "0123456789ABCDEF"
+
+hexDigit : Nat -> Char
+hexDigit v = fromMaybe ' ' (getAt (mod v 16) chars)
+
+toHex : Nat -> List Char
+toHex 0 = []
+toHex v = snoc (toHex (div v 16)) (hexDigit v)
 
 -- FIXME escaping is wrong, e.g. \215 instead of \xd7
 jsString : String -> Doc
-jsString str = text (show str)
+jsString str = text $ pack $ encode (unpack str) [< '"']
+  where
+    encode : List Char -> SnocList Char -> List Char
+    encode [] acc = acc <>> ['"']
+    encode ('"' :: cs) acc = encode cs (acc :< '\\' :< '"')
+    encode ('\n' :: cs) acc = encode cs (acc :< '\\' :< 'n')
+    encode ('\\' :: cs) acc = encode cs (acc :< '\\' :< '\\')
+    encode (c :: cs) acc =
+      let v : Nat = cast c in
+      if v < 32 then encode cs (acc :< '\\' :< 'x' :< hexDigit (div v 16) :< hexDigit v )
+      else if v < 128 then encode cs (acc :< c)
+      -- TODO unicode
+      else if v < 256 then encode cs (acc :< '\\' :< 'x' :< hexDigit (div v 16) :< hexDigit v )
+      else encode cs (acc :< '\\' :< 'u' :< hexDigit (div v 4096) :< hexDigit (div v 256) :< hexDigit (div v 16) :< hexDigit v )
 
 keywords : List String
 keywords = [
   "var", "true", "false", "let", "case", "switch", "if", "then", "else", "String",
   "function", "void", "undefined", "null", "await", "async", "return", "const",
-  "Number"
+  "Number", "default"
 ]
 
 ||| escape identifiers for js
 jsIdent : String -> Doc
 jsIdent id = if elem id keywords then text ("$" ++ id) else text $ pack $ fix (unpack id)
   where
-    chars : List Char
-    chars = unpack "0123456789ABCDEF"
 
-    toHex : Nat -> List Char
-    toHex 0 = []
-    toHex v = snoc (toHex (div v 16)) (fromMaybe ' ' (getAt (mod v 16) chars))
 
     fix : List Char -> List Char
     fix [] = []

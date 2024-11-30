@@ -93,8 +93,8 @@ makeSpine (S k) (Bound :: xs) = makeSpine k xs :< VVar emptyFC k [<]
 makeSpine 0 xs = ?fixme
 
 solveAutos : Nat -> List MetaEntry -> M ()
-solveAutos mlen [] = pure ()
-solveAutos mlen ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
+solveAutos mstart [] = pure ()
+solveAutos mstart ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
       debug "AUTO solving \{show k} : \{show ty}"
       -- we want the context here too.
       top <- get
@@ -103,7 +103,7 @@ solveAutos mlen ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
             xs => pure xs
         | res => do
           debug "FAILED to solve \{show ty}, matches: \{commaSep $ map (pprint [] . fst) res}"
-          solveAutos mlen es
+          solveAutos mstart es
         -- | res => error fc "FAILED to solve \{show ty}, matches: \{show $ map (pprint [] . fst) res}"
       writeIORef top.metas mc
       val <- eval ctx.env CBN tm
@@ -111,8 +111,9 @@ solveAutos mlen ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
       let sp = makeSpine ctx.lvl ctx.bds
       solve ctx.env k sp val
       mc <- readIORef top.metas
-      solveAutos mlen (take mlen mc.metas)
-solveAutos mlen (_ :: es) = solveAutos mlen es
+      let mlen = length mc.metas `minus` mstart
+      solveAutos mstart (take mlen mc.metas)
+solveAutos mstart (_ :: es) = solveAutos mstart es
 
 dumpEnv : Context -> M String
 dumpEnv ctx =
@@ -218,7 +219,7 @@ processDecl (Def fc nm clauses) = do
 
   mc <- readIORef top.metas
   let mlen = length mc.metas `minus` mstart
-  solveAutos mlen (take mlen mc.metas)
+  solveAutos mstart (take mlen mc.metas)
   -- TODO - make nf that expands all metas and drop zonk
   -- Day1.newt is a test case
   -- tm' <- nf [] tm

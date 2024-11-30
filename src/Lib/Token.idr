@@ -42,6 +42,7 @@ Show Kind where
   show Pragma  = "Pragma"
   show StringKind = "String"
   show JSLit = "JSLit"
+
 export
 Eq Kind where
   Ident   == Ident = True
