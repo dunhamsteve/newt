@@ -1,0 +1,125 @@
+module Day5
+
+import Prelude
+import Node
+
+-- AoC lib?
+nums : String → List Int
+nums s = map stringToInt $ filter (_/=_ "") $ split (trim s) " "
+
+data MapEntry : U where
+  -- dest / src / len
+  MkEntry : Int → Int → Int → MapEntry
+
+src : MapEntry -> Int
+src (MkEntry d s l) = s
+
+Map : U
+Map = List MapEntry
+
+data Problem : U where
+  MkProb : List Int → List Map → Problem
+
+parseEntry : String → Either String MapEntry
+parseEntry part = case nums part of
+  (dest :: src :: len :: Nil) => Right $ MkEntry dest src len
+  _ => Left $ "Bad part " ++ part
+
+parseMap : List String → Either String Map
+parseMap (_ :: parts) = mapM parseEntry parts
+parseMap x = Left $ "bad map " ++ debugStr x
+
+parseFile : String → Either String Problem
+parseFile content = do
+  let parts = split (trim content) "\n\n"
+  -- TODO deconstructing let
+  case parts of
+    (first :: rest) => case split first ": " of
+      (_ :: x :: Nil) => do
+        let seeds = nums x
+        maps <- mapA (λ part => parseMap (split part "\n")) rest
+        Right $ MkProb seeds maps
+      _ => Left $ "expected ': ' in " ++ first
+    _ => Left $ "expected some parts"
+
+applyEntry : Int → MapEntry → Int
+applyEntry n (MkEntry dest src len) =
+  if src <= n && n < src + len then n + dest - src else n
+
+applyMap : Int → Map → Int
+applyMap n Nil = n
+applyMap n (MkEntry dest src len :: es) =
+  if src <= n && n < src + len then n + dest - src else applyMap n es
+
+min : Int → Int → Int
+min x y = if x < y then x else y
+
+part1 : Problem → IO Unit
+part1 (MkProb seeds maps) = do
+  let loc = map (λ s => foldl applyMap s maps) seeds
+  let part1 = foldl min 999999999 loc
+  putStrLn $ "part1 " ++ show part1
+
+Range : U
+Range = Int × Int
+
+apply' : Range → List MapEntry → List Range
+apply' (r1, r2) x = case x of
+  Nil => (r1, r2) :: Nil
+  (MkEntry d s l) :: es =>
+    if r2 + r1 <= s then (r1,r2) :: Nil -- map after range
+    else if s + l <= r1 then apply' (r1, r2) es -- map before range
+    -- take off any bare range on front
+    else if r1 < s then
+      (r1, s - r1) :: apply' (s, r2 + r1 - s) x
+    else if s + l < r1 + r2 then
+      let slack = r1 - s in
+      (r1 + d - s, l - slack) :: apply' (r1 + l - slack, r2  + slack - l) x
+    else
+      (r1 + d - s, r2) :: Nil
+
+-- probably not super efficient, but it works
+qsort : ∀ a. (a → a → Bool) → List a → List a
+qsort lt Nil = Nil
+qsort lt (x :: xs) = qsort lt (filter (λ y => not $ lt x y) xs) ++ x :: qsort lt (filter (lt x) xs)
+
+apply : List Range → List MapEntry → List Range
+apply ranges entries =
+  let entries = qsort (\ a b => src a < src b) entries in
+  join $ map (\ r => apply' r entries) ranges
+
+mkRanges : List Int → Maybe (List Range)
+mkRanges (a :: b :: rs) = do
+  rs <- mkRanges rs
+  Just $ (a,b) :: rs
+mkRanges Nil = Just Nil
+mkRanges _ = Nothing
+
+part2 : Problem → IO Unit
+part2 (MkProb seeds maps) =
+  case mkRanges seeds of
+    Nothing => printLn "odd seeds!"
+    Just ranges => do
+      let results = foldl apply ranges maps
+      -- putStrLn $ debugStr results
+      let answer = foldl min 99999999 $ map fst results
+      putStrLn $ "part2 " ++ show answer
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  case parseFile text of
+    Left err => putStrLn err
+    Right prob => do
+      putStrLn $ debugStr prob
+      part1 prob
+      -- putStrLn "part2"
+      part2 prob
+
+-- 35 / 46
+-- 282277027 / 11554135
+main : IO Unit
+main = do
+  run "aoc2023/day5/eg.txt"
+  run "aoc2023/day5/input.txt"

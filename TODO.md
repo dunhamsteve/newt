@@ -3,6 +3,7 @@
 
 - [ ] Add icit to Lam (see `check` for details)
 - [ ] TCO? Probably needed in browser, since v8 doesn't do it. bun and JavaScriptCore do support it.
+- [ ] deconstructing `let`
 - [x] Fix string printing to be js instead of weird Idris strings
 - [ ] make $ special
   - Makes inference easier, cleaner output, and allows `foo $ \ x => ...`
