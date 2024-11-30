@@ -5,7 +5,7 @@
 - [ ] TCO? Probably needed in browser, since v8 doesn't do it. bun and JavaScriptCore do support it.
 - [x] deconstructing `let` (and do arrows)
 - [x] Fix string printing to be js instead of weird Idris strings
-- [ ] make $ special
+- [x] make $ special
   - Makes inference easier, cleaner output, and allows `foo $ \ x => ...`
   - remove hack from Elab.infer
 - [ ] Support @ on the LHS

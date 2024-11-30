@@ -1,5 +1,7 @@
 module Prelude
 
+id : ∀ a. a → a
+id x = x
 
 data Bool : U where
   True False : Bool
@@ -15,13 +17,26 @@ _||_ : Bool → Bool → Bool
 True || _ = True
 False || b = b
 
+infixr 5 _&&_
+_&&_ : Bool → Bool → Bool
+False && b = False
+True && b = b
+
 infixl 6 _==_
 class Eq a where
   _==_ : a → a → Bool
 
+infixl 6 _/=_
+_/=_ : ∀ a. {{Eq a}} → a → a → Bool
+a /= b = not (a == b)
+
 data Nat : U where
   Z : Nat
   S : Nat -> Nat
+
+pred : Nat → Nat
+pred Z = Z
+pred (S k) = k
 
 instance Eq Nat where
   Z == Z = True
@@ -61,19 +76,23 @@ _<>>_ : ∀ a. SnocList a → List a → List a
 Lin <>> ys = ys
 (xs :< x) <>> ys = xs <>> x :: ys
 
--- TODO this is special cased in some languages, maybe for easier
--- inference? Figure out why.
--- Currently very noisy in generated code (if nothing else, optimize it out?)
-infixr 0 _$_
-_$_ : ∀ a b. (a -> b) -> a -> b
-f $ a = f a
+-- This is now handled by the parser, and LHS becomes `f a`.
+-- infixr 0 _$_
+-- _$_ : ∀ a b. (a -> b) -> a -> b
+-- f $ a = f a
 
 infixr 8 _×_
 infixr 2 _,_
 data _×_ : U → U → U where
   _,_ : ∀ A B. A → B → A × B
 
-infixl 6 _<_
+fst : ∀ a b. a × b → a
+fst (a,b) = a
+
+snd : ∀ a b. a × b → b
+snd (a,b) = b
+
+infixl 6 _<_ _<=_
 class Ord a where
   _<_ : a → a → Bool
 
@@ -82,6 +101,8 @@ instance Ord Nat where
   Z < S _ = True
   S n < S m = n < m
 
+_<=_ : ∀ a. {{Eq a}} {{Ord a}} → a → a → Bool
+a <= b = a == b || a < b
 -- Monad
 
 class Monad (m : U → U) where
@@ -94,6 +115,9 @@ ma >>= amb = bind ma amb
 
 _>>_ :  {0 m} {{Monad m}} {0 a b} -> m a -> m b -> m b
 ma >> mb = mb
+
+join : ∀ m. {{Monad m}} {0 a} → m (m a) → m a
+join mma = mma >>= id
 
 -- Equality
 
@@ -137,6 +161,14 @@ class Applicative (f : U → U) where
   return : {0 a} → a → f a
   _<*>_ : {0 a b} -> f (a → b) → f a → f b
 
+class Traversable (t : U → U) where
+  traverse : {f : U → U} → {{appf : Applicative f}} → {a : U} → {b : U} → (a → f b) → t a → f (t b)
+
+instance Applicative Maybe where
+  return a = Just a
+  Nothing <*> _ = Nothing
+  Just f <*> fa = f <$> fa
+
 infixr 2 _<|>_
 class Alternative (m : U → U) where
   _<|>_ : {0 a} → m a → m a → m a
@@ -167,7 +199,6 @@ instance Mul Nat where
   Z * _ = Z
   S n * m = m + n * m
 
-
 infixl 7 _-_
 class Sub a where
   _-_ : a → a → a
@@ -188,6 +219,17 @@ ptype Char
 pfunc sconcat : String → String → String := `(x,y) => x + y`
 instance Concat String where
   _++_ = sconcat
+
+
+pfunc jsEq uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a == b ? True : False`
+instance Eq Int where
+  a == b = jsEq a b
+
+instance Eq String where
+  a == b = jsEq a b
+
+instance Eq Char where
+  a == b = jsEq a b
 
 data Unit : U where
   MkUnit : Unit
@@ -274,6 +316,21 @@ instance Monad List where
   bind Nil amb = Nil
   bind (x :: xs) amb = amb x ++ bind xs amb
 
+
+
+-- This is traverse, but we haven't defined Traversable yet
+mapA : ∀ m. {{Applicative m}} {0 a b} → (a → m b) → List a → m (List b)
+mapA f Nil = return Nil
+mapA f (x :: xs) = return _::_ <*> f x <*> mapA f xs
+
+
+mapM : ∀ m. {{Monad m}} {0 a b} → (a → m b) → List a → m (List b)
+mapM f Nil = pure Nil
+mapM f (x :: xs) = do
+  b <- f x
+  bs <- mapM f xs
+  pure (b :: bs)
+
 class HasIO (m : U -> U) where
   liftIO : ∀ a. IO a → m a
 
@@ -306,9 +363,6 @@ instance Show Int where
 
 pfunc ord : Char -> Int := `(c) => c.charCodeAt(0)`
 
-infix 6 _<=_
-pfunc _<=_ uses (True False) : Int -> Int -> Bool := `(x,y) => (x <= y) ? True : False`
-
 pfunc unpack : String -> List Char
   := `(s) => {
     let acc = Nil(Char)
@@ -327,9 +381,15 @@ pfunc pack : List Char → String := `(cs) => {
 }
 `
 
-pfunc debugStr : ∀ a. a → String := `(_, obj) => {
+pfunc debugStr uses (natToInt listToArray) : ∀ a. a → String := `(_, obj) => {
   const go = (obj) => {
-    if (obj?.tag) {
+    if (obj?.tag === '_::_') {
+      let stuff = listToArray(undefined,obj)
+      return '['+(stuff.map(go).join(', '))+']'
+    }
+    if (obj?.tag === 'S') {
+      return ''+natToInt(obj)
+    } else if (obj?.tag) {
       let rval = '('+obj.tag
       for(let i=0;;i++) {
         let key = 'h'+i
@@ -398,3 +458,80 @@ span {a} f xs = go xs Nil
     go (x :: xs) left = if f x
       then go xs (x :: left)
       else (reverse left, x :: xs)
+
+instance Show Nat where
+  show n = show (natToInt n)
+
+enumerate : ∀ a. List a → List (Nat × a)
+enumerate {a} xs = go Z xs
+  where
+    go : Nat → List a → List (Nat × a)
+    go k Nil = Nil
+    go k (x :: xs) = (k,x) :: go (S k) xs
+
+filter : ∀ a. (a → Bool) → List a → List a
+filter pred Nil = Nil
+filter pred (x :: xs) = if pred x then x :: filter pred xs else filter pred xs
+
+drop : ∀ a. Nat -> List a -> List a
+drop _ Nil = Nil
+drop Z xs = xs
+drop (S k) (x :: xs) = drop k xs
+
+take : ∀ a. Nat -> List a -> List a
+take Z xs = Nil
+take _ Nil = Nil
+take (S k) (x :: xs) = x :: take k xs
+
+getAt : ∀ a. Nat → List a → Maybe a
+getAt _ Nil = Nothing
+getAt Z (x :: xs) = Just x
+getAt (S k) (x :: xs) = getAt k xs
+
+splitOn : ∀ a. {{Eq a}} → a → List a → List (List a)
+splitOn {a} v xs = go Nil xs
+  where
+    go : List a → List a → List (List a)
+    go acc Nil = reverse acc :: Nil
+    go acc (x :: xs) = if x == v
+      then reverse acc :: go Nil xs
+      else go (x :: acc) xs
+
+
+class Inhabited a where
+  default : a
+
+instance ∀ a. Inhabited (List a) where
+  default = Nil
+
+getAt! : ∀ a. {{Inhabited a}} → Nat → List a → a
+getAt! _ Nil = default
+getAt! Z (x :: xs) = x
+getAt! (S k) (x :: xs) = getAt! k xs
+
+
+instance ∀ a. Applicative (Either a) where
+  return b = Right b
+  Right x <*> Right y = Right (x y)
+  Left x <*> _ = Left x
+  Right x <*> Left y = Left y
+
+instance ∀ a. Monad (Either a) where
+  pure x = Right x
+  bind (Right x) mab = mab x
+  bind (Left x) mab = Left x
+
+instance Monad Maybe where
+  pure x = Just x
+  bind Nothing mab = Nothing
+  bind (Just x) mab = mab x
+
+
+elem : ∀ a. {{Eq a}} → a → List a → Bool
+elem v Nil = False
+elem v (x :: xs) = if v == x then True else elem v xs
+
+-- TODO no empty value on my `Add`, I need a group..
+-- sum : ∀ a. {{Add a}} → List a → a
+-- sum xs = foldl _+_
+pfunc trace uses (debugStr) : ∀ a. String -> a -> a := `(_, msg, a) => { console.log(msg,debugStr(_,a)); return a }`

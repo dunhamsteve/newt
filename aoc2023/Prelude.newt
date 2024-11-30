@@ -76,12 +76,10 @@ _<>>_ : ∀ a. SnocList a → List a → List a
 Lin <>> ys = ys
 (xs :< x) <>> ys = xs <>> x :: ys
 
--- TODO this is special cased in some languages, maybe for easier
--- inference? Figure out why.
--- Currently very noisy in generated code (if nothing else, optimize it out?)
-infixr 0 _$_
-_$_ : ∀ a b. (a -> b) -> a -> b
-f $ a = f a
+-- This is now handled by the parser, and LHS becomes `f a`.
+-- infixr 0 _$_
+-- _$_ : ∀ a b. (a -> b) -> a -> b
+-- f $ a = f a
 
 infixr 8 _×_
 infixr 2 _,_

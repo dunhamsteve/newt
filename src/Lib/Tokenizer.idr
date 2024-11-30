@@ -11,6 +11,7 @@ keywords = ["let", "in", "where", "case", "of", "data", "U", "do",
             "∀", "forall",
             "class", "instance",
             "if", "then", "else",
+            "$", "λ",
              "->", "→", ":", "=>", ":=", "=", "<-", "\\", "_", "|"]
 
 checkKW : String -> Token Kind

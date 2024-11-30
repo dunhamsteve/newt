@@ -296,8 +296,9 @@ ifThenElse = do
   c <- term
   pure $ RIf fc a b c
 
--- This hits an idris codegen bug if parseOp is last and Lazy
-term =  caseExpr
+term' : Parser Raw
+
+term' =  caseExpr
     <|> caseLet
     <|> letExpr
     <|> lamExpr
@@ -305,6 +306,15 @@ term =  caseExpr
     <|> ifThenElse
     -- Make this last for better error messages
     <|> parseOp
+
+term = do
+  t <- term'
+  rest <- many ((,) <$> getPos <* keyword "$" <*> term')
+  pure $ apply t rest
+  where
+    apply : Raw -> List (FC,Raw) -> Raw
+    apply t [] = t
+    apply t ((fc,x) :: xs) = RApp fc t (apply x xs) Explicit
 
 varname : Parser String
 varname = (ident <|> uident <|> keyword "_" *> pure "_")
