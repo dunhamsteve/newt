@@ -2,6 +2,7 @@ module Day3
 
 import Prelude
 import Node
+import Aoc
 
 pfunc repr : {a : U} -> a -> String := `(a,o) => ''+o`
 pfunc jrepr : {a : U} -> a -> String := `(a,o) => JSON.stringify(o, null, '  ')`
@@ -15,18 +16,6 @@ maybe def f (Just a) = f a
 data Number : U where
   MkNumber : (start : Nat) -> (stop : Nat) → (value : Int) → Number
 
-isDigit : Char -> Bool
-isDigit '0' = True
-isDigit '1' = True
-isDigit '2' = True
-isDigit '3' = True
-isDigit '4' = True
-isDigit '5' = True
-isDigit '6' = True
-isDigit '7' = True
-isDigit '8' = True
-isDigit '9' = True
-isDigit _ = False
 
 numbers : List Char -> List Number
 numbers arr = go arr Z

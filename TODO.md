@@ -1,6 +1,8 @@
 
 ## TODO
 
+- [ ] literals for double
+- [ ] default failing case for constructor matching
 - [ ] Add icit to Lam (see `check` for details)
 - [ ] TCO? Probably needed in browser, since v8 doesn't do it. bun and JavaScriptCore do support it.
 - [x] deconstructing `let` (and do arrows)

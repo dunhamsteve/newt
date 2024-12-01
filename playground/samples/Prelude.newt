@@ -187,9 +187,12 @@ infixl 7 _+_
 class Add a where
   _+_ : a → a → a
 
-infixl 8 _*_
+infixl 8 _*_ _/_
 class Mul a where
   _*_ : a → a → a
+
+class Div a where
+  _/_ : a → a → a
 
 instance Add Nat where
   Z + m = m
@@ -535,3 +538,29 @@ elem v (x :: xs) = if v == x then True else elem v xs
 -- sum : ∀ a. {{Add a}} → List a → a
 -- sum xs = foldl _+_
 pfunc trace uses (debugStr) : ∀ a. String -> a -> a := `(_, msg, a) => { console.log(msg,debugStr(_,a)); return a }`
+
+mapMaybe : ∀ a b. (a → Maybe b) → List a → List b
+mapMaybe f Nil = Nil
+mapMaybe f (x :: xs) = case f x of
+  Just y => y :: mapMaybe f xs
+  Nothing => mapMaybe f xs
+
+zip : ∀ a b. List a → List b → List (a × b)
+zip (x :: xs) (y :: ys) = (x,y) :: zip xs ys
+zip _ _ = Nil
+
+-- TODO add double literals
+ptype Double
+pfunc intToDouble : Int → Double := `(x) => x`
+pfunc doubleToInt : Double → Int := `(x) => x`
+pfunc addDouble : Double → Double → Double := `(x,y) => x + y`
+pfunc subDouble : Double → Double → Double := `(x,y) => x - y`
+pfunc mulDouble : Double → Double → Double := `(x,y) => x * y`
+pfunc divDouble : Double → Double → Double := `(x,y) => x / y`
+pfunc sqrtDouble : Double → Double := `(x) => Math.sqrt(x)`
+pfunc ceilDouble : Double → Double := `(x) => Math.ceil(x)`
+
+instance Add Double where x + y = addDouble x y
+instance Sub Double where x - y = subDouble x y
+instance Mul Double where x * y = mulDouble x y
+instance Div Double where x / y = divDouble x y
