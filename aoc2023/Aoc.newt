@@ -17,3 +17,21 @@ isDigit '7' = True
 isDigit '8' = True
 isDigit '9' = True
 isDigit _ = False
+
+indexOf? : ∀ a. {{Eq a}} → a → List a → Maybe Nat
+indexOf? {a} z xs = go Z z xs
+  where
+    go : Nat → a → List a → Maybe Nat
+    go ix z Nil = Nothing
+    go ix z (x :: xs) =
+      if z == x then Just ix else go (S ix) z xs
+
+-- if_then_else shorthand
+-- Lean version uses a decidable instead of Bool
+ite : ∀ a. Bool → a → a → a
+ite c t e = if c then t else e
+
+-- probably not super efficient, but it works
+qsort : ∀ a. (a → a → Bool) → List a → List a
+qsort lt Nil = Nil
+qsort lt (x :: xs) = qsort lt (filter (λ y => not $ lt x y) xs) ++ x :: qsort lt (filter (lt x) xs)

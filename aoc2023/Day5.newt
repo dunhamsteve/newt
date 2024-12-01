@@ -2,10 +2,11 @@ module Day5
 
 import Prelude
 import Node
+import Aoc
 
 -- AoC lib?
-nums : String → List Int
-nums s = map stringToInt $ filter (_/=_ "") $ split (trim s) " "
+-- nums : String → List Int
+-- nums s = map stringToInt $ filter (_/=_ "") $ split (trim s) " "
 
 data MapEntry : U where
   -- dest / src / len
@@ -78,10 +79,6 @@ apply' (r1, r2) x = case x of
     else
       (r1 + d - s, r2) :: Nil
 
--- probably not super efficient, but it works
-qsort : ∀ a. (a → a → Bool) → List a → List a
-qsort lt Nil = Nil
-qsort lt (x :: xs) = qsort lt (filter (λ y => not $ lt x y) xs) ++ x :: qsort lt (filter (lt x) xs)
 
 apply : List Range → List MapEntry → List Range
 apply ranges entries =

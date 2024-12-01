@@ -164,6 +164,13 @@ class Applicative (f : U → U) where
 class Traversable (t : U → U) where
   traverse : {f : U → U} → {{appf : Applicative f}} → {a : U} → {b : U} → (a → f b) → t a → f (t b)
 
+instance Traversable List where
+  traverse f nil = return Nil
+  traverse f (x :: xs) = return _::_ <*> f a <*> traverse f xs
+
+for : {t : U → U} {f : U → U} → {{Traversable t}} {{appf : Applicative f}} → {a : U} → {b : U} → t a → (a → f b) → f (t b)
+for stuff fun = traverse fun stuff
+
 instance Applicative Maybe where
   return a = Just a
   Nothing <*> _ = Nothing
@@ -308,6 +315,7 @@ instance Monad IO where
     MkIORes a w => mab a w
   pure a = \ w => MkIORes a w
 
+
 bindList : ∀ a b. List a → (a → List b) → List b
 
 instance ∀ a. Concat (List a) where
@@ -386,11 +394,11 @@ pfunc pack : List Char → String := `(cs) => {
 
 pfunc debugStr uses (natToInt listToArray) : ∀ a. a → String := `(_, obj) => {
   const go = (obj) => {
-    if (obj?.tag === '_::_') {
+    if (obj?.tag === '_::_' || obj?.tag === 'Nil') {
       let stuff = listToArray(undefined,obj)
       return '['+(stuff.map(go).join(', '))+']'
     }
-    if (obj?.tag === 'S') {
+    if (obj?.tag === 'S' || obj?.tag === 'Z') {
       return ''+natToInt(obj)
     } else if (obj?.tag) {
       let rval = '('+obj.tag
@@ -564,3 +572,29 @@ instance Add Double where x + y = addDouble x y
 instance Sub Double where x - y = subDouble x y
 instance Mul Double where x * y = mulDouble x y
 instance Div Double where x / y = divDouble x y
+
+ptype IOArray : U → U
+pfunc newArray uses (MkIORes) : ∀ a. Int → a → IO (IOArray a) :=
+  `(_, n, v) => (w) => MkIORes(undefined,Array(n).fill(v),w)`
+pfunc arrayGet : ∀ a. IOArray a → Int → IO a := `(_, arr, ix) => w => MkIORes(undefined, arr[ix], w)`
+pfunc arraySet uses (MkUnit) : ∀ a. IOArray a → Int → a → IO Unit := `(_, arr, ix, v) => w => {
+  arr[ix] = v
+  return MkIORes(undefined, MkUnit, w)
+}`
+
+class Cast a b where
+  cast : a → b
+
+instance Cast Nat Int where
+  cast = natToInt
+
+instance Cast Int Double where
+  cast = intToDouble
+
+instance Applicative IO where
+  return a = \ w => MkIORes a w
+  f <*> a = \ w =>
+    let (MkIORes f w) = trace "fw" $ f w in
+    let (MkIORes a w) = trace "aw" $ a w in
+    MkIORes (f a) w
+

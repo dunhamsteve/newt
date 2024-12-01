@@ -1,0 +1,60 @@
+module Day1
+
+import Prelude
+import Node
+import Aoc
+
+pairUp : List Int -> List (Int × Int)
+pairUp (a :: b :: rest) = (a,b) :: pairUp rest
+pairUp (a :: rest) = trace "fail" Nil
+pairUp Nil = Nil
+
+dist : (Int × Int) → Int
+dist (a,b) = if a < b then b - a else a - b
+
+part1 : String -> Int
+part1 text =
+  let pairs = pairUp $ join $ map nums $ split text "\n"
+      left  = qsort _<_ $ map fst pairs
+      right = qsort _<_ $ map snd pairs
+      dists = map dist $ zip left right
+  in foldl _+_ 0 dists
+
+
+lookup : ∀ a b. {{Eq a}} → a → List (a × b) → Maybe b
+lookup key Nil = Nothing
+lookup key ((k,v) :: rest) = if k == key then Just v else lookup key rest
+
+
+coalesce : List Int → Int -> List (Int × Int)
+coalesce (a :: b :: rest) cnt =
+  if a == b then coalesce (b :: rest) (cnt + 1) else (a,cnt) :: coalesce (b :: rest) 1
+coalesce (a :: Nil) cnt = (a,cnt) :: Nil
+coalesce Nil cnt = Nil
+
+cross : List (Int × Int) → List (Int × Int) → Int → Int
+cross xs ys acc =
+  let ((a,cnt) :: xs') = xs | Nil => acc in
+  let ((b,cnt') :: ys') = ys | Nil => acc in
+  if a == b then cross xs' ys' (acc + a * cnt * cnt')
+  else if a < b then cross xs' ys acc
+  else cross xs ys' acc
+
+part2 : String → Int
+part2 text =
+  let pairs = pairUp $ join $ map nums $ split text "\n"
+      left  = coalesce (qsort _<_ $ map fst pairs) 1
+      right = coalesce (qsort _<_ $ map snd pairs) 1
+  in cross left right 0
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  putStrLn $ "part1 " ++ show (part1 text)
+  putStrLn $ "part2 " ++ show (part2 text)
+
+main : IO Unit
+main = do
+  run "aoc2024/day1/eg.txt"
+  run "aoc2024/day1/input.txt"

@@ -202,7 +202,7 @@ keywords : List String
 keywords = [
   "var", "true", "false", "let", "case", "switch", "if", "then", "else", "String",
   "function", "void", "undefined", "null", "await", "async", "return", "const",
-  "Number", "default"
+  "Number", "default", "for", "while", "Function"
 ]
 
 ||| escape identifiers for js
