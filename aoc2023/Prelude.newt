@@ -162,11 +162,11 @@ class Applicative (f : U → U) where
   _<*>_ : {0 a b} -> f (a → b) → f a → f b
 
 class Traversable (t : U → U) where
-  traverse : {f : U → U} → {{appf : Applicative f}} → {a : U} → {b : U} → (a → f b) → t a → f (t b)
+  traverse : ∀ f a b. {{Applicative f}} → (a → f b) → t a → f (t b)
 
 instance Traversable List where
-  traverse f nil = return Nil
-  traverse f (x :: xs) = return _::_ <*> f a <*> traverse f xs
+  traverse f Nil = return Nil
+  traverse f (x :: xs) = return _::_ <*> f x <*> traverse f xs
 
 for : {t : U → U} {f : U → U} → {{Traversable t}} {{appf : Applicative f}} → {a : U} → {b : U} → t a → (a → f b) → f (t b)
 for stuff fun = traverse fun stuff
@@ -582,6 +582,14 @@ pfunc arraySet uses (MkUnit) : ∀ a. IOArray a → Int → a → IO Unit := `(_
   return MkIORes(undefined, MkUnit, w)
 }`
 
+pfunc ioArrayToList uses (Nil _::_ MkIORes) : {0 a} → IOArray a → IO (List a) := `(a,arr) => w => {
+  let rval = Nil(a)
+  for (let i = arr.length - 1;i >= 0; i--) {
+    rval = _$3A$3A_(a, arr[i], rval)
+  }
+  return MkIORes(undefined, rval, w)
+}`
+
 class Cast a b where
   cast : a → b
 
@@ -597,4 +605,20 @@ instance Applicative IO where
     let (MkIORes f w) = trace "fw" $ f w in
     let (MkIORes a w) = trace "aw" $ a w in
     MkIORes (f a) w
+
+class Bifunctor (f : U → U → U) where
+  bimap : ∀ a b c d. (a → c) → (b → d) → f a b → f c d
+
+mapFst : ∀ a b c f. {{Bifunctor f}} → (a → c) → f a b → f c b
+mapFst f ab = bimap f id ab
+
+mapSnd : ∀ a b c f. {{Bifunctor f}} → (b → c) → f a b → f a c
+mapSnd f ab = bimap id f ab
+
+isNothing : ∀ a. Maybe a → Bool
+isNothing Nothing = True
+isNothing _ = False
+
+instance Bifunctor _×_ where
+  bimap f g (a,b) = (f a, g b)
 

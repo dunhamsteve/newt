@@ -894,23 +894,26 @@ showDef ctx names n v@(VVar _ n' [<]) =  if n == n' then pure "" else pure "= \{
 showDef ctx names n v = pure "= \{pprint names !(quote ctx.lvl v)}"
 
 
-undo : List DoStmt -> M Raw
-undo [] = error emptyFC "do block must end in expression"
-undo ((DoExpr fc tm) :: Nil) = pure tm
+undo : FC -> List DoStmt -> M Raw
+undo prev [] = error prev "do block must end in expression"
+undo prev ((DoExpr fc tm) :: Nil) = pure tm
 -- TODO decide if we want to use >> or just >>=
-undo ((DoExpr fc tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc (BI fc "_" Explicit Many) !(undo xs)) Explicit
+undo prev ((DoExpr fc tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc (BI fc "_" Explicit Many) !(undo fc xs)) Explicit
 -- undo ((DoExpr fc tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>_") tm Explicit) !(undo xs) Explicit
-undo ((DoLet fc nm tm) :: xs) = RLet fc nm (RImplicit fc) tm <$> undo xs
-undo ((DoArrow fc (RVar fc' nm) right []) :: xs) =
+undo prev ((DoLet fc nm tm) :: xs) = RLet fc nm (RImplicit fc) tm <$> undo fc xs
+undo prev ((DoArrow fc left@(RVar fc' nm) right []) :: xs) =
   case lookup nm !get of
-    Just _ => ?todo
+    Just _ => do
+      let nm = "$sc"
+      rest <- pure $ RCase fc (RVar fc nm) [MkAlt left !(undo fc xs)]
+      pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
+        (RLam fc (BI fc nm Explicit Many) rest) Explicit
     Nothing =>
       pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
-        (RLam fc (BI fc' nm Explicit Many) !(undo xs)) Explicit
-
-undo ((DoArrow fc left right alts) :: xs) = do
+        (RLam fc (BI fc' nm Explicit Many) !(undo fc xs)) Explicit
+undo prev ((DoArrow fc left right alts) :: xs) = do
   let nm = "$sc"
-  rest <- pure $ RCase fc (RVar fc nm) (MkAlt left !(undo xs) :: alts)
+  rest <- pure $ RCase fc (RVar fc nm) (MkAlt left !(undo fc xs) :: alts)
   pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
     (RLam fc (BI fc nm Explicit Many) rest) Explicit
 
@@ -919,7 +922,7 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
   (RIf fc a b c, ty) =>
     let tm' = RCase fc a [ MkAlt (RVar (getFC b) "True") b, MkAlt (RVar (getFC c) "False") c ] in
     check ctx tm' ty
-  (RDo fc stmts, ty) => check ctx !(undo stmts) ty
+  (RDo fc stmts, ty) => check ctx !(undo fc stmts) ty
   (RCase fc rsc alts, ty) => do
     (sc, scty) <- infer ctx rsc
     scty <- forceMeta scty

@@ -1,6 +1,7 @@
 
 ## TODO
 
+- [ ] if we're staying with this version of auto, we might need to list candidates and why they're rejected. e.g. I had a bifunctor fail to solve because the right answer unblocked a Foo vs IO Foo mismatch
 - [ ] literals for double
 - [ ] default failing case for constructor matching
 - [ ] Add icit to Lam (see `check` for details)
