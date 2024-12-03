@@ -123,7 +123,8 @@ const preload = [
   "aoc2023/day1/eg.txt",
   "aoc2023/day1/eg2.txt",
 ]
-onmessage = async function (e) {
+const handleMessage = async function (e) {
+  console.log('message for you sir', e.data)
   for (let fn of preload) {
 
     if (!files[fn]) {
@@ -156,6 +157,9 @@ onmessage = async function (e) {
   console.log(`process ${fn} in ${duration} ms`)
   let javascript = files['out.js']
   let output = stdout
-  postMessage({javascript, output, duration})
+  sendResponse({javascript, output, duration})
 }
+let sendResponse = postMessage
+onmessage = handleMessage
+
 importScripts('newt.js')

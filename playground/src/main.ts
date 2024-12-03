@@ -10,13 +10,26 @@ monaco.languages.setMonarchTokensProvider("newt", newtTokens);
 monaco.languages.setLanguageConfiguration("newt", newtConfig);
 
 const newtWorker = new Worker("worker.js");
+let postMessage = (msg: any) => newtWorker.postMessage(msg)
+
+// Safari/MobileSafari have small stacks in webworkers.
+if (navigator.vendor.includes('Apple')) {
+  const workerFrame = document.createElement("iframe");
+  workerFrame.src = "worker.html"
+  workerFrame.style.display = "none"
+  document.body.appendChild(workerFrame)
+  postMessage = (msg: any) => workerFrame.contentWindow?.postMessage(msg, '*')
+}
+
+// iframe for running newt output
 const iframe = document.createElement("iframe");
 iframe.src = "frame.html";
 iframe.style.display = "none";
 document.body.appendChild(iframe);
 
 function run(src: string) {
-  newtWorker.postMessage({ src });
+  console.log('SEND TO', iframe.contentWindow)
+  postMessage({src})
 }
 
 function runOutput() {
@@ -34,6 +47,11 @@ window.onmessage = (ev) => {
   if (ev.data.messages) state.messages.value = ev.data.messages;
   if (ev.data.message) {
     state.messages.value = [...state.messages.value, ev.data.message]
+  }
+  // safari callback
+  if (ev.data.output !== undefined) {
+    state.output.value = ev.data.output;
+    state.javascript.value = ev.data.javascript;
   }
 };
 

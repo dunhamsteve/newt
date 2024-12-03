@@ -1,0 +1,18 @@
+<html>
+    <head>
+
+      <script src="worker.js"></script>
+      <script>
+        sendResponse = (msg) => {
+          console.log('RETURN', msg)
+          window.parent.postMessage(msg, '*')
+        }
+        console.log('WORKER INITIALIZED')
+      </script>
+      <script src="newt.js"></script>
+
+    </head>
+    <body>
+
+    </body>
+</html>
