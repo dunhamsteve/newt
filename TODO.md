@@ -2,6 +2,9 @@
 ## TODO
 
 - [x] Put worker in iframe on safari
+- [ ] Warnings or errors for missing definitions
+- [ ] Warnings or errors for unused cases
+  - Important when misspelled constructors become pattern vars
 - [ ] if we're staying with this version of auto, we might need to list candidates and why they're rejected. e.g. I had a bifunctor fail to solve because the right answer unblocked a Foo vs IO Foo mismatch
 - [ ] literals for double
 - [ ] default failing case for constructor matching
@@ -13,6 +16,7 @@
 - [x] make $ special
   - Makes inference easier, cleaner output, and allows `foo $ \ x => ...`
   - remove hack from Elab.infer
+  - [ ] `$` no longer works inside ≡⟨ ⟩ sort out how to support both that and `$ \ x => ...`
 - [ ] Support @ on the LHS
 - [ ] records
 - [ ] rework unify case tree
@@ -22,6 +26,7 @@
   - Meta hasn't been solved yet. It's Normal, but maybe our delayed solving of Auto plays into it. Idris will peek at LHS of CaseAlts to guess the type if it doesn't have one.
 - [ ] Can't skip an auto. We need `{{_}}` to be auto or `%search` syntax.
 - [x] add filenames to FC
+- [ ] Add full ranges to FC
 - [x] maybe use backtick for javascript so we don't highlight strings as JS
 - [ ] add namespaces
 - [x] dead code elimination

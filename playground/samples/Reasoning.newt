@@ -94,6 +94,17 @@ reverse (x :: xs) = reverse xs ++ (x :: Nil)
 
 -- concatenation is associative
 ++-associative : ∀ A. (xs ys zs : List A) -> xs ++ (ys ++ zs) ≡ (xs ++ ys) ++ zs
+++-associative Nil ys zs = Refl
+++-associative (x :: xs) ys zs =
+  begin
+    (x :: xs) ++ (ys ++ zs)
+  ≡⟨⟩
+    x :: (xs ++ (ys ++ zs))
+  ≡⟨ cong (_::_ x) (++-associative xs ys zs) ⟩
+    x :: ((xs ++ ys) ++ zs)
+  ≡⟨⟩
+    (x :: xs ++ ys) ++ zs
+  ∎
 
 -- reverse distributes over ++, but switches order
 reverse-++-distrib : ∀ A. (xs ys : List A) -> reverse (xs ++ ys) ≡ reverse ys ++ reverse xs
