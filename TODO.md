@@ -1,10 +1,12 @@
 
 ## TODO
 
+- [x] Put worker in iframe on safari
 - [ ] if we're staying with this version of auto, we might need to list candidates and why they're rejected. e.g. I had a bifunctor fail to solve because the right answer unblocked a Foo vs IO Foo mismatch
 - [ ] literals for double
 - [ ] default failing case for constructor matching
 - [ ] Add icit to Lam (see `check` for details)
+- [ ] add jump to definition magic to vscode extension
 - [ ] TCO? Probably needed in browser, since v8 doesn't do it. bun and JavaScriptCore do support it.
 - [x] deconstructing `let` (and do arrows)
 - [x] Fix string printing to be js instead of weird Idris strings

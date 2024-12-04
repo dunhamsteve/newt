@@ -4,17 +4,12 @@ import Prelude
 import Node
 import Aoc
 
-uncurry : ∀ a b c. (a -> b -> c) -> (a × b) -> c
-uncurry f (a,b) = f a b
-
 Parser : U → U
 Parser a = List Char → Maybe (a × List Char)
 
 instance Monad Parser where
   pure a = \ cs => Just (a, cs)
-  bind ma mab = \ cs => case ma cs of
-    Nothing =>  Nothing
-    Just (a,cs) => mab a cs
+  bind ma mab = \ cs => ma cs >>= uncurry mab
 
 instance Alternative Parser where
   pa <|> pb = \ cs => case pa cs of
