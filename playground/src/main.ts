@@ -193,7 +193,7 @@ function Tabs() {
   };
 
   useEffect(() => {
-    if (state.messages.value) setSelected(CONSOLE);
+    if (state.messages.value.length) setSelected(CONSOLE);
   }, [state.messages.value]);
 
   let body;
