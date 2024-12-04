@@ -114,7 +114,7 @@ _>>=_ : {0 m} {{Monad m}} {0 a b} -> (m a) -> (a -> m b) -> m b
 ma >>= amb = bind ma amb
 
 _>>_ :  {0 m} {{Monad m}} {0 a b} -> m a -> m b -> m b
-ma >> mb = mb
+ma >> mb = ma >>= (\ _ => mb)
 
 join : ∀ m. {{Monad m}} {0 a} → m (m a) → m a
 join mma = mma >>= id
@@ -162,7 +162,14 @@ class Applicative (f : U → U) where
   _<*>_ : {0 a b} -> f (a → b) → f a → f b
 
 class Traversable (t : U → U) where
-  traverse : {f : U → U} → {{appf : Applicative f}} → {a : U} → {b : U} → (a → f b) → t a → f (t b)
+  traverse : ∀ f a b. {{Applicative f}} → (a → f b) → t a → f (t b)
+
+instance Traversable List where
+  traverse f Nil = return Nil
+  traverse f (x :: xs) = return _::_ <*> f x <*> traverse f xs
+
+for : {t : U → U} {f : U → U} → {{Traversable t}} {{appf : Applicative f}} → {a : U} → {b : U} → t a → (a → f b) → f (t b)
+for stuff fun = traverse fun stuff
 
 instance Applicative Maybe where
   return a = Just a
@@ -187,9 +194,12 @@ infixl 7 _+_
 class Add a where
   _+_ : a → a → a
 
-infixl 8 _*_
+infixl 8 _*_ _/_
 class Mul a where
   _*_ : a → a → a
+
+class Div a where
+  _/_ : a → a → a
 
 instance Add Nat where
   Z + m = m
@@ -305,6 +315,7 @@ instance Monad IO where
     MkIORes a w => mab a w
   pure a = \ w => MkIORes a w
 
+
 bindList : ∀ a b. List a → (a → List b) → List b
 
 instance ∀ a. Concat (List a) where
@@ -383,11 +394,11 @@ pfunc pack : List Char → String := `(cs) => {
 
 pfunc debugStr uses (natToInt listToArray) : ∀ a. a → String := `(_, obj) => {
   const go = (obj) => {
-    if (obj?.tag === '_::_') {
+    if (obj?.tag === '_::_' || obj?.tag === 'Nil') {
       let stuff = listToArray(undefined,obj)
       return '['+(stuff.map(go).join(', '))+']'
     }
-    if (obj?.tag === 'S') {
+    if (obj?.tag === 'S' || obj?.tag === 'Z') {
       return ''+natToInt(obj)
     } else if (obj?.tag) {
       let rval = '('+obj.tag
@@ -535,3 +546,84 @@ elem v (x :: xs) = if v == x then True else elem v xs
 -- sum : ∀ a. {{Add a}} → List a → a
 -- sum xs = foldl _+_
 pfunc trace uses (debugStr) : ∀ a. String -> a -> a := `(_, msg, a) => { console.log(msg,debugStr(_,a)); return a }`
+
+mapMaybe : ∀ a b. (a → Maybe b) → List a → List b
+mapMaybe f Nil = Nil
+mapMaybe f (x :: xs) = case f x of
+  Just y => y :: mapMaybe f xs
+  Nothing => mapMaybe f xs
+
+zip : ∀ a b. List a → List b → List (a × b)
+zip (x :: xs) (y :: ys) = (x,y) :: zip xs ys
+zip _ _ = Nil
+
+-- TODO add double literals
+ptype Double
+pfunc intToDouble : Int → Double := `(x) => x`
+pfunc doubleToInt : Double → Int := `(x) => x`
+pfunc addDouble : Double → Double → Double := `(x,y) => x + y`
+pfunc subDouble : Double → Double → Double := `(x,y) => x - y`
+pfunc mulDouble : Double → Double → Double := `(x,y) => x * y`
+pfunc divDouble : Double → Double → Double := `(x,y) => x / y`
+pfunc sqrtDouble : Double → Double := `(x) => Math.sqrt(x)`
+pfunc ceilDouble : Double → Double := `(x) => Math.ceil(x)`
+
+instance Add Double where x + y = addDouble x y
+instance Sub Double where x - y = subDouble x y
+instance Mul Double where x * y = mulDouble x y
+instance Div Double where x / y = divDouble x y
+
+ptype IOArray : U → U
+pfunc newArray uses (MkIORes) : ∀ a. Int → a → IO (IOArray a) :=
+  `(_, n, v) => (w) => MkIORes(undefined,Array(n).fill(v),w)`
+pfunc arrayGet : ∀ a. IOArray a → Int → IO a := `(_, arr, ix) => w => MkIORes(undefined, arr[ix], w)`
+pfunc arraySet uses (MkUnit) : ∀ a. IOArray a → Int → a → IO Unit := `(_, arr, ix, v) => w => {
+  arr[ix] = v
+  return MkIORes(undefined, MkUnit, w)
+}`
+
+pfunc ioArrayToList uses (Nil _::_ MkIORes) : {0 a} → IOArray a → IO (List a) := `(a,arr) => w => {
+  let rval = Nil(a)
+  for (let i = arr.length - 1;i >= 0; i--) {
+    rval = _$3A$3A_(a, arr[i], rval)
+  }
+  return MkIORes(undefined, rval, w)
+}`
+
+class Cast a b where
+  cast : a → b
+
+instance Cast Nat Int where
+  cast = natToInt
+
+instance Cast Int Double where
+  cast = intToDouble
+
+instance Applicative IO where
+  return a = \ w => MkIORes a w
+  f <*> a = \ w =>
+    let (MkIORes f w) = trace "fw" $ f w in
+    let (MkIORes a w) = trace "aw" $ a w in
+    MkIORes (f a) w
+
+class Bifunctor (f : U → U → U) where
+  bimap : ∀ a b c d. (a → c) → (b → d) → f a b → f c d
+
+mapFst : ∀ a b c f. {{Bifunctor f}} → (a → c) → f a b → f c b
+mapFst f ab = bimap f id ab
+
+mapSnd : ∀ a b c f. {{Bifunctor f}} → (b → c) → f a b → f a c
+mapSnd f ab = bimap id f ab
+
+isNothing : ∀ a. Maybe a → Bool
+isNothing Nothing = True
+isNothing _ = False
+
+instance Bifunctor _×_ where
+  bimap f g (a,b) = (f a, g b)
+
+instance Functor IO where
+  map f a = bind a $ \ a => pure (f a)
+
+uncurry : ∀ a b c. (a -> b -> c) -> (a × b) -> c
+uncurry f (a,b) = f a b

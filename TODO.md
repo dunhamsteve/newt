@@ -21,7 +21,7 @@
 - [ ] records
 - [ ] rework unify case tree
   - Idris needs help with the case tree to keep code size down, do it in stages, one dcon at a time.
-- [ ] Strategy to avoid three copies of `Prelude.newt` in this source tree
+- [x] Strategy to avoid three copies of `Prelude.newt` in this source tree
 - [ ] `mapM` needs inference help when scrutinee (see Day2.newt)
   - Meta hasn't been solved yet. It's Normal, but maybe our delayed solving of Auto plays into it. Idris will peek at LHS of CaseAlts to guess the type if it doesn't have one.
 - [ ] Can't skip an auto. We need `{{_}}` to be auto or `%search` syntax.

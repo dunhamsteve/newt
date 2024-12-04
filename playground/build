@@ -1,4 +1,5 @@
 #!/bin/sh
+mkdir -p public
 echo build monaco worker
 esbuild --bundle node_modules/monaco-editor/esm/vs/editor/editor.worker.js > public/workerMain.js
 echo build newt worker
