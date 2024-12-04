@@ -1,0 +1,81 @@
+module Day4
+
+import Prelude
+import Node
+import Aoc
+
+data Problem : U where
+  P : Int → String → Problem
+
+get : Problem → Int → Int → Char
+get (P size text) r c =
+  if r < 0 || size <= r then '.'
+  else if c < 0 || size <= c then '.'
+  else sindex text (r * (size + 1) + c)
+
+check : Problem → Int → Int → Int × Int → Int
+check prob r c (dr,dc) =
+  if (get prob r c) /= 'X' then 0
+  else if (get prob (r + dr) (c + dc)) /= 'M' then 0
+  else if (get prob (r + 2 * dr) (c + 2 * dc)) /= 'A' then 0
+  else if (get prob (r + 3 * dr) (c + 3 * dc)) /= 'S' then 0
+  else 1
+
+tail : ∀ a. List a → List a
+tail Nil = Nil
+tail (x :: xs) = xs
+
+dirs : List (Int × Int)
+dirs = tail $ _,_ <$> (0 :: 0 - 1 :: 1 :: Nil) <*> (0 :: 0 - 1 :: 1 :: Nil)
+
+part1 : Problem → Int
+part1 (P size text) = go 0 0 0
+  where
+    go : Int → Int → Int → Int
+    go acc r c =
+      if r == size then acc else
+      if c == size then go acc (r + 1) 0 else
+      let acc = foldl _+_ acc $ map (check (P size text) r c) dirs in
+      go acc r (c + 1)
+
+pats : List (Char × Char × Char × Char)
+pats = ('M', 'M', 'S', 'S') ::
+       ('S', 'M', 'M', 'S') ::
+       ('S', 'S', 'M', 'M') ::
+       ('M', 'S', 'S', 'M') ::
+       Nil
+
+check2 : Problem → Int → Int → (Char × Char × Char × Char) → Int
+check2 prob r c (w,x,y,z) =
+  if (get prob r c) /= 'A' then 0
+  else if (get prob (r - 1) (c - 1)) /= w then 0
+  else if (get prob (r - 1) (c + 1)) /= x then 0
+  else if (get prob (r + 1) (c + 1)) /= y then 0
+  else if (get prob (r + 1) (c - 1)) /= z then 0
+  else 1
+
+part2 : Problem → Int
+part2 (P size text) = go 0 0 0
+  where
+    go : Int → Int → Int → Int
+    go acc r c =
+      if r == size then acc else
+      if c == size then go acc (r + 1) 0 else
+      let acc = foldl _+_ acc $ map (check2 (P size text) r c) pats in
+      go acc r (c + 1)
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let lines = split (trim text) "\n"
+  -- I'm going to assume it's square for convenience
+  -- part2 will probably wrap around.
+  let size = length lines
+  printLn $ "part1 " ++ show (part1 $ P (cast size) text)
+  printLn $ "part2 " ++ show (part2 $ P (cast size) text)
+
+main : IO Unit
+main = do
+  run "aoc2024/day4/eg.txt"
+  run "aoc2024/day4/input.txt"

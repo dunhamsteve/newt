@@ -627,3 +627,9 @@ instance Functor IO where
 
 uncurry : ∀ a b c. (a -> b -> c) -> (a × b) -> c
 uncurry f (a,b) = f a b
+
+-- TODO Idris has a tail recursive version of this
+instance Applicative List where
+  return a = a :: Nil
+  Nil <*> _ = Nil
+  fs <*> ys = join $ map (\ f => map f ys) fs

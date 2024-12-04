@@ -1,13 +1,14 @@
 
 ## TODO
 
+- [ ] syntax for negative integers
 - [x] Put worker in iframe on safari
 - [ ] Warnings or errors for missing definitions
 - [ ] Warnings or errors for unused cases
   - Important when misspelled constructors become pattern vars
 - [ ] if we're staying with this version of auto, we might need to list candidates and why they're rejected. e.g. I had a bifunctor fail to solve because the right answer unblocked a Foo vs IO Foo mismatch
 - [ ] literals for double
-- [ ] default failing case for constructor matching
+- [ ] add default failing case for constructor matching to catch errors
 - [ ] Add icit to Lam (see `check` for details)
 - [ ] add jump to definition magic to vscode extension
 - [ ] TCO? Probably needed in browser, since v8 doesn't do it. bun and JavaScriptCore do support it.
@@ -19,8 +20,9 @@
   - [ ] `$` no longer works inside ≡⟨ ⟩ sort out how to support both that and `$ \ x => ...`
 - [ ] Support @ on the LHS
 - [ ] records
-- [ ] rework unify case tree
+- [ ] rework `unify` case tree
   - Idris needs help with the case tree to keep code size down, do it in stages, one dcon at a time.
+  - I'm not sure it can go a few steps deep and have a default hanging off the side, so we may need to put the default case in another function ourselves.
 - [x] Strategy to avoid three copies of `Prelude.newt` in this source tree
 - [ ] `mapM` needs inference help when scrutinee (see Day2.newt)
   - Meta hasn't been solved yet. It's Normal, but maybe our delayed solving of Auto plays into it. Idris will peek at LHS of CaseAlts to guess the type if it doesn't have one.
@@ -36,7 +38,7 @@
 - [ ] refactor playground to better share code with idris2-playground
 - [ ] accepting DCon for another type (skipping case, but should be an error)
 - [ ] don't allow (or dot) duplicate names on LHS
-- [ ] remove metas from context, M has TopContext
+- [x] remove metas from context, M has TopContext
 - [ ] improve test driver
   - maybe a file listing jobs, whether they are known broken, optional expected output, optional expected JS execution output.
 - [x] forall / ∀ sugar (Maybe drop this, issues with `.` and `{A}` works fine)
@@ -75,14 +77,16 @@
 - [x] Case for primitives
 - [ ] aoc2023 translation
   - [x] day1
-  - [x] day2
+  - [x] day2 - day6
   - some "real world" examples
 - [ ] Translate newt to newt
   - [x] Prettier
   - [x] if / then / else sugar
   - [ ] `data Foo = A | B` sugar
   - [ ] records
-  - [ ] where
+  - [x] where
+  - [ ] namespaces
+  - [ ] magic nat?
 - [x] Maybe Eq and stuff would work for typeclass without dealing with unification issues yet
 - [x] unsolved meta errors repeat (need to freeze or only report at end)
 - [x] Sanitize JS idents, e.g. `_+_`
