@@ -652,6 +652,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         then case y of
           PatVar _ _ s => pure $ Just $ c :: (xs ++ acc)
           PatWild _ _ => pure $ Just $ c :: (xs ++ acc)
+          -- FIXME why don't we hit this ('x' for Just x)
           PatLit fc lit => error fc "Literal \{show lit} in constructor split"
           PatCon _ _ str ys => if str == dcName
             then pure $ Just $ !(makeConstr vars ys) ++ xs ++ acc

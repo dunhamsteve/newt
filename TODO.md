@@ -1,10 +1,14 @@
 
 ## TODO
 
+- [ ] SortedMap.newt issue in `where`
 - [x] fix "insufficient patterns", wire in M or Either String
+- [ ] Matching _,_ when Maybe is expected should be an error
+- [ ] error for repeated names on LHS
 - [ ] typeclass dependencies
-  - need to flag internal functions to not search (or flag functions for search)
-  - don't search instances that are currently being defined
+  - need to flag internal functions to not search (or flag functions for search). I need to decide on syntax for this.
+  - don't search functions that are currently being defined. This is subtle... We do want to recurse in bind, we don't want to do that for the isEq function.  Maybe something idris like.
+- [ ] default implementations (use them if nothing is defined, where do we store them?) e.g. Ord compare, <, etc in Idris
 - [ ] syntax for negative integers
 - [x] Put worker in iframe on safari
 - [ ] Warnings or errors for missing definitions

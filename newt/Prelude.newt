@@ -220,6 +220,8 @@ instance Concat String where
 
 
 pfunc jsEq uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a == b ? True : False`
+pfunc jsLT uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a < b ? True : False`
+
 instance Eq Int where
   a == b = jsEq a b
 
@@ -357,7 +359,7 @@ instance Show Int where
 
 pfunc ord : Char -> Int := `(c) => c.charCodeAt(0)`
 
-pfunc unpack : String -> List Char
+pfunc unpack uses (Nil _::_) : String -> List Char
   := `(s) => {
     let acc = Nil(Char)
     for (let i = s.length - 1; 0 <= i; i--) acc = _$3A$3A_(Char, s[i], acc)
@@ -376,6 +378,7 @@ pfunc pack : List Char → String := `(cs) => {
 
 pfunc debugStr uses (natToInt listToArray) : ∀ a. a → String := `(_, obj) => {
   const go = (obj) => {
+    if (obj === undefined) return "_"
     if (obj?.tag === '_::_' || obj?.tag === 'Nil') {
       let stuff = listToArray(undefined,obj)
       return '['+(stuff.map(go).join(', '))+']'
@@ -675,3 +678,6 @@ ordNub {a} {{ordA}} xs = go $ qsort _<_ xs
 
 ite : ∀ a. Bool → a → a → a
 ite c t e = if c then t else e
+
+instance Ord String where
+  a < b = jsLT a b
