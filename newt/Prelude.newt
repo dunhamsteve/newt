@@ -91,18 +91,6 @@ fst (a,b) = a
 
 snd : ∀ a b. a × b → b
 snd (a,b) = b
-
-infixl 6 _<_ _<=_
-class Ord a where
-  _<_ : a → a → Bool
-
-instance Ord Nat where
-  _ < Z = False
-  Z < S _ = True
-  S n < S m = n < m
-
-_<=_ : ∀ a. {{Eq a}} {{Ord a}} → a → a → Bool
-a <= b = a == b || a < b
 -- Monad
 
 class Monad (m : U → U) where
@@ -348,11 +336,6 @@ class HasIO (m : U -> U) where
 instance HasIO IO where
   liftIO a = a
 
-pfunc debugLog uses (MkIORes MkUnit) : ∀ a. a -> IO Unit := `(_,s) => (w) => {
-  console.log(s)
-  return MkIORes(undefined,MkUnit,w)
-}`
-
 pfunc primPutStrLn uses (MkIORes MkUnit) : String -> IO Unit := `(s) => (w) => {
   console.log(s)
   return MkIORes(undefined,MkUnit,w)
@@ -387,7 +370,6 @@ pfunc pack : List Char → String := `(cs) => {
     rval += cs.h1
     cs = cs.h2
   }
-
   return rval
 }
 `
@@ -414,6 +396,9 @@ pfunc debugStr uses (natToInt listToArray) : ∀ a. a → String := `(_, obj) =>
   }
   return go(obj)
 }`
+
+debugLog : ∀ a. a → IO Unit
+debugLog a = putStrLn (debugStr a)
 
 pfunc stringToInt : String → Int := `(s) => {
   let rval = Number(s)
@@ -443,9 +428,6 @@ instance Add Int where
 
 instance Sub Int where
   x - y = subInt x y
-
-instance Ord Int where
-  x < y = ltInt x y
 
 printLn : {m} {{HasIO m}} {a} {{Show a}} → a → m Unit
 printLn a = putStrLn (show a)
@@ -633,3 +615,63 @@ instance Applicative List where
   return a = a :: Nil
   Nil <*> _ = Nil
   fs <*> ys = join $ map (\ f => map f ys) fs
+
+tail : ∀ a. List a → List a
+tail Nil = Nil
+tail (x :: xs) = xs
+
+--
+
+infixl 6 _<_ _<=_
+class Ord a where
+  -- isEq : Eq a
+  _<_ : a → a → Bool
+
+_<=_ : ∀ a. {{Eq a}} {{Ord a}} → a → a → Bool
+a <= b = a == b || a < b
+
+
+search : ∀ cl. {{cl}} -> cl
+search {{x}} = x
+
+instance Ord Nat where
+  -- isEq = search
+  _ < Z = False
+  Z < S _ = True
+  S n < S m = n < m
+
+
+instance Ord Int where
+  -- isEq = ?
+  x < y = ltInt x y
+
+-- foo : ∀ a. {{Ord a}} -> a -> Bool
+-- foo a = a == a
+
+
+flip : ∀ a b c. (a → b → c) → (b → a → c)
+flip f b a = f a b
+
+partition : ∀ a. (a → Bool) → List a → List a × List a
+partition {a} pred xs = go xs Nil Nil
+  where
+    go : List a → List a → List a → List a × List a
+    go Nil as bs = (as, bs)
+    go (x :: xs) as bs = if pred x
+      then go xs (x :: as) bs
+      else go xs as (x :: bs)
+
+-- probably not super efficient, but it works
+qsort : ∀ a. (a → a → Bool) → List a → List a
+qsort lt Nil = Nil
+qsort lt (x :: xs) = qsort lt (filter (λ y => not $ lt x y) xs) ++ x :: qsort lt (filter (lt x) xs)
+
+ordNub : ∀ a. {{Eq a}} {{Ord a}} -> List a -> List a
+ordNub {a} {{ordA}} xs = go $ qsort _<_ xs
+  where
+    go : List a → List a
+    go (a :: b :: xs) = if a == b then go (a :: xs) else a :: go (b :: xs)
+    go t = t
+
+ite : ∀ a. Bool → a → a → a
+ite c t e = if c then t else e

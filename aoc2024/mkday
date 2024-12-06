@@ -1,0 +1,7 @@
+#!/bin/zsh -e
+day=$1
+if [ ! -d day${day} -a ! -z "$1" ]; then
+  echo Make Day ${day}
+  mkdir day${day}
+  sed "s/XX/$day/g" DayXX.newt > Day$day.newt
+fi

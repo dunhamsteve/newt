@@ -96,6 +96,10 @@ solveAutos : Nat -> List MetaEntry -> M ()
 solveAutos mstart [] = pure ()
 solveAutos mstart ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
       debug "AUTO solving \{show k} : \{show ty}"
+      -- fill in solved metas in type
+      x <- quote ctx.lvl ty
+      ty <- eval ctx.env CBN x
+      debug "AUTO ---> \{show ty}"
       -- we want the context here too.
       top <- get
       [(tm, mc)] <- case !(contextMatches ctx ty) of
@@ -138,7 +142,11 @@ logMetas mstart = do
   mc <- readIORef top.metas
   let mlen = length mc.metas `minus` mstart
   for_ (reverse $ take mlen mc.metas) $ \case
-    (Solved fc k soln) => info fc "solve \{show k} as \{pprint [] !(quote 0 soln)}"
+    (Solved fc k soln) => do
+      -- TODO put a flag on this, vscode is getting overwhelmed and
+      -- dropping errors
+      --info fc "solve \{show k} as \{pprint [] !(quote 0 soln)}"
+      pure ()
     (Unsolved fc k ctx ty User cons) => do
       ty' <- quote ctx.lvl ty
       let names = (toList $ map fst ctx.types)

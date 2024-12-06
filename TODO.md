@@ -1,6 +1,10 @@
 
 ## TODO
 
+- [ ] fix "insufficient patterns", wire in M or Either String
+- [ ] typeclass dependencies
+  - need to flag internal functions to not search (or flag functions for search)
+  - don't search instances that are currently being defined
 - [ ] syntax for negative integers
 - [x] Put worker in iframe on safari
 - [ ] Warnings or errors for missing definitions

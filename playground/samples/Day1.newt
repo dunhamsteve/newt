@@ -17,10 +17,6 @@ digits1 (c :: cs) = let x = ord c in
       False => digits1 cs
     False => digits1 cs
 
-tail : {a : U} -> List a -> List a
-tail Nil = Nil
-tail (x :: xs) = xs
-
 -- TODO I used @ patterns in Lean
 digits2 : List Char -> List Int
 digits2 xs = case xs of

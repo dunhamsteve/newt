@@ -1,0 +1,17 @@
+module DayXX
+
+import Prelude
+import Node
+import Aoc
+
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  putStrLn text
+
+main : IO Unit
+main = do
+  run "aoc2024/dayXX/eg.txt"
+  run "aoc2024/dayXX/input.txt"
