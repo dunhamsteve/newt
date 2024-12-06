@@ -569,7 +569,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         debug "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
         debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
         for_ prob.clauses $ (\x => debug "    \{show x}")
-        let clauses = mapMaybe (rewriteClause vars) prob.clauses
+        clauses <- mapMaybe id <$> traverse (rewriteClause vars) prob.clauses
         debug "and now:"
         for_ clauses $ (\x => debug "    \{show x}")
         when (length clauses == 0) $ error ctx.fc "Missing case for \{dcName} splitting \{scnm}"
@@ -607,7 +607,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         debug "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
         debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
         for_ prob.clauses $ (\x => debug "    \{show x}")
-        let clauses = mapMaybe (rewriteClause vars) prob.clauses
+        clauses <- mapMaybe id <$> traverse (rewriteClause vars) prob.clauses
         debug "and now:"
         for_ clauses $ (\x => debug "    \{show x}")
         when (length clauses == 0) $ error ctx.fc "Missing case for \{dcName} splitting \{scnm}"
@@ -627,39 +627,41 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
     -- We get a list of clauses back (a Problem) and then solve that
     -- If they all fail, we have a coverage issue. (Assuming the constructor is valid)
 
-    makeConstr : List Bind -> List Pattern -> List (String, Pattern)
-    makeConstr [] [] = []
+    makeConstr : List Bind -> List Pattern -> M (List (String, Pattern))
+    makeConstr [] [] = pure $ []
     -- would need M in here to throw, and I'm building stuff as I go, I suppose I could <$>
-    makeConstr [] (pat :: pats) = ?extra_patterns
-    makeConstr ((MkBind nm Implicit x) :: xs) [] = (nm, PatWild emptyFC Implicit) :: makeConstr xs []
-    makeConstr ((MkBind nm Auto x) :: xs) [] = (nm, PatWild emptyFC Auto) :: makeConstr xs []
+    makeConstr [] (pat :: pats) = error ctx.fc "too many patterns"
+    makeConstr ((MkBind nm Implicit x) :: xs) [] = pure $ (nm, PatWild emptyFC Implicit) :: !(makeConstr xs [])
+    makeConstr ((MkBind nm Auto x) :: xs) [] = pure $ (nm, PatWild emptyFC Auto) :: !(makeConstr xs [])
     -- FIXME need a proper error, but requires wiring M three levels down
-    makeConstr ((MkBind nm Explicit x) :: xs) [] = ?insufficient_patterns
+    makeConstr ((MkBind nm Explicit x) :: xs) [] = error ctx.fc "not enough patterns"
     makeConstr ((MkBind nm Explicit x) :: xs) (pat :: pats) =
       if getIcit pat == Explicit
-        then (nm, pat) :: makeConstr xs pats
-        else ?explict_implicit_mismatch
+        then pure $ (nm, pat) :: !(makeConstr xs pats)
+        else error ctx.fc "mismatch between Explicit and \{show $ getIcit pat}"
     makeConstr ((MkBind nm icit x) :: xs) (pat :: pats) =
       if getIcit pat /= icit -- Implicit/Explicit Implicit/Auto, etc
-        then (nm, PatWild (getFC pat) icit) :: makeConstr xs (pat :: pats)
-        else (nm, pat) :: makeConstr xs pats
+        then pure $ (nm, PatWild (getFC pat) icit) :: !(makeConstr xs (pat :: pats))
+        else pure $ (nm, pat) :: !(makeConstr xs pats)
 
     -- replace constraint with constraints on parameters, or nothing if non-matching clause
-    rewriteConstraint : List Bind -> List Constraint -> List Constraint -> Maybe (List Constraint)
-    rewriteConstraint vars [] acc = Just acc
+    rewriteConstraint : List Bind -> List Constraint -> List Constraint -> M (Maybe (List Constraint))
+    rewriteConstraint vars [] acc = pure $ Just acc
     rewriteConstraint vars (c@(nm, y) :: xs) acc =
       if nm == scnm
         then case y of
-          PatVar _ _ s => Just $ c :: (xs ++ acc)
-          PatWild _ _ => Just $ c :: (xs ++ acc)
-          PatLit fc lit => Nothing -- error fc "Literal \{show lit} in constructor split"
+          PatVar _ _ s => pure $ Just $ c :: (xs ++ acc)
+          PatWild _ _ => pure $ Just $ c :: (xs ++ acc)
+          PatLit fc lit => error fc "Literal \{show lit} in constructor split"
           PatCon _ _ str ys => if str == dcName
-            then Just $ (makeConstr vars ys) ++ xs ++ acc
-            else Nothing
+            then pure $ Just $ !(makeConstr vars ys) ++ xs ++ acc
+            else pure Nothing
         else rewriteConstraint vars xs (c :: acc)
 
-    rewriteClause : List Bind -> Clause -> Maybe Clause
-    rewriteClause vars (MkClause fc cons pats expr) = pure $ MkClause fc !(rewriteConstraint vars cons []) pats expr
+    rewriteClause : List Bind -> Clause -> M (Maybe Clause)
+    rewriteClause vars (MkClause fc cons pats expr) = do
+      Just cons <- rewriteConstraint vars cons [] | _ => pure Nothing
+      pure $ Just $ MkClause fc cons pats expr
 
 
 splitArgs : Raw -> List (Raw, Icit) -> (Raw, List (Raw, Icit))
