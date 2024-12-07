@@ -9,6 +9,7 @@ import Data.String
 import Data.Vect
 import Data.IORef
 -- import Lib.Elab
+import Lib.Common
 import Lib.Compile
 import Lib.Parser
 import Lib.Elab
@@ -28,6 +29,19 @@ import System.Path
 
 fail : String -> M a
 fail msg = putStrLn msg >> exitFailure
+
+jsonTopContext : M Json
+jsonTopContext = do
+  top <- get
+  pure $ JsonObj [("context", JsonArray (map jsonDef top.defs))]
+  where
+    jsonDef : TopEntry -> Json
+    -- There is no FC here...
+    jsonDef (MkEntry fc name type def) = JsonObj
+      [ ("fc", toJson fc)
+      , ("name", toJson name)
+      , ("type", toJson (render 80 $ pprint [] type) )
+      ]
 
 dumpContext : TopContext -> M ()
 dumpContext top = do
@@ -121,6 +135,7 @@ processFile fn = do
 
 cmdLine : List String -> M (Maybe String, List String)
 cmdLine [] = pure (Nothing, [])
+cmdLine ("--top" :: args) = cmdLine args -- handled later
 cmdLine ("-v" :: args) = do
   modify { verbose := True }
   cmdLine args
@@ -140,6 +155,8 @@ main' = do
     | _ => error emptyFC "error reading args"
   (out, files) <- cmdLine args
   traverse_ processFile files
+
+  when (elem "--top" args) $ putStrLn "TOP:\{renderJson !jsonTopContext}"
 
   case out of
     Nothing => pure ()

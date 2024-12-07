@@ -171,33 +171,6 @@ termToJS env (CCase t alts) f =
     maybeCaseStmt env nm alts =
           (JCase (Dot (Var nm) "tag") (map (termToJSAlt env nm) alts))
 
-chars : List Char
-chars = unpack "0123456789ABCDEF"
-
-hexDigit : Nat -> Char
-hexDigit v = fromMaybe ' ' (getAt (mod v 16) chars)
-
-toHex : Nat -> List Char
-toHex 0 = []
-toHex v = snoc (toHex (div v 16)) (hexDigit v)
-
--- FIXME escaping is wrong, e.g. \215 instead of \xd7
-jsString : String -> Doc
-jsString str = text $ pack $ encode (unpack str) [< '"']
-  where
-    encode : List Char -> SnocList Char -> List Char
-    encode [] acc = acc <>> ['"']
-    encode ('"' :: cs) acc = encode cs (acc :< '\\' :< '"')
-    encode ('\n' :: cs) acc = encode cs (acc :< '\\' :< 'n')
-    encode ('\\' :: cs) acc = encode cs (acc :< '\\' :< '\\')
-    encode (c :: cs) acc =
-      let v : Nat = cast c in
-      if v < 32 then encode cs (acc :< '\\' :< 'x' :< hexDigit (div v 16) :< hexDigit v )
-      else if v < 128 then encode cs (acc :< c)
-      -- TODO unicode
-      else if v < 256 then encode cs (acc :< '\\' :< 'x' :< hexDigit (div v 16) :< hexDigit v )
-      else encode cs (acc :< '\\' :< 'u' :< hexDigit (div v 4096) :< hexDigit (div v 256) :< hexDigit (div v 16) :< hexDigit v )
-
 keywords : List String
 keywords = [
   "var", "true", "false", "let", "case", "switch", "if", "then", "else", "String",
@@ -232,7 +205,7 @@ expToDoc (LitObject xs) = text "{" <+> folddoc (\ a, e => a ++ ", " <+/> e) (map
     -- TODO quote if needed
     entry (nm, exp) = jsIdent nm ++ ":" <+> expToDoc exp
 
-expToDoc (LitString str) = jsString str
+expToDoc (LitString str) = text $ quoteString str
 expToDoc (LitInt i) = text $ show i
 -- TODO add precedence
 expToDoc (Apply x@(JLam{}) xs) = text "(" ++ expToDoc x ++ ")" ++ "(" ++ nest 2 (commaSep (map expToDoc xs)) ++ ")"
@@ -251,7 +224,7 @@ caseBody {e} stmt@(JCase{}) = nest 2 (line ++ stmtToDoc stmt </> text "break;")
 caseBody stmt = line ++ "{" ++ nest 2 (line ++ stmtToDoc stmt </> text "break;") </> "}"
 
 altToDoc : JAlt -> Doc
-altToDoc (JConAlt nm stmt) = text "case" <+> jsString nm ++ ":" ++ caseBody stmt
+altToDoc (JConAlt nm stmt) = text "case" <+> text (quoteString nm) ++ ":" ++ caseBody stmt
 altToDoc (JDefAlt stmt) = text "default" ++ ":" ++ caseBody stmt
 altToDoc (JLitAlt a stmt) = text "case" <+> expToDoc a ++ ":" ++ caseBody stmt
 
@@ -262,7 +235,7 @@ stmtToDoc (JLet nm body) = "let" <+> jsIdent nm ++ ";" </> stmtToDoc body
 stmtToDoc (JAssign nm expr) = jsIdent nm <+> "=" <+> expToDoc expr ++ ";"
 stmtToDoc (JConst nm x) = text "const" <+> jsIdent nm <+> nest 2 ("=" <+/> expToDoc x ++ ";")
 stmtToDoc (JReturn x) = text "return" <+> expToDoc x ++ ";"
-stmtToDoc (JError str) = text "throw new Error(" ++ jsString str ++ ");"
+stmtToDoc (JError str) = text "throw new Error(" ++ text (quoteString str) ++ ");"
 stmtToDoc (JCase sc alts) =
   text "switch (" ++ expToDoc sc ++ ")" <+> bracket "{" (stack $ map altToDoc alts) "}"
 
@@ -283,16 +256,16 @@ maybeWrap (JReturn exp) = exp
 maybeWrap stmt = Apply (JLam [] stmt) []
 
 entryToDoc : TopEntry -> M Doc
-entryToDoc (MkEntry name ty (Fn tm)) = do
+entryToDoc (MkEntry _ name ty (Fn tm)) = do
   debug "compileFun \{pprint [] tm}"
   ct <- compileFun tm
   let exp = maybeWrap $ termToJS empty ct JReturn
   pure $ text "const" <+> jsIdent name <+> text "=" <+/> expToDoc exp ++ ";"
-entryToDoc (MkEntry name type Axiom) = pure ""
-entryToDoc (MkEntry name type (TCon strs)) = pure $ dcon name (piArity type)
-entryToDoc (MkEntry name type (DCon arity str)) = pure $ dcon name arity
-entryToDoc (MkEntry name type PrimTCon) = pure $ dcon name (piArity type)
-entryToDoc (MkEntry name _ (PrimFn src _)) = pure $ text "const" <+> jsIdent name <+> "=" <+> text src
+entryToDoc (MkEntry _ name type Axiom) = pure ""
+entryToDoc (MkEntry _ name type (TCon strs)) = pure $ dcon name (piArity type)
+entryToDoc (MkEntry _ name type (DCon arity str)) = pure $ dcon name arity
+entryToDoc (MkEntry _ name type PrimTCon) = pure $ dcon name (piArity type)
+entryToDoc (MkEntry _ name _ (PrimFn src _)) = pure $ text "const" <+> jsIdent name <+> "=" <+> text src
 
 ||| This version (call `reverse . snd <$> process "main" ([],[])`) will do dead
 ||| code elimination, but the Prelude js primitives are reaching for
@@ -303,10 +276,10 @@ process (done,docs) nm = do
   top <- get
   case TopContext.lookup nm top of
     Nothing => error emptyFC "\{nm} not in scope"
-    Just entry@(MkEntry name ty (PrimFn src uses)) => do
+    Just entry@(MkEntry _ name ty (PrimFn src uses)) => do
       (done,docs) <- foldlM process (nm :: done, docs) uses
       pure (done, !(entryToDoc entry) :: docs)
-    Just (MkEntry name ty (Fn tm)) => do
+    Just (MkEntry _ name ty (Fn tm)) => do
                 debug "compileFun \{pprint [] tm}"
                 ct <- compileFun tm
                 -- If ct has zero arity and is a compount expression, this fails..

@@ -17,18 +17,24 @@
 - [ ] if we're staying with this version of auto, we might need to list candidates and why they're rejected. e.g. I had a bifunctor fail to solve because the right answer unblocked a Foo vs IO Foo mismatch
 - [ ] literals for double
 - [ ] add default failing case for constructor matching to catch errors
-- [x] Add icit to Lam (see `check` for details)
-  - [ ] make change to `check` NOW
+- [x] Add icit to Lam
 - [ ] add jump to definition magic to vscode extension
+  - [x] Cheap dump to def - dump context
 - [ ] TCO? Probably needed in browser, since v8 doesn't do it. bun and JavaScriptCore do support it.
 - [x] deconstructing `let` (and do arrows)
 - [x] Fix string printing to be js instead of weird Idris strings
 - [x] make $ special
   - Makes inference easier, cleaner output, and allows `foo $ \ x => ...`
   - remove hack from Elab.infer
-  - [ ] `$` no longer works inside ≡⟨ ⟩ sort out how to support both that and `$ \ x => ...`
-- [ ] Support @ on the LHS
-- [ ] records
+  - [ ] `$` no longer works inside ≡⟨ ⟩ sort out how to support both that and `$ \ x => ...` (or don't bother)
+- [ ] **Translate newt to newt**
+  - [ ] Support @ on the LHS
+  - [x] if / then / else sugar
+  - [ ] `data Foo = A | B` sugar
+  - [ ] records
+  - [x] where
+  - [ ] add namespaces
+  - [ ] magic nat?
 - [ ] rework `unify` case tree
   - Idris needs help with the case tree to keep code size down, do it in stages, one dcon at a time.
   - I'm not sure it can go a few steps deep and have a default hanging off the side, so we may need to put the default case in another function ourselves.
@@ -39,7 +45,6 @@
 - [x] add filenames to FC
 - [ ] Add full ranges to FC
 - [x] maybe use backtick for javascript so we don't highlight strings as JS
-- [ ] add namespaces
 - [x] dead code elimination
 - [x] imported files leak info messages everywhere
   - For now, take the start ix for the file and report at end starting there
@@ -60,8 +65,7 @@
     we have different core terms for TCon/DCon/Function
 - [ ] Require infix decl before declaring names with `_` (helps find bugs)
 - [x] sugar for typeclasses
-- [ ] maybe add implicits in core to help resugar operators?
-  - There is also a bit where kovacs uses the implicit on the type (a value) to decide to insert
+- [x] maybe add implicits in core to help resugar operators?
 - [ ] consider binders in environment, like Idris, to better mark `let` and to provide names
 - [x] move some top-level chattiness to `debug`
 - [ ] consider optionally compiling to eliminators for a second type-checking pass to help catch bugs.
@@ -70,7 +74,7 @@
   - [x] editor
   - [x] view output
   - [x] view javascript
-  - [ ] run javascript
+  - [x] run javascript
   - [x] need to shim out Buffer
 - [x] get rid of stray INFO from auto resolution
 - [x] handle `if_then_else_` style mixfix
@@ -88,14 +92,6 @@
   - [x] day1
   - [x] day2 - day6
   - some "real world" examples
-- [ ] Translate newt to newt
-  - [x] Prettier
-  - [x] if / then / else sugar
-  - [ ] `data Foo = A | B` sugar
-  - [ ] records
-  - [x] where
-  - [ ] namespaces
-  - [ ] magic nat?
 - [x] Maybe Eq and stuff would work for typeclass without dealing with unification issues yet
 - [x] unsolved meta errors repeat (need to freeze or only report at end)
 - [x] Sanitize JS idents, e.g. `_+_`
@@ -137,10 +133,10 @@
   - I'm going to try explicit annotation, forall/∀ is erased
   - [x] Parser side
   - [x] push down to value/term
-  - [ ] check quantity!!
+  - [x] check quantity
   - [x] erase in output
   - [ ] remove erased top level arguments
-- [ ] type at point in vscode
+- [ ] type at point in vscode NOW
 - [ ] repl
 - [ ] LSP
 - [x] don't match forced constructors at runtime

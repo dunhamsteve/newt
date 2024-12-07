@@ -44,8 +44,8 @@ setDef name fc ty def = do
   put $ { defs := defs } top
   where
     go : List TopEntry -> M (List TopEntry)
-    go [] = pure $ [MkEntry name ty def]
-    go (x@(MkEntry nm ty' def') :: defs) = if nm == name
+    go [] = pure $ [MkEntry fc name ty def]
+    go (x@(MkEntry _ nm ty' def') :: defs) = if nm == name
       then error fc "\{name} is already defined"
       else (x ::) <$> go defs
 
@@ -58,8 +58,9 @@ updateDef name fc ty def = do
   where
     go : List TopEntry -> M (List TopEntry)
     go [] = error fc "\{name} not declared"
-    go (x@(MkEntry nm ty' def') :: defs) = if nm == name
-      then pure $ MkEntry name ty def :: defs
+    go (x@(MkEntry fc' nm ty' def') :: defs) = if nm == name
+      -- keep original fc, so it points to the TypeSig
+      then pure $ MkEntry fc' name ty def :: defs
       else (x ::) <$> go defs
 
 

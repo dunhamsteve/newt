@@ -62,13 +62,13 @@ arityForName : FC -> Name -> M Nat
 arityForName fc nm = case lookup nm !get of
   -- let the magic hole through for now (will generate bad JS)
   Nothing => error fc "Name \{show nm} not in scope"
-  (Just (MkEntry name type Axiom)) => pure 0
-  (Just (MkEntry name type (TCon strs))) => pure $ piArity type
-  (Just (MkEntry name type (DCon k str))) => pure k
-  (Just (MkEntry name type (Fn t))) => pure $ lamArity t
-  (Just (MkEntry name type (PrimTCon))) => pure $ piArity type
+  (Just (MkEntry _ name type Axiom)) => pure 0
+  (Just (MkEntry _ name type (TCon strs))) => pure $ piArity type
+  (Just (MkEntry _ name type (DCon k str))) => pure k
+  (Just (MkEntry _ name type (Fn t))) => pure $ lamArity t
+  (Just (MkEntry _ name type (PrimTCon))) => pure $ piArity type
   -- Assuming a primitive can't return a function
-  (Just (MkEntry name type (PrimFn t uses))) => pure $ piArity type
+  (Just (MkEntry _ name type (PrimFn t uses))) => pure $ piArity type
 
 export
 compileTerm : Tm -> M CExp
@@ -109,7 +109,7 @@ compileTerm (Bnd _ k) = pure $ CBnd k
 -- need to eta expand to arity
 compileTerm t@(Ref fc nm _) = do
   top <- get
-  let Just (MkEntry _ type _) = lookup nm top
+  let Just (MkEntry _ _ type _) = lookup nm top
           | Nothing => error fc "Undefined name \{nm}"
   apply (CRef nm) [] [<] !(arityForName fc nm) type
 
@@ -123,7 +123,7 @@ compileTerm tm@(App _ _ _) with (funArgs tm)
         args' <- traverse compileTerm args
         arity <- arityForName fc nm
         top <- get
-        let Just (MkEntry _ type _) = lookup nm top
+        let Just (MkEntry _ _ type _) = lookup nm top
           | Nothing => error fc "Undefined name \{nm}"
         apply (CRef nm) args' [<] arity type
   _ | (t, args) = do

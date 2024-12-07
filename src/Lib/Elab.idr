@@ -331,13 +331,13 @@ unify env mode t u = do
     unify' t         u@(VRef fc' k' def sp') = do
       debug "expand \{show t} =?= %ref \{k'}"
       case lookup k' !(get) of
-        Just (MkEntry name ty (Fn tm)) => unify env mode t !(vappSpine !(eval [] CBN tm) sp')
+        Just (MkEntry _ name ty (Fn tm)) => unify env mode t !(vappSpine !(eval [] CBN tm) sp')
         _ => error fc' "unify failed \{show t} =?= \{show u} [no Fn]\n  env is \{show env}"
 
     unify' t@(VRef fc k def sp) u = do
       debug "expand %ref \{k} \{show sp} =?= \{show u}"
       case lookup k !(get) of
-        Just (MkEntry name ty (Fn tm)) => unify env mode !(vappSpine !(eval [] CBN tm) sp) u
+        Just (MkEntry _ name ty (Fn tm)) => unify env mode !(vappSpine !(eval [] CBN tm) sp) u
         _ => error fc "unify failed \{show t} [no Fn] =?= \{show u}\n  env is \{show env}"
 
     -- REVIEW I'd like to quote this back, but we have l that aren't in the environment.
@@ -397,7 +397,7 @@ insert ctx tm ty = do
 
 primType : FC -> String -> M Val
 primType fc nm = case lookup nm !(get) of
-      Just (MkEntry name ty PrimTCon) => pure $ VRef fc name PrimTCon [<]
+      Just (MkEntry _ name ty PrimTCon) => pure $ VRef fc name PrimTCon [<]
       _ => error fc "Primitive type \{show nm} not in scope"
 
 export
@@ -470,12 +470,12 @@ getConstructors ctx scfc (VRef fc nm _ _) = do
   where
     lookupTCon : String -> M (List String)
     lookupTCon str = case lookup nm !get of
-        (Just (MkEntry name type (TCon names))) => pure names
+        (Just (MkEntry _ name type (TCon names))) => pure names
         _ => error scfc "Not a type constructor \{nm}"
     lookupDCon : String -> M (String, Nat, Tm)
     lookupDCon nm = do
       case lookup nm !get of
-        (Just (MkEntry name type (DCon k str))) => pure (name, k, type)
+        (Just (MkEntry _ name type (DCon k str))) => pure (name, k, type)
         Just _ => error fc "Internal Error: \{nm} is not a DCon"
         Nothing => error fc "Internal Error: DCon \{nm} not found"
 getConstructors ctx scfc tm = error scfc "Can't split - not VRef: \{!(pprint ctx tm)}"
@@ -676,7 +676,7 @@ mkPat : TopContext -> (Raw, Icit) -> M Pattern
 mkPat top (tm, icit) = do
   case splitArgs tm [] of
     ((RVar fc nm), b) => case lookup nm top of
-                (Just (MkEntry name type (DCon k str))) =>
+                (Just (MkEntry _ name type (DCon k str))) =>
                   -- TODO check arity, also figure out why we need reverse
                   pure $ PatCon fc icit nm !(traverse (mkPat top) b)
                 -- This fires when a global is shadowed by a pattern var
@@ -994,21 +994,10 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
     pure $ Lam (getFC tm) nm' Auto rig sc
 
   (tm,ty) => do
-    -- We need to insert if tm is not an Implicit Lam
-    -- assuming all of the implicit ty have been handled above
+    (tm', ty') <- infer ctx tm
+    (tm', ty') <- insert ctx tm' ty'
+
     let names = toList $ map fst ctx.types
-    (tm', ty') <- case !(infer ctx tm) of
-      -- Kovacs doesn't insert on tm = Implicit Lam, we don't have Plicity in Lam
-      -- so I'll check the inferred type for an implicit pi
-      -- This seems wrong, the ty' is what insert runs on, so we're just short circuiting here
-
-      -- REVIEW - I think we need icit on Lam, check that they match and drop the two "edge" above?
-      -- (tm'@(Lam{}), ty'@(VPi _ _ Implicit rig _ _)) => do debug "CheckMe 1"; pure (tm', ty')
-      -- (tm'@(Lam{}), ty'@(VPi _ _ Auto rig _ _)) => do debug "CheckMe 2"; pure (tm', ty')
-      (tm', ty') => do
-        debug "RUN INSERT ON \{pprint names tm'} at \{show ty'}"
-        insert ctx tm' ty'
-
     debug "INFER \{show tm} to (\{pprint names tm'} : \{show ty'}) expect \{show ty}"
     unifyCatch (getFC tm) ctx ty' ty
     pure tm'
@@ -1017,7 +1006,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
   where
     go : Nat -> Vect n (String, Val)  -> M  (Tm, Val)
     go i [] = case lookup nm !(get) of
-      Just (MkEntry name ty def) => do
+      Just (MkEntry _ name ty def) => do
         debug "lookup \{name} as \{show def}"
         pure (Ref fc nm def, !(eval [] CBN ty))
       Nothing => error fc "\{show nm} not in scope"

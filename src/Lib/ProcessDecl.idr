@@ -29,7 +29,7 @@ isCandidate _ _ = False
 -- TODO consider ctx
 findMatches : Context -> Val -> List TopEntry -> M (List (Tm, MetaContext))
 findMatches ctx ty [] = pure []
-findMatches ctx ty ((MkEntry name type def) :: xs) = do
+findMatches ctx ty ((MkEntry _ name type def) :: xs) = do
   let True = isCandidate ty type | False => findMatches ctx ty xs
   top <- get
   -- let ctx = mkCtx (getFC ty)
@@ -181,8 +181,8 @@ processDecl (TypeSig fc names tm) = do
       | _ => error fc "\{show nm} is already defined"
     pure ()
   ty <- check (mkCtx fc) tm (VU fc)
+  ty <- zonk top 0 [] ty
   putStrLn "TypeSig \{unwords names} : \{pprint [] ty}"
-  debug "got \{pprint [] ty}"
   for_ names $ \nm => setDef nm fc ty Axiom
   -- Zoo4eg has metas in TypeSig, need to decide if I want to support leaving them unsolved here
   -- logMetas mstart
@@ -211,7 +211,7 @@ processDecl (Def fc nm clauses) = do
   let mstart = length mc.metas
   let Just entry = lookup nm top
     | Nothing => throwError $ E fc "No declaration for \{nm}"
-  let (MkEntry name ty Axiom) := entry
+  let (MkEntry fc name ty Axiom) := entry
     | _ => throwError $ E fc "\{nm} already defined"
 
   putStrLn "check \{nm} at \{pprint [] ty}"
@@ -324,11 +324,11 @@ processDecl (Instance instfc ty decls) = do
 
   let (Ref _ tconName _, args) := funArgs codomain
     | (tm, _) => error tyFC "\{pprint [] codomain} doesn't appear to be a TCon application"
-  let (Just (MkEntry name type (TCon cons))) = lookup tconName top
+  let (Just (MkEntry _ name type (TCon cons))) = lookup tconName top
     | _ => error tyFC "\{tconName} is not a type constructor"
   let [con] = cons
     | _ => error tyFC "\{tconName} has multiple constructors \{show cons}"
-  let (Just (MkEntry _ dcty (DCon _ _))) = lookup con top
+  let (Just (MkEntry _ _ dcty (DCon _ _))) = lookup con top
     | _ => error tyFC "can't find constructor \{show con}"
   vdcty@(VPi _ nm icit rig a b) <- eval [] CBN dcty
     | x => error (getFC x) "dcty not Pi"
@@ -402,9 +402,9 @@ processDecl (Data fc nm ty cons) = do
   let mstart = length mc.metas
   tyty <- check (mkCtx fc) ty (VU fc)
   case lookup nm top of
-    Just (MkEntry name type Axiom) => do
+    Just (MkEntry _ name type Axiom) => do
       unifyCatch fc (mkCtx fc) !(eval [] CBN tyty) !(eval [] CBN type)
-    Just (MkEntry name type _) => error fc "\{show nm} already declared"
+    Just (MkEntry _ name type _) => error fc "\{show nm} already declared"
     Nothing => setDef nm fc tyty Axiom
   cnames <- for cons $ \x => case x of
       (TypeSig fc names tm) => do

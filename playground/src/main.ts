@@ -5,20 +5,78 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { h, render, VNode } from "preact";
 import { ChangeEvent } from "preact/compat";
 
+interface FC {
+  file: string;
+  line: number;
+  col: number;
+}
+
+interface TopEntry {
+  fc: FC;
+  name: String;
+  type: String;
+}
+interface TopData {
+  context: TopEntry[];
+}
+
+let topData: undefined | TopData;
+
+// we need to fix the definition of word
 monaco.languages.register({ id: "newt" });
 monaco.languages.setMonarchTokensProvider("newt", newtTokens);
 monaco.languages.setLanguageConfiguration("newt", newtConfig);
+monaco.languages.registerDefinitionProvider("newt", {
+  provideDefinition(model, position, token) {
+    if (!topData) return;
+    // HACK - we don't know our filename which was generated from `module` decl, so
+    // assume the last context entry is in our file.
+    let last = topData.context[topData.context.length-1]
+    let file = last.fc.file
 
+    const info = model.getWordAtPosition(position);
+    if (!info) return;
+    let entry = topData.context.find((entry) => entry.name === info.word);
+    // we can't switch files at the moment
+    if (!entry || entry.fc.file !== file) return
+    let lineNumber = entry.fc.line + 1
+    let column = entry.fc.col + 1
+    let word = model.getWordAtPosition({lineNumber, column})
+    let range = new monaco.Range(lineNumber, column, lineNumber, column)
+    if (word) {
+      range = new monaco.Range(lineNumber, word.startColumn, lineNumber, word.endColumn)
+    }
+    return { uri: model.uri,range}
+  },
+});
+monaco.languages.registerHoverProvider("newt", {
+  provideHover(model, position, token, context) {
+    if (!topData) return;
+    const info = model.getWordAtPosition(position);
+    if (!info) return;
+    let entry = topData.context.find((entry) => entry.name === info.word);
+    if (!entry) return;
+    return {
+      range: new monaco.Range(
+        position.lineNumber,
+        info.startColumn,
+        position.lineNumber,
+        info.endColumn
+      ),
+      contents: [{ value: `${entry.name} : ${entry.type}` }],
+    };
+  },
+});
 const newtWorker = new Worker("worker.js");
-let postMessage = (msg: any) => newtWorker.postMessage(msg)
+let postMessage = (msg: any) => newtWorker.postMessage(msg);
 
 // Safari/MobileSafari have small stacks in webworkers.
-if (navigator.vendor.includes('Apple')) {
+if (navigator.vendor.includes("Apple")) {
   const workerFrame = document.createElement("iframe");
-  workerFrame.src = "worker.html"
-  workerFrame.style.display = "none"
-  document.body.appendChild(workerFrame)
-  postMessage = (msg: any) => workerFrame.contentWindow?.postMessage(msg, '*')
+  workerFrame.src = "worker.html";
+  workerFrame.style.display = "none";
+  document.body.appendChild(workerFrame);
+  postMessage = (msg: any) => workerFrame.contentWindow?.postMessage(msg, "*");
 }
 
 // iframe for running newt output
@@ -28,8 +86,8 @@ iframe.style.display = "none";
 document.body.appendChild(iframe);
 
 function run(src: string) {
-  console.log('SEND TO', iframe.contentWindow)
-  postMessage({src})
+  console.log("SEND TO", iframe.contentWindow);
+  postMessage({ src });
 }
 
 function runOutput() {
@@ -42,21 +100,38 @@ function runOutput() {
   }
 }
 
+function setOutput(output: string) {
+  let lines = output.split("\n");
+  output = lines.filter((l) => !l.startsWith("TOP:")).join("\n");
+  let data = lines.find((l) => l.startsWith("TOP:"));
+  if (data) {
+    try {
+      topData = JSON.parse(data.slice(4));
+      console.log({ topData });
+    } catch (e) {
+      console.error(e);
+    }
+  } else {
+    topData = undefined;
+  }
+  state.output.value = output;
+}
+
 window.onmessage = (ev) => {
   console.log("window got", ev.data);
   if (ev.data.messages) state.messages.value = ev.data.messages;
   if (ev.data.message) {
-    state.messages.value = [...state.messages.value, ev.data.message]
+    state.messages.value = [...state.messages.value, ev.data.message];
   }
   // safari callback
   if (ev.data.output !== undefined) {
-    state.output.value = ev.data.output;
+    setOutput(ev.data.output);
     state.javascript.value = ev.data.javascript;
   }
 };
 
 newtWorker.onmessage = (ev) => {
-  state.output.value = ev.data.output;
+  setOutput(ev.data.output);
   state.javascript.value = ev.data.javascript;
 };
 
@@ -310,9 +385,9 @@ const processOutput = (
   let model = editor.getModel()!;
   let markers: monaco.editor.IMarkerData[] = [];
   let lines = output.split("\n");
-  let m = lines[0].match(/.*Process (.*)/)
-  let fn = ''
-  if (m) fn = m[1]
+  let m = lines[0].match(/.*Process (.*)/);
+  let fn = "";
+  if (m) fn = m[1];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const match = line.match(/(INFO|ERROR) at (.*):\((\d+), (\d+)\):\s*(.*)/);
@@ -321,7 +396,7 @@ const processOutput = (
       let lineNumber = +line + 1;
       let column = +col + 1;
       if (fn && file !== fn) {
-        lineNumber = column = 0
+        lineNumber = column = 0;
       }
       let start = { column, lineNumber };
       // we don't have the full range, so grab the surrounding word
@@ -340,15 +415,15 @@ const processOutput = (
         kind === "ERROR"
           ? monaco.MarkerSeverity.Error
           : monaco.MarkerSeverity.Info;
-      if (kind === 'ERROR' || lineNumber)
-      markers.push({
-        severity,
-        message,
-        startLineNumber: lineNumber,
-        endLineNumber: lineNumber,
-        startColumn: column,
-        endColumn,
-      });
+      if (kind === "ERROR" || lineNumber)
+        markers.push({
+          severity,
+          message,
+          startLineNumber: lineNumber,
+          endLineNumber: lineNumber,
+          startColumn: column,
+          endColumn,
+        });
     }
   }
   monaco.editor.setModelMarkers(model, "newt", markers);

@@ -139,7 +139,7 @@ const handleMessage = async function (e) {
   let m = src.match(/module (\w+)/)
   if (m) module = m[1]
   let fn = `${module}.newt`
-  process.argv = ["", "", fn, "-o", "out.js"];
+  process.argv = ["", "", fn, "-o", "out.js", "--top"];
   console.log("args", process.argv);
   files[fn] = src;
   files['out.js'] = 'No JS output';

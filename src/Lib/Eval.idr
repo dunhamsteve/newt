@@ -73,7 +73,7 @@ export
 tryEval : Env -> Val -> M (Maybe Val)
 tryEval env (VRef fc k _ sp) =
   case lookup k !(get) of
-      Just (MkEntry name ty (Fn tm)) =>
+      Just (MkEntry _ name ty (Fn tm)) =>
         catchError {e=Error} (
             do
             debug "app \{name} to \{show sp}"
@@ -105,7 +105,7 @@ evalCase env mode sc@(VRef _ nm _ sp) (cc@(CaseCons name nms t) :: xs) =
       debug "ECase \{nm} \{show sp} \{show nms} \{showTm t}"
       go env (sp <>> []) nms
     else case lookup nm !(get) of
-      (Just (MkEntry str type (DCon k str1))) => evalCase env mode sc xs
+      (Just (MkEntry _ str type (DCon k str1))) => evalCase env mode sc xs
       -- bail for a stuck function
       _ => pure Nothing
   where

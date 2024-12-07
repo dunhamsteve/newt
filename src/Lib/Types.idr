@@ -404,6 +404,7 @@ Show Def where
 public export
 record TopEntry where
   constructor MkEntry
+  fc : FC
   name : String
   type : Tm
   def : Def
@@ -413,7 +414,7 @@ record TopEntry where
 export
 covering
 Show TopEntry where
-  show (MkEntry name type def) = "\{name} : \{show type} := \{show def}"
+  show (MkEntry fc name type def) = "\{name} : \{show type} := \{show def}"
 
 ||| Top level context.
 ||| Most of the reason this is separate is to have a different type

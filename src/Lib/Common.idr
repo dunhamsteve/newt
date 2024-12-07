@@ -1,14 +1,82 @@
 module Lib.Common
 
 import Data.String
+import Data.Nat
+import Data.Maybe
 import public Data.SortedMap
 
+hexChars : List Char
+hexChars = unpack "0123456789ABCDEF"
+
+-- export
+hexDigit : Nat -> Char
+hexDigit v = fromMaybe ' ' (getAt (mod v 16) hexChars)
+
+export
+toHex : Nat -> List Char
+toHex 0 = []
+toHex v = snoc (toHex (div v 16)) (hexDigit v)
+
+export
+quoteString : String -> String
+quoteString str = pack $ encode (unpack str) [< '"']
+  where
+    encode : List Char -> SnocList Char -> List Char
+    encode [] acc = acc <>> ['"']
+    encode ('"' :: cs) acc = encode cs (acc :< '\\' :< '"')
+    encode ('\n' :: cs) acc = encode cs (acc :< '\\' :< 'n')
+    encode ('\\' :: cs) acc = encode cs (acc :< '\\' :< '\\')
+    encode (c :: cs) acc =
+      let v : Nat = cast c in
+      if v < 32 then encode cs (acc :< '\\' :< 'u' :< hexDigit (div v 4096) :< hexDigit (div v 256) :< hexDigit (div v 16) :< hexDigit v )
+      else encode cs (acc :< c)
+      -- else if v < 128 then encode cs (acc :< c)
+      -- if v < 32 then encode cs (acc :< '\\' :< 'x' :< hexDigit (div v 16) :< hexDigit v )
+      -- else if v < 128 then encode cs (acc :< c)
+      -- -- TODO unicode
+      -- else if v < 256 then encode cs (acc :< '\\' :< 'x' :< hexDigit (div v 16) :< hexDigit v )
+      -- else encode cs (acc :< '\\' :< 'u' :< hexDigit (div v 4096) :< hexDigit (div v 256) :< hexDigit (div v 16) :< hexDigit v )
+
+public export
+data Json : Type where
+  JsonObj : List (String, Json) -> Json
+  JsonStr : String -> Json
+  JsonBool : Bool -> Json
+  JsonInt : Int -> Json
+  JsonArray : List Json -> Json
+
+export
+renderJson : Json -> String
+renderJson (JsonObj xs) = "{" ++ joinBy "," (map renderPair xs) ++ "}"
+  where
+    renderPair : (String,Json) -> String
+    renderPair (k,v) = quoteString k ++ ":" ++ renderJson v
+renderJson (JsonStr str) = quoteString str
+renderJson (JsonBool x) = ifThenElse x "true" "false"
+renderJson (JsonInt i) = cast i
+renderJson (JsonArray xs) = "[" ++ joinBy "," (map renderJson xs) ++ "]"
+
+public export
+interface ToJSON a where
+  toJson : a -> Json
+
+export
+ToJSON String where
+  toJson = JsonStr
+
+export
+ToJSON Int where
+  toJson = JsonInt
 
 public export
 record FC where
   constructor MkFC
   file : String
   start : (Int,Int)
+
+export
+ToJSON FC where
+  toJson (MkFC file (line,col)) = JsonObj [ ("file", toJson file), ("line", toJson line), ("col", toJson col)]
 
 export
 (.line) : FC -> Int
