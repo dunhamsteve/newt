@@ -1,7 +1,7 @@
 
 ## TODO
 
-- [ ] SortedMap.newt issue in `where`
+- [x] SortedMap.newt issue in `where`
 - [x] fix "insufficient patterns", wire in M or Either String
 - [ ] Matching _,_ when Maybe is expected should be an error
 - [ ] error for repeated names on LHS
@@ -18,7 +18,7 @@
 - [ ] literals for double
 - [ ] add default failing case for constructor matching to catch errors
 - [x] Add icit to Lam (see `check` for details)
-  - [ ] make change to `check`
+  - [ ] make change to `check` NOW
 - [ ] add jump to definition magic to vscode extension
 - [ ] TCO? Probably needed in browser, since v8 doesn't do it. bun and JavaScriptCore do support it.
 - [x] deconstructing `let` (and do arrows)

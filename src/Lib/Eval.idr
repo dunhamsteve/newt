@@ -153,7 +153,7 @@ eval env mode (Meta fc i) =
 eval env mode (Lam fc x icit rig t) = pure $ VLam fc x icit rig (MkClosure env t)
 eval env mode (Pi fc x icit rig a b) = pure $ VPi fc x icit rig !(eval env mode a) (MkClosure env b)
 eval env mode (Let fc nm t u) = pure $ VLet fc nm !(eval env mode t) !(eval (VVar fc (length env) [<] :: env) mode u)
-eval env mode (LetRec fc nm t u) = pure $ VLetRec fc nm !(eval (VVar fc (length env) [<] :: env) mode t) !(eval (VVar fc (length env) [<] :: env) mode u)
+eval env mode (LetRec fc nm ty t u) = pure $ VLetRec fc nm !(eval env mode ty) !(eval (VVar fc (length env) [<] :: env) mode t) !(eval (VVar fc (length env) [<] :: env) mode u)
 -- Here, we assume env has everything. We push levels onto it during type checking.
 -- I think we could pass in an l and assume everything outside env is free and
 -- translate to a level
@@ -189,7 +189,7 @@ quote l (VMeta fc i sp) =
 quote l (VLam fc x icit rig t) = pure $ Lam fc x icit rig !(quote (S l) !(t $$ VVar emptyFC l [<]))
 quote l (VPi fc x icit rig a b) = pure $ Pi fc x icit rig !(quote l a) !(quote (S l) !(b $$ VVar emptyFC l [<]))
 quote l (VLet fc nm t u) = pure $ Let fc nm !(quote l t) !(quote (S l) u)
-quote l (VLetRec fc nm t u) = pure $ LetRec fc nm !(quote (S l) t) !(quote (S l) u)
+quote l (VLetRec fc nm ty t u) = pure $ LetRec fc nm !(quote l ty) !(quote (S l) t) !(quote (S l) u)
 quote l (VU fc) = pure (U fc)
 quote l (VRef fc n def sp) = quoteSp l (Ref fc n def) sp
 quote l (VCase fc sc alts) = pure $ Case fc !(quote l sc) alts
@@ -249,7 +249,7 @@ tweakFC fc (App fc1 t u) = App fc t u
 tweakFC fc (Pi fc1 nm icit x t u) = Pi fc nm icit x t u
 tweakFC fc (Case fc1 t xs) = Case fc t xs
 tweakFC fc (Let fc1 nm t u) = Let fc nm t u
-tweakFC fc (LetRec fc1 nm t u) = LetRec fc nm t u
+tweakFC fc (LetRec fc1 nm ty t u) = LetRec fc nm ty t u
 tweakFC fc (Lit fc1 lit) = Lit fc lit
 tweakFC fc (Erased fc1) = Erased fc
 
@@ -282,7 +282,7 @@ zonk top l env t = case t of
   (App fc t u) => zonkApp top l env t [!(zonk top l env u)]
   (Pi fc nm icit rig a b) => Pi fc nm icit rig <$> zonk top l env a <*> zonkBind top l env b
   (Let fc nm t u) => Let fc nm <$> zonk top l env t <*> zonkBind top l env u
-  (LetRec fc nm t u) => LetRec fc nm <$> zonkBind top l env t <*> zonkBind top l env u
+  (LetRec fc nm ty t u) => LetRec fc nm <$> zonk top l env ty <*> zonkBind top l env t <*> zonkBind top l env u
   (Case fc sc alts) => Case fc <$> zonk top l env sc <*> traverse (zonkAlt top l env) alts
   U fc => pure $ U fc
   Lit fc lit => pure $ Lit fc lit

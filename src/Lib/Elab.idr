@@ -181,8 +181,9 @@ rename meta ren lvl v = go ren lvl v
     go ren lvl (VLit fc lit) = pure (Lit fc lit)
     go ren lvl (VLet fc name val body) =
       pure $ Let fc name !(go ren lvl val) !(go (lvl :: ren) (S lvl) body)
-    go ren lvl (VLetRec fc name val body) =
-      pure $ Let fc name !(go (lvl :: ren) (S lvl) val) !(go (lvl :: ren) (S lvl) body)
+    -- these probably shouldn't show up in solutions...
+    go ren lvl (VLetRec fc name ty val body) =
+      pure $ LetRec fc name !(go ren lvl ty) !(go (lvl :: ren) (S lvl) val) !(go (lvl :: ren) (S lvl) body)
 
 lams : Nat -> List String -> Tm -> Tm
 lams 0 _ tm = tm
@@ -731,7 +732,7 @@ checkWhere ctx decls body ty = do
   -- Should we run the rest with the definition in place?
   -- I'm wondering if switching from bind to define will mess with metas
   -- let ctx' = define ctx name vtm vty
-  pure $ LetRec sigFC name tm !(checkWhere ctx' decls' body ty)
+  pure $ LetRec sigFC name funTy tm !(checkWhere ctx' decls' body ty)
 
 
 checkDone : Context -> List (String, Pattern) -> Raw -> Val -> M Tm

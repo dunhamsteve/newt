@@ -125,7 +125,7 @@ data Tm : Type where
   -- need type?
   Let : FC -> Name -> Tm -> Tm -> Tm
   -- for desugaring where
-  LetRec : FC -> Name -> Tm -> Tm -> Tm
+  LetRec : FC -> Name -> Tm -> Tm -> Tm -> Tm
   Lit : FC -> Literal -> Tm
   Erased : FC -> Tm
 
@@ -143,7 +143,7 @@ HasFC Tm where
   getFC (Case fc t xs) = fc
   getFC (Lit fc _) = fc
   getFC (Let fc _ _ _) = fc
-  getFC (LetRec fc _ _ _) = fc
+  getFC (LetRec fc _ _ _ _) = fc
   getFC (Erased fc) = fc
 
 covering
@@ -169,7 +169,7 @@ Show Tm where
   show (Pi _ str Auto rig t u) = "(Pi {{\{show rig}\{str} : \{show t}}} => \{show u})"
   show (Case _ sc alts) = "(Case \{show sc} \{show alts})"
   show (Let _ nm t u) = "(Let \{nm} \{show t} \{show u})"
-  show (LetRec _ nm t u) = "(LetRec \{nm} \{show t} \{show u})"
+  show (LetRec _ nm ty t u) = "(LetRec \{nm} : \{show ty} \{show t} \{show u})"
   show (Erased _) = "ERASED"
 
 public export
@@ -244,7 +244,7 @@ pprint names tm = go 0 names tm
     go p names (Case _ sc alts) = parens 0 p $ text "case" <+> go 0 names sc <+> text "of" ++ (nest 2 (line ++ stack (map (goAlt 0 names) alts)))
     go p names (Lit _ lit) = text (show lit)
     go p names (Let _ nm t u) = parens 0 p $ text "let" <+> text nm <+> ":=" <+> go 0 names t <+> "in" </> (nest 2 $ go 0 (nm :: names) u)
-    go p names (LetRec _ nm t u) = parens 0 p $ text "letrec" <+> text nm <+> ":=" <+> go 0 names t <+> "in" </> (nest 2 $ go 0 (nm :: names) u)
+    go p names (LetRec _ nm ty t u) = parens 0 p $ text "letrec" <+> text nm <+> ":" <+> go 0 names ty <+> ":=" <+> go 0 names t <+> "in" </> (nest 2 $ go 0 (nm :: names) u)
     go p names (Erased _) = "ERASED"
 data Val : Type
 
@@ -277,7 +277,7 @@ data Val : Type where
   VLam : FC -> Name -> Icit -> Quant -> Closure -> Val
   VPi : FC -> Name -> Icit -> Quant -> (a : Lazy Val) -> (b : Closure) -> Val
   VLet : FC -> Name -> Val -> Val -> Val
-  VLetRec : FC -> Name -> Val -> Val -> Val
+  VLetRec : FC -> Name -> Val -> Val -> Val -> Val
   VU : FC -> Val
   VErased : FC -> Val
   VLit : FC -> Literal -> Val
@@ -294,7 +294,7 @@ getValFC (VU fc) = fc
 getValFC (VErased fc) = fc
 getValFC (VLit fc _) = fc
 getValFC (VLet fc _ _ _) = fc
-getValFC (VLetRec fc _ _ _) = fc
+getValFC (VLetRec fc _ _ _ _) = fc
 
 
 public export
@@ -316,7 +316,7 @@ Show Val where
   show (VU _) = "U"
   show (VLit _ lit) = show lit
   show (VLet _ nm a b) = "(%let \{show nm} = \{show a} in \{show b}"
-  show (VLetRec _ nm a b) = "(%letrec \{show nm} = \{show a} in \{show b}"
+  show (VLetRec _ nm ty a b) = "(%letrec \{show nm} : \{show ty} = \{show a} in \{show b}"
   show (VErased _) = "ERASED"
 
 public export

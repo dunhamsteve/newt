@@ -77,10 +77,10 @@ erase env t sp = case t of
     u' <- erase env u []
     v' <- erase ((nm, Many, Nothing) :: env) v []
     eraseSpine env (Let fc nm u' v') sp Nothing
-  (LetRec fc nm u v) => do
-    u' <- erase ((nm, Many, Nothing) :: env) u []
-    v' <- erase ((nm, Many, Nothing) :: env) v []
-    eraseSpine env (LetRec fc nm u' v') sp Nothing
+  (LetRec fc nm ty u v) => do
+    u' <- erase ((nm, Many, Just ty) :: env) u []
+    v' <- erase ((nm, Many, Just ty) :: env) v []
+    eraseSpine env (LetRec fc nm ty u' v') sp Nothing
   (Bnd fc k) => do
     case getAt k env of
       Nothing => error fc "bad index \{show k}"

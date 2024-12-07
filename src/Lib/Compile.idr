@@ -328,7 +328,7 @@ process (done,docs) nm = do
     walkTm (App x t u) acc = walkTm t !(walkTm u acc)
     walkTm (Pi x str icit y t u) acc = walkTm t !(walkTm u acc)
     walkTm (Let x str t u) acc = walkTm t !(walkTm u acc)
-    walkTm (LetRec x str t u) acc = walkTm t !(walkTm u acc)
+    walkTm (LetRec x str _ t u) acc = walkTm t !(walkTm u acc)
     walkTm (Case x t alts) acc = foldlM walkAlt acc alts
     walkTm _ acc = pure acc
 

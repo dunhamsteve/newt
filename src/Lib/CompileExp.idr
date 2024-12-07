@@ -143,7 +143,7 @@ compileTerm (Case _ t alts) = do
   pure $ CCase t' alts'
 compileTerm (Lit _ lit) = pure $ CLit lit
 compileTerm (Let _ nm t u) = pure $ CLet nm !(compileTerm t) !(compileTerm u)
-compileTerm (LetRec _ nm t u) = pure $ CLetRec nm !(compileTerm t) !(compileTerm u)
+compileTerm (LetRec _ nm _ t u) = pure $ CLetRec nm !(compileTerm t) !(compileTerm u)
 compileTerm (Erased _) = pure CErased
 
 export
