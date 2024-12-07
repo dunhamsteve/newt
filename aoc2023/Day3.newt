@@ -22,9 +22,7 @@ numbers arr = go arr Z
   where
     go : List Char → Nat → List Number
     go (c :: cs) start = if isDigit c
-      -- then let (front,back) = span isDigit (c :: cs) in ?
       then case span isDigit (c :: cs) of
-        -- NOW FC on app is now broken, need the fc of the left
           (front,back) => let stop = start + length front
             in MkNumber start stop (stringToInt $ pack front) :: go back stop
       else go cs (S start)

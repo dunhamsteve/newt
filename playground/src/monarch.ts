@@ -87,7 +87,7 @@ export let newtTokens: monaco.languages.IMonarchLanguage = {
     "infixr",
     "infix",
   ],
-  specialOps: ["=>", "->", ":", "=", ":="],
+  specialOps: ["=>", "->", ":", "=", ":=", "<-"],
   tokenizer: {
     root: [
       [

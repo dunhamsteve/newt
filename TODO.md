@@ -13,11 +13,12 @@
 - [x] Put worker in iframe on safari
 - [ ] Warnings or errors for missing definitions
 - [ ] Warnings or errors for unused cases
-  - Important when misspelled constructors become pattern vars
+  - This is important when misspelled constructors become pattern vars
 - [ ] if we're staying with this version of auto, we might need to list candidates and why they're rejected. e.g. I had a bifunctor fail to solve because the right answer unblocked a Foo vs IO Foo mismatch
 - [ ] literals for double
 - [ ] add default failing case for constructor matching to catch errors
-- [ ] Add icit to Lam (see `check` for details)
+- [x] Add icit to Lam (see `check` for details)
+  - [ ] make change to `check`
 - [ ] add jump to definition magic to vscode extension
 - [ ] TCO? Probably needed in browser, since v8 doesn't do it. bun and JavaScriptCore do support it.
 - [x] deconstructing `let` (and do arrows)

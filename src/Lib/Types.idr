@@ -117,7 +117,7 @@ data Tm : Type where
   Meta : FC -> Nat -> Tm
   -- kovacs optimization, I think we can App out meta instead
   -- InsMeta : Nat -> List BD -> Tm
-  Lam : FC -> Name -> Tm -> Tm
+  Lam : FC -> Name -> Icit -> Quant -> Tm -> Tm
   App : FC -> Tm -> Tm -> Tm
   U   : FC -> Tm
   Pi  : FC -> Name -> Icit -> Quant -> Tm -> Tm -> Tm
@@ -136,7 +136,7 @@ HasFC Tm where
   getFC (Bnd fc k) = fc
   getFC (Ref fc str x) = fc
   getFC (Meta fc k) = fc
-  getFC (Lam fc str t) = fc
+  getFC (Lam fc str _ _ t) = fc
   getFC (App fc t u) = fc
   getFC (U fc) = fc
   getFC (Pi fc str icit quant t u) = fc
@@ -159,14 +159,14 @@ public export covering
 Show Tm where
   show (Bnd _ k) = "(Bnd \{show k})"
   show (Ref _ str _) = "(Ref \{show str})"
-  show (Lam _ nm t) = "(\\ \{nm}  => \{show  t})"
+  show (Lam _ nm icit rig t) = "(\\ \{show rig}\{nm}  => \{show  t})"
   show (App _ t u) = "(\{show t} \{show u})"
   show (Meta _ i) = "(Meta \{show i})"
   show (Lit _ l) = "(Lit \{show l})"
   show (U _) = "U"
-  show (Pi _ str Explicit rig t u) = "(Pi (\{show rig} \{str} : \{show t}) => \{show u})"
-  show (Pi _ str Implicit rig t u) = "(Pi {\{show rig} \{str} : \{show t}} => \{show u})"
-  show (Pi _ str Auto rig t u) = "(Pi {{\{show rig} \{str} : \{show t}}} => \{show u})"
+  show (Pi _ str Explicit rig t u) = "(Pi (\{show rig}\{str} : \{show t}) => \{show u})"
+  show (Pi _ str Implicit rig t u) = "(Pi {\{show rig}\{str} : \{show t}} => \{show u})"
+  show (Pi _ str Auto rig t u) = "(Pi {{\{show rig}\{str} : \{show t}}} => \{show u})"
   show (Case _ sc alts) = "(Case \{show sc} \{show alts})"
   show (Let _ nm t u) = "(Let \{nm} \{show t} \{show u})"
   show (LetRec _ nm t u) = "(LetRec \{nm} \{show t} \{show u})"
@@ -192,7 +192,7 @@ Eq (Tm) where
   -- (Local x) == (Local y) = x == y
   (Bnd _ x) == (Bnd _ y) = x == y
   (Ref _ x _) == Ref _ y _ = x == y
-  (Lam _ n t) == Lam _ n' t' = t == t'
+  (Lam _ n _ _ t) == Lam _ n' _ _ t' = t == t'
   (App _ t u) == App _ t' u' = t == t' && u == u'
   (U _) == (U _) = True
   (Pi _ n icit rig t u) == (Pi _ n' icit' rig' t' u') = icit == icit' && rig == rig' && t == t' && u == u'
@@ -229,7 +229,7 @@ pprint names tm = go 0 names tm
       Just nm => text "\{nm}:\{show k}"
     go p names (Ref _ str mt) = text str
     go p names (Meta _ k) = text "?m:\{show k}"
-    go p names (Lam _ nm t) = parens 0 p $ nest 2 $ text "\\ \{nm} =>" <+/> go 0 (nm :: names) t
+    go p names (Lam _ nm icit quant t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> go 0 (nm :: names) t
     go p names (App _ t u) = parens 0 p $ go 0 names t <+> go 1 names u
     go p names (U _) = "U"
     go p names (Pi _ nm Auto rig t u) = parens 0 p $
@@ -274,7 +274,7 @@ data Val : Type where
   VCase : FC -> (sc : Val) -> List CaseAlt -> Val
   -- we'll need to look this up in ctx with IO
   VMeta : FC -> (ix : Nat) -> (sp : SnocList Val) -> Val
-  VLam : FC -> Name -> Closure -> Val
+  VLam : FC -> Name -> Icit -> Quant -> Closure -> Val
   VPi : FC -> Name -> Icit -> Quant -> (a : Lazy Val) -> (b : Closure) -> Val
   VLet : FC -> Name -> Val -> Val -> Val
   VLetRec : FC -> Name -> Val -> Val -> Val
@@ -288,7 +288,7 @@ getValFC (VVar fc _ _) = fc
 getValFC (VRef fc _ _ _) = fc
 getValFC (VCase fc _ _) = fc
 getValFC (VMeta fc _ _) = fc
-getValFC (VLam fc _ _) = fc
+getValFC (VLam fc _ _ _ _) = fc
 getValFC (VPi fc _ _ _ a b) = fc
 getValFC (VU fc) = fc
 getValFC (VErased fc) = fc
@@ -309,7 +309,7 @@ Show Val where
   show (VRef _ nm _ [<]) = nm
   show (VRef _ nm _ sp) = "(\{nm} \{unwords $ map show (sp <>> [])})"
   show (VMeta _ ix sp) = "(%meta \{show ix} [\{show $ length sp} sp])"
-  show (VLam _ str x) = "(%lam \{str} \{show x})"
+  show (VLam _ str icit quant x) = "(%lam \{show quant}\{str} \{show x})"
   show (VPi fc str Implicit rig x y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{show  y})"
   show (VPi fc str Explicit rig x y) = "(%pi (\{show rig} \{str} : \{show  x}). \{show  y})"
   show (VCase fc sc alts) = "(%case \{show sc} ...)"

@@ -172,7 +172,7 @@ rename meta ren lvl v = go ren lvl v
           _ => do
             debug "rename: \{show ix} is unsolved"
             catchError {e=Error} (goSpine ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc ix (errorMsg err))
-    go ren lvl (VLam fc n t) = pure (Lam fc n !(go (lvl :: ren) (S lvl) !(t $$ VVar fc lvl [<])))
+    go ren lvl (VLam fc n icit rig t) = pure (Lam fc n icit rig !(go (lvl :: ren) (S lvl) !(t $$ VVar fc lvl [<])))
     go ren lvl (VPi fc n icit rig ty tm) = pure (Pi fc n icit rig !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar emptyFC lvl [<])))
     go ren lvl (VU fc) = pure (U fc)
     go ren lvl (VErased fc) = pure (Erased fc)
@@ -186,8 +186,9 @@ rename meta ren lvl v = go ren lvl v
 
 lams : Nat -> List String -> Tm -> Tm
 lams 0 _ tm = tm
-lams (S k) [] tm = Lam emptyFC "arg_\{show k}" (lams k [] tm)
-lams (S k) (x :: xs) tm = Lam emptyFC x (lams k xs tm)
+-- REVIEW do we want a better FC, icity?, rig?
+lams (S k) [] tm = Lam emptyFC "arg_\{show k}" Explicit Many (lams k [] tm)
+lams (S k) (x :: xs) tm = Lam emptyFC x Explicit Many (lams k xs tm)
 
 export
 unify : Env -> UnifyMode -> Val -> Val  -> M UnifyResult
@@ -284,14 +285,14 @@ unify env mode t u = do
       [| unify env mode a a' <+> unify (fresh :: env) mode !(b $$ fresh) !(b' $$ fresh) |]
 
     -- we don't eta expand on LHS
-    unify' (VLam fc _ t)  (VLam _ _ t') = do
+    unify' (VLam fc _ _ _ t)  (VLam _ _ _ _ t') = do
       let fresh = VVar fc (length env) [<]
       unify (fresh :: env) mode !(t $$ fresh) !(t' $$ fresh)
-    unify' t         (VLam fc' _ t') = do
+    unify' t         (VLam fc' _ _ _ t') = do
       debug "ETA \{show t}"
       let fresh = VVar fc' (length env) [<]
       unify (fresh :: env) mode !(t `vapp` fresh) !(t' $$ fresh)
-    unify' (VLam fc _ t)  t'     = do
+    unify' (VLam fc _ _ _ t)  t'     = do
       debug "ETA' \{show t'}"
       let fresh = VVar fc (length env) [<]
       unify (fresh :: env) mode !(t $$ fresh) !(t' `vapp` fresh)
@@ -853,7 +854,7 @@ buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ str 
   clauses <- traverse (introClause nm icit) prob.clauses
   -- REVIEW fc from a pat?
   vb <- b $$ VVar fc l [<]
-  Lam fc nm <$> buildTree ctx' ({ clauses := clauses, ty := vb } prob)
+  Lam fc nm icit rig <$> buildTree ctx' ({ clauses := clauses, ty := vb } prob)
 buildTree ctx prob@(MkProb ((MkClause fc cons pats@(x :: xs) expr) :: cs) ty) =
   error fc "Extra pattern variables \{show pats}"
 -- need to find some name we can split in (x :: xs)
@@ -949,13 +950,13 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
               let var = VVar fc (length ctx.env) [<]
               let ctx' = extend ctx nm a
               tm' <- check ctx' tm !(b $$ var)
-              pure $ Lam fc nm tm'
+              pure $ Lam fc nm icit rig tm'
             else if icit' /= Explicit then do
               let var = VVar fc (length ctx.env) [<]
               ty' <- b $$ var
               -- use nm' here if we want them automatically in scope
               sc <- check (extend ctx nm' a) t ty'
-              pure $ Lam fc nm' sc
+              pure $ Lam fc nm' icit rig sc
             else
               error fc "Icity issue checking \{show t} at \{show ty}"
   (t@(RLam _ (BI fc nm icit quant) tm), ty) =>
@@ -980,7 +981,7 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
     ty' <- b $$ var
     debugM $ pure "XXX ty' is \{!(prvalCtx {ctx=(extend ctx nm' a)} ty')}"
     sc <- check (extend ctx nm' a) tm ty'
-    pure $ Lam (getFC tm) nm' sc
+    pure $ Lam (getFC tm) nm' Implicit rig sc
 
   (tm, ty@(VPi fc nm' Auto rig a b)) => do
     let names = toList $ map fst ctx.types
@@ -989,7 +990,7 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
     ty' <- b $$ var
     debugM $ pure "XXX ty' is \{!(prvalCtx {ctx=(extend ctx nm' a)} ty')}"
     sc <- check (extend ctx nm' a) tm ty'
-    pure $ Lam (getFC tm) nm' sc
+    pure $ Lam (getFC tm) nm' Auto rig sc
 
   (tm,ty) => do
     -- We need to insert if tm is not an Implicit Lam
@@ -1080,7 +1081,7 @@ infer ctx (RLam _ (BI fc nm icit quant) tm) = do
   let ctx' = extend ctx nm a
   (tm', b) <- infer ctx' tm
   debug "make lam for \{show nm} scope \{pprint (names ctx) tm'} : \{show b}"
-  pure $ (Lam fc nm tm', VPi fc nm icit quant a $ MkClosure ctx.env !(quote (S ctx.lvl) b))
+  pure $ (Lam fc nm icit quant tm', VPi fc nm icit quant a $ MkClosure ctx.env !(quote (S ctx.lvl) b))
 
 infer ctx (RImplicit fc) = do
   ty <- freshMeta ctx fc (VU emptyFC) Normal

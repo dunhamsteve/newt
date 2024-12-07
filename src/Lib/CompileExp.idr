@@ -47,7 +47,7 @@ data CExp : Type where
 ||| code gen.
 export
 lamArity : Tm -> Nat
-lamArity (Lam _ _ t) = S (lamArity t)
+lamArity (Lam _ _ _ _ t) = S (lamArity t)
 lamArity _ = Z
 
 export
@@ -114,7 +114,7 @@ compileTerm t@(Ref fc nm _) = do
   apply (CRef nm) [] [<] !(arityForName fc nm) type
 
 compileTerm (Meta _ k) = pure $ CRef "meta$\{show k}" -- FIXME
-compileTerm (Lam _ nm t) = pure $ CLam nm !(compileTerm t)
+compileTerm (Lam _ nm _ _ t) = pure $ CLam nm !(compileTerm t)
 compileTerm tm@(App _ _ _) with (funArgs tm)
   _ | (Meta _ k, args) = do
         -- this will be undefined, should only happen for use metas
@@ -151,7 +151,7 @@ compileFun : Tm -> M CExp
 compileFun tm = go tm [<]
   where
     go : Tm -> SnocList String -> M CExp
-    go (Lam _ nm t) acc = go t (acc :< nm)
+    go (Lam _ nm _ _ t) acc = go t (acc :< nm)
     go tm [<] = compileTerm tm
     go tm args = pure $ CFun (args <>> []) !(compileTerm tm)
 

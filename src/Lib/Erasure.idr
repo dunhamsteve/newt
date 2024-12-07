@@ -4,7 +4,7 @@ import Lib.Types
 import Data.SnocList
 import Lib.TopContext
 
-EEnv = List (String, Quant)
+EEnv = List (String, Quant, Maybe Tm)
 
 -- check App at type
 
@@ -43,7 +43,7 @@ doAlt env (CaseCons name args t) = do
   CaseCons name args <$> erase env' t []
   where
     piEnv : EEnv -> Tm -> List String -> EEnv
-    piEnv env (Pi fc nm icit rig t u) (arg :: args) = piEnv ((arg,rig) :: env) u args
+    piEnv env (Pi fc nm icit rig t u) (arg :: args) = piEnv ((arg, rig, Just t) :: env) u args
     piEnv env _ _ = env
 
 doAlt env (CaseLit lit t) = CaseLit lit <$> erase env t []
@@ -51,6 +51,7 @@ doAlt env (CaseLit lit t) = CaseLit lit <$> erase env t []
 -- Check erasure and insert "Erased" value
 -- We have a solution for Erased values, so important thing here is checking.
 -- build stack, see what to do when we hit a non-app
+-- This is a little fuzzy because we don't have all of the types.
 erase env t sp = case t of
   (App fc u v) => erase env u ((fc,v) :: sp)
   (Ref fc nm x) => do
@@ -58,11 +59,12 @@ erase env t sp = case t of
     case lookup nm top of
       Nothing => eraseSpine env t sp Nothing
       (Just (MkEntry name type def)) => eraseSpine env t sp (Just type)
-  (Lam fc nm u) => Lam fc nm <$> erase ((nm, Many) :: env) u []
+  (Lam fc nm icit rig u) => Lam fc nm icit rig <$> erase ((nm, rig, Nothing) :: env) u []
+  (Lam fc nm icit rig u) => Lam fc nm icit rig <$> erase ((nm, rig, Nothing) :: env) u []
   -- If we get here, we're looking at a runtime pi type
   (Pi fc nm icit rig u v) => do
     u' <- erase env u []
-    v' <- erase ((nm, Many) :: env) v []
+    v' <- erase ((nm, Many, Just u) :: env) v []
     eraseSpine env (Pi fc nm icit rig u' v') sp Nothing
   -- leaving as-is for now, we don't know the quantity of the apps
   (Meta fc k) => pure t
@@ -73,18 +75,18 @@ erase env t sp = case t of
     eraseSpine env (Case fc u' alts') sp Nothing
   (Let fc nm u v) => do
     u' <- erase env u []
-    v' <- erase ((nm, Many) :: env) v []
+    v' <- erase ((nm, Many, Nothing) :: env) v []
     eraseSpine env (Let fc nm u' v') sp Nothing
   (LetRec fc nm u v) => do
-    u' <- erase ((nm, Many) :: env) u []
-    v' <- erase ((nm, Many) :: env) v []
+    u' <- erase ((nm, Many, Nothing) :: env) u []
+    v' <- erase ((nm, Many, Nothing) :: env) v []
     eraseSpine env (LetRec fc nm u' v') sp Nothing
   (Bnd fc k) => do
     case getAt k env of
       Nothing => error fc "bad index \{show k}"
       -- This is working, but empty FC
-      Just (nm, Zero) => error fc "used erased value \{show nm} (FIXME FC may be wrong here)"
-      Just (nm, Many) => eraseSpine env t sp Nothing
+      Just (nm, Zero, ty) => error fc "used erased value \{show nm} (FIXME FC may be wrong here)"
+      Just (nm, Many, ty) => eraseSpine env t sp ty
   (U fc) => eraseSpine env t sp Nothing
   (Lit fc lit) => eraseSpine env t sp Nothing
   Erased fc => eraseSpine env t sp Nothing

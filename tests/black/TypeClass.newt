@@ -2,7 +2,7 @@ module TypeClass
 
 data Monad : (U -> U) -> U where
   MkMonad : { M : U -> U } ->
-            (bind : {A B : U} -> (M A) -> (A -> M B) -> M B) ->
+            (bind : ∀ A B. (M A) -> (A -> M B) -> M B) ->
             (pure : ∀ A. A -> M A) ->
             Monad M
 
@@ -24,7 +24,7 @@ bindEither : ∀ A B C. (Either A B) -> (B -> Either A C) -> Either A C
 bindEither (Left a) amb = Left a
 bindEither (Right b) amb = amb b
 
-EitherMonad : ∀ A. Monad (Either A)
+EitherMonad : {A : U} -> Monad (Either A)
 EitherMonad = MkMonad {Either A} bindEither Right
 
 data Maybe : U -> U where

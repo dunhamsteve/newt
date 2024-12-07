@@ -255,7 +255,7 @@ Pretty Raw where
     asDoc p (RU _) = text "U"
     asDoc p (RPi _ (BI _ "_" Explicit Many) ty scope) = par p 1 $ asDoc p ty <+> text "->" <+/> asDoc p scope
     asDoc p (RPi _ (BI _ nm icit quant) ty scope) =
-      par p 1 $ wrap icit (text "_" <+> text ":" <+> asDoc p ty ) <+> text "->" <+/> asDoc 1 scope
+      par p 1 $ wrap icit (text (show quant ++ nm) <+> text ":" <+> asDoc p ty ) <+> text "->" <+/> asDoc 1 scope
     asDoc p (RLet _ x v ty scope) =
       par p 0 $ text "let" <+> text x <+> text ":" <+> asDoc p ty
           <+> text "=" <+> asDoc p v

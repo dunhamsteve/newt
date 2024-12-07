@@ -98,13 +98,13 @@ class Monad (m : U → U) where
   pure : {0 a} → a → m a
 
 infixl 1 _>>=_ _>>_
-_>>=_ : {0 m} {{Monad m}} {0 a b} -> (m a) -> (a -> m b) -> m b
+_>>=_ : ∀ m a b. {{Monad m}} -> (m a) -> (a -> m b) -> m b
 ma >>= amb = bind ma amb
 
-_>>_ :  {0 m} {{Monad m}} {0 a b} -> m a -> m b -> m b
+_>>_ :  ∀ m a b. {{Monad m}} -> m a -> m b -> m b
 ma >> mb = ma >>= (\ _ => mb)
 
-join : ∀ m. {{Monad m}} {0 a} → m (m a) → m a
+join : ∀ m a. {{Monad m}} → m (m a) → m a
 join mma = mma >>= id
 
 -- Equality
@@ -295,7 +295,7 @@ pfunc replicate : Nat -> Char → String := `(n,c) => c.repeat(natToInt(n))`
 ptype World
 
 data IORes : U -> U where
-  MkIORes : {a : U} -> a -> World -> IORes a
+  MkIORes : ∀ a. a -> World -> IORes a
 
 IO : U -> U
 IO a = World -> IORes a
@@ -303,8 +303,7 @@ IO a = World -> IORes a
 instance Monad IO where
   bind ma mab = \ w => case ma w of
     MkIORes a w => mab a w
-  pure a = \ w => MkIORes a w
-
+  pure x = \ w => MkIORes x w
 
 bindList : ∀ a b. List a → (a → List b) → List b
 

@@ -34,7 +34,7 @@ infixl 8 $$
 
 export
 vapp : Val -> Val -> M Val
-vapp (VLam _ _ t) u = t $$ u
+vapp (VLam _ _ _ _ t) u = t $$ u
 vapp (VVar fc k sp) u = pure $ VVar fc k (sp :< u)
 vapp (VRef fc nm def sp) u = pure $ VRef fc nm def (sp :< u)
 vapp (VMeta fc k sp) u = pure $ VMeta fc k (sp :< u)
@@ -150,7 +150,7 @@ eval env mode (Meta fc i) =
   case !(lookupMeta i) of
         (Unsolved _ k xs _ _ _) => pure $ VMeta fc i [<]
         (Solved _ k t) => pure $ t
-eval env mode (Lam fc x t) = pure $ VLam fc x (MkClosure env t)
+eval env mode (Lam fc x icit rig t) = pure $ VLam fc x icit rig (MkClosure env t)
 eval env mode (Pi fc x icit rig a b) = pure $ VPi fc x icit rig !(eval env mode a) (MkClosure env b)
 eval env mode (Let fc nm t u) = pure $ VLet fc nm !(eval env mode t) !(eval (VVar fc (length env) [<] :: env) mode u)
 eval env mode (LetRec fc nm t u) = pure $ VLetRec fc nm !(eval (VVar fc (length env) [<] :: env) mode t) !(eval (VVar fc (length env) [<] :: env) mode u)
@@ -186,7 +186,7 @@ quote l (VMeta fc i sp) =
   case !(lookupMeta i) of
         (Unsolved _ k xs _ _ _) => quoteSp l (Meta fc i) sp
         (Solved _ k t) => quote l !(vappSpine t sp)
-quote l (VLam fc x t) = pure $ Lam fc x !(quote (S l) !(t $$ VVar emptyFC l [<]))
+quote l (VLam fc x icit rig t) = pure $ Lam fc x icit rig !(quote (S l) !(t $$ VVar emptyFC l [<]))
 quote l (VPi fc x icit rig a b) = pure $ Pi fc x icit rig !(quote l a) !(quote (S l) !(b $$ VVar emptyFC l [<]))
 quote l (VLet fc nm t u) = pure $ Let fc nm !(quote l t) !(quote (S l) u)
 quote l (VLetRec fc nm t u) = pure $ LetRec fc nm !(quote (S l) t) !(quote (S l) u)
@@ -244,7 +244,7 @@ tweakFC fc (Bnd fc1 k) = Bnd fc k
 tweakFC fc (Ref fc1 nm x) = Ref fc nm x
 tweakFC fc (U fc1) = U fc
 tweakFC fc (Meta fc1 k) = Meta fc k
-tweakFC fc (Lam fc1 nm t) = Lam fc nm t
+tweakFC fc (Lam fc1 nm icit rig t) = Lam fc nm icit rig t
 tweakFC fc (App fc1 t u) = App fc t u
 tweakFC fc (Pi fc1 nm icit x t u) = Pi fc nm icit x t u
 tweakFC fc (Case fc1 t xs) = Case fc t xs
@@ -278,7 +278,7 @@ zonkAlt top l env (CaseCons name args t) = CaseCons name args <$> go l env args 
 
 zonk top l env t = case t of
   (Meta fc k) => zonkApp top l env t []
-  (Lam fc nm u) => Lam fc nm <$> (zonk top (S l) (VVar fc l [<] :: env) u)
+  (Lam fc nm icit rig u) => Lam fc nm icit rig <$> (zonk top (S l) (VVar fc l [<] :: env) u)
   (App fc t u) => zonkApp top l env t [!(zonk top l env u)]
   (Pi fc nm icit rig a b) => Pi fc nm icit rig <$> zonk top l env a <*> zonkBind top l env b
   (Let fc nm t u) => Let fc nm <$> zonk top l env t <*> zonkBind top l env u

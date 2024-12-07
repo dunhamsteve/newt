@@ -57,7 +57,7 @@ updateMap k v (MapOf map) = case insertT23 k v map of
   Left map' => MapOf map'
   Right (a, b, c) => MapOf (Node2 a b c)
 
--- FIXME this doesn't work in a `where` because the erased args are un-erased
+-- FIXME this doesn't work in a `where` because Letrec doesn't have the type
 toList' : ∀ k v h. T23 h k v → List (k × v) → List (k × v)
 toList' (Leaf k v) acc = (k, v) :: acc
 toList' (Node2 t1 k1 t2) acc = toList' t2 (toList' t1 acc)
@@ -65,7 +65,7 @@ toList' (Node3 t1 k1 t2 k2 t3) acc = toList' t3 $ toList' t2 $ toList' t1 acc
 
 toList : ∀ k v. SortedMap k v → List (k × v)
 toList {k} {v} (MapOf smap) = reverse $ toList' smap Nil
-  -- FIXME erasure checking false positive - maybe because I'm not handling the top level args yet
+  -- FIXME erasure checking false positive (need type on foo in env when processing Letrec)
   -- where
   --   foo : ∀ k v h. T23 h k v → List (k × v) → List (k × v)
   --   foo (Leaf k v) acc = (k, v) :: acc

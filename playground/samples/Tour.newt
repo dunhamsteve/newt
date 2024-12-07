@@ -64,8 +64,8 @@ infixl 2 _≡_
 -- Here is an equality, like Idris, everything goes to the right of the colon
 -- Implicits are denoted with braces `{ }`
 -- unlike idris, you have to declare all of your implicits
-data _≡_ : {A : U} -> A -> A -> U where
-  Refl : {A : U} {a : A} -> a ≡ a
+data _≡_ : {0 A : U} -> A -> A -> U where
+  Refl : {0 A : U} {0 a : A} -> a ≡ a
 
 -- And now the compiler can verify that 1 + 1 = 2
 test : plus (S Z) (S Z) ≡ S (S Z)
@@ -124,7 +124,6 @@ pfunc plusString : String -> String -> String := `(x,y) => x + y`
 
 -- We can make them Plus instances:
 
-
 instance Add Int where
   _+_ = plusInt
 
@@ -159,10 +158,10 @@ bind {m} {{MkMonad pure bind}} = bind
 -- we can declare multiple infix operators at once
 infixl 1 _>>=_ _>>_
 
-_>>=_ : {m} {{Monad m}} {a b} -> m a -> (a -> m b) -> m b
+_>>=_ : ∀ m a b. {{Monad m}} -> m a -> (a -> m b) -> m b
 _>>=_ ma amb = bind ma amb
 
-_>>_ :  {m} {{Monad m}} {a b} -> m a -> m b -> m b
+_>>_ :  ∀ m a b. {{Monad m}} -> m a -> m b -> m b
 ma >> mb = ma >>= (λ _ => mb)
 
 -- Now we define list and show it is a monad. At the moment, I don't

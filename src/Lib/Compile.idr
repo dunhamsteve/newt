@@ -324,7 +324,7 @@ process (done,docs) nm = do
     walkAlt acc (CaseLit lit t) = walkTm t acc
 
     walkTm (Ref x nm y) acc = process acc nm
-    walkTm (Lam x str t) acc = walkTm t acc
+    walkTm (Lam x str _ _ t) acc = walkTm t acc
     walkTm (App x t u) acc = walkTm t !(walkTm u acc)
     walkTm (Pi x str icit y t u) acc = walkTm t !(walkTm u acc)
     walkTm (Let x str t u) acc = walkTm t !(walkTm u acc)
