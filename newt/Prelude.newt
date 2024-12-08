@@ -647,6 +647,9 @@ instance Ord Int where
   -- isEq = ?
   x < y = ltInt x y
 
+instance Ord Char where
+  x < y = jsLT x y
+
 -- foo : ∀ a. {{Ord a}} -> a -> Bool
 -- foo a = a == a
 
