@@ -23,6 +23,7 @@ modules =
   Lib.Prettier,
   Lib.ProcessDecl,
   Lib.Syntax,
+  Lib.Common,
   Lib.Eval,
   Lib.Token,
   Lib.TopContext,

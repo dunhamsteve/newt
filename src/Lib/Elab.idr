@@ -556,6 +556,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
 
   -- if the value is already constrained to a different constructor, return Nothing
   debug "scrut \{scnm} constrained to \{show $ lookupDef ctx scnm}"
+  let (VRef _ sctynm _ _) = scty | _ => error (getFC scty) "case split on non-inductive \{show scty}"
 
   case lookupDef ctx scnm of
     Just val@(VRef fc nm y sp) =>
@@ -571,7 +572,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         debug "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
         debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
         for_ prob.clauses $ (\x => debug "    \{show x}")
-        clauses <- mapMaybe id <$> traverse (rewriteClause vars) prob.clauses
+        clauses <- mapMaybe id <$> traverse (rewriteClause sctynm vars) prob.clauses
         debug "and now:"
         for_ clauses $ (\x => debug "    \{show x}")
         when (length clauses == 0) $ error ctx.fc "Missing case for \{dcName} splitting \{scnm}"
@@ -609,7 +610,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         debug "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
         debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
         for_ prob.clauses $ (\x => debug "    \{show x}")
-        clauses <- mapMaybe id <$> traverse (rewriteClause vars) prob.clauses
+        clauses <- mapMaybe id <$> traverse (rewriteClause sctynm vars) prob.clauses
         debug "and now:"
         for_ clauses $ (\x => debug "    \{show x}")
         when (length clauses == 0) $ error ctx.fc "Missing case for \{dcName} splitting \{scnm}"
@@ -647,23 +648,32 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         else pure $ (nm, pat) :: !(makeConstr xs pats)
 
     -- replace constraint with constraints on parameters, or nothing if non-matching clause
-    rewriteConstraint : List Bind -> List Constraint -> List Constraint -> M (Maybe (List Constraint))
-    rewriteConstraint vars [] acc = pure $ Just acc
-    rewriteConstraint vars (c@(nm, y) :: xs) acc =
+    rewriteConstraint : String -> List Bind -> List Constraint -> List Constraint -> M (Maybe (List Constraint))
+    rewriteConstraint sctynm vars [] acc = pure $ Just acc
+    rewriteConstraint sctynm vars (c@(nm, y) :: xs) acc =
       if nm == scnm
         then case y of
           PatVar _ _ s => pure $ Just $ c :: (xs ++ acc)
           PatWild _ _ => pure $ Just $ c :: (xs ++ acc)
           -- FIXME why don't we hit this ('x' for Just x)
           PatLit fc lit => error fc "Literal \{show lit} in constructor split"
-          PatCon _ _ str ys => if str == dcName
+          -- FIXME check type
+          PatCon fc _ nm ys => if nm == dcName
             then pure $ Just $ !(makeConstr vars ys) ++ xs ++ acc
-            else pure Nothing
-        else rewriteConstraint vars xs (c :: acc)
+            -- TODO can we check this when we make the PatCon?
+            else do
+              case lookup nm !get of
+                  (Just (MkEntry _ name type (DCon k tcname))) =>
+                    if (tcname /= sctynm)
+                      then error fc "Constructor is \{tcname} expected \{sctynm}"
+                      else pure Nothing
+                  Just _ => error fc "Internal Error: \{nm} is not a DCon"
+                  Nothing => error fc "Internal Error: DCon \{nm} not found"
+        else rewriteConstraint sctynm vars xs (c :: acc)
 
-    rewriteClause : List Bind -> Clause -> M (Maybe Clause)
-    rewriteClause vars (MkClause fc cons pats expr) = do
-      Just cons <- rewriteConstraint vars cons [] | _ => pure Nothing
+    rewriteClause : String -> List Bind -> Clause -> M (Maybe Clause)
+    rewriteClause sctynm vars (MkClause fc cons pats expr) = do
+      Just cons <- rewriteConstraint sctynm vars cons [] | _ => pure Nothing
       pure $ Just $ MkClause fc cons pats expr
 
 
@@ -843,6 +853,10 @@ buildLitCases ctx prob fc scnm scty = do
       Nothing => True
       _ => False
 
+litTyName : Literal -> String
+litTyName (LString str) = "String"
+litTyName (LInt i) = "Int"
+litTyName (LChar c) = "Char"
 
 -- This process is similar to extendPi, but we need to stop
 -- if one clause is short on patterns.
@@ -873,21 +887,27 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
   let Just (sctm, scty) := lookupName ctx scnm
     | _ => error fc "Internal Error: can't find \{scnm} in environment"
 
+  -- REVIEW We probably need to know this is a VRef before we decide to split on this slot..
+  scty' <- unlet ctx.env scty >>= forceType ctx.env
   case pat of
     PatCon _ _ _ _ => do
       -- expand vars that may be solved, eval top level functions
-      scty' <- unlet ctx.env scty >>= forceType ctx.env
+
       debug "EXP \{show scty} -> \{show scty'}"
       -- this is per the paper, but it would be nice to coalesce
       -- default cases
       cons <- getConstructors ctx (getFC pat) scty'
       debug "CONS \{show $ map fst cons}"
-      alts <- traverse (buildCase ctx prob scnm scty) cons
+      alts <- traverse (buildCase ctx prob scnm scty') cons
       debug "GOTALTS \{show alts}"
       when (length (catMaybes alts) == 0) $ error (fc) "no alts for \{show scty'}"
       -- TODO check for empty somewhere?
       pure $ Case fc sctm (catMaybes alts)
     PatLit fc v => do
+      let tyname = litTyName v
+      case scty' of
+        (VRef fc1 nm x sp) => when (nm /= tyname) $ error fc "expected \{show scty} and got \{tyname}"
+        _ => error fc "expected \{show scty} and got \{tyname}"
       -- need to run through all of the PatLits in this slot and then find a fallback
       -- walk the list of patterns, stop if we hit a PatVar / PatWild, fail if we don't
       alts <- buildLitCases ctx prob fc scnm scty

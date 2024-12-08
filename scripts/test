@@ -1,6 +1,6 @@
 #!/bin/sh
 
-for i in tests/black/*.newt playground/samples/*.newt; do
+for i in tests/black/*.newt playground/samples/*.newt aoc2024/*.newt; do
   ./build/exec/newt $i
   if [ $? != "0" ]; then
     echo FAIL $i

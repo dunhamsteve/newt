@@ -7,6 +7,21 @@ import Lib.ProcessDecl
 import Lib.TopContext
 import Lib.Syntax
 
+{-
+
+Expect these to throw. (need failing blocks or a white box test here)
+After we get pack/lsp issues sorted with this directory
+
+foo : Maybe (Int × Int) -> Int
+foo 1 = ?
+foo _ = ?
+
+foo : Maybe (Int × Int) -> Int
+foo (1,1) = ?
+foo _ = ?
+
+-}
+
 testCase : M ()
 testCase = do
   -- need to get some defs in here

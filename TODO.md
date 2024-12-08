@@ -3,15 +3,17 @@
 
 - [x] SortedMap.newt issue in `where`
 - [x] fix "insufficient patterns", wire in M or Either String
-- [ ] Matching _,_ when Maybe is expected should be an error
+- [x] Matching _,_ when Maybe is expected should be an error
 - [ ] error for non-linear pattern
 - [ ] typeclass dependencies
   - need to flag internal functions to not search (or flag functions for search). I need to decide on syntax for this.
   - don't search functions that are currently being defined. This is subtle... We do want to recurse in bind, we don't want to do that for the isEq function.  Maybe something idris like.
 - [ ] default implementations (use them if nothing is defined, where do we store them?) e.g. Ord compare, <, etc in Idris
 - [ ] syntax for negative integers
+- [ ] White box tests in `test` directory
 - [x] Put worker in iframe on safari
 - [ ] Warnings or errors for missing definitions
+- [ ] Add the type name to dcon so confusion detection in case split is simpler
 - [ ] Warnings or errors for unused cases
   - This is important when misspelled constructors become pattern vars
 - [ ] if we're staying with this version of auto, we might need to list candidates and why they're rejected. e.g. I had a bifunctor fail to solve because the right answer unblocked a Foo vs IO Foo mismatch
@@ -27,6 +29,7 @@
   - Makes inference easier, cleaner output, and allows `foo $ \ x => ...`
   - remove hack from Elab.infer
   - [ ] `$` no longer works inside ≡⟨ ⟩ sort out how to support both that and `$ \ x => ...` (or don't bother)
+    - We'd either need to blacklist all non-initial mixfix bits at the appropriate spots or always pass around a terminating token.
 - [ ] **Translate newt to newt**
   - [ ] Support @ on the LHS
   - [x] if / then / else sugar
