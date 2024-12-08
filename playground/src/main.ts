@@ -2,8 +2,18 @@ import { effect, signal } from "@preact/signals";
 import { newtConfig, newtTokens } from "./monarch.ts";
 import * as monaco from "monaco-editor";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { h, render, VNode } from "preact";
+import { h, render } from "preact";
 import { ChangeEvent } from "preact/compat";
+import { archive, preload } from "./preload.ts";
+import { CompileReq, CompileRes } from "./types.ts";
+
+// editor.(createModel / setModel / getModels) to switch files
+
+// TODO - remember files and allow switching?
+
+// static zip filesystem with user changes overlaid via localStorage
+// download individual files (we could use the cheap compression from the pdflib or no compression to make zip download)
+// would need way to reset/delete
 
 interface FC {
   file: string;
@@ -31,22 +41,27 @@ monaco.languages.registerDefinitionProvider("newt", {
     if (!topData) return;
     // HACK - we don't know our filename which was generated from `module` decl, so
     // assume the last context entry is in our file.
-    let last = topData.context[topData.context.length-1]
-    let file = last.fc.file
+    let last = topData.context[topData.context.length - 1];
+    let file = last.fc.file;
 
     const info = model.getWordAtPosition(position);
     if (!info) return;
     let entry = topData.context.find((entry) => entry.name === info.word);
     // we can't switch files at the moment
-    if (!entry || entry.fc.file !== file) return
-    let lineNumber = entry.fc.line + 1
-    let column = entry.fc.col + 1
-    let word = model.getWordAtPosition({lineNumber, column})
-    let range = new monaco.Range(lineNumber, column, lineNumber, column)
+    if (!entry || entry.fc.file !== file) return;
+    let lineNumber = entry.fc.line + 1;
+    let column = entry.fc.col + 1;
+    let word = model.getWordAtPosition({ lineNumber, column });
+    let range = new monaco.Range(lineNumber, column, lineNumber, column);
     if (word) {
-      range = new monaco.Range(lineNumber, word.startColumn, lineNumber, word.endColumn)
+      range = new monaco.Range(
+        lineNumber,
+        word.startColumn,
+        lineNumber,
+        word.endColumn
+      );
     }
-    return { uri: model.uri,range}
+    return { uri: model.uri, range };
   },
 });
 monaco.languages.registerHoverProvider("newt", {
@@ -68,7 +83,7 @@ monaco.languages.registerHoverProvider("newt", {
   },
 });
 const newtWorker = new Worker("worker.js");
-let postMessage = (msg: any) => newtWorker.postMessage(msg);
+let postMessage = (msg: CompileReq) => newtWorker.postMessage(msg);
 
 // Safari/MobileSafari have small stacks in webworkers.
 if (navigator.vendor.includes("Apple")) {
@@ -117,20 +132,29 @@ function setOutput(output: string) {
   state.output.value = output;
 }
 
-window.onmessage = (ev) => {
+interface ConsoleList {
+  messages: string[]
+}
+interface ConsoleItem {
+  message: string
+}
+
+type WinMessage = CompileRes | ConsoleList | ConsoleItem
+
+window.onmessage = (ev: MessageEvent<WinMessage>) => {
   console.log("window got", ev.data);
-  if (ev.data.messages) state.messages.value = ev.data.messages;
-  if (ev.data.message) {
+  if ('messages' in ev.data) state.messages.value = ev.data.messages;
+  if ('message' in ev.data) {
     state.messages.value = [...state.messages.value, ev.data.message];
   }
   // safari callback
-  if (ev.data.output !== undefined) {
+  if ('output' in ev.data) {
     setOutput(ev.data.output);
     state.javascript.value = ev.data.javascript;
   }
 };
 
-newtWorker.onmessage = (ev) => {
+newtWorker.onmessage = (ev: MessageEvent<CompileRes>) => {
   setOutput(ev.data.output);
   state.javascript.value = ev.data.javascript;
 };
@@ -169,9 +193,10 @@ if (window.matchMedia) {
 }
 
 async function loadFile(fn: string) {
-  if (fn) {
-    const res = await fetch(fn);
-    const text = await res.text();
+  await preload;
+  let data = archive?.getData(fn);
+  if (data) {
+    let text = new TextDecoder().decode(data);
     state.editor.value!.setValue(text);
   } else {
     state.editor.value!.setValue("module Main\n");

@@ -3,9 +3,8 @@ mkdir -p public
 echo build monaco worker
 esbuild --bundle node_modules/monaco-editor/esm/vs/editor/editor.worker.js > public/workerMain.js
 echo build newt worker
-esbuild src/worker.ts > public/worker.js
+esbuild src/worker.ts --bundle --format=esm > public/worker.js
 echo copy newt
 cp ../build/exec/newt.js public
-# cat ../build/exec/newt.js |grep -v '^#'>> public/worker.js
-cp -r samples/* public
-# esbuild --minify ../build/exec/newt.min.js > public/newt.js
+cp -r static/* public
+(cd samples && zip -r ../public/files.zip .)
