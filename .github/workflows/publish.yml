@@ -20,6 +20,8 @@ jobs:
           node-version: 18
       - name: build
         run: |
+          apt update
+          apt-get install -y zip
           pack install contrib
           make
           cd playground
