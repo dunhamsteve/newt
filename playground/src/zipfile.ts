@@ -298,6 +298,7 @@ export class ZipFile {
     }
   }
   getData(name: string) {
+    if (!(name in this.entries)) return
     let { start, end, size } = this.entries[name];
     return inflate(new Uint8Array(this.data.slice(start, end)));
   }

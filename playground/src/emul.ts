@@ -135,7 +135,7 @@ export let shim: NodeShim = {
           buf = shim.files[name];
         } else if (shim.archive?.entries[name]) {
           // keep a copy of the uncompressed version for speed
-          buf = shim.files[name] = shim.archive.getData(name);
+          buf = shim.files[name] = shim.archive.getData(name)!;
         } else {
           shim.process.__lasterr.errno = 1;
           throw new Error(`${name} not found`);

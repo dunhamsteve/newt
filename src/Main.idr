@@ -74,7 +74,7 @@ processModule base stk name = do
   modify { loaded $= (name::) }
   let fn = if base == "" then name ++ ".newt" else base ++ "/" ++ name ++ ".newt"
   Right src <- readFile $ fn
-    | Left err => fail (show err)
+    | Left err => fail "error reading \{fn}: \{show err}"
   let Right toks = tokenise fn src
     | Left err => fail (showError src err)
 

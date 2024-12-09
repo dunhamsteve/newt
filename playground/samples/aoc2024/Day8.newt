@@ -1,0 +1,95 @@
+module Day8
+
+import Prelude
+import Node
+import Aoc
+import SortedMap
+
+Point : U
+Point = Int × Int
+
+instance Add Point where
+  (a,b) + (c,d) = (a + c, b + d)
+
+instance Sub Point where
+  (a,b) - (c,d) = (a - c, b - d)
+
+Ant : U
+Ant = Char × Int × Int
+
+-- This should be a utility...
+parse : String → List Ant
+parse text = go 0 0 (unpack text) Nil
+  where
+    -- might as well be tail recursive
+    go : Int → Int → List Char → List Ant → List Ant
+    go row col Nil ants = ants
+    go row col ('\n' :: cs) ants = go (row + 1) 0 cs ants
+    go row col (c :: cs) ants = go row (col + 1) cs ((c,row,col) :: ants)
+
+doPair : Point → Point → List Point
+doPair x y = let d = y - x in y + d :: x - d :: Nil
+
+doGroup : List Ant -> List Point
+doGroup (x :: xs) = join $ doGroup xs ::  map (doPair (snd x) ∘ snd) xs
+doGroup Nil = Nil
+
+group : List Ant → (List Ant) → List (List Ant)
+group (a :: as) Nil = group as (a :: Nil)
+group (a :: as) (b :: bs) =
+  if fst a == fst b
+    then group as (a :: b :: bs)
+    else (b :: bs) :: group as (a :: Nil)
+group Nil bs = bs :: Nil
+
+max : Int → Int → Int
+max a b = if a < b then b else a
+
+check : Int → Point → Bool
+check mr (r,c) = 0 <= r && 0 <= c && r <= mr && c <= mr
+
+
+doPair2 : Int -> Point → Point → List Point
+doPair2 m x y = go x (y - x) ++ go y (x - y)
+  where
+    go : Point -> Point -> List Point
+    go pt d = if check m pt then pt :: go (pt + d) d else Nil
+
+doGroup2 : Int -> List Ant -> List Point
+doGroup2 m (x :: xs) = join $ doGroup2 m xs ::  map (doPair2 m (snd x) ∘ snd) xs
+doGroup2 m Nil = Nil
+
+instance Ord Point where
+  (a,b) < (c,d) = a < c || a == c && b < d
+
+instance Eq Point where
+  (a,b) == (c,d) = a == c && b == d
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let points = parse text
+  let maxrow = trace "maxrow" $ foldl max 0 $ map (fst ∘ snd) points
+  let maxcol = trace "maxcol" $ foldl max 0 $ map (snd ∘ snd) points
+  let ants = filter (\ pt => fst pt /= '.') points
+  let ants = qsort (\ x y => fst x < fst y) ants
+  let groups = group ants Nil
+  let stuff = join $ map doGroup groups
+  let nodes = filter (check maxrow) stuff
+
+  let part1 = length $ ordNub nodes
+  putStrLn $ "part1 " ++ show part1
+
+  let stuff2 = join $ map (doGroup2 maxrow) groups
+  let part2 = length $ ordNub stuff2
+  putStrLn $ "part2 " ++ show part2
+
+
+
+
+
+main : IO Unit
+main = do
+  run "aoc2024/day8/eg.txt"
+  run "aoc2024/day8/input.txt"

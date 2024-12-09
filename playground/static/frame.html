@@ -1,31 +1,6 @@
 <html>
-    <head>
-        <script>
-realLog = console.log
-messages = []
-console.log = (...args) => {
-    window.parent.postMessage({message: args.join(' ')}, '*')
-    // messages.push(args.join(' '))
-    realLog(...args)
-}
-window.addEventListener('message', (ev) => {
-    realLog('got', ev)
-    let {cmd, src} = ev.data
-    if (cmd === 'exec') {
-        try {
-          window.parent.postMessage({messages: []}, '*')
-          eval(src)
-        } catch (e) {
-            console.log(e)
-        }
-    }
-    // window.parent.postMessage({messages}, '*')
-    messages = []
-})
-realLog('IFRAME INITIALIZED')
-        </script>
-    </head>
-    <body>
-
-    </body>
+  <head>
+    <script src="frame.js"></script>
+  </head>
+  <body></body>
 </html>

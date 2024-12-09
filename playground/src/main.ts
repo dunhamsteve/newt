@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { h, render } from "preact";
 import { ChangeEvent } from "preact/compat";
 import { archive, preload } from "./preload.ts";
-import { CompileReq, CompileRes } from "./types.ts";
+import { CompileReq, CompileRes, Message } from "./types.ts";
 
 // editor.(createModel / setModel / getModels) to switch files
 
@@ -102,14 +102,15 @@ document.body.appendChild(iframe);
 
 function run(src: string) {
   console.log("SEND TO", iframe.contentWindow);
-  postMessage({ src });
+  const fileName = state.currentFile.value
+  postMessage({ type: 'compileRequest', fileName, src });
 }
 
 function runOutput() {
   const src = state.javascript.value;
   console.log("RUN", iframe.contentWindow);
   try {
-    iframe.contentWindow?.postMessage({ cmd: "exec", src }, "*");
+    iframe.contentWindow?.postMessage({ type: "exec", src }, "*");
   } catch (e) {
     console.error(e);
   }
@@ -132,23 +133,15 @@ function setOutput(output: string) {
   state.output.value = output;
 }
 
-interface ConsoleList {
-  messages: string[]
-}
-interface ConsoleItem {
-  message: string
-}
 
-type WinMessage = CompileRes | ConsoleList | ConsoleItem
-
-window.onmessage = (ev: MessageEvent<WinMessage>) => {
+window.onmessage = (ev: MessageEvent<Message>) => {
   console.log("window got", ev.data);
-  if ('messages' in ev.data) state.messages.value = ev.data.messages;
-  if ('message' in ev.data) {
+  if ("messages" in ev.data) state.messages.value = ev.data.messages;
+  if ("message" in ev.data) {
     state.messages.value = [...state.messages.value, ev.data.message];
   }
   // safari callback
-  if ('output' in ev.data) {
+  if ("output" in ev.data) {
     setOutput(ev.data.output);
     state.javascript.value = ev.data.javascript;
   }
@@ -172,8 +165,11 @@ const state = {
   messages: signal<string[]>([]),
   editor: signal<monaco.editor.IStandaloneCodeEditor | null>(null),
   dark: signal(false),
+  files: signal<string[]>(["Tour.newt"]),
+  currentFile: signal<string>(localStorage.currentFile ?? 'Tour.newt')
 };
 
+// Monitor dark mode state (TODO - let user override system setting)
 if (window.matchMedia) {
   function checkDark(ev: { matches: boolean }) {
     console.log("CHANGE", ev);
@@ -199,8 +195,10 @@ async function loadFile(fn: string) {
     let text = new TextDecoder().decode(data);
     state.editor.value!.setValue(text);
   } else {
-    state.editor.value!.setValue("module Main\n");
+    state.editor.value!.setValue("module Main\n\n-- File not found\n");
   }
+  state.currentFile.value = fn
+  localStorage.currentFile = fn
 }
 
 // I keep pressing this.
@@ -212,8 +210,6 @@ const LOADING = "module Loading\n";
 
 let value = localStorage.code || LOADING;
 let initialVertical = localStorage.vertical == "true";
-
-// let result = document.getElementById("result")!;
 
 // the editor might handle this itself with the right prodding.
 effect(() => {
@@ -325,20 +321,16 @@ function Tabs() {
   );
 }
 
-const SAMPLES = [
-  "Tour.newt",
-  "Hello.newt",
-  "DSL.newt",
-  "Tree.newt",
-  "Reasoning.newt",
-  "Lists.newt",
-  "Day1.newt",
-  "Day2.newt",
-  "Node.newt",
-  "Prelude.newt",
-  "TypeClass.newt",
-  "Combinatory.newt",
-];
+preload.then(() => {
+  if (archive) {
+    let files = [];
+    for (let name in archive.entries) {
+      if (name.endsWith(".newt")) files.push(name);
+    }
+    files.sort();
+    state.files.value = files;
+  }
+});
 
 function EditWrap({
   vertical,
@@ -347,9 +339,12 @@ function EditWrap({
   vertical: boolean;
   toggle: () => void;
 }) {
-  const options = SAMPLES.map((value) => h("option", { value }, value));
+  // const [file, setFile] = useState("Tour.newt");
+  const options = state.files.value.map((value) =>
+    h("option", { value }, value)
+  );
 
-  const onChange = async (ev: ChangeEvent) => {
+  const selectFile = async (ev: ChangeEvent) => {
     if (ev.target instanceof HTMLSelectElement) {
       let fn = ev.target.value;
       ev.target.value = "";
@@ -368,12 +363,7 @@ function EditWrap({
     h(
       "div",
       { className: "tabBar" },
-      h(
-        "select",
-        { onChange },
-        h("option", { value: "" }, "choose sample"),
-        options
-      ),
+      h("select", { onChange: selectFile, value: state.currentFile.value }, options),
       h("div", { style: { flex: "1 1" } }),
       h("button", { onClick: runOutput }, svg(play)),
       h("button", { onClick: toggle }, svg(d))
@@ -420,7 +410,8 @@ const processOutput = (
       let [_full, kind, file, line, col, message] = match;
       let lineNumber = +line + 1;
       let column = +col + 1;
-      if (fn && file !== fn) {
+      // FIXME - pass the real path in
+      if (fn && fn == file) {
         lineNumber = column = 0;
       }
       let start = { column, lineNumber };
