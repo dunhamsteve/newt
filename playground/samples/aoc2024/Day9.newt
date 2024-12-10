@@ -1,0 +1,127 @@
+module Day9
+
+import Prelude
+import Node
+import Aoc
+import SortedMap
+
+File : U
+File = Int × Int × Int
+
+parse : String -> List File
+parse cs = go 0 (unpack $ trim cs) Nil
+  where
+    go : Int -> List Char -> List File -> List File
+    go id (a :: b :: cs) acc =
+      go (id + 1) cs ((id, (ord a - 48), (ord b - 48)) :: acc)
+    go id (a :: cs) acc = go (id + 1) cs ((id, (ord a - 48), 0) :: acc)
+    go _ _ acc = reverse acc
+
+part1 : List File -> Int
+part1 fs = go 0 0 fs $ reverse fs
+  where
+    go : Int -> Int -> List File -> List File -> Int
+    go pos csum Nil bwd = ?
+    go pos csum fwd Nil = csum
+    go pos csum ((id, 0, 0) :: fwd) bwd = go pos csum fwd bwd
+    go pos csum fwd ((id, 0, _) :: bwd) = go pos csum fwd bwd
+    go pos csum ((id, 0, k) :: fs) ((id', l, g) :: bwd) =
+      if id == id' then csum
+      else go (pos + 1) (csum + pos * id') ((id, 0, k - 1) :: fs) ((id', l - 1, g) :: bwd)
+    go pos csum ((id, k, gap) :: fs) ((id', l, g) :: rest) =
+      if id == id'
+        then go (pos + 1) (csum + pos * id) ((id, k, gap) :: fs) ((id', l - 1, g) :: Nil)
+        else go (pos + 1) (csum + pos * id) ((id, k - 1, gap) :: fs) ((id', l, g) :: rest)
+
+min : Int → Int → Int
+min a b = if a < b then a else b
+
+-- I really do want records...
+Node : U
+Node = Int × Int × File
+
+FileSystem : U
+FileSystem = SortedMap Int Node
+
+mkfs : List File → FileSystem
+mkfs = foldl go EmptyMap
+  where
+    go : FileSystem → File → FileSystem
+    go fs (id,l,g) = updateMap id (id - 1, id + 1, id, l, g) fs
+
+removeNode : Int → FileSystem → FileSystem
+removeNode ix fs =
+  -- yeah, I want records..
+  let (Just (_ ,p1,n1, i1, l1, g1)) = lookupMap ix fs | _ => fs in
+  let (Just (_, p2, _, i2, l2, g2)) = lookupMap p1 fs | _ => fs in
+  let fs = updateMap p1 (p2, n1, i2, l2, g2 + l1 + g1) fs in
+  let (Just (_, _, n2, i2, l2, g2)) = lookupMap n1 fs | _ => fs in
+  updateMap n1 (p1, n2, i2, l2, g2) fs
+
+insertNode : Int → File → FileSystem → FileSystem
+insertNode ix (i,l,g) fs =
+  -- previous
+  let (Just (_, p1, n1, i1, l1, g1)) = lookupMap ix fs | _ => fs in
+  let fs = updateMap ix (p1,i,i1,l1,0) fs in
+  let fs = updateMap i (ix, n1, i,l,g1 - l) fs in
+  let (Just (_, p2, n2, i2, l2, g2)) = lookupMap n1 fs | _ => fs in
+  updateMap n1 (i, n2, i2, l2, g2) fs
+
+defrag : FileSystem → Int -> Int → Int → FileSystem
+defrag fs start end limit =
+  case lookupMap end fs of
+    Nothing => fs
+    Just (k,(p,n,id,l,g)) =>
+      -- our only optimization...
+      if limit <= l then defrag fs start p limit else
+      case search l start end of
+        Nothing => defrag fs start p (min l limit)
+        Just (id',l',g') =>
+          defrag (insertNode id' (id,l,g) $ removeNode end fs) start p limit
+  where
+    search : Int → Int → Int -> Maybe File
+    search size pos end =
+      if pos == end then Nothing else
+      case lookupMap pos fs of
+        Nothing => Nothing
+        Just (_,(p,n,id,l,g)) =>
+          if size <= g then Just (id,l,g)
+          else search size n end
+
+check : FileSystem → Int
+check fs = go 0 0 $ files 0 Lin
+  where
+    files : Int → SnocList File → List File
+    files start acc = case lookupMap start fs of
+      Nothing => acc <>> Nil
+      Just (_, _, n, f) => files n (acc :< f)
+
+    go : Int → Int → List File → Int
+    go pos csum Nil = csum
+    go pos csum ((id,l,g) :: rest) =
+      if l == 0 then go (pos + g) csum rest
+      else go (pos + 1) (csum + pos * id) ((id, l - 1, g) :: rest)
+
+part2 : List File → Int
+part2 files =
+  let fs = mkfs files
+      end = cast (length files) - 1
+      fs' = defrag fs 0 end end
+  in check fs'
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let files = parse $ trim text
+  putStrLn $ show (length files) ++  " files"
+  let p1 = part1 files
+  putStrLn $ "part1 " ++ show p1
+  let p2 = part2 files
+  putStrLn $ "part2 " ++ show p2
+  pure MkUnit
+
+main : IO Unit
+main = do
+  run "aoc2024/day9/eg.txt"
+  run "aoc2024/day9/input.txt"

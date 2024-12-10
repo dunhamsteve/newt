@@ -3,6 +3,9 @@ module Prelude
 id : ∀ a. a → a
 id x = x
 
+the : (a : U) → a → a
+the _ a = a
+
 data Bool : U where
   True False : Bool
 
@@ -288,6 +291,14 @@ pfunc natToInt : Nat -> Int := `(n) => {
   return rval
 }`
 
+pfunc intToNat uses (Z S) : Int -> Nat := `(n) => {
+  let rval = Z
+  for (;n>0;n--) rval = S(rval);
+  return rval;
+}`
+
+
+
 pfunc fastConcat : List String → String := `(xs) => listToArray(undefined, xs).join('')`
 pfunc replicate : Nat -> Char → String := `(n,c) => c.repeat(natToInt(n))`
 
@@ -360,8 +371,8 @@ pfunc ord : Char -> Int := `(c) => c.charCodeAt(0)`
 
 pfunc unpack uses (Nil _::_) : String -> List Char
   := `(s) => {
-    let acc = Nil(Char)
-    for (let i = s.length - 1; 0 <= i; i--) acc = _$3A$3A_(Char, s[i], acc)
+    let acc = Nil(undefined)
+    for (let i = s.length - 1; 0 <= i; i--) acc = _$3A$3A_(undefined, s[i], acc)
     return acc
 }`
 
@@ -378,9 +389,20 @@ pfunc pack : List Char → String := `(cs) => {
 pfunc debugStr uses (natToInt listToArray) : ∀ a. a → String := `(_, obj) => {
   const go = (obj) => {
     if (obj === undefined) return "_"
+    if (obj.tag === '_,_') {
+      let rval = '('
+      while (obj?.tag === '_,_') {
+        rval += go(obj.h2) + ', '
+        obj = obj.h3
+      }
+      return rval + go(obj) + ')'
+    }
     if (obj?.tag === '_::_' || obj?.tag === 'Nil') {
       let stuff = listToArray(undefined,obj)
       return '['+(stuff.map(go).join(', '))+']'
+    }
+    if (obj instanceof Array) {
+      return 'io['+(obj.map(go).join(', '))+']'
     }
     if (obj?.tag === 'S' || obj?.tag === 'Z') {
       return ''+natToInt(obj)
@@ -558,6 +580,7 @@ instance Mul Double where x * y = mulDouble x y
 instance Div Double where x / y = divDouble x y
 
 ptype IOArray : U → U
+
 pfunc newArray uses (MkIORes) : ∀ a. Int → a → IO (IOArray a) :=
   `(_, n, v) => (w) => MkIORes(undefined,Array(n).fill(v),w)`
 pfunc arrayGet : ∀ a. IOArray a → Int → IO a := `(_, arr, ix) => w => MkIORes(undefined, arr[ix], w)`
@@ -565,6 +588,7 @@ pfunc arraySet uses (MkUnit) : ∀ a. IOArray a → Int → a → IO Unit := `(_
   arr[ix] = v
   return MkIORes(undefined, MkUnit, w)
 }`
+pfunc arraySize uses (MkIORes) : ∀ a. IOArray a → IO Int := `(_, arr) => w => MkIORes(undefined, arr.length, w)`
 
 pfunc ioArrayToList uses (Nil _::_ MkIORes) : {0 a} → IOArray a → IO (List a) := `(a,arr) => w => {
   let rval = Nil(a)
@@ -572,6 +596,15 @@ pfunc ioArrayToList uses (Nil _::_ MkIORes) : {0 a} → IOArray a → IO (List a
     rval = _$3A$3A_(a, arr[i], rval)
   }
   return MkIORes(undefined, rval, w)
+}`
+
+pfunc listToIOArray uses (MkIORes) : {0 a} → List a → IO (Array a) := `(a,list) => w => {
+  let rval = []
+  while (list.tag === '_::_') {
+    rval.push(list.h1)
+    list = list.h2
+  }
+  return MkIORes(undefined,rval,w)
 }`
 
 class Cast a b where
@@ -683,3 +716,6 @@ ite c t e = if c then t else e
 
 instance Ord String where
   a < b = jsLT a b
+
+instance Cast Int Nat where
+  cast n = intToNat n
