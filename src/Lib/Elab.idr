@@ -121,7 +121,7 @@ addConstraint env ix sp tm = do
     (Unsolved pos k a b c cons) => do
       debug "Add constraint m\{show ix} \{show sp} =?= \{show tm}"
       pure (Unsolved pos k a b c (MkMc (getFC tm) env sp tm :: cons))
-    (Solved _ k tm) => error' "Meta \{show k} already solved"
+    (Solved _ k tm) => error' "Meta \{show k} already solved [addConstraint]"
   pure ()
 
 
@@ -201,7 +201,7 @@ export
 solve : Env -> (k : Nat) -> SnocList Val -> Val -> M  ()
 solve env m sp t = do
   meta@(Unsolved metaFC ix ctx_ ty kind cons) <- lookupMeta m
-    | _ => error (getFC t) "Meta \{show m} already solved!"
+    | _ => error (getFC t) "Meta \{show m} already solved! [solve]"
   debug "SOLVE \{show m} \{show kind} lvl \{show $ length env} sp \{show sp} is \{show t}"
   let size = length $ filter (\x => x == Bound) $ toList ctx_.bds
   debug "\{show m} size is \{show size} sps \{show $ length sp}"
@@ -226,7 +226,7 @@ solve env m sp t = do
 
     updateMeta m $ \case
       (Unsolved pos k _ _ _ cons) => pure $ Solved pos k soln
-      (Solved _ k x) => error' "Meta \{show ix} already solved!"
+      (Solved _ k x) => error' "Meta \{show ix} already solved! [solve2]"
     for_ cons $ \case
       MkMc fc env sp rhs => do
         val <- vappSpine soln sp
@@ -238,6 +238,9 @@ solve env m sp t = do
         debug "CONSTRAINT2 m\{show ix} \{show sp} =?= \{show t}"
         addConstraint env m sp t
       err => do
+        -- I get legit errors after stuffing in solution
+        -- report for now, tests aren't hitting this branch
+        throwError err
         debug "CONSTRAINT3 m\{show ix} \{show sp} =?= \{show t}"
         debug "because \{showError "" err}"
         addConstraint env m sp t)

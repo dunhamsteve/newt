@@ -1,0 +1,108 @@
+module Day10
+
+import Prelude
+import Node
+import Aoc
+import SortedMap
+
+-- move to lib
+
+gridPoints : String → List (Char × Int × Int)
+gridPoints text = go 0 0 (unpack text) Nil
+  where
+    -- might as well be tail recursive
+    go : Int → Int → List Char → List (Char × Int × Int) → List (Char × Int × Int)
+    go row col Nil points = points
+    go row col ('\n' :: cs) points = go (row + 1) 0 cs points
+    go row col (c :: cs) points = go row (col + 1) cs ((c,row,col) :: points)
+
+Point : U
+Point = Int × Int
+
+instance Add Point where
+  (a,b) + (c,d) = (a + c, b + d)
+
+instance Sub Point where
+  (a,b) - (c,d) = (a - c, b - d)
+
+instance Ord Point where
+  (a,b) < (c,d) = a < c || a == c && b < d
+
+instance Eq Point where
+  (a,b) == (c,d) = a == c && b == d
+
+swap : ∀ a b. a × b → b × a
+swap (a,b) = (b,a)
+
+const : ∀ a b. a → b → a
+const a b = a
+
+-- TODO add parameter a and pass Char -> a into getGrid
+Grid : U
+Grid = SortedMap Point Int
+
+digitToInt : Char → Int
+digitToInt c = ord c - 48
+
+getGrid : String → Grid
+
+getGrid text = foldl update EmptyMap $ gridPoints text
+  where
+    update : Grid → Char × Point → Grid
+    update grid (c,pt) = updateMap pt (digitToInt c) grid
+
+peers : Point → List Point
+peers pt = map (_+_ pt) ((0, 0 - 1) :: (0,1) :: (0 - 1,0) :: (1,0) :: Nil)
+
+
+paths : Grid → List Point → Int → Int
+paths grid pts ht =
+  if ht == 9 then cast $ length pts else
+  -- Maybe I should nub with a sortedMap
+  let cands = ordNub $ map fst $ filter (_==_ (ht + 1) ∘ snd) $ join $ map getCands pts
+  in paths grid cands (ht + 1)
+  where
+    getCands : Point → List (Point × Int)
+    getCands pt = mapMaybe (\ p => lookupMap p grid) (peers pt)
+
+foldMap : ∀ a b. {{Ord a}} {{Eq a}} → (b → b → b) → SortedMap a b → List (a × b) → SortedMap a b
+foldMap f m Nil = m
+foldMap f m ((a,b) :: xs) = case lookupMap a m of
+  Nothing => foldMap f (updateMap a b m) xs
+  Just (_, b') => foldMap f (updateMap a (f b' b) m) xs
+
+paths2 : Grid → List (Point × Int) → Int → Int
+paths2 grid pts ht =
+  if ht == 9 then foldl _+_ 0 $ map snd $ pts else
+  let cands = join $ map getCands pts
+      pts' = toList $ foldMap _+_ EmptyMap cands
+  in paths2 grid pts' (ht + 1)
+  where
+    getCands : Point × Int → List (Point × Int)
+    getCands (pt,cnt) =
+      map (\ x => fst x , cnt)
+        $ filter (_==_ (ht + 1) ∘ snd)
+        $ mapMaybe (\ p => lookupMap p grid) (peers pt)
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let grid = getGrid text
+  let starts = filter (_==_ 0 ∘ snd) $ toList grid
+  let all = map (\ pt => paths grid (fst pt :: Nil) 0) starts
+  let part1 = foldl _+_ 0 all
+  putStrLn $ "part1 " ++ show part1
+
+  let all = map (\ pt => paths2 grid ((fst pt, 1) :: Nil) 0) starts
+  let part2 = foldl _+_ 0 all
+  putStrLn $ "part2 " ++ show part2
+
+main : IO Unit
+main = do
+  run "aoc2024/day10/eg.txt"
+  run "aoc2024/day10/eg2.txt"
+  run "aoc2024/day10/eg3.txt"
+  run "aoc2024/day10/eg4.txt"
+  run "aoc2024/day10/eg5.txt"
+  run "aoc2024/day10/input.txt"

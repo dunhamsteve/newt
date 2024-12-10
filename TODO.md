@@ -1,6 +1,7 @@
 
 ## TODO
 
+- [ ] keymap for monaco
 - [x] SortedMap.newt issue in `where`
 - [x] fix "insufficient patterns", wire in M or Either String
 - [x] Matching _,_ when Maybe is expected should be an error
