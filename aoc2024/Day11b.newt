@@ -1,18 +1,26 @@
-module Day11
+module Day11b
 
 import Prelude
 import Node
 import Aoc
 import SortedMap
 
+-- Alternate version that doesn't use string
+
 infixl 7 _%_
 pfunc _%_ : Int → Int → Int := `(x,y) => x % y`
 
--- should have a few more foreign functions and do this in newt
-pfunc divide uses (_,_) : String → String × String := `(s) => {
-  let l = s.length/2|0
-  return _$2C_(undefined, undefined, s.slice(0,l), s.slice(l))
-}`
+-- 32 bit ints are too small
+pfunc div53 : Int → Int → Int := `(x,y) => Math.floor(x / y)`
+
+stone : Int → Either Int (Int × Int)
+stone num = if num == 0 then Left 1 else go num num 1
+  where
+    go : Int → Int → Int → Either Int (Int × Int)
+    go a b mod =
+      if b == 0 then Right (a, num % mod)
+      else if b < 10 then Left (2024 * num)
+      else go (div53 a 10) (div53 b 100) (mod * 10)
 
 foldMap : ∀ a b. {{Ord a}} {{Eq a}} → (b → b → b) → SortedMap a b → List (a × b) → SortedMap a b
 foldMap f m Nil = m
@@ -21,16 +29,13 @@ foldMap f m ((a,b) :: xs) = case lookupMap a m of
   Just (_, b') => foldMap f (updateMap a (f b' b) m) xs
 
 step : List (Int × Int) → List (Int × Int)
-step = go Nil
+step xs = go Nil xs
   where
     go : List (Int × Int) → List (Int × Int) → List (Int × Int)
     go acc Nil = acc
-    go acc ((0,c) :: xs) = go ((1,c) :: acc) xs
-    go acc ((x,c) :: xs) =
-      let str = show x in
-      if slen str % 2 == 0
-        then let (a,b) = divide str in go ((stringToInt a,c) :: (stringToInt b,c) :: acc) xs
-        else go ((2024 * x,c) :: acc) xs
+    go acc ((x,c) :: xs) = case stone x of
+      Left a => go ((a,c) :: acc) xs
+      Right (a,b) => go ((a,c) :: (b,c) :: acc) xs
 
 iter : Int → SortedMap Int Int → Int
 iter count parts = let x = go count parts in foldl _+_ 0 $ map snd $ toList x

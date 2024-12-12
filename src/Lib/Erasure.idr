@@ -1,10 +1,14 @@
 module Lib.Erasure
 
 import Lib.Types
+import Data.Maybe
 import Data.SnocList
 import Lib.TopContext
 
 EEnv = List (String, Quant, Maybe Tm)
+
+-- TODO look into removing Nothing below, can we recover all of the types?
+-- Idris does this in `chk` for linearity checking.
 
 -- check App at type
 
@@ -12,7 +16,7 @@ getType : Tm -> M (Maybe Tm)
 getType (Ref fc nm x) = do
   top <- get
   case lookup nm top of
-    Nothing => pure Nothing
+    Nothing => error fc "\{nm} not in scope"
     (Just (MkEntry _ name type def)) => pure $ Just type
 getType tm = pure Nothing
 
@@ -20,14 +24,17 @@ export
 erase : EEnv -> Tm -> List (FC, Tm) -> M Tm
 
 -- App a spine using type
-eraseSpine : EEnv -> Tm -> List (FC, Tm) -> Maybe Tm -> M Tm
+eraseSpine : EEnv -> Tm -> List (FC, Tm) -> (ty : Maybe Tm) -> M Tm
 eraseSpine env tm [] _ = pure tm
 eraseSpine env t ((fc, arg) :: args) (Just (Pi fc1 str icit Zero a b)) = do
   let u = Erased (getFC arg)
   eraseSpine env (App fc t u) args (Just b)
 eraseSpine env t ((fc, arg) :: args) (Just (Pi fc1 str icit Many a b)) = do
   u <- erase env arg []
+  -- TODO this seems wrong, we need to subst u into b to get the type
   eraseSpine env (App fc t u) args (Just b)
+-- eraseSpine env t ((fc, arg) :: args) (Just ty) = do
+--   error fc "ceci n'est pas une ∏ \{showTm ty}" -- e.g. Bnd 1
 eraseSpine env t ((fc, arg) :: args) _ = do
   u <- erase env arg []
   eraseSpine env (App fc t u) args Nothing
@@ -57,14 +64,14 @@ erase env t sp = case t of
   (Ref fc nm x) => do
     top <- get
     case lookup nm top of
-      Nothing => eraseSpine env t sp Nothing
+      Nothing => error fc "\{nm} not in scope"
       (Just (MkEntry _ name type def)) => eraseSpine env t sp (Just type)
   (Lam fc nm icit rig u) => Lam fc nm icit rig <$> erase ((nm, rig, Nothing) :: env) u []
   -- If we get here, we're looking at a runtime pi type
   (Pi fc nm icit rig u v) => do
     u' <- erase env u []
     v' <- erase ((nm, Many, Just u) :: env) v []
-    eraseSpine env (Pi fc nm icit rig u' v') sp Nothing
+    eraseSpine env (Pi fc nm icit rig u' v') sp (Just $ U emptyFC)
   -- leaving as-is for now, we don't know the quantity of the apps
   (Meta fc k) => pure t
   (Case fc u alts) => do
@@ -86,8 +93,8 @@ erase env t sp = case t of
       -- This is working, but empty FC
       Just (nm, Zero, ty) => error fc "used erased value \{show nm} (FIXME FC may be wrong here)"
       Just (nm, Many, ty) => eraseSpine env t sp ty
-  (U fc) => eraseSpine env t sp Nothing
+  (U fc) => eraseSpine env t sp (Just $ U fc)
   (Lit fc lit) => eraseSpine env t sp Nothing
-  Erased fc => eraseSpine env t sp Nothing
+  Erased fc => error fc "erased value in relevant context" -- eraseSpine env t sp Nothing
 
 

@@ -5,10 +5,11 @@
 - [x] SortedMap.newt issue in `where`
 - [x] fix "insufficient patterns", wire in M or Either String
 - [x] Matching _,_ when Maybe is expected should be an error
+- [ ] There are issues with matching inside do blocks, I think we need to guess scrutinee? I could imagine constraining metas too (e.g. if Just ... at ?m123 then ?m123 =?= Maybe ?m456)
 - [ ] error for non-linear pattern
 - [ ] typeclass dependencies
   - need to flag internal functions to not search (or flag functions for search). I need to decide on syntax for this.
-  - don't search functions that are currently being defined. This is subtle... We do want to recurse in bind, we don't want to do that for the isEq function.  Maybe something idris like.
+  - for something like an `isEq` field in `Ord`, auto-search is picking up the function being defined.
 - [ ] default implementations (use them if nothing is defined, where do we store them?) e.g. Ord compare, <, etc in Idris
 - [ ] syntax for negative integers
 - [ ] White box tests in `test` directory
@@ -52,25 +53,26 @@
 - [x] dead code elimination
 - [x] imported files leak info messages everywhere
   - For now, take the start ix for the file and report at end starting there
-- [ ] update node shim to include idris2-playground changes
-- [ ] refactor playground to better share code with idris2-playground
-- [ ] accepting DCon for another type (skipping case, but should be an error)
+- [x] update node shim to include idris2-playground changes
+- [x] refactor playground to better share code with idris2-playground
+- [x] accepting DCon for another type (skipping case, but should be an error)
 - [ ] don't allow (or dot) duplicate names on LHS
 - [x] remove metas from context, M has TopContext
 - [ ] improve test driver
   - maybe a file listing jobs, whether they are known broken, optional expected output, optional expected JS execution output.
 - [x] forall / ∀ sugar (Maybe drop this, issues with `.` and `{A}` works fine)
 - [x] Bad module name error has FC 0,0 instead of the module or name
-- [ ] Remove context lambdas when printing solutions (show names from context)
+- [ ] ~~Remove context lambdas when printing solutions (show names from context)~~
   - maybe build list of names and strip λ, then call pprint with names
+  - I've removed solution printing, so this is moot
 - [ ] Revisit substitution in case building
 - [x] Check for shadowing when declaring dcon
   - Handles the forward decl in `Zoo1.newt`, but we'll need different syntax if
     we have different core terms for TCon/DCon/Function
-- [ ] Require infix decl before declaring names with `_` (helps find bugs)
+- [ ] Require infix decl before declaring names with `_` (helps find bugs) or implicitly define infixl something if it's missing
 - [x] sugar for typeclasses
 - [x] maybe add implicits in core to help resugar operators?
-- [ ] consider binders in environment, like Idris, to better mark `let` and to provide names
+- [ ] consider putting binders in environment, like Idris, to better mark `let` and to provide names
 - [x] move some top-level chattiness to `debug`
 - [ ] consider optionally compiling to eliminators for a second type-checking pass to help catch bugs.
 - [x] Allow unicode operators/names

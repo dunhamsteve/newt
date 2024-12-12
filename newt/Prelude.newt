@@ -441,6 +441,7 @@ _∘_ : {A B C : U} -> (B -> C) -> (A -> B) -> A -> C
 
 pfunc addInt : Int → Int → Int := `(x,y) => x + y`
 pfunc mulInt : Int → Int → Int := `(x,y) => x * y`
+pfunc divInt : Int → Int → Int := `(x,y) => x / y | 0`
 pfunc subInt : Int → Int → Int := `(x,y) => x - y`
 pfunc ltInt uses (True False) : Int → Int → Bool := `(x,y) => x < y ? True : False`
 
@@ -452,6 +453,9 @@ instance Add Int where
 
 instance Sub Int where
   x - y = subInt x y
+
+instance Div Int where
+  x / y = divInt x y
 
 printLn : {m} {{HasIO m}} {a} {{Show a}} → a → m Unit
 printLn a = putStrLn (show a)
