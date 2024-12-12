@@ -137,9 +137,21 @@ instance Functor Maybe where
   map f Nothing = Nothing
   map f (Just a) = Just (f a)
 
+reverse : ∀ a. List a → List a
+reverse {a} = go Nil
+  where
+    go : List a → List a → List a
+    go acc Nil = acc
+    go acc (x :: xs) = go (x :: acc) xs
+
 instance Functor List where
-  map f Nil = Nil
-  map f (x :: xs) = f x :: map f xs
+  map f xs = go f xs Nil
+    where
+      go : ∀ a b. (a → b) → List a → List b → List b
+      go f Nil ys = reverse ys
+      go f (x :: xs) ys = go f xs (f x :: ys)
+  -- map f Nil = Nil
+  -- map f (x :: xs) = f x :: map f xs
 
 instance Functor SnocList where
   map f Lin = Lin
@@ -463,12 +475,6 @@ printLn a = putStrLn (show a)
 -- opaque JSObject
 ptype JSObject
 
-reverse : ∀ a. List a → List a
-reverse {a} = go Nil
-  where
-    go : List a → List a → List a
-    go acc Nil = acc
-    go acc (x :: xs) = go (x :: acc) xs
 
 -- Like Idris1, but not idris2, we need {a} to put a in scope.
 span : ∀ a. (a -> Bool) -> List a -> List a × List a

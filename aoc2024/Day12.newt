@@ -1,0 +1,115 @@
+module Day12
+
+import Prelude
+import Node
+import Aoc
+import SortedMap
+
+-- move to lib
+
+gridPoints : String → List (Char × Int × Int)
+gridPoints text = go 0 0 (unpack text) Nil
+  where
+    -- might as well be tail recursive
+    go : Int → Int → List Char → List (Char × Int × Int) → List (Char × Int × Int)
+    go row col Nil points = points
+    go row col ('\n' :: cs) points = go (row + 1) 0 cs points
+    go row col (c :: cs) points = go row (col + 1) cs ((c,row,col) :: points)
+
+Point : U
+Point = Int × Int
+
+instance Add Point where
+  (a,b) + (c,d) = (a + c, b + d)
+
+instance Sub Point where
+  (a,b) - (c,d) = (a - c, b - d)
+
+instance Ord Point where
+  (a,b) < (c,d) = a < c || a == c && b < d
+
+instance Eq Point where
+  (a,b) == (c,d) = a == c && b == d
+
+-- TODO add parameter a and pass Char -> a into getGrid
+Grid : U
+Grid = SortedMap Point Int
+
+digitToInt : Char → Int
+digitToInt c = ord c
+
+getGrid : String → Grid
+
+getGrid text = foldl update EmptyMap $ gridPoints text
+  where
+    update : Grid → Char × Point → Grid
+    update grid (c,pt) = updateMap pt (digitToInt c) grid
+
+north east south west : Point
+north = (0, 0 - 1)
+south = (0, 1)
+east = (1, 0)
+west = (0 - 1, 0)
+
+
+neighbors : Point → List Point
+neighbors pt = map (_+_ pt) ((0, 0 - 1) :: (0,1) :: (0 - 1,0) :: (1,0) :: Nil)
+
+
+perim2 : Grid → Point → Int → Int
+perim2 grid pt color =
+  let top = different (north + pt) && (different (west + pt) || same (west + north + pt))
+      bottom = different (south + pt) && (different (west + pt) || same (west + south + pt))
+      left = different (west + pt) && (different (north + pt) || same (north + west + pt))
+      right = different (east + pt) && (different (north + pt) || same (north + east + pt))
+  in (ite top 1 0) + (ite bottom 1 0) + ite left 1 0 + ite right 1 0
+  where
+    same : Point → Bool
+    same pt = case lookupMap pt grid of
+      Just (_, c) => c == color
+      Nothing => False
+    different : Point → Bool
+    different pt = not $ same pt
+
+-- use negative numbers for the regions we've filled
+flood : Grid → Point → Int → Maybe (Int × Int × Grid)
+flood orig start id =
+  let (Just (pt,color)) = lookupMap start orig | Nothing => Nothing in
+  if 0 < color then Just $ go orig color (start :: Nil) 0 0 0 else Nothing
+  where
+    go : Grid → Int → List Point → Int → Int → Int → Int × Int × Grid
+    go grid' color Nil area perim p2 = ((area * perim), (area * p2), grid')
+    go grid' color (pt :: pts) area perim p2 =
+      let (Just (_,c2)) = lookupMap pt grid' | Nothing => go grid' color pts area perim p2 in
+      if c2 /= color then go grid' color pts area perim p2 else
+      let next = map fst $ filter (_==_ color ∘ snd) $ mapMaybe (flip lookupMap orig) $ neighbors pt
+          perim = perim + 4 - cast (length next)
+          p2 = p2 + perim2 orig pt color
+          grid = updateMap pt id grid'
+      in go grid color (next ++ pts) (area + 1) perim p2
+
+
+part1 : Grid → Int × Int
+part1 grid = go grid (0 - 1) (map fst $ toList grid) 0 0
+  where
+    go : Grid → Int → List Point → Int → Int → Int × Int
+    go grid id Nil acc acc2 = (acc, acc2)
+    go grid id (pt :: pts) acc acc2 =
+      case flood grid pt id of
+        Nothing => go grid id pts acc acc2
+        Just (cost, cost2, grid) => go grid (id - 1) pts (acc + cost) (acc2 + cost2)
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let grid = getGrid text
+  let (p1, p2) = part1 grid
+  putStrLn $ "part1 " ++ show p1
+  putStrLn $ "part2 " ++ show p2
+
+main : IO Unit
+main = do
+  run "aoc2024/day12/eg.txt"
+  run "aoc2024/day12/eg2.txt"
+  run "aoc2024/day12/input.txt"
