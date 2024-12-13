@@ -158,11 +158,17 @@ instance Functor SnocList where
   map f (xs :< x) = map f xs :< f x
 
 -- TODO this probably should depend on / entail Functor
-infixl 3 _<*>_
+infixl 3 _<*>_ _<*_ _*>_
 class Applicative (f : U → U) where
   -- appIsFunctor : Functor f
   return : {0 a} → a → f a
   _<*>_ : {0 a b} -> f (a → b) → f a → f b
+
+const : ∀ a b. a → b → a
+const a b = a
+
+_<*_ : ∀ f a b. {{Applicative f}} → f a → f b → f a
+fa <* fb = return const <*> fa <*> fb
 
 class Traversable (t : U → U) where
   traverse : ∀ f a b. {{Applicative f}} → (a → f b) → t a → f (t b)
@@ -236,7 +242,7 @@ instance Concat String where
 
 pfunc jsEq uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a == b ? True : False`
 pfunc jsLT uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a < b ? True : False`
-
+pfunc jsShow : ∀ a . a → String := `(_,a) => ''+a`
 instance Eq Int where
   a == b = jsEq a b
 
@@ -245,6 +251,7 @@ instance Eq String where
 
 instance Eq Char where
   a == b = jsEq a b
+
 
 data Unit : U where
   MkUnit : Unit
@@ -401,6 +408,7 @@ pfunc pack : List Char → String := `(cs) => {
 pfunc debugStr uses (natToInt listToArray) : ∀ a. a → String := `(_, obj) => {
   const go = (obj) => {
     if (obj === undefined) return "_"
+    if (typeof obj == 'bigint') return ''+obj
     if (obj.tag === '_,_') {
       let rval = '('
       while (obj?.tag === '_,_') {
@@ -729,3 +737,6 @@ instance Ord String where
 
 instance Cast Int Nat where
   cast n = intToNat n
+
+instance Show Char where
+  show c = jsShow c

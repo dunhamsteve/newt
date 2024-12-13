@@ -1,0 +1,102 @@
+module Day13
+
+import Prelude
+import Node
+import Aoc
+import Parser
+
+
+Point : U
+Point = Int × Int
+
+instance Add Point where
+  (a,b) + (c,d) = (a + c, b + d)
+
+instance Sub Point where
+  (a,b) - (c,d) = (a - c, b - d)
+
+instance Ord Point where
+  (a,b) < (c,d) = a < c || a == c && b < d
+
+instance Eq Point where
+  (a,b) == (c,d) = a == c && b == d
+
+
+token : String → Parser Unit
+token str = string str >> ws
+
+
+data Machine : U where
+  MkMachine : Point → Point → Point → Machine
+
+-- need Either parser..
+parseButton : Parser Point
+parseButton = do
+  token "Button"
+  any
+  token ":"
+  token "X+"
+  x <- number
+  token ","
+  token "Y+"
+  y <- number
+  match '\n'
+  pure (x,y)
+
+parsePrize : Parser Point
+parsePrize = do
+  token "Prize:"
+  token "X="
+  x <- number
+  token ","
+  token "Y="
+  y <- number
+  match '\n'
+  pure (x,y)
+
+pMachine : Parser Machine
+pMachine = MkMachine <$> parseButton <*> parseButton <*> parsePrize <* many (match '\n')
+
+-- TODO should be a proper primitive, so we can have literals (also need Double)
+ptype BigInt
+pfunc itobi : Int → BigInt := `(x) => BigInt(x)`
+pfunc addbi : BigInt → BigInt → BigInt := `(a,b) => a + b`
+pfunc subbi : BigInt → BigInt → BigInt := `(a,b) => a - b`
+pfunc mulbi : BigInt → BigInt → BigInt := `(a,b) => a * b`
+pfunc divbi : BigInt → BigInt → BigInt := `(a,b) => a / b`
+
+instance Mul BigInt where a * b = mulbi a b
+instance Div BigInt where a / b = divbi a b
+instance Add BigInt where a + b = addbi a b
+instance Sub BigInt where a - b = subbi a b
+instance Cast Int BigInt where cast x = itobi x
+instance Eq BigInt where a == b = jsEq a b
+instance Show BigInt where show = jsShow
+instance Ord BigInt where a < b = jsLT a b
+
+calcCost : BigInt → Machine → Maybe BigInt
+calcCost extra (MkMachine (ax, ay) (bx, by) (px, py)) =
+  let px = itobi px + extra
+      py = itobi py + extra
+      b = (px * itobi ay - py * itobi ax) / (itobi ay * itobi bx - itobi by * itobi ax)
+      a = (px - itobi bx * b) / itobi ax
+  in if a * itobi ax + b * itobi bx == px && a * itobi ay + b * itobi by == py
+    then Just (a * itobi 3 + b) else Nothing
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let (Right (machines,_)) = some pMachine $ unpack text | _ => putStrLn "Parse Error"
+
+  let extra = itobi 0
+  let p1 = foldl _+_ (itobi 0) $ mapMaybe (calcCost extra) machines
+  putStrLn $ "part1 " ++ show p1
+  let extra = itobi 10000000 * itobi 1000000
+  let p2 = foldl _+_ (itobi 0) $ mapMaybe (calcCost extra) machines
+  putStrLn $ "part2 " ++ show p2
+
+main : IO Unit
+main = do
+   run "aoc2024/day13/eg.txt"
+   run "aoc2024/day13/input.txt"

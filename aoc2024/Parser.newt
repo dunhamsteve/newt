@@ -1,0 +1,69 @@
+module Parser
+
+import Prelude
+import Aoc
+
+Parser : U → U
+Parser a = List Char → Either String (a × List Char)
+
+instance Monad Parser where
+  pure a = \ cs => Right (a, cs)
+  bind ma mab = \ cs => ma cs >>= uncurry mab
+
+instance Alternative Parser where
+  pa <|> pb = \ cs => case pa cs of
+    Left msg => pb cs
+    res => res
+
+instance Functor Parser where
+  map f pa = \ cs => case pa cs of
+    Left msg => Left msg
+    Right (a, cs) => Right (f a, cs)
+
+instance Applicative Parser where
+  return a = pure a
+  pa <*> pb = pa >>= (\ f => map f pb)
+
+
+fail : ∀ a. String -> Parser a
+fail msg = \ cs => Left msg
+
+-- TODO, case builder isn't expanding Parser Unit to count lambdas
+eof : Parser Unit
+eof = \ cs => case cs of
+  Nil => Right (MkUnit, Nil)
+  _ =>  Left "expected eof"
+
+satisfy : (Char → Bool) → Parser Char
+satisfy pred = λ cs => case cs of
+  Nil => Left "unexpected EOF"
+  (c :: cs) => if pred c then Right (c, cs) else Left ("did not expect " ++ show c)
+
+match : Char → Parser Char
+match d = satisfy (_==_ d)
+
+any : Parser Char
+any = satisfy (λ _ => True)
+
+some many : ∀ a. Parser a → Parser (List a)
+many p = some p <|> pure Nil
+some p = do
+  v <- p
+  vs <- many p
+  pure (v :: vs)
+
+string : String → Parser Unit
+string str = go (unpack str)
+  where
+    go : List Char → Parser Unit
+    go Nil = pure MkUnit
+    go (c :: cs) = match c >> go cs
+
+number : Parser Int
+number = stringToInt ∘ pack <$> some (satisfy isDigit)
+  -- do
+  -- digs <- some (satisfy isDigit)
+  -- pure $ stringToInt $ pack digs
+
+ws : Parser Unit
+ws = many (match ' ') >> pure MkUnit
