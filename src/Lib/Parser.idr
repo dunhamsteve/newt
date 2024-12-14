@@ -193,31 +193,6 @@ lamExpr = do
   scope <- typeExpr
   pure $ foldr (\(fc, icit, name, ty), sc => RLam pos (BI fc name icit Many) sc) scope args
 
-
--- Idris just has a term on the LHS and sorts it out later..
--- This allows some eval, like n + 2 -> S (S n), and expands to more complexity
--- like dotting
-
--- We may need to look up names at some point to see if they're constructors.
-
--- so, we can do the capital letter thing here or push that bit down and collect single/double
-pPattern : Parser Pattern
-patAtom : Parser Pattern
-patAtom = do
-  fc <- getPos
-  PatWild fc Explicit <$ keyword "_"
-    <|> PatVar fc Explicit <$> ident
-    <|> PatCon fc Explicit <$> (uident <|> token MixFix) <*> pure []
-    <|> braces (PatVar fc Implicit <$> ident)
-    <|> braces (PatWild fc Implicit <$ keyword "_")
-    <|> braces (PatCon fc Implicit <$> (uident <|> token MixFix) <*> many patAtom)
-    <|> dbraces (PatVar fc Auto <$> ident)
-    <|> dbraces (PatWild fc Auto <$ keyword "_")
-    <|> dbraces (PatCon fc Auto <$> (uident <|> token MixFix) <*> many patAtom)
-    <|> parens pPattern
-
-pPattern = PatCon (!getPos) Explicit <$> (uident <|> token MixFix) <*> many patAtom <|> patAtom
-
 caseAlt : Parser RCaseAlt
 caseAlt = do
   pat <- typeExpr
@@ -388,9 +363,7 @@ typeExpr
           -- consider Maybe String to represent missing
           (Just scope) => pure $ RPi fc (BI fc "_" Explicit Many) exp scope
 
-
 -- And top level stuff
-
 
 export
 parseSig : Parser Decl
@@ -424,8 +397,6 @@ parseDef = do
   fc <- getPos
   t <- typeExpr
   nm <- getName t
-  -- nm <- ident <|> uident
-  pats <- many patAtom
   keyword "="
   body <- typeExpr
   wfc <- getPos
