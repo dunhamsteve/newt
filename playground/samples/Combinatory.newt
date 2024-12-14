@@ -79,9 +79,10 @@ sapp (CApp K t) I = t
 sapp (CApp K t) (CApp K u) = CApp K (CApp t u)
 -- was out of pattern because of unexpanded lets.
 sapp (CApp K t) u = CApp (CApp B t) u
--- TODO unsolved meta, out of pattern fragment
+-- TODO unsolved meta, out of pattern fragment (now it's skolem - from changes to updateContext?)
+-- so I may need to point the var -> var in another direction (hopefully something simple)
 sapp t (CApp K u) = ? -- CApp (CApp C t) u
--- TODO unsolved meta, out of pattern fragment
+-- TODO unsolved meta, out of pattern fragment (ditto, skolem)
 sapp t u = ? -- CApp (CApp S t) u
 
 abs : {Γ : Ctx} {σ τ : Type} {f : _} → Comb (σ :: Γ) τ f → Comb Γ (σ ~> τ) (\ env x => f (x ::: env))

@@ -31,12 +31,6 @@ instance Ord Point where
 instance Eq Point where
   (a,b) == (c,d) = a == c && b == d
 
-swap : ∀ a b. a × b → b × a
-swap (a,b) = (b,a)
-
-const : ∀ a b. a → b → a
-const a b = a
-
 -- TODO add parameter a and pass Char -> a into getGrid
 Grid : U
 Grid = SortedMap Point Int

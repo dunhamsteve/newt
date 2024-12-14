@@ -517,13 +517,31 @@ substVal k v tm = go tm
     -- go (VLit x y) = ?rhs_8
 
 
+-- need to turn k into a ground value
+
+-- TODO rework this to do something better.  We've got constraints, and
+-- and may need to do proper unification if it's already defined to a value
+-- below we're handling the case if it's defined to another var, but not
+-- checking for loops.
 updateContext : Context -> List (Nat, Val) -> M Context
 updateContext ctx [] = pure ctx
-updateContext ctx ((k, val) :: cs) = let ix = (length ctx.env `minus` k) `minus` 1 in
-  updateContext ({env $= map (substVal k val), bds $= replaceV ix Defined } ctx) cs
+updateContext ctx ((k, val) :: cs) =
+  let ix = (length ctx.env `minus` k) `minus` 1 in
+  case getAt ix ctx.env of
+    (Just (VVar _ k' [<])) =>
+      if k' /= k
+        then updateContext ctx ((k',val) :: cs)
+        else updateContext ({env $= map (substVal k val), bds $= replaceV ix Defined } ctx) cs
+    (Just val') => do
+      -- This is fine for Z =?= Z but for other stuff, we probably have to match
+      info (getFC val) "need to unify \{show val} and \{show val'} or something"
+      updateContext ctx cs
+    Nothing => error (getFC val) "INTERNAL ERROR: bad index in updateContext"
+
+  --
   -- updateContext ({env $= replace ix val, bds $= replaceV ix Defined } ctx) cs
   where
-    replace : Nat -> a -> List a -> List a
+    replace : Nat -> Val -> List Val -> List Val
     replace k x [] = []
     replace 0 x (y :: xs) = x :: xs
     replace (S k) x (y :: xs) = y :: replace k x xs
@@ -562,15 +580,28 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   let (VRef _ sctynm _ _) = scty | _ => error (getFC scty) "case split on non-inductive \{show scty}"
 
   case lookupDef ctx scnm of
+    -- NOW this is S var7
     Just val@(VRef fc nm y sp) =>
       if nm /= dcName
       then do
         debug "SKIP \{dcName} because \{scnm} forced to \{show val}"
         pure Nothing
       else do
-        debug "DOTTED \{dcName} \{show val}"
+        debug "case \{dcName} dotted \{show val}"
+        when (length vars /= length sp) $ error emptyFC "\{show $ length vars} vars /= \{show $ length sp}"
+
+        -- TODO - do we need this one?
+        -- Constrain the scrutinee's variable to be dcon applied to args
+        -- let Just x = findIndex ((==scnm) . fst) ctx'.types
+        --   | Nothing => error ctx.fc "\{scnm} not is scope?"
+        -- let lvl = ((length ctx'.env) `minus` (cast x)) `minus` 1
+        -- let scon : (Nat, Val) = (lvl, VRef ctx.fc dcName (DCon arity dcName) sc)
 
         -- TODO - I think we need to define the context vars to sp via updateContext
+
+        let lvl = (length ctx'.env `minus` length vars)
+        let scons = constrainSpine lvl (sp <>> []) -- REVIEW is this the right order?
+        ctx' <- updateContext ctx' scons
 
         debug "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
         debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
@@ -620,6 +651,10 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         tm <- buildTree ctx' (MkProb clauses prob.ty)
         pure $ Just $ CaseCons dcName (map getName vars) tm
   where
+    constrainSpine : Nat -> List Val -> List (Nat, Val)
+    constrainSpine lvl [] = []
+    constrainSpine lvl (v :: vs) = (lvl, v) :: constrainSpine (S lvl) vs
+
     getName : Bind -> String
     getName (MkBind nm _ _) = nm
 

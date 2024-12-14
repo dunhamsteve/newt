@@ -637,8 +637,8 @@ instance Cast Int Double where
 instance Applicative IO where
   return a = \ w => MkIORes a w
   f <*> a = \ w =>
-    let (MkIORes f w) = trace "fw" $ f w in
-    let (MkIORes a w) = trace "aw" $ a w in
+    let (MkIORes f w) = f w in
+    let (MkIORes a w) = a w in
     MkIORes (f a) w
 
 class Bifunctor (f : U → U → U) where
@@ -740,3 +740,6 @@ instance Cast Int Nat where
 
 instance Show Char where
   show c = jsShow c
+
+swap : ∀ a b. a × b → b × a
+swap (a,b) = (b,a)
