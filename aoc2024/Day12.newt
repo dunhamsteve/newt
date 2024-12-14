@@ -16,21 +16,6 @@ gridPoints text = go 0 0 (unpack text) Nil
     go row col ('\n' :: cs) points = go (row + 1) 0 cs points
     go row col (c :: cs) points = go row (col + 1) cs ((c,row,col) :: points)
 
-Point : U
-Point = Int × Int
-
-instance Add Point where
-  (a,b) + (c,d) = (a + c, b + d)
-
-instance Sub Point where
-  (a,b) - (c,d) = (a - c, b - d)
-
-instance Ord Point where
-  (a,b) < (c,d) = a < c || a == c && b < d
-
-instance Eq Point where
-  (a,b) == (c,d) = a == c && b == d
-
 -- TODO add parameter a and pass Char -> a into getGrid
 Grid : U
 Grid = SortedMap Point Int

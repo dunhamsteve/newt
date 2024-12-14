@@ -5,27 +5,6 @@ import Node
 import Aoc
 import Parser
 
-
-Point : U
-Point = Int × Int
-
-instance Add Point where
-  (a,b) + (c,d) = (a + c, b + d)
-
-instance Sub Point where
-  (a,b) - (c,d) = (a - c, b - d)
-
-instance Ord Point where
-  (a,b) < (c,d) = a < c || a == c && b < d
-
-instance Eq Point where
-  (a,b) == (c,d) = a == c && b == d
-
-
-token : String → Parser Unit
-token str = string str >> ws
-
-
 data Machine : U where
   MkMachine : Point → Point → Point → Machine
 

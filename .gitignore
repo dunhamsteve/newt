@@ -8,3 +8,4 @@ build/
 /*.js
 input.txt
 node_modules
+mkday.py

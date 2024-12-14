@@ -5,15 +5,6 @@ import Node
 import Aoc
 import SortedMap
 
-Point : U
-Point = Int × Int
-
-instance Add Point where
-  (a,b) + (c,d) = (a + c, b + d)
-
-instance Sub Point where
-  (a,b) - (c,d) = (a - c, b - d)
-
 Ant : U
 Ant = Char × Int × Int
 
@@ -58,12 +49,6 @@ doPair2 m x y = go x (y - x) ++ go y (x - y)
 doGroup2 : Int -> List Ant -> List Point
 doGroup2 m (x :: xs) = join $ doGroup2 m xs ::  map (doPair2 m (snd x) ∘ snd) xs
 doGroup2 m Nil = Nil
-
-instance Ord Point where
-  (a,b) < (c,d) = a < c || a == c && b < d
-
-instance Eq Point where
-  (a,b) == (c,d) = a == c && b == d
 
 run : String -> IO Unit
 run fn = do

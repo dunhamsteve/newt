@@ -5,15 +5,6 @@ import Node
 import Aoc
 import SortedMap
 
-Point : U
-Point = Int × Int
-
-instance Eq Point where
-  (a,b) == (c,d) = a == c && b == d
-
-instance Ord Point where
-  (a,b) < (c,d) = a < c || a == c && b < d
-
 Grid : U
 Grid = SortedMap Point Char
 

@@ -232,13 +232,13 @@ processDecl (Def fc nm clauses) = do
   -- Day1.newt is a test case
   -- tm' <- nf [] tm
   tm' <- zonk top 0 [] tm
-  putStrLn "NF\n\{render 80 $ pprint[] tm'}"
+  when top.verbose $ putStrLn "NF\n\{render 80 $ pprint[] tm'}"
   -- TODO we want to keep both versions, but this is checking in addition to erasing
   -- currently CompileExp is also doing erasure.
   -- TODO we need erasure info on the lambdas or to fake up an appropriate environment
   -- and erase inside. Currently the checking is imprecise
   tm'' <- erase [] tm' []
-  putStrLn "ERASED\n\{render 80 $ pprint[] tm'}"
+  when top.verbose $ putStrLn "ERASED\n\{render 80 $ pprint[] tm'}"
   debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
   updateDef nm fc ty (Fn tm')
   -- logMetas mstart
@@ -347,10 +347,10 @@ processDecl (Instance instfc ty decls) = do
        let ty' = foldr (\(MkBind fc nm' icit rig ty'), acc => Pi fc nm' icit rig ty' acc) ty tele
        let nm' = "\{instname},\{nm}"
        -- we're working with a Tm, so we define directly instead of processDecl
-       setDef nm' fc ty' Axiom
        let Just (Def fc name xs) = find (\case (Def y name xs) => name == nm; _ => False) decls
           | _ => error instfc "no definition for \{nm}"
 
+       setDef nm' fc ty' Axiom
        let decl = (Def fc nm' xs)
        putStrLn "***"
        putStrLn "«\{nm'}» : \{pprint [] ty'}"
@@ -358,7 +358,8 @@ processDecl (Instance instfc ty decls) = do
        pure $ Just decl
      _ => pure Nothing
   -- This needs to be declared before processing the defs, but the defs need to be
-  -- declared before this
+  -- declared before this - side effect is that a duplicate def is noted at the first
+  -- member
   processDecl sigDecl
   for_ (mapMaybe id defs) $ \decl => do
     -- debug because already printed above, but nice to have it near processing

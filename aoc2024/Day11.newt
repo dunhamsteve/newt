@@ -14,12 +14,6 @@ pfunc divide uses (_,_) : String → String × String := `(s) => {
   return _$2C_(undefined, undefined, s.slice(0,l), s.slice(l))
 }`
 
-foldMap : ∀ a b. {{Ord a}} {{Eq a}} → (b → b → b) → SortedMap a b → List (a × b) → SortedMap a b
-foldMap f m Nil = m
-foldMap f m ((a,b) :: xs) = case lookupMap a m of
-  Nothing => foldMap f (updateMap a b m) xs
-  Just (_, b') => foldMap f (updateMap a (f b' b) m) xs
-
 step : List (Int × Int) → List (Int × Int)
 step = go Nil
   where

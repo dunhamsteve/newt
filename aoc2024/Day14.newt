@@ -1,0 +1,156 @@
+module Day14
+
+import Prelude
+import Node
+import Aoc
+import Parser
+import SortedMap
+
+data Robot : U where
+  MkBot : Point → Point → Robot
+
+pint : Parser Int
+pint = do
+  sign <- pure (0 - 1) <* match '-' <|> pure 1
+  num <- number
+  pure $ sign * num
+
+ppoint : Parser Point
+ppoint = _,_ <$> pint <* match ',' <*> pint
+
+probot : Parser Robot
+probot = do
+  token "p="
+  p <- ppoint
+  ws
+  token "v="
+  v <- ppoint
+  ws
+  many (match '\n')
+  pure $ MkBot p v
+
+-- TODO make Mod typeclass or something
+infixl 7 _%_
+pfunc _%_ : Int → Int → Int := `(x,y) => x % y`
+
+pmod : Int → Int → Int
+pmod a b =
+  if a < 0 then (a + b * ((0 - a / b) + 1)) % b else a % b
+
+move : Int → Int → Int → Robot → Point
+move w h time (MkBot (x,y) (dx,dy)) =
+  -- no HMul yet
+  -- let (x',y') = trace "to" $ (x,y) + (time * dx, time * dy) in
+  let x' = pmod (x + time * dx) w
+      y' = pmod (y + time * dy) h
+   in (x', y')
+
+count : ∀ a. (a → Bool) → List a → Int
+count {a} f xs = go xs 0
+  where
+    go : List a → Int → Int
+    go Nil acc = acc
+    go (x :: xs) acc = if f x then go xs (acc + 1) else go xs acc
+
+draw' : Int → Int → SortedMap Point Int → IO Unit
+draw' w h pts = go 0
+  where
+    mkLine : Int → Int → SnocList Char → String
+    mkLine y x acc = if x == w then pack (acc <>> Nil)
+      else case lookupMap (x,y) pts of
+        Nothing => mkLine y (x + 1) (acc :< '.')
+        _       => mkLine y (x + 1) (acc :< '*')
+
+    go : Int → IO Unit
+    go y = if y == h then pure MkUnit else do
+      putStrLn $ mkLine y 0 Lin
+      go (y + 1)
+
+draw : Int → Int → List Point → IO Unit
+draw w h pts =
+  let m = foldMap _+_ EmptyMap $ map (flip _,_ 1) pts in draw' w h m
+
+
+part2 : Int → Int → List Robot → List Point × Int
+part2 w h robots = go 1
+  where
+    heuristic : Point → Bool
+    heuristic (x,y) = if x < w / 2 then 100 < 2 * x + y else 2 * (x - 50) < y
+    -- heuristic (x,y) = x == w / 2
+    go : Int → List Point × Int
+    go t =
+      let pts = map (move w h t) robots
+          cnt = count heuristic pts
+      in if cnt > 20 then (pts, t)
+      else go (t + 1)
+
+run : String → Int → Int → IO Unit
+run fn w h = do
+  putStrLn fn
+  text <- readFile fn
+  let (Right (robots, Nil)) = some probot $ unpack text
+    | Left msg => putStrLn $ "Parse Error " ++ msg
+    | Right (robots, rest) => putStrLn $ "stuck at¬" ++ pack rest
+  let result = map (move w h 100) robots
+  -- debugLog result
+  let q1 = count quad1 result
+  let q2 = count quad2 result
+  let q3 = count quad3 result
+  let q4 = count quad4 result
+  debugLog (q1,q2,q3,q4)
+  let p1 = q1 * q2 * q3 * q4
+  putStrLn $ "part1 " ++ show p1
+  printLn $ count (\ x => True) robots
+  let scores = collect robots 0 Nil
+  let stuff = qsort (\ a b => snd a < snd b) $ collect robots 0 Nil
+  -- debugLog stuff
+  dump robots stuff 1
+  where
+    dump : List Robot → List (Int × Int) → Int → IO Unit
+    dump robots Nil _ = pure MkUnit
+    dump robots (((t,cnt) :: xs)) 0 = pure MkUnit
+    dump robots (((t,cnt) :: xs)) gas = do
+      printLn t
+      draw w h $ map (move w h t) robots
+      printLn ""
+      dump robots xs (gas - 1)
+
+    quad1 : Point → Bool
+    quad1 (x,y) = x < w / 2 && y < h / 2
+
+    quad2 : Point → Bool
+    quad2 (x,y) = x > w / 2 && y < h / 2
+
+    quad3 : Point → Bool
+    quad3 (x,y) = x > w / 2 && y > h / 2
+
+    quad4 : Point → Bool
+    quad4 (x,y) = x < w / 2 && y > h / 2
+
+    heuristic : Point → Bool
+    heuristic (x,y) = if x < w / 2  then 100 - 2 * x < y else 2 * x - 100 < y
+
+    dist : Point → Int
+    dist (x,y) = let d = if x < w / 2 then y - (h - 2 * x) else y - (h - 2 * (w - x)) in
+      if d < 0 then 0 - d else d
+
+    collect : List Robot → Int → List (Int × Int) → List (Int × Int)
+    collect robots iter acc =
+      if iter > w * h then acc else
+      let pts = map (move w h iter) robots in
+
+      -- This heuristic found it, attempting to find an outline of a large tree
+      -- but the picture looks nothing like that, so I got lucky
+      -- let cnt = foldl _+_ 0 $ map dist pts in
+      -- so I'll go with min danger (although it takes 4 * as long)
+      let q1 = count quad1 pts
+          q2 = count quad2 pts
+          q3 = count quad3 pts
+          q4 = count quad4 pts
+          cnt = q1 * q2 * q3 * q4 in
+      collect robots (iter + 1) ((iter,cnt) :: acc)
+
+main : IO Unit
+main = do
+  -- run "aoc2024/day14/eg.txt" 11 7
+  run "aoc2024/day14/input.txt" 101 103

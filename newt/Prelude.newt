@@ -675,7 +675,7 @@ tail (x :: xs) = xs
 
 --
 
-infixl 6 _<_ _<=_
+infixl 6 _<_ _<=_ _>_
 class Ord a where
   -- isEq : Eq a
   _<_ : a → a → Bool
@@ -683,6 +683,8 @@ class Ord a where
 _<=_ : ∀ a. {{Eq a}} {{Ord a}} → a → a → Bool
 a <= b = a == b || a < b
 
+_>_ : ∀ a. {{Ord a}} → a → a → Bool
+a > b = b < a
 
 search : ∀ cl. {{cl}} -> cl
 search {{x}} = x
@@ -743,3 +745,5 @@ instance Show Char where
 
 swap : ∀ a b. a × b → b × a
 swap (a,b) = (b,a)
+
+

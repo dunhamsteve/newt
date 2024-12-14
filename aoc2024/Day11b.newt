@@ -22,12 +22,6 @@ stone num = if num == 0 then Left 1 else go num num 1
       else if b < 10 then Left (2024 * num)
       else go (div53 a 10) (div53 b 100) (mod * 10)
 
-foldMap : ∀ a b. {{Ord a}} {{Eq a}} → (b → b → b) → SortedMap a b → List (a × b) → SortedMap a b
-foldMap f m Nil = m
-foldMap f m ((a,b) :: xs) = case lookupMap a m of
-  Nothing => foldMap f (updateMap a b m) xs
-  Just (_, b') => foldMap f (updateMap a (f b' b) m) xs
-
 step : List (Int × Int) → List (Int × Int)
 step xs = go Nil xs
   where

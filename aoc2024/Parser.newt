@@ -65,5 +65,11 @@ number = stringToInt ∘ pack <$> some (satisfy isDigit)
   -- digs <- some (satisfy isDigit)
   -- pure $ stringToInt $ pack digs
 
+optional : ∀ a. Parser a → Parser (Maybe a)
+optional pa = Just <$> pa <|> pure Nothing
+
 ws : Parser Unit
 ws = many (match ' ') >> pure MkUnit
+
+token : String → Parser Unit
+token str = string str >> ws

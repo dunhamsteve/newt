@@ -29,3 +29,19 @@ indexOf? {a} z xs = go Z z xs
     go ix z Nil = Nothing
     go ix z (x :: xs) =
       if z == x then Just ix else go (S ix) z xs
+
+-- TODO move to Aoc library
+Point : U
+Point = Int × Int
+
+instance Add Point where
+  (a,b) + (c,d) = (a + c, b + d)
+
+instance Sub Point where
+  (a,b) - (c,d) = (a - c, b - d)
+
+instance Ord Point where
+  (a,b) < (c,d) = a < c || a == c && b < d
+
+instance Eq Point where
+  (a,b) == (c,d) = a == c && b == d
