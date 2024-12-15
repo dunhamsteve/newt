@@ -1,0 +1,110 @@
+module Day15
+
+import Prelude
+import Node
+import SortedMap
+import Aoc
+
+gridPoints : String → List (Char × Int × Int)
+gridPoints text = go 0 0 (unpack text) Nil
+  where
+    go : Int → Int → List Char → List (Char × Int × Int) → List (Char × Int × Int)
+    go row col Nil points = points
+    go row col ('\n' :: cs) points = go (row + 1) 0 cs points
+    go row col (c :: cs) points = go row (col + 1) cs ((c,row,col) :: points)
+
+Grid : U
+Grid = SortedMap Point Char
+
+getDir : Char → Maybe Point
+getDir '^' = Just (0 - 1, 0)
+getDir '>' = Just (0, 1)
+getDir 'v' = Just (1, 0)
+getDir '<' = Just (0, 0 - 1)
+getDir _ = Nothing
+
+getGrid : String → Grid
+getGrid text = foldl update EmptyMap $ gridPoints text
+  where
+    update : Grid → Char × Point → Grid
+    update grid (c,pt) = updateMap pt c grid
+
+Problem : U
+Problem = Grid × List Point
+
+parseFile : String → Either String Problem
+parseFile text =
+  let (a :: b :: Nil) = split text "\n\n" | xs => Left $ (show $ length xs) ++ " parts"
+  in Right (getGrid a, mapMaybe getDir (unpack b))
+
+-- Move thing at Point in direction
+tryMove : Grid → Point → Point -> Maybe Grid
+tryMove grid pt dir =
+  let x = lookupMap pt grid in
+  case lookupMap pt grid of
+    Just (_, '.') => Just grid -- noop moving empty space
+    Just (_, '#') => Nothing   -- fail to move wall
+    Just (_, '[') =>
+      if fst dir == 0 then do
+        grid <- tryMove grid (pt + dir) dir
+        Just $ updateMap pt '.' (updateMap (pt + dir) '[' grid)
+      else do
+        grid <- tryMove grid (pt + dir) dir
+        grid <- tryMove grid (pt + (0,1) + dir) dir
+        let grid = updateMap pt '.' (updateMap (pt + dir) '[' grid)
+        let grid = updateMap (pt + (0,1)) '.' (updateMap (pt + (0,1) + dir) ']' grid)
+        Just grid
+    Just (_, ']') =>
+      if fst dir == 0 then do
+        grid <- tryMove grid (pt + dir) dir
+        Just $ updateMap pt '.' (updateMap (pt + dir) ']' grid)
+      else do
+        grid <- tryMove grid (pt + dir) dir
+        grid <- tryMove grid (pt + (0,0 - 1) + dir) dir
+        let grid = updateMap pt '.' (updateMap (pt + dir) ']' grid)
+        let grid = updateMap (pt + (0,0 - 1)) '.' (updateMap (pt + (0,0 - 1) + dir) '[' grid)
+        Just grid
+    Just (_, c)   => do
+      grid <- tryMove grid (pt + dir) dir
+      Just $ updateMap pt '.' (updateMap (pt + dir) c grid)
+    Nothing => Nothing
+
+step : Grid × Point → Point → Grid × Point
+step (grid, pt) dir = case tryMove grid pt dir of
+  Just grid => (grid, pt + dir)
+  Nothing => (grid, pt)
+
+fromList : ∀ k v. {{Ord k}} {{Eq k}} → List (k × v) → SortedMap k v
+fromList xs = foldMap (\ a b => b) EmptyMap xs
+
+mkPart2 : Grid → Grid
+mkPart2 = fromList ∘ go Nil ∘ toList
+  where
+    go : List (Point × Char) → List (Point × Char) → List (Point × Char)
+    go acc Nil = acc
+    go acc (((r,c), '@') :: rest) = go (((r, 2 * c), '@') :: ((r, 2 * c + 1), '.') :: acc) rest
+    go acc (((r,c), 'O') :: rest) = go (((r,2 * c), '[') :: ((r, 2 * c + 1), ']') :: acc) rest
+    go acc (((r,c), ch) :: rest) = go (((r,2 * c), ch) :: ((r, 2 * c + 1), ch) :: acc) rest
+
+gps : Point → Int
+gps (x,y) = x * 100 + y
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let (Right (grid,steps)) = parseFile text | Left err => putStrLn $ "Error " ++ err
+  let ((start,_) :: Nil) = filter ((_==_ '@') ∘ snd) $ toList grid | x => debugLog x
+  let (grid', end) = foldl step (grid, start) steps
+  let p1 = foldl _+_ 0 $ map (gps ∘ fst) $ filter (_==_ 'O' ∘ snd) $ toList grid'
+  putStrLn $ "part1 " ++ show p1
+  let grid2 = mkPart2 grid
+  let ((start,_) :: Nil) = filter ((_==_ '@') ∘ snd) $ toList grid2 | x => debugLog x
+  let (grid2', end) = foldl step (grid2, start) steps
+  let p2 = foldl _+_ 0 $ map (gps ∘ fst) $ filter (_==_ '[' ∘ snd) $ toList grid2'
+  putStrLn $ "part2 " ++ show p2
+
+main : IO Unit
+main = do
+  run "aoc2024/day15/eg.txt"
+  run "aoc2024/day15/input.txt"

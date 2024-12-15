@@ -195,7 +195,8 @@ token' k = pred (\t => t.val.kind == k) "Expected a \{show k} token"
 
 export
 keyword' : String -> Parser ()
-keyword' kw = ignore $ pred (\t => t.val.text == kw) "Expected \{kw}"
+-- FIXME make this an appropriate whitelist
+keyword' kw = ignore $ pred (\t => t.val.text == kw && t.val.kind /= Character) "Expected \{kw}"
 
 ||| expect indented token of given kind
 export
