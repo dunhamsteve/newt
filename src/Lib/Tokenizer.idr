@@ -11,7 +11,7 @@ keywords = ["let", "in", "where", "case", "of", "data", "U", "do",
             "∀", "forall",
             "class", "instance",
             "if", "then", "else",
-            "$", "λ", "?",
+            "$", "λ", "?", "@",
              "->", "→", ":", "=>", ":=", "=", "<-", "\\", "_", "|"]
 
 checkKW : String -> Token Kind
@@ -27,7 +27,7 @@ identMore : Lexer
 identMore = alphaNum <|> exact "'" <|> exact "_"
 
 singleton : Lexer
-singleton = oneOf "()\\{}[],."
+singleton = oneOf "()\\{}[],.@"
 
 quo : Recognise True
 quo = is '"'

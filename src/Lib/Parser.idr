@@ -74,10 +74,20 @@ export term : (Parser Raw)
 withPos : Parser a -> Parser (FC, a)
 withPos pa = (,) <$> getPos <*> pa
 
+asAtom : Parser Raw
+asAtom = do
+  fc <- getPos
+  nm <- ident
+  asPat <- optional $ keyword "@" *> parens typeExpr
+  case asPat of
+    Just exp => pure $ RAs fc nm exp
+    Nothing  => pure $ RVar fc nm
+
 -- the inside of Raw
 atom : Parser Raw
 atom = RU <$> getPos <* keyword "U"
-    <|> RVar <$> getPos <*> ident
+    -- <|> RVar <$> getPos <*> ident
+    <|> asAtom
     <|> RVar <$> getPos <*> uident
     <|> lit
     <|> RImplicit <$> getPos <* keyword "_"

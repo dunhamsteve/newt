@@ -1,11 +1,16 @@
 
 ## TODO
 
+More comments in code! This is getting big enough that I need to re-find my bearings when fixing stuff.
+
+- [ ] Move on to next decl in case of error
+  - for parse error, seek to col 0 token
 - [ ] keymap for monaco
 - [x] SortedMap.newt issue in `where`
 - [x] fix "insufficient patterns", wire in M or Either String
 - [x] Matching _,_ when Maybe is expected should be an error
 - [ ] There are issues with matching inside do blocks, I think we need to guess scrutinee? I could imagine constraining metas too (e.g. if Just ... at ?m123 then ?m123 =?= Maybe ?m456)
+  - Also, the root cause is tough to track down if there is a type error (this happens with `do` in Idris, too).
 - [ ] error for non-linear pattern
 - [ ] typeclass dependencies
   - need to flag internal functions to not search (or flag functions for search). I need to decide on syntax for this.
@@ -33,7 +38,7 @@
   - [ ] `$` no longer works inside ≡⟨ ⟩ sort out how to support both that and `$ \ x => ...` (or don't bother)
     - We'd either need to blacklist all non-initial mixfix bits at the appropriate spots or always pass around a terminating token.
 - [ ] **Translate newt to newt**
-  - [ ] Support @ on the LHS
+  - [x] Support @ on the LHS
   - [x] if / then / else sugar
   - [ ] `data Foo = A | B` sugar
   - [ ] records

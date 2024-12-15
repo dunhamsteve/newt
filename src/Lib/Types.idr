@@ -449,6 +449,14 @@ record Context where
   -- FC to use if we don't have a better option
   fc : FC
 
+setName : Context -> Nat -> String -> Context
+setName ctx ix name = case natToFin ix ctx.lvl of
+  Just ix' => { types $= updateAt ix' go  } ctx
+  Nothing => ctx
+  where
+    go : (String,Val) -> (String, Val)
+    go (a,b) = (name,b)
+
 %name Context ctx
 
 ||| add a binding to environment

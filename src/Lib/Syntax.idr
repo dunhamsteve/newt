@@ -12,7 +12,7 @@ data Raw : Type where
 public export
 data Pattern
   = PatVar FC Icit Name
-  | PatCon FC Icit Name (List Pattern)
+  | PatCon FC Icit Name (List Pattern) (Maybe Name)
   | PatWild FC Icit
   -- Not handling this yet, but we need to be able to work with numbers and strings...
   | PatLit FC Literal
@@ -20,7 +20,7 @@ data Pattern
 export
 getIcit : Pattern -> Icit
 getIcit (PatVar x icit str) = icit
-getIcit (PatCon x icit str xs) = icit
+getIcit (PatCon x icit str xs as) = icit
 getIcit (PatWild x icit) = icit
 getIcit (PatLit fc lit) = Explicit
 
@@ -28,7 +28,7 @@ getIcit (PatLit fc lit) = Explicit
 export
 HasFC Pattern where
   getFC (PatVar fc _ _) = fc
-  getFC (PatCon fc _ _ _) = fc
+  getFC (PatCon fc _ _ _ _) = fc
   getFC (PatWild fc _) = fc
   getFC (PatLit fc lit) = fc
 
@@ -78,6 +78,7 @@ data Raw : Type where
   RDo : (fc : FC) -> List DoStmt -> Raw
   RIf : (fc : FC) -> Raw -> Raw -> Raw -> Raw
   RWhere : (fc : FC) -> (List Decl) -> Raw -> Raw
+  RAs : (fc : FC) -> Name -> Raw -> Raw
 
 %name Raw tm
 
@@ -98,6 +99,7 @@ HasFC Raw where
   getFC (RDo fc stmts) = fc
   getFC (RIf fc _ _ _) = fc
   getFC (RWhere fc _ _) = fc
+  getFC (RAs fc _ _) = fc
 
 
 -- derive some stuff - I'd like json, eq, show, ...
@@ -187,7 +189,7 @@ Show Module where
 export
 Show Pattern where
   show (PatVar _ icit str) = foo ["PatVar", show icit, show str]
-  show (PatCon _ icit str xs) = foo ["PatCon", show icit, show str, assert_total $ show xs]
+  show (PatCon _ icit str xs as) = foo ["PatCon", show icit, show str, assert_total $ show xs, show as]
   show (PatWild _ icit) = foo ["PatWild", show icit]
   show (PatLit _ lit) = foo ["PatLit", show lit]
 
@@ -214,6 +216,7 @@ Show Raw where
   show (RU _) = "U"
   show (RIf _ x y z) = foo [ "If", show x, show y, show z]
   show (RWhere _ _ _) = foo [ "Where", "FIXME"]
+  show (RAs _ nm x) = foo [ "RAs", nm, show x]
 
 export
 Pretty Literal where
@@ -225,11 +228,10 @@ export
 Pretty Pattern where
   -- FIXME - wrap Implicit with {}
   pretty (PatVar _ icit nm) = text nm
-  pretty (PatCon _ icit nm args) = text nm <+> spread (map pretty args)
+  pretty (PatCon _ icit nm args Nothing) = text nm <+> spread (map pretty args)
+  pretty (PatCon _ icit nm args (Just as)) = text as ++ "@(" ++ text nm <+> spread (map pretty args) ++ ")"
   pretty (PatWild _icit) = "_"
   pretty (PatLit _ lit) = pretty lit
-
-
 
 export
 Pretty Raw where
@@ -269,6 +271,7 @@ Pretty Raw where
     asDoc p (RDo _ stmts) = text "TODO - RDo"
     asDoc p (RIf _ x y z) = par p 0 $ text "if" <+> asDoc 0 x <+/> "then" <+> asDoc 0 y <+/> "else" <+> asDoc 0 z
     asDoc p (RWhere _ dd b) = text "TODO pretty where"
+    asDoc p (RAs _ nm x) = text nm ++ "@(" ++ asDoc 0 x ++ ")"
 
 export
 Pretty Decl where

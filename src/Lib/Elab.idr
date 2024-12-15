@@ -15,7 +15,6 @@ import Lib.Eval
 import Lib.TopContext
 import Lib.Syntax
 
-
 ||| collectDecl collects multiple Def for one function into one
 export
 collectDecl : List Decl -> List Decl
@@ -453,7 +452,7 @@ introClause nm icit (MkClause fc cons [] expr) = error fc "Clause size doesn't m
 findSplit : List Constraint -> Maybe Constraint
 findSplit [] = Nothing
     -- FIXME look up type, ensure it's a constructor
-findSplit (x@(nm, PatCon _ _ cnm pats) :: xs) = Just x
+findSplit (x@(nm, PatCon _ _ _ _ _) :: xs) = Just x
 findSplit (x@(nm, PatLit _ val) :: xs) = Just x
 findSplit (x :: xs) = findSplit xs
 
@@ -580,7 +579,6 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   let (VRef _ sctynm _ _) = scty | _ => error (getFC scty) "case split on non-inductive \{show scty}"
 
   case lookupDef ctx scnm of
-    -- NOW this is S var7
     Just val@(VRef fc nm y sp) =>
       if nm /= dcName
       then do
@@ -693,13 +691,15 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         then case y of
           PatVar _ _ s => pure $ Just $ c :: (xs ++ acc)
           PatWild _ _ => pure $ Just $ c :: (xs ++ acc)
-          -- FIXME why don't we hit this ('x' for Just x)
+          -- FIXME why don't we hit this (when user puts 'x' for Just 'x')
           PatLit fc lit => error fc "Literal \{show lit} in constructor split"
-          -- FIXME check type
-          PatCon fc _ nm ys => if nm == dcName
-            then pure $ Just $ !(makeConstr vars ys) ++ xs ++ acc
-            -- TODO can we check this when we make the PatCon?
+          PatCon fc icit nm ys as => if nm == dcName
+            then case as of
+              Nothing => pure $ Just $ !(makeConstr vars ys) ++ xs ++ acc
+              -- putting this in constraints causes it to be renamed scnm -> nm' when we check body.
+              Just nm' => pure $ Just $ (scnm, (PatVar fc icit nm')) :: !(makeConstr vars ys) ++ xs ++ acc
             else do
+              -- TODO can we check this when we make the PatCon?
               case lookup nm !get of
                   (Just (MkEntry _ name type (DCon k tcname))) =>
                     if (tcname /= sctynm)
@@ -721,12 +721,17 @@ splitArgs tm args = (tm, args)
 
 
 mkPat : TopContext -> (Raw, Icit) -> M Pattern
+mkPat top (RAs fc as tm, icit) =
+  case !(mkPat top (tm, icit)) of
+    (PatCon fc icit nm args Nothing) => pure $ PatCon fc icit nm args (Just as)
+    (PatCon fc icit nm args Nothing) => error fc "Double as pattern \{show tm}"
+    t => error fc "Can't put as on non-constructor \{show tm}"
 mkPat top (tm, icit) = do
   case splitArgs tm [] of
     ((RVar fc nm), b) => case lookup nm top of
                 (Just (MkEntry _ name type (DCon k str))) =>
                   -- TODO check arity, also figure out why we need reverse
-                  pure $ PatCon fc icit nm !(traverse (mkPat top) b)
+                  pure $ PatCon fc icit nm !(traverse (mkPat top) b) Nothing
                 -- This fires when a global is shadowed by a pattern var
                 -- Just _ => error (getFC tm) "\{show nm} is not a data constructor"
                 _ => case b of
@@ -736,7 +741,7 @@ mkPat top (tm, icit) = do
     ((RImplicit fc), _) => error fc "implicit pat can't be applied to arguments"
     ((RLit fc lit), []) => pure $ PatLit fc lit
     ((RLit fc y), b) => error fc "lit cannot be applied to arguments"
-    (a,b) => error (getFC a) "expected pat var or constructor"
+    (a,b) => error (getFC a) "expected pat var or constructor, got \{show a}"
 
 
 export
@@ -853,6 +858,7 @@ buildLitCase ctx prob fc scnm scty lit = do
   pure $ CaseLit lit tm
 
   where
+    -- FIXME - thread in M for errors
     -- replace constraint with constraints on parameters, or nothing if non-matching clause
     rewriteConstraint : List Constraint -> List Constraint -> Maybe (List Constraint)
     rewriteConstraint [] acc = Just acc
@@ -862,7 +868,7 @@ buildLitCase ctx prob fc scnm scty lit = do
           PatVar _ _ s => Just $ c :: (xs ++ acc)
           PatWild _ _ => Just $ c :: (xs ++ acc)
           PatLit fc lit' => if lit' == lit then Just $ (xs ++ acc) else Nothing
-          PatCon _ _ str ys => Nothing -- error matching lit against constructor
+          PatCon _ _ str ys as => Nothing -- error matching lit against constructor
         else rewriteConstraint xs (c :: acc)
 
     rewriteClause : Clause -> Maybe Clause
@@ -896,6 +902,13 @@ litTyName (LString str) = "String"
 litTyName (LInt i) = "Int"
 litTyName (LChar c) = "Char"
 
+renameContext : String -> String -> Context -> Context
+renameContext from to ctx = { types $= go } ctx
+  where
+    go : Vect n (String,Val) -> Vect n (String,Val)
+    go Nil = Nil
+    go ((a,b) :: types) = if a == from then (to,b) :: types else (a,b) :: go types
+
 -- This process is similar to extendPi, but we need to stop
 -- if one clause is short on patterns.
 buildTree ctx (MkProb [] ty) = error emptyFC "no clauses"
@@ -928,9 +941,8 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
   -- REVIEW We probably need to know this is a VRef before we decide to split on this slot..
   scty' <- unlet ctx.env scty >>= forceType ctx.env
   case pat of
-    PatCon _ _ _ _ => do
+    PatCon fc _ _ _ as => do
       -- expand vars that may be solved, eval top level functions
-
       debug "EXP \{show scty} -> \{show scty'}"
       -- this is per the paper, but it would be nice to coalesce
       -- default cases
@@ -939,7 +951,6 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
       alts <- traverse (buildCase ctx prob scnm scty') cons
       debug "GOTALTS \{show alts}"
       when (length (catMaybes alts) == 0) $ error (fc) "no alts for \{show scty'}"
-      -- TODO check for empty somewhere?
       pure $ Case fc sctm (catMaybes alts)
     PatLit fc v => do
       let tyname = litTyName v
@@ -1140,5 +1151,5 @@ infer ctx (RImplicit fc) = do
 infer ctx (RLit fc (LString str)) = pure (Lit fc (LString str), !(primType fc "String"))
 infer ctx (RLit fc (LInt i)) = pure (Lit fc (LInt i), !(primType fc "Int"))
 infer ctx (RLit fc (LChar c)) = pure (Lit fc (LChar c), !(primType fc "Char"))
-
+infer ctx (RAs fc _ _) = error fc "@ can only be used in patterns"
 infer ctx tm = error (getFC tm) "Implement infer \{show tm}"
