@@ -4,7 +4,7 @@
 More comments in code! This is getting big enough that I need to re-find my bearings when fixing stuff.
 
 - [ ] Move on to next decl in case of error
-  - for parse error, seek to col 0 token
+  - [ ] for parse error, seek to col 0 token
 - [ ] keymap for monaco
 - [x] SortedMap.newt issue in `where`
 - [x] fix "insufficient patterns", wire in M or Either String

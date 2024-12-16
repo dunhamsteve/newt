@@ -1,0 +1,161 @@
+module Day16
+
+import Prelude
+import Node
+import Aoc
+import SortedMap
+
+gridPoints : String → List (Char × Int × Int)
+gridPoints text = go 0 0 (unpack text) Nil
+  where
+    go : Int → Int → List Char → List (Char × Int × Int) → List (Char × Int × Int)
+    go row col Nil points = points
+    go row col ('\n' :: cs) points = go (row + 1) 0 cs points
+    go row col (c :: cs) points = go row (col + 1) cs ((c,row,col) :: points)
+
+Grid : U → U
+Grid a = SortedMap Point a
+
+getGrid : ∀ a. String → (Char → a) → Grid a
+getGrid {a} text f = foldl update EmptyMap $ gridPoints text
+  where
+    update : Grid a → Char × Point → Grid a
+    update grid (c, pt) = updateMap pt (f c) grid
+
+find : ∀ a. (a → Bool) → List a → Maybe a
+find f Nil = Nothing
+find f (x :: xs) = if f x then Just x else find f xs
+
+fromList : ∀ k v. {{Ord k}} {{Eq k}} → List (k × v) → SortedMap k v
+fromList xs = foldMap (\ a b => b) EmptyMap xs
+
+data Dir : U where
+  North South East West : Dir
+
+-- all of our co
+
+dist : Point → Point → Int
+dist (a,b) (c,d) =
+  let dr = if a < b then b - a else a - b
+      dc = if c < d then d - c else c - d
+  in dr + dc
+
+dirs : List Dir
+dirs = (North :: South :: East :: West :: Nil)
+
+turn : Dir → Dir → Int
+turn North North = 0
+turn South South = 0
+turn East East = 0
+turn West West = 0
+turn North South = 2000
+turn South North = 2000
+turn East West = 2000
+turn West East = 2000
+turn _ _ = 1000
+
+DPoint : U
+DPoint = Point × Dir
+
+move : DPoint → DPoint
+move ((r,c), North) = ((r - 1, c), North)
+move ((r,c), South) = ((r + 1, c), South)
+move ((r,c), East) = ((r, c + 1), East)
+move ((r,c), West) = ((r, c - 1), West)
+
+unmove : DPoint → DPoint
+unmove ((r,c), South) = ((r - 1, c), North)
+unmove ((r,c), North) = ((r + 1, c), South)
+unmove ((r,c), West) = ((r, c + 1), East)
+unmove ((r,c), East) = ((r, c - 1), West)
+
+dirVal : Dir → Int
+dirVal North = 0
+dirVal South = 1
+dirVal East = 2
+dirVal West = 3
+
+instance Ord Dir where
+  a < b = dirVal a < dirVal b
+
+instance Eq Dir where
+  a == b = dirVal a == dirVal b
+
+instance Eq DPoint where
+  (a,b) == (c,d) = a == c && b == d
+
+instance Ord DPoint where
+  (a,b) < (c,d) = a < c || a == c && b < d
+
+
+Cand : U
+Cand = Int × Point × Dir
+
+instance Eq Cand where
+  (s,pt) == (s',pt') = s == s' && pt == pt'
+
+instance Ord Cand where
+  (s,pt) < (s',pt') = s < s' || s == s' && pt < pt'
+
+min : Int → Int → Int
+min x y = if x < y then x else y
+
+-- todo is (est,dpoint) -> cost
+-- scores helps us cut (dpoint -> cost) -- cost or est should be the same
+-- We return the score map for part2 (which reconstructs the optimal paths)
+part1 : Point → SortedMap DPoint Int → SortedMap Cand Int → SortedMap DPoint Int
+part1 end scores todo =
+  let (Just (((est, pt),cost), todo)) =  (pop todo) | Nothing => scores in
+  let (Just (_,best)) = lookupMap pt scores | _ => part1 end scores todo in
+  if best < cost then part1 end scores todo else
+  let scores = updateMap pt cost scores in
+  -- keep going so we collect all optimal paths
+  if fst pt == end then part1 end scores todo else
+  let todo = foldMap min todo $ mapMaybe (next pt cost) dirs in
+  part1 end scores todo
+  where
+    next : Point × Dir → Int → Dir → Maybe (Cand × Int)
+    next dp@(pt,dir) cost newdir = do
+      let cost = cost + turn dir newdir + 1
+      let dp' = move (pt, newdir)
+      case lookupMap dp' scores of
+        Nothing => Nothing
+        Just (_, best) => if best < cost
+          then Nothing
+          else Just ((cost + dist (fst dp') end, dp'), cost)
+
+-- work backwards to collect optimal path
+goBack : SortedMap DPoint Int → List (DPoint × Int) → SortedMap Point Unit → List Point
+goBack scores Nil tiles = map fst $ toList tiles
+goBack scores ((dp@(pt,dir),cost) :: todo) tiles =
+  let tiles = updateMap (fst dp) MkUnit tiles in
+  let next = filter valid $ mapMaybe (flip lookupMap scores ∘ (_,_ (fst $ unmove dp))) dirs in
+  goBack scores (next ++ todo) tiles
+  where
+    -- if the costs add up, this link is part of the path
+    valid : DPoint × Int → Bool
+    valid  cand@((pt', dir'), cost') = cost == cost' + 1 + turn dir dir'
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let pts = filter (_/=_ '#' ∘ fst) $ gridPoints text
+  let (Just (_, start)) = find (_==_ 'S' ∘ fst) pts | _ => putStrLn "no start"
+  let (Just (_,end)) = find (_==_ 'E' ∘ fst) pts | _ => putStrLn "no end"
+
+  let scores = fromList $ join $ map (\ x => map ( \d => ((snd x, d), 999999)) dirs) pts
+  let todo = updateMap (0, start, East) 0 EmptyMap
+  let scores = part1 end scores todo
+  let (ends@((_, e) :: es)) = mapMaybe (flip lookupMap scores) $ map (_,_ end) dirs | _ => putStrLn "no end"
+  let p1 = foldl min e $ map snd es
+  putStrLn $ "part1 " ++ show p1
+  let todo = filter (_==_ p1 ∘ snd) ends
+  let tiles = goBack scores todo EmptyMap
+  putStrLn $ "part2 " ++ show (length tiles)
+
+main : IO Unit
+main = do
+  run "aoc2024/day16/eg.txt"
+  run "aoc2024/day16/eg2.txt"
+  run "aoc2024/day16/input.txt"
