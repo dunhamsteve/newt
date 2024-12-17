@@ -1,0 +1,141 @@
+module Day17
+
+import Prelude
+import Node
+import Aoc
+import Parser
+
+ptype BigInt
+
+pfunc itobi : Int → BigInt := `(x) => BigInt(x)`
+pfunc bitoi : BigInt → Int := `(x) => Number(x)`
+pfunc addbi : BigInt → BigInt → BigInt := `(a,b) => a + b`
+pfunc subbi : BigInt → BigInt → BigInt := `(a,b) => a - b`
+pfunc mulbi : BigInt → BigInt → BigInt := `(a,b) => a * b`
+pfunc divbi : BigInt → BigInt → BigInt := `(a,b) => a / b`
+
+instance Mul BigInt where a * b = mulbi a b
+instance Div BigInt where a / b = divbi a b
+instance Add BigInt where a + b = addbi a b
+instance Sub BigInt where a - b = subbi a b
+instance Cast Int BigInt where cast x = itobi x
+instance Eq BigInt where a == b = jsEq a b
+instance Show BigInt where show = jsShow
+instance Ord BigInt where a < b = jsLT a b
+
+data Machine : U where
+  M : BigInt → BigInt → BigInt → List Int → Int → SnocList Int → Machine
+
+preg : Parser BigInt
+preg = do
+  token "Register"
+  any
+  token ":"
+  n <- number
+  match '\n'
+  pure $ itobi n
+
+pprog : Parser (List Int)
+pprog = do
+  token "Program:"
+  n <- number
+  ns <- many $ match ',' >> number
+  many $ match '\n'
+  pure $ n :: ns
+
+pmachine : Parser Machine
+pmachine = do
+  a <- preg
+  b <- preg
+  c <- preg
+  many $ match '\n'
+  prog <- pprog
+  pure $ M a b c prog 0 Lin
+
+infixl 7 _**_ _|_ _^_ _%_ _>>>_
+pfunc _**_ : Int → Int → Int := `(x,y) => x ** y`
+pfunc _>>>_ : BigInt → BigInt → BigInt := `(x,y) => x >> y`
+pfunc _%_ : BigInt → BigInt → BigInt := `(x,y) => x % y`
+pfunc bxor : BigInt → BigInt → BigInt := `(x,y) => x ^ y`
+
+step : Machine -> Machine
+step mach@(M a b c mem ip out) =
+  let ip' = cast ip in
+  let (Just ins) = getAt ip' mem | _ => mach in
+  let (Just op) = getAt (S ip') mem | _ => mach in
+  case ins of
+    0 => let a = a >>> combo op in step (M a b c mem (ip + 2) out)
+    1 => let b = bxor b (itobi op) in step (M a b c mem (ip + 2) out)
+    2 => let b = combo op % itobi 8 in step (M a b c mem (ip + 2) out)
+    3 => if a == itobi 0 then step (M a b c mem (ip + 2) out) else step (M a b c mem op out)
+    4 => let b = bxor b c in step (M a b c mem (ip + 2) out)
+    5 => let o = combo op % itobi 8 in step (M a b c mem (ip + 2) (out :< bitoi o))
+    6 => let b = a >>> combo op in step (M a b c mem (ip + 2) out)
+    7 => let c = a >>> combo op in step (M a b c mem (ip + 2) out)
+    _ => ?
+  where
+    combo : Int → BigInt
+    combo 4 = a
+    combo 5 = b
+    combo 6 = c
+    combo n = itobi n
+
+find : ∀ a. (a → Bool) → List a → Maybe a
+find f Nil = Nothing
+find f (x :: xs) = if f x then Just x else find f xs
+
+Cand : U
+Cand = BigInt ×  SnocList Int ×  List Int
+
+part2 : Machine -> Maybe BigInt
+part2 mach@(M a b c mem ip out) = go ((itobi 0,(Lin <>< mem), Nil) :: Nil)
+  where
+    cands : List BigInt
+    cands = map itobi (0 :: 1 :: 2 :: 3 :: 4 :: 5 :: 6 :: 7 :: Nil)
+
+    matches : List Int → BigInt → Bool
+    matches want a =
+      let (M _ b c mem ip out) = step (M a b c mem ip Lin) in
+      let out = out <>> Nil in
+      out == want
+
+    chain : (Int → Maybe Int) → List Int → Maybe Int
+    chain f Nil = Nothing
+    chain f (x :: xs) = case f x of
+      Just a => Just a
+      Nothing => chain f xs
+
+    go : List Cand → Maybe BigInt
+    go Nil = Nothing
+    go ((a, Lin, acc) :: _) = Just a
+    go ((a, xs :< x, acc) :: todo) =
+      let next = filter (matches (x :: acc)) $ map (_+_ (a * itobi 8)) cands in
+      go (map (\a => (a, xs, x :: acc)) next ++ todo)
+
+render : SnocList Int → String
+render out = go out Nil
+  where
+    go : SnocList Int → List Char → String
+    go Lin chars = pack $ tail chars
+    go (xs :< x) acc = go xs (',' :: chr (x + 48) :: acc)
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+
+  let (Right (mach, Nil)) = pmachine (unpack text)
+    | (Right (_, cs)) => putStrLn $ "extra: " ++ pack cs
+    | _ => putStrLn "parse error"
+
+  let (M a b c mem ip out) = (step mach)
+  putStrLn $ "part1 " ++ render out
+  let (Just p2) = part2 mach | Nothing => putStrLn "fail"
+  putStrLn  $ "part2 " ++ show p2
+  putStrLn ""
+
+main : IO Unit
+main = do
+  run "aoc2024/day17/eg.txt"
+  run "aoc2024/day17/eg2.txt"
+  run "aoc2024/day17/input.txt"

@@ -123,7 +123,11 @@ processModule base stk name = do
   putStrLn "process Decls"
 
   traverse_ tryProcessDecl (collectDecl decls)
-  if (stk == []) then logMetas mstart else pure ()
+
+  -- we don't want implict errors from half-processed functions
+  -- but suppress them all on error for simplicity.
+  errors <- readIORef top.errors
+  if stk == [] && length errors == 0 then logMetas mstart else pure ()
   pure src
   where
 

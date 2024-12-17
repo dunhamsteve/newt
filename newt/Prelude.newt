@@ -74,10 +74,14 @@ data SnocList : U → U where
   _:<_ : ∀ A. SnocList A → A → SnocList A
 
 -- 'chips'
-infixr 6 _<>>_
+infixr 6 _<>>_ _<><_
 _<>>_ : ∀ a. SnocList a → List a → List a
 Lin <>> ys = ys
 (xs :< x) <>> ys = xs <>> x :: ys
+
+_<><_ : ∀ a. SnocList a → List a → SnocList a
+xs <>< Nil = xs
+xs <>< (y :: ys) = (xs :< y) <>< ys
 
 -- This is now handled by the parser, and LHS becomes `f a`.
 -- infixr 0 _$_
@@ -387,6 +391,7 @@ instance Show Int where
   show = showInt
 
 pfunc ord : Char -> Int := `(c) => c.charCodeAt(0)`
+pfunc chr : Int → Char := `(c) => String.fromCharCode(c)`
 
 pfunc unpack uses (Nil _::_) : String -> List Char
   := `(s) => {
@@ -752,3 +757,7 @@ instance ∀ a b. {{Eq a}} {{Eq b}} → Eq (a × b) where
 instance ∀ a b. {{Eq a}} {{Ord a}} {{Ord b}} → Ord (a × b) where
   (a,b) < (c,d) = if a == c then b < d else a < c
 
+instance ∀ a. {{Eq a}} → Eq (List a) where
+  Nil == Nil = True
+  (x :: xs) == (y :: ys) = if x == y then xs == ys else False
+  _ == _ = False
