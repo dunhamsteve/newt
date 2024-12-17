@@ -24,17 +24,11 @@ instance Show Dir where
   show South = "S"
   show West = "W"
 
+instance Eq Dir where
+  a == b = show a == show b
+
 instance Ord Dir where
   a < b = show a < show b
-
-instance Eq (Point × Dir) where
-  (a,b) == (c,d) = a == c && show b == show d
-
-instance Ord (Point × Dir) where
-  (a,b) < (c,d) =
-    if a < c then True
-    else if a /= c then False
-    else b < d
 
 Done : U
 Done = SortedMap (Point × Dir) Unit

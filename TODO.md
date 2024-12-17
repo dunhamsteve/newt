@@ -3,8 +3,10 @@
 
 More comments in code! This is getting big enough that I need to re-find my bearings when fixing stuff.
 
-- [ ] Move on to next decl in case of error
-  - [ ] for parse error, seek to col 0 token
+- [x] Move on to next decl in case of error
+- [x] for parse error, seek to col 0 token and process next decl
+- [ ] Change `Ord` to be more like Idris - LT / EQ / GT (and entail equality)
+- [ ] Keep a `compare` function on `SortedMap` (like lean)
 - [ ] keymap for monaco
 - [x] SortedMap.newt issue in `where`
 - [x] fix "insufficient patterns", wire in M or Either String

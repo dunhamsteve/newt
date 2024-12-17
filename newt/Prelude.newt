@@ -746,4 +746,9 @@ instance Show Char where
 swap : ∀ a b. a × b → b × a
 swap (a,b) = (b,a)
 
+instance ∀ a b. {{Eq a}} {{Eq b}} → Eq (a × b) where
+  (a,b) == (c,d) = a == c && b == d
+
+instance ∀ a b. {{Eq a}} {{Ord a}} {{Ord b}} → Ord (a × b) where
+  (a,b) < (c,d) = if a == c then b < d else a < c
 

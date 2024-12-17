@@ -65,5 +65,7 @@ updateDef name fc ty def = do
 
 
 public export
-addError : HasIO io => {auto top : TopContext} -> Error -> io ()
-addError err = modifyIORef top.errors (err ::)
+addError : Error -> M ()
+addError err = do
+  top <- get
+  modifyIORef top.errors (err ::)

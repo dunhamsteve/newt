@@ -81,21 +81,8 @@ instance Ord Dir where
 instance Eq Dir where
   a == b = dirVal a == dirVal b
 
-instance Eq DPoint where
-  (a,b) == (c,d) = a == c && b == d
-
-instance Ord DPoint where
-  (a,b) < (c,d) = a < c || a == c && b < d
-
-
 Cand : U
 Cand = Int × Point × Dir
-
-instance Eq Cand where
-  (s,pt) == (s',pt') = s == s' && pt == pt'
-
-instance Ord Cand where
-  (s,pt) < (s',pt') = s < s' || s == s' && pt < pt'
 
 min : Int → Int → Int
 min x y = if x < y then x else y

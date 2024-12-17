@@ -108,7 +108,6 @@ solveAutos mstart ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
         | res => do
           debug "FAILED to solve \{show ty}, matches: \{commaSep $ map (pprint [] . fst) res}"
           solveAutos mstart es
-        -- | res => error fc "FAILED to solve \{show ty}, matches: \{show $ map (pprint [] . fst) res}"
       writeIORef top.metas mc
       val <- eval ctx.env CBN tm
       debug "SOLUTION \{pprint [] tm} evaled to \{show val}"
@@ -153,6 +152,7 @@ logMetas mstart = do
       env <- dumpEnv ctx
       let msg = "\{env}  -----------\n  \{pprint names ty'}"
       info fc "User Hole\n\{msg}"
+
     (Unsolved fc k ctx ty kind cons) => do
       tm <- quote ctx.lvl !(forceMeta ty)
       -- Now that we're collecting errors, maybe we simply check at the end
@@ -161,7 +161,21 @@ logMetas mstart = do
       let msg = "Unsolved meta \{show k} \{show kind} type \{pprint (names ctx) tm} \{show $ length cons} constraints"
       msgs <- for cons $ \ (MkMc fc env sp val) => do
             pure "  * (m\{show k} (\{unwords $ map show $ sp <>> []}) =?= \{show val}"
-      addError $ E fc $ unlines ([msg] ++ msgs)
+      sols <- case kind of
+        AutoSolve => do
+          x <- quote ctx.lvl ty
+          ty <- eval ctx.env CBN x
+          debug "AUTO ---> \{show ty}"
+          -- we want the context here too.
+          top <- get
+          matches <- case !(contextMatches ctx ty) of
+            [] => findMatches ctx ty top.defs
+            xs => pure xs
+          -- TODO try putting mc into TopContext for to see if it gives better terms
+          pure $ "  \{show $ length matches} Solutions:" :: map (("  " ++) . interpolate . pprint (names ctx) . fst) matches
+
+        _ => pure []
+      addError $ E fc $ unlines ([msg] ++ msgs ++ sols)
 
 
 export

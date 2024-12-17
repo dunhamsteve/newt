@@ -7,4 +7,5 @@ endif
 
 CompilerSet makeprg=newt
 " doesn't work
-CompilerSet errorformat=ERROR\ at\ (%l,\ %c)
+setlocal errorformat=ERROR\ at\ %f:(%l\,\ %c):\ %m,%-G%.%#
+

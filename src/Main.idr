@@ -66,6 +66,21 @@ writeSource fn = do
   Right _ <- chmodRaw fn 493 | Left err => fail (show err)
   pure ()
 
+
+parseDecls : String -> Operators -> TokenList -> SnocList Decl -> M (List Decl, Operators)
+parseDecls fn ops [] acc = pure (acc <>> [], ops)
+parseDecls fn ops toks acc =
+  case partialParse fn (sameLevel parseDecl) ops toks of
+    Left (err, toks) => do
+      putStrLn $ showError "" err
+      addError err
+      parseDecls fn ops (recover toks) acc
+    Right (decl,ops,toks) => parseDecls fn ops toks (acc :< decl)
+  where
+    recover : TokenList -> TokenList
+    recover [] = []
+    recover (tok :: toks) = if tok.bounds.startCol == 0 then (tok :: toks) else recover toks
+
 ||| New style loader, one def at a time
 processModule : String -> List String -> String -> M String
 processModule base stk name = do
@@ -79,7 +94,7 @@ processModule base stk name = do
     | Left err => fail (showError src err)
 
   let Right ((nameFC, modName), ops, toks) := partialParse fn parseModHeader top.ops toks
-    | Left err => fail (showError src err)
+    | Left (err, toks) => fail (showError src err)
 
 
   putStrLn "module \{modName}"
@@ -87,7 +102,7 @@ processModule base stk name = do
     | _ => fail "ERROR at \{show nameFC}: module name \{show modName} doesn't match file name \{show fn}"
 
   let Right (imports, ops, toks) := partialParse fn parseImports ops toks
-    | Left err => fail (showError src err)
+    | Left (err, toks) => fail (showError src err)
 
   for_ imports $ \ (MkImport fc name') => do
     -- we could use `fc` if it had a filename in it
@@ -100,18 +115,24 @@ processModule base stk name = do
   -- REVIEW suppressing unsolved and solved metas from previous files
   -- I may want to know about (or fail early on) unsolved
   let mstart = length mc.metas
-  let Right (decls, ops, toks) := partialParse fn (manySame parseDecl) top.ops toks
-    | Left err => fail (showError src err)
-  let [] := toks
-    | (x :: xs) =>
-        fail (showError src (E (MkFC fn (startBounds x.bounds)) "extra toks"))
+  -- let Right (decls, ops, toks) := partialParse fn (manySame parseDecl) top.ops toks
+  --   | Left (err, toks) => fail (showError src err)
+  (decls, ops) <- parseDecls fn top.ops toks [<]
   modify { ops := ops }
 
   putStrLn "process Decls"
-  Right _ <- tryError $ traverse_ processDecl (collectDecl decls)
-    | Left y => fail (showError src y)
+
+  traverse_ tryProcessDecl (collectDecl decls)
   if (stk == []) then logMetas mstart else pure ()
   pure src
+  where
+
+    -- parseDecls :
+    -- tryParseDecl :
+    tryProcessDecl : Decl -> M ()
+    tryProcessDecl decl = do
+      Left err <- tryError {e=Error} $ processDecl decl | _ => pure ()
+      addError err
 
 processFile : String -> M ()
 processFile fn = do

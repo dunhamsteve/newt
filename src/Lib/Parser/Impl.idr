@@ -55,9 +55,9 @@ parse fn pa toks = case runP pa toks False empty (MkFC fn (-1,-1)) of
 
 ||| Intended for parsing a top level declaration
 export
-partialParse : String -> Parser a -> Operators -> TokenList -> Either Error (a, Operators, TokenList)
+partialParse : String -> Parser a -> Operators -> TokenList -> Either (Error, TokenList) (a, Operators, TokenList)
 partialParse fn pa ops toks = case runP pa toks False ops (MkFC fn (0,0)) of
-  Fail fatal err toks com ops => Left err
+  Fail fatal err toks com ops => Left (err, toks)
   OK a ts _ ops => Right (a,ops,ts)
 
 -- I think I want to drop the typeclasses for v1

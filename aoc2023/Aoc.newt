@@ -40,8 +40,10 @@ instance Add Point where
 instance Sub Point where
   (a,b) - (c,d) = (a - c, b - d)
 
-instance Ord Point where
-  (a,b) < (c,d) = a < c || a == c && b < d
 
-instance Eq Point where
-  (a,b) == (c,d) = a == c && b == d
+
+-- instance Ord Point where
+--   (a,b) < (c,d) = a < c || a == c && b < d
+
+-- instance Eq Point where
+--   (a,b) == (c,d) = a == c && b == d
