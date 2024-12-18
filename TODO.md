@@ -7,7 +7,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [x] for parse error, seek to col 0 token and process next decl
 - [ ] Change `Ord` to be more like Idris - LT / EQ / GT (and entail equality)
 - [ ] Keep a `compare` function on `SortedMap` (like lean)
-- [ ] keymap for monaco
+- [x] keymap for monaco
 - [x] SortedMap.newt issue in `where`
 - [x] fix "insufficient patterns", wire in M or Either String
 - [x] Matching _,_ when Maybe is expected should be an error
