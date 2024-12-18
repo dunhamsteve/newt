@@ -85,6 +85,21 @@ fresh nm env = if free env.env nm then nm else go nm 1
     go : String -> Nat -> String
     go nm k = let nm' = "\{nm}\{show k}" in if free env.env nm' then nm' else go nm (S k)
 
+fresh' : String -> JSEnv -> (String, JSEnv)
+fresh' nm env =
+  let nm' = fresh nm env -- "\{nm}$\{show $ length env}"
+      env' = push env (Var nm')
+  in (nm', env')
+
+freshNames : List String -> JSEnv -> (List String, JSEnv)
+freshNames nms env = go nms env [<]
+  where
+    go : List Name -> JSEnv -> SnocList Name -> (List String, JSEnv)
+    go Nil env acc = (acc <>> Nil, env)
+    go (n :: ns) env acc =
+      let (n', env') = fresh' n env
+      in go ns env' (acc :< n')
+
 -- This is inspired by A-normalization, look into the continuation monad
 -- There is an index on JSStmt, adopted from Stefan Hoeck's code.
 --
@@ -97,12 +112,10 @@ termToJS env (CBnd k) f = case getAt k env.env of
   Nothing => ?bad_bounds
 termToJS env CErased f = f JUndefined
 termToJS env (CLam nm t) f =
-  let nm' = fresh nm env -- "\{nm}$\{show $ length env}"
-      env' = push env (Var nm')
+  let (nm',env') = fresh' nm env -- "\{nm}$\{show $ length env}"
   in f $ JLam [nm'] (termToJS env' t JReturn)
 termToJS env (CFun nms t) f =
-  let nms' = map (\nm => fresh nm env) nms
-      env' = foldl (\ e, nm => push e (Var nm)) env nms'
+  let (nms', env') = freshNames nms env
   in f $ JLam nms' (termToJS env' t JReturn)
 termToJS env (CRef nm) f = f $ Var nm
 termToJS env (CMeta k) f = f $ LitString "META \{show k}"
