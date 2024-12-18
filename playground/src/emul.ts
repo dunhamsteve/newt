@@ -205,9 +205,7 @@ export let shim: NodeShim = {
     platform: "linux",
     argv: ["", ""],
     stdout: {
-      // We'll want to replace this one
       write(s) {
-        console.log("*", s);
         shim.stdout += s;
       },
     },

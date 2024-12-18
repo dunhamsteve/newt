@@ -26,6 +26,7 @@ import System
 import System.Directory
 import System.File
 import System.Path
+import Data.Buffer
 
 fail : String -> M a
 fail msg = putStrLn msg >> exitFailure
@@ -69,7 +70,7 @@ writeSource fn = do
 
 parseDecls : String -> Operators -> TokenList -> SnocList Decl -> M (List Decl, Operators)
 parseDecls fn ops [] acc = pure (acc <>> [], ops)
-parseDecls fn ops toks acc =
+parseDecls fn ops toks@(first :: _) acc =
   case partialParse fn (sameLevel parseDecl) ops toks of
     Left (err, toks) => do
       putStrLn $ showError "" err
@@ -79,7 +80,17 @@ parseDecls fn ops toks acc =
   where
     recover : TokenList -> TokenList
     recover [] = []
-    recover (tok :: toks) = if tok.bounds.startCol == 0 then (tok :: toks) else recover toks
+    -- skip to top token, but make sure there is progress
+    recover (tok :: toks) = if tok.bounds.startCol == 0 && tok.bounds /= first.bounds
+      then (tok :: toks)
+      else recover toks
+
+fastReadFile : HasIO io => String -> io (Either FileError String)
+fastReadFile fn = do
+  Right buf <- createBufferFromFile fn | Left err => pure $ Left err
+  len <- rawSize buf
+  Right <$> getString buf 0 len
+
 
 ||| New style loader, one def at a time
 processModule : String -> List String -> String -> M String
@@ -88,7 +99,7 @@ processModule base stk name = do
   let False := elem name top.loaded | _ => pure ""
   modify { loaded $= (name::) }
   let fn = if base == "" then name ++ ".newt" else base ++ "/" ++ name ++ ".newt"
-  Right src <- readFile $ fn
+  Right src <- fastReadFile $ fn
     | Left err => fail "error reading \{fn}: \{show err}"
   let Right toks = tokenise fn src
     | Left err => fail (showError src err)

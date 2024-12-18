@@ -102,8 +102,8 @@ document.body.appendChild(iframe);
 
 function run(src: string) {
   console.log("SEND TO", iframe.contentWindow);
-  const fileName = state.currentFile.value
-  postMessage({ type: 'compileRequest', fileName, src });
+  const fileName = state.currentFile.value;
+  postMessage({ type: "compileRequest", fileName, src });
 }
 
 function runOutput() {
@@ -132,7 +132,6 @@ function setOutput(output: string) {
   }
   state.output.value = output;
 }
-
 
 window.onmessage = (ev: MessageEvent<Message>) => {
   console.log("window got", ev.data);
@@ -166,7 +165,7 @@ const state = {
   editor: signal<monaco.editor.IStandaloneCodeEditor | null>(null),
   dark: signal(false),
   files: signal<string[]>(["Tour.newt"]),
-  currentFile: signal<string>(localStorage.currentFile ?? 'Tour.newt')
+  currentFile: signal<string>(localStorage.currentFile ?? "Tour.newt"),
 };
 
 // Monitor dark mode state (TODO - let user override system setting)
@@ -197,8 +196,8 @@ async function loadFile(fn: string) {
   } else {
     state.editor.value!.setValue("module Main\n\n-- File not found\n");
   }
-  state.currentFile.value = fn
-  localStorage.currentFile = fn
+  state.currentFile.value = fn;
+  localStorage.currentFile = fn;
 }
 
 // I keep pressing this.
@@ -222,6 +221,16 @@ interface EditorProps {
   initialValue: string;
 }
 
+const ABBREV: Record<string, string> = {
+    '\\x': '×',
+    '\\r': '→',
+    '\\all': '∀',
+    '\\\\': '\\',
+    '\\==': '≡',
+    '\circ': '∘',
+    '\\_1': '₁',
+  }
+
 function Editor({ initialValue }: EditorProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -244,6 +253,36 @@ function Editor({ initialValue }: EditorProps) {
         run(value);
         localStorage.code = value;
       }, 1000);
+      let last = ev.changes[ev.changes.length - 1];
+      const model = editor.getModel();
+      // figure out heuristics here, what chars do we want to trigger?
+      if (model && last.text && " ')_".includes(last.text)) {
+        console.log('LAST', last)
+        let { startLineNumber, startColumn } = last.range;
+        const text = model.getValueInRange(
+          new monaco.Range(
+            startLineNumber,
+            Math.max(1, startColumn - 10),
+            startLineNumber,
+            startColumn
+          )
+        );
+        const m = text.match(/(\\[^ ]+)$/);
+        if (m) {
+          let cand = m[0];
+          console.log("GOT", cand);
+          let text = ABBREV[cand];
+          if (text) {
+            const range = new monaco.Range(
+              startLineNumber,
+              startColumn - cand.length,
+              startLineNumber,
+              startColumn
+            );
+            editor.executeEdits("replaceSequence", [{ range, text: text }]);
+          }
+        }
+      }
     });
     if (initialValue === LOADING) loadFile("Tour.newt");
     else run(initialValue);
@@ -363,7 +402,11 @@ function EditWrap({
     h(
       "div",
       { className: "tabBar" },
-      h("select", { onChange: selectFile, value: state.currentFile.value }, options),
+      h(
+        "select",
+        { onChange: selectFile, value: state.currentFile.value },
+        options
+      ),
       h("div", { style: { flex: "1 1" } }),
       h("button", { onClick: runOutput }, svg(play)),
       h("button", { onClick: toggle }, svg(d))
