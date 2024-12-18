@@ -1,0 +1,107 @@
+module Day18
+
+import Prelude
+import Node
+import Aoc
+import Parser
+import SortedMap
+
+ppoint : Parser Point
+ppoint = _,_ <$> number <* match ',' <*> number <* match '\n'
+
+pfile : Parser (List Point)
+pfile = many ppoint
+
+step : SortedMap Point Char → List Point → Int → SortedMap Point Char
+step st (pt :: pts) 0 = st
+step st (pt :: pts) n = step (updateMap pt '#' st) pts (n - 1)
+step st Nil _ = st
+
+step2 : SortedMap Point Int → List Point → Int → SortedMap Point Int
+step2 st Nil _ = st
+step2 st (pt :: pts) x = step2 (updateMap pt x st) pts (x + 1)
+
+
+data Dir : U where North East South West : Dir
+
+dirs : List Dir
+dirs = (North :: South :: East :: West :: Nil)
+
+move : Point → Dir → Point
+move (r, c) North  = (r - 1, c)
+move (r, c) East   = (r, c + 1)
+move (r, c) South  = (r + 1, c)
+move (r, c) West   = (r, c - 1)
+
+Visited : U
+Visited = SortedMap Point Int
+
+minPath : SortedMap Point Char → Int → Int
+minPath st size = go EmptyMap ((0,0,0):: Nil) Lin
+  where
+    valid : Visited → Point → Bool
+    valid visited pt@(r,c) =
+      if r < 0 || c < 0 || size < r || size < c then False
+      else case lookupMap pt st of
+        Just _ => False
+        _ => case lookupMap pt visited of
+          Just _ => False
+          _ => True
+    go : Visited → List (Int × Point) → SnocList (Int × Point) → Int
+    go visited Nil Lin = 0
+    go visited xs Lin = go visited Nil (Lin <>< xs)
+    go visited xs (ys :< (l, pt@(r,c))) =
+      if pt == (size,size) then l else
+      let next = filter (valid visited) $ map (move pt) dirs
+          visited = foldMap const visited $ map (flip _,_ l) next
+      in go visited (map (_,_ (l + 1)) next ++ xs) ys
+
+min : Int → Int → Int
+min a b = if a < b then a else b
+
+part2 : SortedMap Point Int → Int → Int
+part2 st size = go EmptyMap (((0,0),99999):: Nil) Lin
+  where
+    valid : Visited → Int → Point → Maybe (Point × Int)
+    valid visited pathT pt@(r,c) =
+      if r < 0 || c < 0 || size < r || size < c then Nothing
+      else
+        let pathT' = case lookupMap pt st of -- traversible
+                        Just (_,t) => min t pathT
+                        Nothing => pathT
+        in case lookupMap pt visited of
+          Just (_,best) => if best < pathT' then Just (pt, pathT') else Nothing
+          _ => Just (pt, pathT')
+
+    go : Visited → List (Point × Int) → SnocList (Point × Int) → Int
+    go visited Nil Lin = case lookupMap (size,size) visited of
+      Just (_,best) => trace "best" best
+      Nothing => 0
+    go visited xs Lin = go visited Nil (Lin <>< xs)
+    go visited xs (ys :< (pt@(r,c), best)) =
+      if pt == (size,size) then go visited xs ys
+      else
+      let next = mapMaybe (valid visited best) $ map (move pt) dirs
+          visited = foldMap (\a b => b) visited next
+      in go visited (next ++ xs) ys
+
+run : String → Int → Int → IO Unit
+run fn size time = do
+  putStrLn fn
+  text <- readFile fn
+  let (Right (points, Nil)) = pfile $ unpack text
+    | Left err => putStrLn err
+    | Right (_, cs) => putStrLn $ "extra: " ++ pack cs
+  let p1map = step EmptyMap points time
+  let p1 = minPath p1map size
+  debugLog $ length $ toList p1map
+  putStrLn $ "part1 " ++ show p1
+  let p2map = step2 EmptyMap points 0
+  let p2 = part2 p2map size
+  let (Just (a,b)) = getAt (intToNat p2) points | _ => putStrLn $ "bad " ++ show p2
+  putStrLn $ "part2 " ++ show a ++ "," ++ show b
+
+main : IO Unit
+main = do
+  run "aoc2024/day18/eg.txt" 6 12
+  run "aoc2024/day18/input.txt" 70 1024
