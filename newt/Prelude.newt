@@ -287,7 +287,7 @@ pfunc arrayToList uses (Nil _::_) : {0 a} → Array a → List a := `(a,arr) => 
 
 
 -- for now I'll run this in JS
-pfunc lines : String → List String := `(s) => arrayToList(s.split('\n'))`
+pfunc lines uses (arrayToList) : String → List String := `(s) => arrayToList(undefined,s.split('\n'))`
 
 pfunc p_strHead : (s : String) -> Char := `(s) => s[0]`
 pfunc p_strTail : (s : String) -> String := `(s) => s[0]`

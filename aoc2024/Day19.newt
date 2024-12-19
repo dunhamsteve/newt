@@ -1,0 +1,63 @@
+module Day19
+
+import Prelude
+import Node
+import Aoc
+
+Rules : U
+Rules = List (List Char)
+
+data Problem : U where
+  MkP : Rules → Rules → Problem
+
+parseFile : String -> Either String Problem
+parseFile text =
+  let (a :: b :: Nil) = split (trim text) "\n\n" | xs => Left $ (show $ length xs) ++ " parts"
+  in Right (MkP (map unpack $ split a ", ") (map unpack $ lines b))
+
+State : U
+State = List (Int × List Char)
+
+matches : Rules -> List Char -> Int
+matches rules text = go (map (_,_ 1) rules) text
+  where
+    step : State -> Char -> State -> State
+    step acc c Nil = acc
+    step acc c ((n, Nil) :: rs) = step acc c rs
+    step acc c ((n, (x :: xs)) :: rs) = if x == c
+      then step ((n, xs) :: acc) c rs
+      else step acc c rs
+
+    nils : Int -> State -> Int
+    nils acc Nil = acc
+    nils acc ((n, Nil) :: xs) = nils (acc + n) xs
+    nils acc (x :: xs) = nils acc xs
+
+    go : State -> List Char -> Int
+    go st Nil = nils 0 st
+    go st (c :: cs) = case nils 0 st of
+      0 => go (step Nil c st) cs
+      n => let st = map (_,_ n) rules ++ st
+        in go (step Nil c st) cs
+
+part1 : Problem -> IO Unit
+part1 (MkP rules msgs) = do
+  let (r :: rs) = rules | _ => putStrLn "no rules"
+  let out = map (matches rules) msgs
+  let p1 = length $ filter (_/=_ 0) out
+  putStrLn $ "part1 " ++ show p1
+  let p2 = foldl _+_ 0 out
+  putStrLn $ "part2 " ++ show p2
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let (Right prob) = parseFile text | Left err => putStrLn err
+  part1 prob
+
+
+main : IO Unit
+main = do
+  run "aoc2024/day19/eg.txt"
+  run "aoc2024/day19/input.txt"
