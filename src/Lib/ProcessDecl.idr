@@ -178,6 +178,21 @@ logMetas mstart = do
       addError $ E fc $ unlines ([msg] ++ msgs ++ sols)
 
 
+-- Used for Class and Record
+getSigs : List Decl -> List (FC, String, Raw)
+getSigs [] = []
+getSigs ((TypeSig _ [] _) :: xs) = getSigs xs
+getSigs ((TypeSig fc (nm :: nms) ty) :: xs) = (fc, nm, ty) :: getSigs xs
+getSigs (_:: xs) = getSigs xs
+
+teleToPi : Telescope -> Raw -> Raw
+teleToPi [] end = end
+teleToPi ((info, ty) :: tele) end = RPi (getFC info) info ty (teleToPi tele end)
+
+impTele : Telescope -> Telescope
+impTele tele = map (\(BI fc nm _ quant, ty) => (BI fc nm Implicit Zero, ty)) tele
+
+
 export
 processDecl : Decl -> M ()
 
@@ -273,6 +288,9 @@ processDecl (DCheck fc tm ty) = do
   putStrLn "  NFV \{pprint [] norm}"
 
 processDecl (Class classFC nm tele decls) = do
+  -- REVIEW maybe we can leverage Record for this
+  -- a couple of catches, we don't want the dotted accessors and
+  -- the self argument should be an auto-implicit
   putStrLn "-----"
   putStrLn "Class \{nm}"
   let fields = getSigs decls
@@ -280,7 +298,7 @@ processDecl (Class classFC nm tele decls) = do
   let dcName = "Mk\{nm}"
   let tcType = teleToPi tele (RU classFC)
   let tail = foldl (\ acc, (BI fc nm icit _, _) => RApp fc acc (RVar fc nm) icit) (RVar classFC nm) tele
-  let dcType = teleToPi impTele $
+  let dcType = teleToPi (impTele tele) $
     foldr (\(fc, nm, ty), acc =>  RPi fc (BI fc nm Explicit Many) ty acc  ) tail fields
 
   putStrLn "tcon type \{pretty tcType}"
@@ -290,7 +308,7 @@ processDecl (Class classFC nm tele decls) = do
   putStrLn $ render 90 $ pretty decl
   processDecl decl
   for_ fields $ \ (fc,name,ty) => do
-      let funType = teleToPi impTele $ RPi fc (BI fc "_" Auto Many) tail ty
+      let funType = teleToPi (impTele tele) $ RPi fc (BI fc "_" Auto Many) tail ty
       let autoPat = foldl (\acc, (fc,nm,ty) => RApp fc acc (RVar fc nm) Explicit) (RVar classFC dcName) fields
       let lhs = foldl (\acc, (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc name) tele
       let lhs = RApp classFC lhs autoPat Auto
@@ -300,20 +318,7 @@ processDecl (Class classFC nm tele decls) = do
       putStrLn "\{pretty decl}"
       processDecl $ TypeSig fc [name] funType
       processDecl decl
-  where
 
-    getSigs : List Decl -> List (FC, String, Raw)
-    getSigs [] = []
-    getSigs ((TypeSig _ [] _) :: xs) = getSigs xs
-    getSigs ((TypeSig fc (nm :: nms) ty) :: xs) = (fc, nm, ty) :: getSigs xs
-    getSigs (_:: xs) = getSigs xs
-
-    impTele : Telescope
-    impTele = map (\(BI fc nm _ quant, ty) => (BI fc nm Implicit Zero, ty)) tele
-
-    teleToPi : Telescope -> Raw -> Raw
-    teleToPi [] end = end
-    teleToPi ((info, ty) :: tele) end = RPi (getFC info) info ty (teleToPi tele end)
 
 processDecl (Instance instfc ty decls) = do
   let decls = collectDecl decls
@@ -414,7 +419,6 @@ processDecl (Data fc nm ty cons) = do
   putStrLn "Data \{nm}"
   top <- get
   mc <- readIORef top.metas
-  let mstart = length mc.metas
   tyty <- check (mkCtx fc) ty (VU fc)
   case lookup nm top of
     Just (MkEntry _ name type Axiom) => do
@@ -449,3 +453,34 @@ processDecl (Data fc nm ty cons) = do
     checkDeclType (U _) = pure ()
     checkDeclType (Pi _ str icit rig t u) = checkDeclType u
     checkDeclType _ = error fc "data type doesn't return U"
+
+processDecl (Record recordFC nm tele cname decls) = do
+  putStrLn "-----"
+  putStrLn "Record"
+  let fields = getSigs decls
+  let dcName = fromMaybe "Mk\{nm}" cname
+  let tcType = teleToPi tele (RU recordFC)
+  -- REVIEW - I probably want to stick the telescope in front of the fields
+  let tail = foldl (\ acc, (BI fc nm icit _, _) => RApp fc acc (RVar fc nm) icit) (RVar recordFC nm) tele
+  let dcType = teleToPi (impTele tele) $
+    foldr (\(fc, nm, ty), acc =>  RPi fc (BI fc nm Explicit Many) ty acc  ) tail fields
+
+  putStrLn "tcon type \{pretty tcType}"
+  putStrLn "dcon type \{pretty dcType}"
+  let decl = Data recordFC nm tcType [TypeSig recordFC [dcName] dcType]
+  putStrLn "Decl:"
+  putStrLn $ render 90 $ pretty decl
+  processDecl decl
+  for_ fields $ \ (fc,name,ty) => do
+    -- TODO dependency isn't handled yet
+    -- we'll need to replace stuff like `len` with `len self`.
+    let funType = teleToPi (impTele tele) $ RPi fc (BI fc "_" Explicit Many) tail ty
+    let autoPat = foldl (\acc, (fc,nm,ty) => RApp fc acc (RVar fc nm) Explicit) (RVar recordFC dcName) fields
+    let lhs = foldl (\acc, (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc name) tele
+    let lhs = RApp recordFC lhs autoPat Explicit
+    let decl = Def fc name [(lhs, (RVar fc name))]
+
+    putStrLn "\{name} : \{pretty funType}"
+    putStrLn "\{pretty decl}"
+    processDecl $ TypeSig fc [name] funType
+    processDecl decl

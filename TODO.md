@@ -18,6 +18,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
   - need to flag internal functions to not search (or flag functions for search). I need to decide on syntax for this.
   - for something like an `isEq` field in `Ord`, auto-search is picking up the function being defined.
 - [ ] default implementations (use them if nothing is defined, where do we store them?) e.g. Ord compare, <, etc in Idris
+  - I may need to actually store some details on interfaces rather than reverse engineer from type.
 - [x] syntax for negative integers
 - [ ] White box tests in `test` directory
 - [x] Put worker in iframe on safari

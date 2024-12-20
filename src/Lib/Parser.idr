@@ -458,6 +458,19 @@ nakedBind = do
   pure $ map (\(pos,name) => (BI pos name Explicit Many, RImplicit pos)) names
 
 export
+parseRecord : Parser Decl
+parseRecord = do
+  fc <- getPos
+  keyword "record"
+  name <- uident
+  teles <- many $ ebind <|> nakedBind
+  keyword "where"
+  cname <- optional $ keyword "constructor" *> uident
+  decls <- startBlock $ manySame $ parseSig
+  pure $ Record fc name (join teles) cname decls
+
+
+export
 parseClass : Parser Decl
 parseClass = do
   fc <- getPos
@@ -487,7 +500,7 @@ export
 parseDecl : Parser Decl
 parseDecl = parseMixfix <|> parsePType <|> parsePFunc
   <|> parseNorm <|> parseData <|> parseSig <|> parseDef
-  <|> parseClass <|> parseInstance
+  <|> parseClass <|> parseInstance <|> parseRecord
 
 
 export

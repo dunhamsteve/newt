@@ -125,6 +125,7 @@ data Decl
   | PMixFix FC (List Name) Nat Fixity
   | Class FC Name Telescope (List Decl)
   | Instance FC Raw (List Decl)
+  | Record FC Name Telescope (Maybe Name) (List Decl)
 
 public export
 HasFC Decl where
@@ -137,6 +138,7 @@ HasFC Decl where
   getFC (PMixFix x strs k y) = x
   getFC (Class x str xs ys) = x
   getFC (Instance x tm xs) = x
+  getFC (Record x str tm str1 xs) = x
 
 public export
 record Module where
@@ -169,6 +171,9 @@ Show Clause where
 Show Import where
   show (MkImport _ str) = foo ["MkImport", show str]
 
+Show BindInfo where
+  show (BI _ nm icit quant) = foo ["BI", show nm, show icit, show quant]
+
 -- this is for debugging, use pretty when possible
 covering
 Show Decl where
@@ -181,6 +186,7 @@ Show Decl where
   show (PMixFix _ nms prec fix) = foo ["PMixFix", show nms, show prec, show fix]
   show (Class _ nm tele decls) = foo ["Class",  nm, "...", show $ map show decls]
   show (Instance _ nm decls) = foo ["Instance",  show nm, show $ map show decls]
+  show (Record _ nm tele nm1 decls) = foo ["Record", show nm, show tele, show nm1, show decls]
 
 export covering
 Show Module where
@@ -196,9 +202,6 @@ Show Pattern where
 covering
 Show RCaseAlt where
   show (MkAlt x y)= foo ["MkAlt", show x, assert_total $ show y]
-
-Show BindInfo where
-  show (BI _ name icit quant) = foo ["BI", show name, show icit, show quant]
 
 covering
 Show Raw where
@@ -233,16 +236,17 @@ Pretty Pattern where
   pretty (PatWild _icit) = "_"
   pretty (PatLit _ lit) = pretty lit
 
+wrap : Icit -> Doc -> Doc
+wrap Explicit x = text "(" ++ x ++ text ")"
+wrap Implicit x = text "{" ++ x ++ text "}"
+wrap Auto x = text "{{" ++ x ++ text "}}"
+
 export
 Pretty Raw where
   pretty = asDoc 0
     where
     bindDoc : BindInfo -> Doc
     bindDoc (BI _ nm icit quant) = ?rhs_0
-    wrap : Icit -> Doc -> Doc
-    wrap Explicit x = text "(" ++ x ++ text ")"
-    wrap Implicit x = text "{" ++ x ++ text "}"
-    wrap Auto x = text "{{" ++ x ++ text "}}"
 
     par : Nat -> Nat -> Doc -> Doc
     par p p' d = if p' < p then text "(" ++ d ++ text ")" else d
@@ -273,6 +277,9 @@ Pretty Raw where
     asDoc p (RWhere _ dd b) = text "TODO pretty where"
     asDoc p (RAs _ nm x) = text nm ++ "@(" ++ asDoc 0 x ++ ")"
 
+prettyBind : (BindInfo, Raw) -> Doc
+prettyBind (BI _ nm icit quant, ty) = wrap icit (text (show quant ++ nm) <+> text ":" <+> pretty ty)
+
 export
 Pretty Decl where
   pretty (TypeSig _ nm ty) = spread (map text nm) <+> text ":" <+> nest 2 (pretty ty)
@@ -283,7 +290,10 @@ Pretty Decl where
   pretty (PFunc _ nm [] ty src) = "pfunc" <+> text nm <+> ":" <+> nest 2 (pretty ty <+> ":=" <+/> text (show src))
   pretty (PFunc _ nm uses ty src) = "pfunc" <+> text nm <+> "uses" <+> spread (map text uses) <+> ":" <+> nest 2 (pretty ty <+> ":=" <+/> text (show src))
   pretty (PMixFix _ names prec fix) = text (show fix) <+> text (show prec) <+> spread (map text names)
-  pretty (Class _ _ _ _) = text "TODO pretty Class"
+  pretty (Record _ nm tele cname decls) = text "record" <+> text nm <+> ":" <+> spread (map prettyBind tele)
+    <+> (nest 2 $ text "where" </> stack (maybe empty (\ nm' => text "constructor" <+> text nm') cname :: map pretty decls))
+  pretty (Class _ nm tele decls) = text "class" <+> text nm <+> ":" <+> spread (map prettyBind tele)
+    <+> (nest 2 $ text "where" </> stack (map pretty decls))
   pretty (Instance _ _ _) = text "TODO pretty Instance"
 
 export
