@@ -90,7 +90,7 @@ rawTokens
   -- TODO Drop MixFix token type when we support if_then_else_
   <|> match (exact "_,_" <|> exact "_._") (Tok MixFix)
   -- REVIEW - expect non-alpha after?
-  <|> match (some digit) (Tok Number)
+  <|> match (opt (exact "-") <+> some digit) (Tok Number)
   -- for module names and maybe type constructors
   <|> match (charLit) (Tok Character . unquoteChar)
   <|> match (is '#' <+> many alpha) (Tok Pragma)
