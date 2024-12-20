@@ -761,3 +761,7 @@ instance ∀ a. {{Eq a}} → Eq (List a) where
   Nil == Nil = True
   (x :: xs) == (y :: ys) = if x == y then xs == ys else False
   _ == _ = False
+
+find : ∀ a. (a → Bool) → List a → Maybe a
+find f Nil = Nothing
+find f (x :: xs) = if f x then Just x else find f xs

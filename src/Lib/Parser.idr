@@ -440,6 +440,7 @@ parsePFunc = do
   src <- cast <$> token JSLit
   pure $ PFunc fc nm (fromMaybe [] uses) ty src
 
+
 export
 parseData : Parser Decl
 parseData = do

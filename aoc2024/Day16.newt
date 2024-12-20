@@ -22,10 +22,6 @@ getGrid {a} text f = foldl update EmptyMap $ gridPoints text
     update : Grid a → Char × Point → Grid a
     update grid (c, pt) = updateMap pt (f c) grid
 
-find : ∀ a. (a → Bool) → List a → Maybe a
-find f Nil = Nothing
-find f (x :: xs) = if f x then Just x else find f xs
-
 fromList : ∀ k v. {{Ord k}} {{Eq k}} → List (k × v) → SortedMap k v
 fromList xs = foldMap (\ a b => b) EmptyMap xs
 

@@ -1,0 +1,113 @@
+module Day20
+
+import Prelude
+import Node
+import Aoc
+import SortedMap
+
+gridPoints : String → List (Char × Int × Int)
+gridPoints text = go 0 0 (unpack text) Nil
+  where
+    -- might as well be tail recursive
+    go : Int → Int → List Char → List (Char × Int × Int) → List (Char × Int × Int)
+    go row col Nil points = points
+    go row col ('\n' :: cs) points = go (row + 1) 0 cs points
+    go row col (c :: cs) points = go row (col + 1) cs ((c,row,col) :: points)
+
+State Grid Next Cheat : U
+Grid = SortedMap Point Char
+State = SortedMap Point Int
+Next = (Point × Int)
+Cheat = (Point × Point)
+
+data Dir : U where North East South West : Dir
+
+dirs : List Dir
+dirs = (North :: South :: East :: West :: Nil)
+
+move : Point → Dir → Point
+move (r, c) North  = (r - 1, c)
+move (r, c) East   = (r, c + 1)
+move (r, c) South  = (r + 1, c)
+move (r, c) West   = (r, c - 1)
+
+distances : SortedMap Point Char → Point → State
+distances grid start = go EmptyMap ((start,0) :: Nil) Lin
+  where
+    valid : State → Point → Bool
+    valid st pt = case lookupMap pt grid of
+      Just (_, '.') => case lookupMap pt st of
+        Just _ => False
+        Nothing => True
+      _ => False
+
+    go : State → List (Point × Int) → SnocList (Point × Int) → State
+    go st Nil Lin = st
+    go st xs Lin = go st Nil (Lin <>< xs)
+    go st xs (ys :< (pt, l)) =
+      let next = map (flip _,_ $ l + 1) $ filter (valid st) $ map (move pt) dirs
+          st = foldMap const st next
+        in go st (next ++ xs) ys
+
+manh : Point → Point → Int
+manh (r,c) (r',c') =
+  let dr = if r < r' then r' - r else r - r'
+      dc = if c < c' then c' - c else c - c'
+  in dr + dc
+
+candidates : Point → Int → List Point
+candidates pt@(sr,sc) dist = go (sr - dist) (sc - dist) Nil
+  where
+    go : Int → Int → List Point → List Point
+    go r' c' acc =
+      if sr + dist < r' then acc
+      else if sc + dist < c' then go (r' + 1) (sc - dist) acc
+      else if manh pt (r',c') <= dist
+        then go r' (c' + 1) ((r', c') :: acc)
+        else go r' (c' + 1) acc
+
+calcCheats : State → State → Int → Int → Int
+calcCheats start dists fuel threshold = go (toList start) 0
+  where
+     -- only '.' have dist
+    tryCand : Int → Point → Point → Int
+    tryCand l pt cand = case lookupMap cand dists of
+      Just (_, dist) =>
+        let d = manh pt cand in
+        if fuel < d then (let x = (trace "X" (pt, cand, d)) in ?) else
+        if l + manh pt cand + dist <= threshold then 1 else 0
+      Nothing => 0
+
+    go : List (Point × Int) → Int → Int
+    go Nil acc = acc
+    go (x@(pt,l) :: xs) acc =
+          let acc = foldl _+_ acc $ map (tryCand l pt) $ candidates pt fuel
+          in go xs acc
+
+run : String → Int → IO Unit
+run fn time = do
+  putStrLn fn
+  text <- readFile fn
+  let pts = map swap $ gridPoints text
+  let grid = foldMap const EmptyMap pts
+  let (Just (start,_)) = find (_==_ 'S' ∘ snd) pts | _ => putStrLn "no start"
+  let (Just (end,_)) = find (_==_ 'E' ∘ snd) pts | _ => putStrLn "no end"
+  let grid' = updateMap start '.' $ updateMap end '.' grid
+  let dists = distances grid' end
+  -- this bit threw me off for a while
+  let dists = updateMap end 0 dists
+  let dists' = distances grid' start
+  let dists' = updateMap start 0 dists'
+  let (Just (_,base)) = lookupMap start dists | _ => putStrLn "no start in dists"
+  let p1 = calcCheats dists dists' 2 (base - time)
+
+  putStrLn $ "base " ++ show base
+  putStrLn $ "part1 " ++ show p1
+  let p2 = calcCheats dists dists' 20 (base - time)
+  putStrLn $ "part2 " ++ show p2
+  pure MkUnit
+
+main : IO Unit
+main = do
+  run "aoc2024/day20/eg.txt" 50
+  run "aoc2024/day20/input.txt" 100
