@@ -6,6 +6,8 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [ ] editor - idnent newline on let with no in
 - [x] Move on to next decl in case of error
 - [x] for parse error, seek to col 0 token and process next decl
+- [ ] record initialization sugar, e.g. `{ x := 1, y := 2 }`
+- [ ] record update sugar
 - [ ] Change `Ord` to be more like Idris - LT / EQ / GT (and entail equality)
 - [ ] Keep a `compare` function on `SortedMap` (like lean)
 - [x] keymap for monaco
@@ -14,6 +16,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [x] Matching _,_ when Maybe is expected should be an error
 - [ ] There are issues with matching inside do blocks, I think we need to guess scrutinee? I could imagine constraining metas too (e.g. if Just ... at ?m123 then ?m123 =?= Maybe ?m456)
   - Also, the root cause is tough to track down if there is a type error (this happens with `do` in Idris, too).
+  - Part of it is the auto solutions are getting discarded because of an unrelated unification failure. Either auto shouldn't go as deep or should run earlier. Forgetting that lookupMap returns a (k,v) pair is a good example.
 - [ ] error for non-linear pattern
 - [ ] typeclass dependencies
   - need to flag internal functions to not search (or flag functions for search). I need to decide on syntax for this.

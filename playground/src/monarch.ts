@@ -68,6 +68,7 @@ export let newtTokens: monaco.languages.IMonarchLanguage = {
     "in",
     "where",
     "case",
+    "record",
     "of",
     "data",
     "forall",

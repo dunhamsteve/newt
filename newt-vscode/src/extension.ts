@@ -37,9 +37,9 @@ export function activate(context: vscode.ExtensionContext) {
       { cwd, maxBuffer: 1024 * 1024 * 10 },
       (err, stdout, _stderr) => {
         // I think I ignored 1 here because I wanted failure to launch
-        if (err && err.code !== 1) {
+        if (err && err.code !== 1)
           vscode.window.showErrorMessage(`newt error: ${err}`);
-        }
+
 
         // extract errors and messages from stdout
         const lines = stdout.split("\n");
@@ -79,9 +79,9 @@ export function activate(context: vscode.ExtensionContext) {
 
             let lnum = Number(line);
             let cnum = Number(column);
-            if (file !== fileName) {
+            if (file !== fileName)
               lnum = cnum = 0;
-            }
+
             let start = new vscode.Position(lnum, cnum);
             // we don't have the full range, so grab the surrounding word
             let end = new vscode.Position(lnum, cnum + 1);
@@ -92,17 +92,17 @@ export function activate(context: vscode.ExtensionContext) {
             // anything indented
             // Context:, or Goal: are part of PRINTME
             // unexpected / expecting appear in parse errors
-            while (lines[i + 1]?.match(/^(  )/)) {
+            while (lines[i + 1]?.match(/^(  )/))
               message += "\n" + lines[++i];
-            }
+
             const severity =
               kind === "ERROR"
                 ? vscode.DiagnosticSeverity.Error
                 : vscode.DiagnosticSeverity.Information;
             const diag = new vscode.Diagnostic(range, message, severity);
-            if (kind === "ERROR" || lnum > 0) {
+            if (kind === "ERROR" || lnum > 0)
               diagnostics.push(diag);
-            }
+
           }
         }
         diagnosticCollection.set(vscode.Uri.file(fileName), diagnostics);
@@ -116,9 +116,9 @@ export function activate(context: vscode.ExtensionContext) {
       const editor = vscode.window.activeTextEditor;
       if (editor) {
         const document = editor.document;
-        if (document.fileName.endsWith(".newt")) {
+        if (document.fileName.endsWith(".newt"))
           checkDocument(document);
-        }
+
       }
     }
   );
@@ -164,25 +164,25 @@ export function activate(context: vscode.ExtensionContext) {
         }
       }
     )
-  )
+  );
 
   context.subscriptions.push(runPiForall);
 
   vscode.workspace.onDidSaveTextDocument((document) => {
-    if (document.fileName.endsWith(".newt")) {
+    if (document.fileName.endsWith(".newt"))
       vscode.commands.executeCommand("newt-vscode.check");
-    }
+
   });
   vscode.workspace.onDidOpenTextDocument((document) => {
-    if (document.fileName.endsWith(".newt")) {
+    if (document.fileName.endsWith(".newt"))
       vscode.commands.executeCommand("newt-vscode.check");
-    }
+
   });
-  for (let document of vscode.workspace.textDocuments) {
-    if (document.fileName.endsWith(".newt")) {
+  for (let document of vscode.workspace.textDocuments)
+    if (document.fileName.endsWith(".newt"))
       checkDocument(document);
-    }
-  }
+
+
   context.subscriptions.push(diagnosticCollection);
 }
 

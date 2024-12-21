@@ -1,0 +1,143 @@
+module Day21
+
+import Prelude
+import Node
+import Aoc
+import SortedMap
+import Parser
+
+min : Int → Int → Int
+min a b = if a < b then a else b
+
+gridPoints : String → List (Char × Int × Int)
+gridPoints text = go 0 0 (unpack text) Nil
+  where
+    -- might as well be tail recursive
+    go : Int → Int → List Char → List (Char × Int × Int) → List (Char × Int × Int)
+    go row col Nil points = points
+    go row col ('\n' :: cs) points = go (row + 1) 0 cs points
+    go row col (c :: cs) points = go row (col + 1) cs ((c,row,col) :: points)
+
+data Dir : U where North East South West : Dir
+
+dirs : List Dir
+dirs = (North :: South :: East :: West :: Nil)
+
+move : Point → Dir → Point
+move (r, c) North  = (r - 1, c)
+move (r, c) East   = (r, c + 1)
+move (r, c) South  = (r + 1, c)
+move (r, c) West   = (r, c - 1)
+
+Costs : U
+Costs = SortedMap (Point × Point) Int
+
+-- linked list of keypads
+record Keypad where
+  constructor KP
+  name : String
+  start : Point
+  interdit : Point
+  costs : Costs -- cache of costs
+  next : Maybe Keypad
+
+getPaths : Point → Point → Point → List (List Dir)
+getPaths interdit pt@(a,b) to@(c,d) =
+  if pt == to then Nil :: Nil else
+  if pt == interdit then Nil else
+  join $ map check dirs
+  where
+    check : Dir → List (List Dir)
+    check North = if c < a then map (_::_ North) $ getPaths interdit (move pt North) (c,d) else Nil
+    check South = if a < c then map (_::_ South) $ getPaths interdit (move pt South) (c,d) else Nil
+    check East = if b < d then map (_::_ East) $ getPaths interdit (move pt East) (c,d) else Nil
+    check West = if d < b then map (_::_ West) $ getPaths interdit (move pt West) (c,d) else Nil
+
+updateCost : Point × Point → Int → Keypad → Keypad
+updateCost path cost (KP n s i c nxt) = (KP n s i (updateMap path cost c) nxt)
+
+keyPos : Dir → Point
+keyPos North = (0,1)
+keyPos South = (1,1)
+keyPos East  = (1,2)
+keyPos West  = (1,0)
+
+-- cost to run a path in a keypad
+pathCost : Point → Point → Keypad → Keypad × Int
+
+-- cost of sequence of points (run in parent keypad)
+-- for numpad, we pick points from the map, for the rest map keyPos ...
+seqCost : Point → List Point → Keypad × Int → Keypad × Int
+seqCost cur Nil (kp, cost) = (kp, cost)
+seqCost cur (pt :: pts) (kp, cost) =
+  let (kp, cost') = pathCost cur pt kp in
+  let x = cost' in
+  seqCost pt pts (kp, cost + cost')
+
+-- cost of best path from -> to in kp
+pathCost from to kp = do
+  case lookupMap (from, to) (costs kp) of
+    Just (_, cost) => (kp, cost)
+    Nothing =>
+      let (path :: paths) = getPaths (interdit kp) from to | _ => ? in
+      case kp of
+        (KP n s i c Nothing) => (kp, 1)
+        (KP n s i c (Just kp')) =>
+          let (kp', cost) = mincost path paths kp' in
+          let kp = KP n s i c (Just kp') in
+          (updateCost (from,to) cost kp, cost)
+  where
+    xlate : List Dir → Point -> List Point
+    xlate Nil a = a :: Nil
+    xlate (d :: ds) a = keyPos d :: xlate ds a
+
+    mincost : List Dir → List (List Dir) → Keypad → Keypad × Int
+    mincost path paths kp =
+      let (kp', cost) = seqCost (0,2) (xlate path $ start kp) (kp, 0) in
+      case paths of
+        Nil => (kp', cost)
+        (path :: paths) => let (kp', cost') = mincost path paths kp' in (kp', min cost cost')
+
+fromList : ∀ k v. {{Ord k}} {{Eq k}} → List (k × v) → SortedMap k v
+fromList xs = foldMap (\ a b => b) EmptyMap xs
+
+getNum : String → Int
+getNum str = case number (unpack str) of
+  Right (n, _) => n
+  _ => 0
+
+runOne : Keypad → SortedMap Char Point → String → Int × Int
+runOne kp numpad str =
+  let pts = map snd $ mapMaybe (flip lookupMap numpad) $ unpack str in
+  let res = seqCost (3,2) pts (kp, 0) in
+  (getNum str, snd res)
+
+makeKeypad : Int → Keypad -> Keypad
+makeKeypad 0 kp = kp
+makeKeypad n kp = makeKeypad (n - 1) $ KP (show n) (0,2) (0,0) EmptyMap (Just kp)
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let codes = split (trim text) "\n"
+
+  -- the space is illegal spot
+  let numpad = fromList $ filter (not ∘ _==_ ' ' ∘ fst) $ gridPoints "789\n456\n123\n 0A"
+
+  let rob1 = KP "r1" (0,2) (0,0) EmptyMap Nothing
+  let robn = makeKeypad 2 rob1
+  let kp = KP "kp" (3,2) (3,0) EmptyMap (Just robn)
+  let p1 = foldl _+_ 0 $ map (uncurry _*_ ∘ runOne kp numpad) codes
+  putStrLn $ "part1 " ++ show p1
+
+  let rob1 = KP "r1" (0,2) (0,0) EmptyMap Nothing
+  let robn = makeKeypad 25 rob1
+  let kp = KP "kp" (3,2) (3,0) EmptyMap (Just robn)
+  let p2 = foldl _+_ 0 $ map (uncurry _*_ ∘ runOne kp numpad) codes
+  putStrLn $ "part2 " ++ show p2
+
+main : IO Unit
+main = do
+  run "aoc2024/day21/eg.txt"
+  run "aoc2024/day21/input.txt"
