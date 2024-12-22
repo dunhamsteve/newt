@@ -1,0 +1,90 @@
+module Day22
+
+import Prelude
+import Node
+import Aoc
+import SortedMap
+
+
+ptype BigInt
+pfunc itobi : Int → BigInt := `(x) => BigInt(x)`
+pfunc bitoi : BigInt → Int := `(x) => Number(x)`
+pfunc addbi : BigInt → BigInt → BigInt := `(a,b) => a + b`
+pfunc subbi : BigInt → BigInt → BigInt := `(a,b) => a - b`
+pfunc mulbi : BigInt → BigInt → BigInt := `(a,b) => a * b`
+pfunc divbi : BigInt → BigInt → BigInt := `(a,b) => a / b`
+pfunc shlbi : BigInt → BigInt → BigInt := `(a,b) => a << b`
+pfunc shrbi : BigInt → BigInt → BigInt := `(x,y) => x >> y`
+
+instance Mul BigInt where a * b = mulbi a b
+instance Div BigInt where a / b = divbi a b
+instance Add BigInt where a + b = addbi a b
+instance Sub BigInt where a - b = subbi a b
+instance Cast Int BigInt where cast x = itobi x
+instance Eq BigInt where a == b = jsEq a b
+instance Show BigInt where show = jsShow
+instance Ord BigInt where a < b = jsLT a b
+
+infixl 7 _%_
+pfunc _%_ : BigInt → BigInt → BigInt := `(x,y) => x % y`
+pfunc bxor : BigInt → BigInt → BigInt := `(x,y) => x ^ y`
+
+modulus : BigInt
+modulus = itobi 16777216
+
+b5 b6 b10 b11 : BigInt
+b10 = itobi 10
+b5 = itobi 5
+b6 = itobi 6
+b11 = itobi 11
+
+step : BigInt → BigInt
+step s =
+  let s = bxor (shlbi s b6) s % modulus in
+  let s = bxor (shrbi s b5) s % modulus in
+  let s = bxor (shlbi s b11) s % modulus in
+  s
+
+-- for part1
+stepN : Int → BigInt → BigInt
+stepN 0 s = s
+stepN n s = stepN (n - 1) (step s)
+
+Key KeyMap : U
+Key = (Int × Int × Int × Int)
+KeyMap = SortedMap Key Int
+
+bananas : Int → BigInt → SnocList Int → List Int
+bananas 0 s acc = acc <>> Nil
+bananas n s acc =
+  let s' = step s
+      b = bitoi (s' % b10)
+  in bananas (n - 1) s' (acc :< b)
+
+build : List Int → List (Key × Int)
+build (a :: rest@(b :: c :: d :: e :: _)) = ((b - a, c - b, d - c, e - d), e) :: build rest
+build _ = Nil
+
+makeMap : BigInt -> KeyMap
+makeMap s = foldMap const EmptyMap $ build $ bananas 2000 s Lin
+
+max : Int → Int → Int
+max a b = if a < b then b else a
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let numbers = map (itobi ∘ stringToInt) $ split (trim text) "\n"
+  let p1 = foldl _+_ (itobi 0) $ map (stepN 2000) numbers
+  putStrLn $ "part1 " ++ show p1
+
+  let final = foldMap _+_ EmptyMap $ join $ map toList $ map makeMap numbers
+  let p2 = foldl max 0 $ map snd $ toList final
+  putStrLn $ "part2 " ++ show p2
+
+main : IO Unit
+main = do
+  -- run "aoc2024/day22/eg.txt"
+  run "aoc2024/day22/eg2.txt"
+  run "aoc2024/day22/input.txt"
