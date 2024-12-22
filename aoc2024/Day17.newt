@@ -80,10 +80,6 @@ step mach@(M a b c mem ip out) =
     combo 6 = c
     combo n = itobi n
 
-find : ∀ a. (a → Bool) → List a → Maybe a
-find f Nil = Nothing
-find f (x :: xs) = if f x then Just x else find f xs
-
 Cand : U
 Cand = BigInt ×  SnocList Int ×  List Int
 

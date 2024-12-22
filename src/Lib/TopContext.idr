@@ -45,8 +45,8 @@ setDef name fc ty def = do
   where
     go : List TopEntry -> M (List TopEntry)
     go [] = pure $ [MkEntry fc name ty def]
-    go (x@(MkEntry _ nm ty' def') :: defs) = if nm == name
-      then error fc "\{name} is already defined"
+    go (x@(MkEntry fc' nm ty' def') :: defs) = if nm == name
+      then error fc "\{name} is already defined at \{show fc'}"
       else (x ::) <$> go defs
 
 public export

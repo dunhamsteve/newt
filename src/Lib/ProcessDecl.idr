@@ -207,7 +207,7 @@ processDecl (TypeSig fc names tm) = do
   let mstart = length mc.metas
   for_ names $ \nm => do
     let Nothing := lookup nm top
-      | _ => error fc "\{show nm} is already defined"
+      | Just entry => error fc "\{show nm} is already defined at \{show entry.fc}"
     pure ()
   ty <- check (mkCtx fc) tm (VU fc)
   ty <- zonk top 0 [] ty
@@ -241,7 +241,7 @@ processDecl (Def fc nm clauses) = do
   let Just entry = lookup nm top
     | Nothing => throwError $ E fc "No declaration for \{nm}"
   let (MkEntry fc name ty Axiom) := entry
-    | _ => throwError $ E fc "\{nm} already defined"
+    | _ => throwError $ E fc "\{nm} already defined at \{show entry.fc}"
 
   putStrLn "check \{nm} at \{pprint [] ty}"
   vty <- eval empty CBN ty
