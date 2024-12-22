@@ -48,7 +48,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
   - [x] Support @ on the LHS
   - [x] if / then / else sugar
   - [ ] `data Foo = A | B` sugar
-  - [ ] records
+  - [x] records
   - [x] where
   - [ ] add namespaces
   - [ ] magic nat?
@@ -154,7 +154,8 @@ More comments in code! This is getting big enough that I need to re-find my bear
   - [x] check quantity
   - [x] erase in output
   - [ ] remove erased top level arguments
-- [ ] type at point in vscode NOW
+- [x] top level at point in vscode
+- [ ] in-scope type at point in vscode
 - [ ] repl
 - [ ] LSP
 - [x] don't match forced constructors at runtime

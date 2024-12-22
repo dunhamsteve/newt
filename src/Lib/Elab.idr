@@ -724,7 +724,7 @@ mkPat : TopContext -> (Raw, Icit) -> M Pattern
 mkPat top (RAs fc as tm, icit) =
   case !(mkPat top (tm, icit)) of
     (PatCon fc icit nm args Nothing) => pure $ PatCon fc icit nm args (Just as)
-    (PatCon fc icit nm args Nothing) => error fc "Double as pattern \{show tm}"
+    (PatCon fc icit nm args _) => error fc "Double as pattern \{show tm}"
     t => error fc "Can't put as on non-constructor \{show tm}"
 mkPat top (tm, icit) = do
   case splitArgs tm [] of

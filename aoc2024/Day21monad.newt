@@ -1,10 +1,35 @@
-module Day21
+module Day21monad
 
 import Prelude
 import Node
 import Aoc
 import SortedMap
 import Parser
+
+record State st a where
+  constructor ST
+  runState : st → (st × a)
+
+instance ∀ st. Applicative (State st) where
+  return x = ST (\st => (st, x))
+  (ST sf) <*> (ST sx) = ST $ \st =>
+    let (st', f) = sf st in
+    let (st'', x) = sx st' in
+    (st'', f x)
+
+instance ∀ st. Monad (State st) where
+  pure x = ST (\st => (st, x))
+  bind (ST run) f = ST $ \st =>
+    let (st', a) = run st in
+    let (ST run') = f a in
+    run' st'
+
+get : ∀ st. State st st
+get = ST (\st => (st, st))
+
+put : ∀ st. st → State st Unit
+put st = ST (\_ => (st, MkUnit))
+
 
 min : Int → Int → Int
 min a b = if a < b then a else b
@@ -53,8 +78,10 @@ getPaths interdit pt@(a,b) to@(c,d) =
     check East = if b < d then map (_::_ East) $ getPaths interdit (move pt East) (c,d) else Nil
     check West = if d < b then map (_::_ West) $ getPaths interdit (move pt West) (c,d) else Nil
 
-updateCost : Point × Point → Int → Keypad → Keypad
-updateCost path cost (KP n s i c nxt) = (KP n s i (updateMap path cost c) nxt)
+updateCost : Point × Point → Int → State Keypad Unit
+updateCost path cost = do
+  kp <- get
+  put (KP (name kp) (start kp) (interdit kp) (updateMap path cost (costs kp)) (next kp))
 
 keyPos : Dir → Point
 keyPos North = (0,1)
@@ -63,39 +90,47 @@ keyPos East  = (1,2)
 keyPos West  = (1,0)
 
 -- cost to run a path in a keypad
-pathCost : Point → Point → Keypad → Keypad × Int
+pathCost : Point → Point → State Keypad Int
 
 -- cost of sequence of points (run in parent keypad)
 -- for numpad, we pick points from the map, for the rest map keyPos ...
-seqCost : Point → List Point → Keypad × Int → Keypad × Int
-seqCost cur Nil (kp, cost) = (kp, cost)
-seqCost cur (pt :: pts) (kp, cost) =
-  let (kp, cost') = pathCost cur pt kp in
-  seqCost pt pts (kp, cost + cost')
+seqCost : Point → List Point → Int → State Keypad Int
+seqCost cur Nil cost = pure cost
+seqCost cur (pt :: pts) cost = do
+  cost' <- pathCost cur pt
+  seqCost pt pts (cost + cost')
 
 -- cost of best path from -> to in kp
-pathCost from to kp =
+pathCost from to = do
+  kp <- get {Keypad}
   case lookupMap (from, to) (costs kp) of
-    Just (_, cost) => (kp, cost)
+    Just (_, cost) => pure {State Keypad} cost
     Nothing =>
       let (path :: paths) = getPaths (interdit kp) from to | _ => ? in
       case kp of
-        (KP n s i c Nothing) => (kp, 1)
-        (KP n s i c (Just kp')) =>
-          let (kp', cost) = mincost path paths kp' in
-          let kp = KP n s i c (Just kp') in
-          (updateCost (from,to) cost kp, cost)
+        (KP n s i c Nothing) => pure 1
+        (KP n s i c (Just kp')) => do
+          put kp'
+          cost <- mincost path paths
+          kp' <- get
+          put $ KP n s i c (Just kp')
+          -- need to ensure cost goes into correct kp
+          updateCost (from,to) cost
+          pure cost
   where
     xlate : List Dir → Point -> List Point
     xlate Nil a = a :: Nil
     xlate (d :: ds) a = keyPos d :: xlate ds a
 
-    mincost : List Dir → List (List Dir) → Keypad → Keypad × Int
-    mincost path paths kp =
-      let (kp', cost) = seqCost (0,2) (xlate path $ start kp) (kp, 0) in
+    mincost : List Dir → List (List Dir) → State Keypad Int
+    mincost path paths = do
+      kp <- get
+      cost <- seqCost (0,2) (xlate path $ start kp) 0
       case paths of
-        Nil => (kp', cost)
-        (path :: paths) => let (kp', cost') = mincost path paths kp' in (kp', min cost cost')
+        Nil => pure cost
+        (path :: paths) => do
+          cost' <- mincost path paths
+          pure $ min cost cost'
 
 fromList : ∀ k v. {{Ord k}} {{Eq k}} → List (k × v) → SortedMap k v
 fromList xs = foldMap (\ a b => b) EmptyMap xs
@@ -105,11 +140,11 @@ getNum str = case number (unpack str) of
   Right (n, _) => n
   _ => 0
 
-runOne : Keypad → SortedMap Char Point → String → Int × Int
-runOne kp numpad str =
-  let pts = map snd $ mapMaybe (flip lookupMap numpad) $ unpack str in
-  let res = seqCost (3,2) pts (kp, 0) in
-  (getNum str, snd res)
+runOne : SortedMap Char Point → String → State Keypad (Int × Int)
+runOne numpad str = do
+  let pts = map snd $ mapMaybe (flip lookupMap numpad) $ unpack str
+  res <- seqCost (3,2) pts 0
+  pure (getNum str, res)
 
 makeKeypad : Int → Keypad -> Keypad
 makeKeypad 0 kp = kp
@@ -128,13 +163,13 @@ run fn = do
   let rob1 = KP "r1" (0,2) (0,0) EmptyMap Nothing
   let robn = makeKeypad 2 rob1
   let kp = KP "kp" (3,2) (3,0) EmptyMap (Just robn)
-  let p1 = foldl _+_ 0 $ map (uncurry _*_ ∘ runOne kp numpad) codes
+  let p1 = foldl _+_ 0 $ map (uncurry _*_) $ snd $ runState (traverse (runOne numpad) codes) kp
   putStrLn $ "part1 " ++ show p1
 
   let rob1 = KP "r1" (0,2) (0,0) EmptyMap Nothing
   let robn = makeKeypad 25 rob1
   let kp = KP "kp" (3,2) (3,0) EmptyMap (Just robn)
-  let p2 = foldl _+_ 0 $ map (uncurry _*_ ∘ runOne kp numpad) codes
+  let p2 = foldl _+_ 0 $ map (uncurry _*_) $ snd $ runState (traverse (runOne numpad) codes) kp
   putStrLn $ "part2 " ++ show p2
 
 main : IO Unit
