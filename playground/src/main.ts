@@ -256,7 +256,10 @@ function Editor({ initialValue }: EditorProps) {
       let last = ev.changes[ev.changes.length - 1];
       const model = editor.getModel();
       // figure out heuristics here, what chars do we want to trigger?
-      if (model && last.text && " ')_".includes(last.text)) {
+      // the lean one will only be active if it sees you type \
+      // and bail if it decides you've gone elsewhere
+      // it maintains an underline annotation, too.
+      if (model && last.text && " ')\\".includes(last.text)) {
         console.log('LAST', last)
         let { startLineNumber, startColumn } = last.range;
         const text = model.getValueInRange(
@@ -454,7 +457,7 @@ const processOutput = (
       let lineNumber = +line + 1;
       let column = +col + 1;
       // FIXME - pass the real path in
-      if (fn && fn == file) {
+      if (fn && fn !== file) {
         lineNumber = column = 0;
       }
       let start = { column, lineNumber };

@@ -3,7 +3,7 @@
 
 More comments in code! This is getting big enough that I need to re-find my bearings when fixing stuff.
 
-- [ ] editor - idnent newline on let with no in
+- [ ] editor - indent newline on let with no in
 - [x] Move on to next decl in case of error
 - [x] for parse error, seek to col 0 token and process next decl
 - [ ] record initialization sugar, e.g. `{ x := 1, y := 2 }`

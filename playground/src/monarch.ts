@@ -1,6 +1,8 @@
 import * as monaco from "monaco-editor";
 
 export let newtConfig: monaco.languages.LanguageConfiguration = {
+  // see singleton in Tokenizer.idr
+  wordPattern: /[^()\\{}\[\],.@\s]+/,
   comments: {
     // symbol used for single line comment. Remove this entry if your language does not support line comments
     lineComment: "--",
@@ -19,7 +21,7 @@ export let newtConfig: monaco.languages.LanguageConfiguration = {
     { open: "[", close: "]" },
     { open: "(", close: ")" },
     { open: '"', close: '"' },
-    { open: "'", close: "'" },
+    // { open: "'", close: "'" }, causes problems with foo''
     { open: "/-", close: "-/" },
   ],
   // symbols that can be used to surround a selection
