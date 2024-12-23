@@ -1,0 +1,96 @@
+module Day23
+
+import Prelude
+import Node
+import Aoc
+import SortedMap
+
+Graph Edge EdgeSet VSet : U
+Graph = SortedMap String (List String)
+Edge = String × String
+EdgeSet = SortedMap Edge Unit
+VSet = SortedMap String Unit
+
+addEdge : Graph -> String × String -> Graph
+addEdge g (a,b) = updateMap a (b :: fromMaybe Nil (snd <$> lookupMap a g)) g
+
+ppair : String → Maybe Edge
+ppair s = case split s "-" of
+  (a :: b :: Nil) => Just (a, b)
+  _ => Nothing
+
+pfile : String → Maybe (List Edge)
+pfile text = traverse ppair $ split (trim text) "\n"
+
+startT : String → Bool
+startT s = case unpack s of
+  ('t' :: _) => True
+  _ => False
+
+isJust : ∀ a. Maybe a → Bool
+isJust (Just x) = True
+isJust _ = False
+
+checkK3 : Graph → EdgeSet → Edge → Int
+checkK3 g es (a,b) =
+  let cand = fromMaybe Nil $ snd <$> lookupMap b g
+      cand = if startT a || startT b then cand else filter startT cand
+  in cast $ length $ filter (\c => isJust $ lookupMap (c,a) es) cand
+
+isect : List String → List String → List String
+isect as bs = filter (flip elem bs) as
+
+remove : String → List String → List String
+remove s Nil = Nil
+remove s (x :: xs) = if x == s then xs else x :: remove s xs
+
+bronKerbosch : Graph → List String → List String → List String → Maybe (List String)
+bronKerbosch g rs Nil Nil = Just rs
+bronKerbosch g rs Nil xs = Nothing
+bronKerbosch g rs (p :: ps) xs =
+  let np = neighbors p
+      ps' = p :: filter (\x => not (elem x np)) ps in
+  foldl best Nothing $ map check ps'
+  where
+    neighbors : String → List String
+    neighbors p = fromMaybe Nil $ snd <$> lookupMap p g
+
+    check : String → Maybe (List String)
+    check p = let nv = neighbors p in
+      bronKerbosch g (p :: rs) (isect ps nv) (isect xs nv)
+
+    best : Maybe (List String) → Maybe (List String) → Maybe (List String)
+    best Nothing Nothing = Nothing
+    best Nothing a = a
+    best a Nothing = a
+    best (Just a) (Just b) = if length a < length b then Just b else Just a
+
+joinBy : String → List String → String
+joinBy _ Nil = ""
+joinBy _ (x :: Nil) = x
+joinBy s (x :: y :: xs) = joinBy s ((x ++ s ++ y) :: xs)
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let (Just pairs) = pfile text | _ => putStrLn "parse error"
+  let dpairs = pairs ++ map swap pairs
+  let g = foldl addEdge EmptyMap dpairs
+  let es = foldl (\g e => updateMap e MkUnit g) EmptyMap dpairs
+  putStrLn $ show (length pairs) ++ " pairs"
+  putStrLn $ show (length dpairs) ++ " dpairs"
+
+  -- one direction, counting each K3 3 times
+  let p1 = (foldl _+_ 0 $ map (checkK3 g es) pairs) / 3
+  putStrLn $ "part1 " ++ show p1
+  let verts = map fst $ toList g
+  let (Just result) = bronKerbosch g Nil verts Nil | _ => putStrLn "fail"
+  let p2 = joinBy "," $ qsort _<_ result
+
+  putStrLn $ "part2 " ++ p2
+
+main : IO Unit
+main = do
+  run "aoc2024/day23/eg.txt"
+  run "aoc2024/day23/input.txt"
