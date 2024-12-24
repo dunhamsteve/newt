@@ -7,7 +7,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [x] Move on to next decl in case of error
 - [x] for parse error, seek to col 0 token and process next decl
 - [ ] record initialization sugar, e.g. `{ x := 1, y := 2 }`
-- [ ] record update sugar
+- [ ] record update sugar, syntax TBD
 - [ ] Change `Ord` to be more like Idris - LT / EQ / GT (and entail equality)
 - [ ] Keep a `compare` function on `SortedMap` (like lean)
 - [x] keymap for monaco
@@ -41,7 +41,6 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [x] Fix string printing to be js instead of weird Idris strings
 - [x] make $ special
   - Makes inference easier, cleaner output, and allows `foo $ \ x => ...`
-  - remove hack from Elab.infer
   - [ ] `$` no longer works inside ≡⟨ ⟩ sort out how to support both that and `$ \ x => ...` (or don't bother)
     - We'd either need to blacklist all non-initial mixfix bits at the appropriate spots or always pass around a terminating token.
 - [ ] **Translate newt to newt**

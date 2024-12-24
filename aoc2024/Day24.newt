@@ -1,0 +1,206 @@
+module Day24
+
+import Prelude
+import Node
+import Aoc
+import SortedMap
+
+data Value : U where
+  One Zero None : Value
+
+data Op : U where
+  Xor And Or : Op
+
+instance Eq Op where
+  Xor == Xor = True
+  And == And = True
+  Or == Or = True
+  _ == _ = False
+
+record Gate where
+  constructor GT
+  in1 : String
+  in2 : String
+  op : Op
+  out : String
+
+Wire : U
+Wire = String × Int
+
+parseFile : String → Either String (List Wire × List Gate)
+parseFile text = do
+  let (a :: b :: Nil) = split (trim text) "\n\n" | _ => Left "too many parts"
+  wires <- traverse parseWire $ lines a
+  gates <- traverse parseGate $ lines b
+  Right (wires, gates)
+
+  where
+    parseWire : String → Either String (String × Int)
+    parseWire s = let (a :: b :: Nil) = split s ": " | _ => Left $ "bad wire: " ++ s in
+      Right (a, stringToInt b)
+
+    getOp : String → Either String Op
+    getOp "XOR" = Right Xor
+    getOp "AND" = Right And
+    getOp "OR"  = Right Or
+    getOp op = Left $ "bad op " ++ op
+
+    parseGate : String → Either String Gate
+    parseGate s = do
+      let (in1 :: op :: in2 :: _ :: out :: Nil) = split s " " | _ => Left $ "bad gate: " ++ s
+      op <- getOp op
+      Right $ GT in1 in2 op out
+
+
+State : U
+State = SortedMap String Int
+
+
+mkFire : List Gate → SortedMap String (List String)
+mkFire gates = go EmptyMap gates
+  where
+    go : SortedMap String (List String) → List Gate → SortedMap String (List String)
+    go acc Nil = acc
+    go acc (g :: gs) =
+      let acc = updateMap (in1 g) (out g :: fromMaybe Nil (snd <$> lookupMap (in1 g) acc)) acc in
+      let acc = updateMap (in2 g) (out g :: fromMaybe Nil (snd <$> lookupMap (in2 g) acc)) acc in
+      go acc gs
+
+
+
+exec : SortedMap String Gate → SortedMap String (List String) → List String → State → State
+exec gateMap fireMap todo state = go todo state
+  where
+    combine : Op → Int → Int → Int
+    combine And 1 x = x
+    combine Xor 1 1 = 0
+    combine Xor 1 0 = 1
+    combine Xor 0 1 = 1
+    combine Or 1 _ = 1
+    combine Or _ 1 = 1
+    combine _ _ _ = 0
+
+    go : List String → State → State
+    go Nil st = st
+    go (x :: xs) st = case lookupMap x st of
+      -- already done
+      Just _ => go xs st
+      Nothing => case lookupMap' x gateMap of
+        Nothing => go xs st
+        Just gate => case (lookupMap' (in1 gate) st, lookupMap' (in2 gate) st) of
+          (Just x, Just y) =>
+            let v = combine (op gate) x y
+                st = updateMap (out gate) v st
+                foo = fromMaybe Nil $ lookupMap' (out gate) fireMap
+                xs' = foo ++ xs
+            in go xs' st
+          _ => go xs st
+
+bitsToInt : Int → List Int → Int
+bitsToInt _ Nil = 0
+bitsToInt m (x :: xs) = m * x + bitsToInt (2 * m) xs
+
+
+-- so I can find the lowest bit that is wrong
+-- or trace out the circuit?
+
+infixl 5 _%_
+pfunc _%_ : Int → Int → Int := `(x,y) => x % y`
+
+label : Char -> Int -> String
+label c bit = pack $ c :: chr (bit / 10 + 48) :: chr ((bit % 10) + 48) :: Nil
+
+range : Int → Int → List Int
+range a b = if a < b then a :: range (a + 1) b else Nil
+
+swapPins : String → String → Gate → Gate
+swapPins a g (GT i1 i2 op out) =
+  if out == a then GT i1 i2 op g
+  else if out == g then GT i1 i2 op a
+  else GT i1 i2 op out
+
+fail : ∀ a. String -> a
+fail msg = let x = trace "FAIL" msg in ?
+
+check : List Gate → List Int → String → Either (String × String) Unit
+check gates Nil carry = Right MkUnit
+check gates (bit :: bits) carry = do
+  let xl = label 'x' bit
+  let yl = label 'x' bit
+  let (Just a1) = matchIn xl And | _ => fail $ "no a1 " ++ show bit
+  let (Just x1) = matchIn xl Xor | _ => fail $ "no x1 " ++ show bit
+  -- just peel of the carry for bit0
+  let (False) = bit == 0 | _ => check gates bits (out a1)
+
+  let (Just x2) = matchIn carry Xor
+    | _ => do
+      -- carry is bad
+      let (Just x2) = matchOut (label 'z' bit) Xor | _ => fail $ "no x2 for " ++ show bit
+      if in1 x2 == out x1 then Left (in2 x2, carry) else Left (in1 x2, carry)
+  let (Just a2) = matchIn carry And | _ => fail $ "no a2 " ++ show bit
+  checkPins x2 carry (out x1)
+  checkPins a2 carry (out x1)
+
+  case (matchIn (out a1) Or, matchIn (out a2) Or) of
+    (Nothing, Nothing) => fail "todo2"
+    (Just g, Nothing) => checkPins g (out a1) (out a2)
+    (Nothing, Just g) => checkPins g (out a1) (out a2)
+    (Just g, Just g') =>
+      if out g == out g'
+        then check gates bits (out g)
+        else fail "todo"
+
+  where
+    checkPins : Gate → String → String → Either (String × String) Unit
+    checkPins g a b =
+      if a == in1 g && b == in2 g then pure MkUnit
+      else if a == in2 g && b == in1 g then pure MkUnit
+      else if a == in1 g then Left (b, in2 g)
+      else if a == in2 g then Left (b, in1 g)
+      else if b == in1 g then Left (a, in2 g)
+      else Left (a, in1 g)
+
+    matchOut : String -> Op -> Maybe Gate
+    matchOut l o = find (\ g => out g == l && op g == o) gates
+
+    matchIn : String -> Op -> Maybe Gate
+    matchIn l o = find (\ g => (in1 g == l || in2 g == l) && op g == o) gates
+
+trampoline : List Gate → List String → IO (List String)
+trampoline gates acc = do
+  case check gates (range 0 44) "" of
+    Right _ => pure acc
+    Left (a,b) => do
+      putStrLn $ "SWAP " ++ a ++ " and " ++ b
+      trampoline (map (swapPins a b) gates) (a :: b :: acc)
+
+joinBy : String → List String → String
+joinBy _ Nil = ""
+joinBy _ (x :: Nil) = x
+joinBy s (x :: y :: xs) = joinBy s ((x ++ s ++ y) :: xs)
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  putStrLn text
+  let (Right (wires, gates)) = parseFile text | Left msg => putStrLn $ "fail: " ++ msg
+  let state = foldMap const EmptyMap wires
+  let gateMap = foldMap const EmptyMap $ map (\ gate => (out gate, gate)) gates
+  let fireMap = mkFire gates
+  let init = join $ map snd $ mapMaybe (\ wire => lookupMap wire fireMap) $ map fst wires
+  let state' = exec gateMap fireMap init state
+  let bits = map snd $ filter (_<_ "z" ∘ fst) $ toList state'
+  let p1 = bitsToInt 1 bits
+  putStrLn $ "part1 " ++ show p1
+
+  stuff <- trampoline gates Nil
+  putStrLn $ "part2 " ++ (joinBy "," $ qsort _<_ stuff)
+  putStrLn ""
+
+main : IO Unit
+main = do
+  -- run "aoc2024/day24/eg.txt"
+  -- run "aoc2024/day24/eg2.txt"
+  -- this is the only adder circuit
+  run "aoc2024/day24/input.txt"

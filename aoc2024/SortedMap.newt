@@ -173,6 +173,11 @@ lookupMap : ∀ k v. {{Ord k}} {{Eq k}} -> k -> SortedMap k v -> Maybe (k × v)
 lookupMap k EmptyMap = Nothing
 lookupMap k (MapOf map) = lookupT23 k map
 
+lookupMap' : ∀ k v. {{Ord k}} {{Eq k}} -> k -> SortedMap k v -> Maybe v
+lookupMap' k EmptyMap = Nothing
+lookupMap' k (MapOf map) = snd <$> lookupT23 k map
+
+
 updateMap : ∀ k v. {{Ord k}} {{Eq k}} -> k -> v -> SortedMap k v -> SortedMap k v
 updateMap k v EmptyMap = MapOf $ Leaf k v
 updateMap k v (MapOf map) = case insertT23 k v map of
