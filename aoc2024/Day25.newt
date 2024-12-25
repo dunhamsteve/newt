@@ -1,0 +1,68 @@
+module Day25
+
+import Prelude
+import Node
+import Aoc
+
+data Chunk : U where
+  Key : List Int → Chunk
+  Lock : List Int → Chunk
+
+-- cribbed from the idris library, it's late and I don't want to work thisout
+transpose : ∀ a. List (List a) → List (List a)
+transpose Nil = Nil
+transpose {a} (heads :: tails) = spreadHeads heads (transpose tails)
+  where
+    spreadHeads : List a → List (List a) → List (List a)
+    spreadHeads Nil tails = tails
+    spreadHeads (head :: heads) Nil = (head :: Nil) :: spreadHeads heads Nil
+    spreadHeads (head :: heads) (tail :: tails) = (head :: tail) :: spreadHeads heads tails
+
+count : List Char → Int
+count cs = go cs 0
+  where
+    go : List Char → Int → Int
+    go ('#' :: cs) acc = go cs (1 + acc)
+    go _ acc = acc
+
+toChunk : List (List Char) → Chunk
+
+parseChunk : String → Chunk
+parseChunk text =
+  let stuff = transpose $ map unpack $ split text "\n" in
+  -- TODO - sort this out
+  case map {List} count stuff of
+    0 :: xs => Key $ map (count ∘ reverse) stuff
+    xs => Lock xs
+
+
+parseFile : String → List Chunk
+parseFile text = do
+  let parts = split (trim text) "\n\n"
+  map parseChunk parts
+
+splitKeys : List Chunk → List (List Int) → List (List Int) → List (List Int) × List (List Int)
+splitKeys (Lock xs :: rest) locks keys = splitKeys rest (xs :: locks) keys
+splitKeys (Key xs :: rest) locks keys = splitKeys rest locks (xs :: keys)
+splitKeys Nil locks keys = (locks, keys)
+
+check : List Int → List Int → Int
+check Nil Nil = 1
+check (a :: as) (b :: bs) = if a + b <= 7 then check as bs else 0
+check _ _ = 0
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  putStrLn text
+  let chunks = parseFile text
+  let (locks,keys) = splitKeys chunks Nil Nil
+  debugLog (length locks, length keys)
+  let p1 = foldl _+_ 0 $ map (\ l => foldl _+_ 0 $ map (check l) keys) locks
+  putStrLn $ "part1 " ++ show p1
+
+main : IO Unit
+main = do
+  run "aoc2024/day25/eg.txt"
+  run "aoc2024/day25/input.txt"
