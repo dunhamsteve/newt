@@ -1,7 +1,7 @@
 module JSLib
 
-ptype Int
-ptype String
+
+
 
 infixl 4 _+_
 infixl 5 _*_

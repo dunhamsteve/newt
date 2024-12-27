@@ -62,10 +62,10 @@ data IO : U -> U where
   MkIO : {a : U} -> (World -> Pair World a) -> IO a
 
 -- TODO unified Number for now
-ptype Int
-ptype String
 
-ptype Char
+
+
+
 
 ptype Array : U -> U
 

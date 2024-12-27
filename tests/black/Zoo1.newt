@@ -2,8 +2,8 @@ module Zoo1
 
 -- I'm starting to translate ezoo 01-eval-closures-debruijn as a test cases.
 
-ptype Int
-ptype String
+
+
 
 ------- Prelude stuff
 

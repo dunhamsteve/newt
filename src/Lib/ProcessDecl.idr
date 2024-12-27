@@ -42,7 +42,9 @@ findMatches ctx ty ((MkEntry _ name type def) :: xs) = do
       debug "TRY \{name} : \{pprint [] type} for \{show ty}"
       -- This check is solving metas, so we save mc below in case we want this solution
       -- tm <- check (mkCtx fc) (RVar fc name) ty
-      tm <- check ctx (RVar fc name) ty
+      -- FIXME RVar should optionally have qualified names
+      let (QN ns nm) = name
+      tm <- check ctx (RVar fc nm) ty
       debug "Found \{pprint [] tm} for \{show ty}"
       mc' <- readIORef top.metas
       writeIORef top.metas mc
@@ -103,7 +105,7 @@ solveAutos mstart ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
       -- we want the context here too.
       top <- get
       [(tm, mc)] <- case !(contextMatches ctx ty) of
-            [] => findMatches ctx ty top.defs
+            [] => findMatches ctx ty $ toList top.defs
             xs => pure xs
         | res => do
           debug "FAILED to solve \{show ty}, matches: \{commaSep $ map (pprint [] . fst) res}"
@@ -169,7 +171,7 @@ logMetas mstart = do
           -- we want the context here too.
           top <- get
           matches <- case !(contextMatches ctx ty) of
-            [] => findMatches ctx ty top.defs
+            [] => findMatches ctx ty $ toList top.defs
             xs => pure xs
           -- TODO try putting mc into TopContext for to see if it gives better terms
           pure $ "  \{show $ length matches} Solutions:" :: map (("  " ++) . interpolate . pprint (names ctx) . fst) matches
@@ -194,51 +196,51 @@ impTele tele = map (\(BI fc nm _ quant, ty) => (BI fc nm Implicit Zero, ty)) tel
 
 
 export
-processDecl : Decl -> M ()
+processDecl : List String -> Decl -> M ()
 
 -- REVIEW I supposed I could have updated top here instead of the dance with the parser...
-processDecl (PMixFix{})  = pure ()
+processDecl ns  (PMixFix{})  = pure ()
 
-processDecl (TypeSig fc names tm) = do
+processDecl ns  (TypeSig fc names tm) = do
   putStrLn "-----"
 
   top <- get
   mc <- readIORef top.metas
   let mstart = length mc.metas
   for_ names $ \nm => do
-    let Nothing := lookup nm top
+    let Nothing := lookupRaw nm top
       | Just entry => error fc "\{show nm} is already defined at \{show entry.fc}"
     pure ()
   ty <- check (mkCtx fc) tm (VU fc)
   ty <- zonk top 0 [] ty
   putStrLn "TypeSig \{unwords names} : \{pprint [] ty}"
-  for_ names $ \nm => setDef nm fc ty Axiom
+  for_ names $ \nm => setDef (QN ns nm) fc ty Axiom
   -- Zoo4eg has metas in TypeSig, need to decide if I want to support leaving them unsolved here
   -- logMetas mstart
 
-processDecl (PType fc nm ty) = do
+processDecl ns (PType fc nm ty) = do
   top <- get
   ty' <- check (mkCtx fc) (maybe (RU fc) id ty) (VU fc)
-  setDef nm fc ty' PrimTCon
+  setDef (QN ns nm) fc ty' PrimTCon
 
-processDecl (PFunc fc nm uses ty src) = do
+processDecl ns  (PFunc fc nm uses ty src) = do
   top <- get
   ty <- check (mkCtx fc) ty (VU fc)
   ty' <- nf [] ty
   putStrLn "pfunc \{nm} : \{pprint [] ty'} := \{show src}"
   -- TODO wire through fc?
-  for_ uses $ \ name => case lookup name top of
+  for_ uses $ \ name => case lookupRaw name top of
     Nothing => error fc "\{name} not in scope"
     _ => pure ()
-  setDef nm fc ty' (PrimFn src uses)
+  setDef (QN ns nm) fc ty' (PrimFn src uses)
 
-processDecl (Def fc nm clauses) = do
+processDecl ns (Def fc nm clauses) = do
   putStrLn "-----"
   putStrLn "Def \{show nm}"
   top <- get
   mc <- readIORef top.metas
   let mstart = length mc.metas
-  let Just entry = lookup nm top
+  let Just entry = lookupRaw nm top
     | Nothing => throwError $ E fc "No declaration for \{nm}"
   let (MkEntry fc name ty Axiom) := entry
     | _ => throwError $ E fc "\{nm} already defined at \{show entry.fc}"
@@ -269,10 +271,10 @@ processDecl (Def fc nm clauses) = do
   tm'' <- erase [] tm' []
   when top.verbose $ putStrLn "ERASED\n\{render 80 $ pprint[] tm'}"
   debug "Add def \{nm} \{pprint [] tm'} : \{pprint [] ty}"
-  updateDef nm fc ty (Fn tm')
+  updateDef (QN ns nm) fc ty (Fn tm')
   -- logMetas mstart
 
-processDecl (DCheck fc tm ty) = do
+processDecl ns (DCheck fc tm ty) = do
   putStrLn "----- DCheck"
   top <- get
 
@@ -287,7 +289,7 @@ processDecl (DCheck fc tm ty) = do
   norm <- nfv [] res
   putStrLn "  NFV \{pprint [] norm}"
 
-processDecl (Class classFC nm tele decls) = do
+processDecl ns (Class classFC nm tele decls) = do
   -- REVIEW maybe we can leverage Record for this
   -- a couple of catches, we don't want the dotted accessors and
   -- the self argument should be an auto-implicit
@@ -306,7 +308,7 @@ processDecl (Class classFC nm tele decls) = do
   let decl = Data classFC nm tcType [TypeSig classFC [dcName] dcType]
   putStrLn "Decl:"
   putStrLn $ render 90 $ pretty decl
-  processDecl decl
+  processDecl ns decl
   for_ fields $ \ (fc,name,ty) => do
       let funType = teleToPi (impTele tele) $ RPi fc (BI fc "_" Auto Many) tail ty
       let autoPat = foldl (\acc, (fc,nm,ty) => RApp fc acc (RVar fc nm) Explicit) (RVar classFC dcName) fields
@@ -316,11 +318,11 @@ processDecl (Class classFC nm tele decls) = do
 
       putStrLn "\{name} : \{pretty funType}"
       putStrLn "\{pretty decl}"
-      processDecl $ TypeSig fc [name] funType
-      processDecl decl
+      processDecl ns $ TypeSig fc [name] funType
+      processDecl ns decl
 
 
-processDecl (Instance instfc ty decls) = do
+processDecl ns (Instance instfc ty decls) = do
   let decls = collectDecl decls
   putStrLn "-----"
   putStrLn "Instance \{pretty ty}"
@@ -369,7 +371,7 @@ processDecl (Instance instfc ty decls) = do
        let Just (Def fc name xs) = find (\case (Def y name xs) => name == nm; _ => False) decls
           | _ => error instfc "no definition for \{nm}"
 
-       setDef nm' fc ty' Axiom
+       setDef (QN ns nm') fc ty' Axiom
        let decl = (Def fc nm' xs)
        putStrLn "***"
        putStrLn "«\{nm'}» : \{pprint [] ty'}"
@@ -379,17 +381,17 @@ processDecl (Instance instfc ty decls) = do
   -- This needs to be declared before processing the defs, but the defs need to be
   -- declared before this - side effect is that a duplicate def is noted at the first
   -- member
-  processDecl sigDecl
+  processDecl ns sigDecl
   for_ (mapMaybe id defs) $ \decl => do
     -- debug because already printed above, but nice to have it near processing
     debug $ render 80 $ pretty decl
-    processDecl decl
-
-  let decl = Def instfc instname [(RVar instfc instname, mkRHS instname conTele (RVar instfc con))]
+    processDecl ns decl
+  let (QN _ con') = con
+  let decl = Def instfc instname [(RVar instfc instname, mkRHS instname conTele (RVar instfc con'))]
   putStrLn "SIGDECL"
   putStrLn "\{pretty sigDecl}"
   putStrLn $ render 80 $ pretty decl
-  processDecl decl
+  processDecl ns decl
   where
     -- try to extract types of individual fields from the typeclass dcon
     -- We're assuming they don't depend on each other.
@@ -414,17 +416,17 @@ processDecl (Instance instfc ty decls) = do
     apply (VPi fc nm icit rig a b) (x :: xs) = apply !(b $$ x) xs
     apply x (y :: xs) = error instfc "expected pi type \{show x}"
 
-processDecl (Data fc nm ty cons) = do
+processDecl ns (Data fc nm ty cons) = do
   putStrLn "-----"
   putStrLn "Data \{nm}"
   top <- get
   mc <- readIORef top.metas
   tyty <- check (mkCtx fc) ty (VU fc)
-  case lookup nm top of
+  case lookupRaw nm top of
     Just (MkEntry _ name type Axiom) => do
       unifyCatch fc (mkCtx fc) !(eval [] CBN tyty) !(eval [] CBN type)
     Just (MkEntry _ name type _) => error fc "\{show nm} already declared"
-    Nothing => setDef nm fc tyty Axiom
+    Nothing => setDef (QN ns nm) fc tyty Axiom
   cnames <- for cons $ \x => case x of
       (TypeSig fc names tm) => do
           debug "check dcon \{show names} \{show tm}"
@@ -438,15 +440,15 @@ processDecl (Data fc nm ty cons) = do
           let tnames = reverse $ map (\(MkBind _ nm _ _ _) => nm) tele
           let (Ref _ hn _, args) := funArgs codomain
             | (tm, _) => error (getFC tm) "expected \{nm} got \{pprint tnames tm}"
-          when (hn /= nm) $
+          when (hn /= QN ns nm) $
             error (getFC codomain) "Constructor codomain is \{pprint tnames codomain} rather than \{nm}"
 
           for_ names $ \ nm' => do
-            setDef nm' fc dty (DCon (getArity dty) nm)
-          pure names
+            setDef (QN ns nm') fc dty (DCon (getArity dty) hn)
+          pure $ map (QN ns) names
       decl => throwError $ E (getFC decl) "expected constructor declaration"
   putStrLn "setDef \{nm}  TCon \{show $ join cnames}"
-  updateDef nm fc tyty (TCon (join cnames))
+  updateDef (QN ns nm) fc tyty (TCon (join cnames))
   -- logMetas mstart
   where
     checkDeclType : Tm -> M ()
@@ -454,7 +456,7 @@ processDecl (Data fc nm ty cons) = do
     checkDeclType (Pi _ str icit rig t u) = checkDeclType u
     checkDeclType _ = error fc "data type doesn't return U"
 
-processDecl (Record recordFC nm tele cname decls) = do
+processDecl ns (Record recordFC nm tele cname decls) = do
   putStrLn "-----"
   putStrLn "Record"
   let fields = getSigs decls
@@ -470,7 +472,7 @@ processDecl (Record recordFC nm tele cname decls) = do
   let decl = Data recordFC nm tcType [TypeSig recordFC [dcName] dcType]
   putStrLn "Decl:"
   putStrLn $ render 90 $ pretty decl
-  processDecl decl
+  processDecl ns decl
   for_ fields $ \ (fc,name,ty) => do
     -- TODO dependency isn't handled yet
     -- we'll need to replace stuff like `len` with `len self`.
@@ -482,5 +484,5 @@ processDecl (Record recordFC nm tele cname decls) = do
 
     putStrLn "\{name} : \{pretty funType}"
     putStrLn "\{pretty decl}"
-    processDecl $ TypeSig fc [name] funType
-    processDecl decl
+    processDecl ns $ TypeSig fc [name] funType
+    processDecl ns decl

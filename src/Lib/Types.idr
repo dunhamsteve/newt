@@ -16,6 +16,29 @@ import Data.SortedMap
 import Data.String
 import Data.Vect
 
+
+public export
+data QName : Type where
+  QN : List String -> String -> QName
+
+public export
+Eq QName where
+  QN ns n == QN ns' n' = n == n' && ns == ns'
+
+public export
+Show QName where
+  show (QN [] n) = n
+  show (QN ns n) = joinBy "." ns ++ "." ++ n
+
+public export
+Interpolation QName where
+  interpolate = show
+
+export
+Ord QName where
+  compare (QN ns nm) (QN ns' nm') = if ns == ns' then compare nm nm' else compare ns ns'
+
+
 public export
 Name : Type
 Name = String
@@ -97,7 +120,7 @@ Show Literal where
 public export
 data CaseAlt : Type where
   CaseDefault : Tm -> CaseAlt
-  CaseCons : (name : String) -> (args : List String) -> Tm ->  CaseAlt
+  CaseCons : (name : QName) -> (args : List String) -> Tm ->  CaseAlt
   CaseLit : Literal -> Tm ->  CaseAlt
 
 data Def : Type
@@ -113,7 +136,7 @@ Eq Literal where
 data Tm : Type where
   Bnd : FC -> Nat -> Tm
   -- Maybe Def here instead of Maybe Tm, we'll have DCon, TCon, etc.
-  Ref : FC -> String -> Def -> Tm
+  Ref : FC -> QName -> Def -> Tm
   Meta : FC -> Nat -> Tm
   -- kovacs optimization, I think we can App out meta instead
   -- InsMeta : Nat -> List BD -> Tm
@@ -219,7 +242,7 @@ pprint names tm = go 0 names tm
     goAlt : Nat -> List String -> CaseAlt -> Doc
 
     goAlt p names (CaseDefault t) = "_" <+> "=>" <+> go p ("_" :: names) t
-    goAlt p names (CaseCons name args t) = text name <+> spread (map text args) <+> (nest 2 $ "=>" <+/> go p (reverse args ++ names) t)
+    goAlt p names (CaseCons name args t) = text (show name) <+> spread (map text args) <+> (nest 2 $ "=>" <+/> go p (reverse args ++ names) t)
     -- `;` is not in surface syntax, but sometimes we print on one line
     goAlt p names (CaseLit lit t) = text (show lit) <+> (nest 2 $ "=>" <+/> go p names t ++ ";")
 
@@ -227,7 +250,7 @@ pprint names tm = go 0 names tm
       -- Either a bug or we're printing without names
       Nothing => text "BND:\{show k}"
       Just nm => text "\{nm}:\{show k}"
-    go p names (Ref _ str mt) = text str
+    go p names (Ref _ str mt) = text (show str)
     go p names (Meta _ k) = text "?m:\{show k}"
     go p names (Lam _ nm icit quant t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> go 0 (nm :: names) t
     go p names (App _ t u) = parens 0 p $ go 0 names t <+> go 1 names u
@@ -246,8 +269,8 @@ pprint names tm = go 0 names tm
     go p names (Let _ nm t u) = parens 0 p $ text "let" <+> text nm <+> ":=" <+> go 0 names t <+> "in" </> (nest 2 $ go 0 (nm :: names) u)
     go p names (LetRec _ nm ty t u) = parens 0 p $ text "letrec" <+> text nm <+> ":" <+> go 0 names ty <+> ":=" <+> go 0 names t <+> "in" </> (nest 2 $ go 0 (nm :: names) u)
     go p names (Erased _) = "ERASED"
-data Val : Type
 
+data Val : Type
 
 -- IS/TypeTheory.idr is calling this a Kripke function space
 -- Yaffle, IS/TypeTheory use a function here.
@@ -259,7 +282,6 @@ data Val : Type
 
 -- Yaffle is vars -> vars here
 
-
 public export
 data Closure : Type
 
@@ -267,9 +289,7 @@ public export
 data Val : Type where
   -- This will be local / flex with spine.
   VVar : FC -> (k : Nat) -> (sp : SnocList Val) -> Val
-  -- I wanted the Maybe Tm in here, but for now we're always expanding.
-  -- Maybe this is where I glue
-  VRef : FC -> (nm : String) -> Def -> (sp : SnocList Val) -> Val
+  VRef : FC -> (nm : QName) -> Def -> (sp : SnocList Val) -> Val
   -- neutral case
   VCase : FC -> (sc : Val) -> List CaseAlt -> Val
   -- we'll need to look this up in ctx with IO
@@ -306,8 +326,8 @@ covering export
 Show Val where
   show (VVar _ k [<]) = "%var\{show k}"
   show (VVar _ k sp) = "(%var\{show k} \{unwords $ map show (sp <>> [])})"
-  show (VRef _ nm _ [<]) = nm
-  show (VRef _ nm _ sp) = "(\{nm} \{unwords $ map show (sp <>> [])})"
+  show (VRef _ nm _ [<]) = show nm
+  show (VRef _ nm _ sp) = "(\{show nm} \{unwords $ map show (sp <>> [])})"
   show (VMeta _ ix sp) = "(%meta \{show ix} [\{show $ length sp} sp])"
   show (VLam _ str icit quant x) = "(%lam \{show quant}\{str} \{show x})"
   show (VPi fc str Implicit rig x y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{show  y})"
@@ -387,7 +407,7 @@ record MetaContext where
 
 
 public export
-data Def = Axiom | TCon (List String) | DCon Nat String | Fn Tm | PrimTCon
+data Def = Axiom | TCon (List QName) | DCon Nat QName | Fn Tm | PrimTCon
          | PrimFn String (List String)
 
 public export
@@ -405,7 +425,7 @@ public export
 record TopEntry where
   constructor MkEntry
   fc : FC
-  name : String
+  name : QName
   type : Tm
   def : Def
 
@@ -426,9 +446,9 @@ public export
 record TopContext where
   constructor MkTop
   -- We'll add a map later?
-  defs : List TopEntry
+  defs : SortedMap QName TopEntry
   metas : IORef MetaContext
-  verbose : Bool
+  verbose : Bool -- command line flag
   errors : IORef (List Error)
   ||| loaded modules
   loaded : List String

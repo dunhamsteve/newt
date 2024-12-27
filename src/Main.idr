@@ -5,6 +5,7 @@ import Control.Monad.Error.Either
 import Control.Monad.Error.Interface
 import Control.Monad.State
 import Data.List
+import Data.List1
 import Data.String
 import Data.Vect
 import Data.IORef
@@ -34,11 +35,11 @@ fail msg = putStrLn msg >> exitFailure
 jsonTopContext : M Json
 jsonTopContext = do
   top <- get
-  pure $ JsonObj [("context", JsonArray (map jsonDef top.defs))]
+  pure $ JsonObj [("context", JsonArray (map jsonDef $ toList top.defs))]
   where
     jsonDef : TopEntry -> Json
     -- There is no FC here...
-    jsonDef (MkEntry fc name type def) = JsonObj
+    jsonDef (MkEntry fc (QN ns name) type def) = JsonObj
       [ ("fc", toJson fc)
       , ("name", toJson name)
       , ("type", toJson (render 80 $ pprint [] type) )
@@ -47,7 +48,7 @@ jsonTopContext = do
 dumpContext : TopContext -> M ()
 dumpContext top = do
     putStrLn "Context:"
-    go top.defs
+    go $ toList top.defs
     putStrLn "---"
   where
     go : List TopEntry -> M ()
@@ -61,7 +62,6 @@ writeSource fn = do
         [ "\"use strict\";"
         ,  "const PiType = (h0, h1) => ({ tag: \"PiType\", h0, h1 })" ]
         ++ map (render 90) docs
-        ++ [ "main();" ]
   Right _ <- writeFile fn src
     | Left err => fail (show err)
   Right _ <- chmodRaw fn 493 | Left err => fail (show err)
@@ -111,7 +111,7 @@ processModule base stk name = do
   putStrLn "module \{modName}"
   let True = name == modName
     | _ => fail "ERROR at \{show nameFC}: module name \{show modName} doesn't match file name \{show fn}"
-
+  let ns = forget $ split (== '.') modName
   let Right (imports, ops, toks) := partialParse fn parseImports ops toks
     | Left (err, toks) => fail (showError src err)
 
@@ -133,7 +133,7 @@ processModule base stk name = do
 
   putStrLn "process Decls"
 
-  traverse_ tryProcessDecl (collectDecl decls)
+  traverse_ (tryProcessDecl ns) (collectDecl decls)
 
   -- we don't want implict errors from half-processed functions
   -- but suppress them all on error for simplicity.
@@ -144,9 +144,9 @@ processModule base stk name = do
 
     -- parseDecls :
     -- tryParseDecl :
-    tryProcessDecl : Decl -> M ()
-    tryProcessDecl decl = do
-      Left err <- tryError {e=Error} $ processDecl decl | _ => pure ()
+    tryProcessDecl : List String -> Decl -> M ()
+    tryProcessDecl ns decl = do
+      Left err <- tryError {e=Error} $ processDecl ns decl | _ => pure ()
       addError err
 
 processFile : String -> M ()
@@ -157,6 +157,11 @@ processFile fn = do
   let dir = fromMaybe "./" $ parent fn
   let (name,ext) = splitFileName (fromMaybe "" $ last' parts)
   putStrLn "\{show dir} \{show name} \{show ext}"
+
+  -- declare internal primitives
+  processDecl ["Prim"] (PType emptyFC "Int" Nothing)
+  processDecl ["Prim"] (PType emptyFC "String" Nothing)
+  processDecl ["Prim"] (PType emptyFC "Char" Nothing)
 
   src <- processModule dir [] name
   top <- get

@@ -101,9 +101,7 @@ foo a b = ?
 
 -- We can define native types, if the type is left off, it defaults to U
 
-ptype Int : U
-ptype String : U
-ptype Char : U
+ptype SomePrimType : U
 
 -- The names of these three types are special, primitive numbers, strings,
 -- and characters inhabit them, respectively. We can match on primitives, but

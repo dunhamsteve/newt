@@ -58,7 +58,7 @@ piArity _ = Z
 ||| This is how much we want to curry at top level
 ||| leading lambda Arity is used for function defs and metas
 ||| TODO - figure out how this will work with erasure
-arityForName : FC -> Name -> M Nat
+arityForName : FC -> QName -> M Nat
 arityForName fc nm = case lookup nm !get of
   -- let the magic hole through for now (will generate bad JS)
   Nothing => error fc "Name \{show nm} not in scope"
@@ -111,7 +111,7 @@ compileTerm t@(Ref fc nm _) = do
   top <- get
   let Just (MkEntry _ _ type _) = lookup nm top
           | Nothing => error fc "Undefined name \{nm}"
-  apply (CRef nm) [] [<] !(arityForName fc nm) type
+  apply (CRef (show nm)) [] [<] !(arityForName fc nm) type
 
 compileTerm (Meta _ k) = pure $ CRef "meta$\{show k}" -- FIXME
 compileTerm (Lam _ nm _ _ t) = pure $ CLam nm !(compileTerm t)
@@ -125,7 +125,7 @@ compileTerm tm@(App _ _ _) with (funArgs tm)
         top <- get
         let Just (MkEntry _ _ type _) = lookup nm top
           | Nothing => error fc "Undefined name \{nm}"
-        apply (CRef nm) args' [<] arity type
+        apply (CRef (show nm)) args' [<] arity type
   _ | (t, args) = do
         debug "apply other \{pprint [] t}"
         t' <- compileTerm t
@@ -138,7 +138,8 @@ compileTerm (Case _ t alts) = do
   t' <- compileTerm t
   alts' <- traverse (\case
     CaseDefault tm => pure $ CDefAlt !(compileTerm tm)
-    CaseCons nm args tm => pure $ CConAlt nm args !(compileTerm tm)
+    -- we use the base name for the tag, some primitives assume this
+    CaseCons (QN ns nm) args tm => pure $ CConAlt nm args !(compileTerm tm)
     CaseLit lit tm => pure $ CLitAlt lit !(compileTerm tm)) alts
   pure $ CCase t' alts'
 compileTerm (Lit _ lit) = pure $ CLit lit

@@ -14,8 +14,8 @@ module Oper
 infixl 8 _+_ _-_
 infixl 9 _*_ _/_
 
-ptype Int
-ptype String
+
+
 ptype JVoid
 
 -- If we had a different quote here, we could tell vscode it's javascript.

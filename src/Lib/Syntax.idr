@@ -12,7 +12,7 @@ data Raw : Type where
 public export
 data Pattern
   = PatVar FC Icit Name
-  | PatCon FC Icit Name (List Pattern) (Maybe Name)
+  | PatCon FC Icit QName (List Pattern) (Maybe Name)
   | PatWild FC Icit
   -- Not handling this yet, but we need to be able to work with numbers and strings...
   | PatLit FC Literal
@@ -231,8 +231,8 @@ export
 Pretty Pattern where
   -- FIXME - wrap Implicit with {}
   pretty (PatVar _ icit nm) = text nm
-  pretty (PatCon _ icit nm args Nothing) = text nm <+> spread (map pretty args)
-  pretty (PatCon _ icit nm args (Just as)) = text as ++ "@(" ++ text nm <+> spread (map pretty args) ++ ")"
+  pretty (PatCon _ icit nm args Nothing) = text (show nm) <+> spread (map pretty args)
+  pretty (PatCon _ icit nm args (Just as)) = text as ++ "@(" ++ text (show nm) <+> spread (map pretty args) ++ ")"
   pretty (PatWild _icit) = "_"
   pretty (PatLit _ lit) = pretty lit
 

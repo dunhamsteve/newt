@@ -4,8 +4,8 @@ module TestPrim
 -- we need to be able to declare a primitive type
 -- distinct from inductive type. there are no constructors per-se but it is inhabited
 
-ptype String
-ptype Int
+
+
 
 pfunc strlen : String -> Int := `(x) => x.length()`
 

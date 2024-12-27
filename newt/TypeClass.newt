@@ -63,7 +63,7 @@ infixr 1 _,_
 data Pair : U -> U -> U where
   _,_ : {A B : U} -> A -> B -> Pair A B
 
-ptype Int
+
 
 test : Maybe Int
 test = pure 10

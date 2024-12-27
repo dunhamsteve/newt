@@ -5,7 +5,7 @@ module Tutorial
 -- import Prelude  not implemented yet
 
 -- declare a primitive type
-ptype Int
+
 
 -- declare a more complex primitive type
 ptype Array : U -> U

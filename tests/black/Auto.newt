@@ -1,8 +1,5 @@
 module Auto
 
-ptype String
-ptype Int
-
 pfunc i2s : Int -> String := `(i) => ''+i`
 pfunc _++_ : String -> String -> String := `(a,b) => a + b`
 

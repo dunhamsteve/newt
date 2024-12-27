@@ -397,7 +397,7 @@ insert ctx tm ty = do
       insert ctx (App (getFC tm) tm m) !(b $$ mv)
     va => pure (tm, va)
 
-primType : FC -> String -> M Val
+primType : FC -> QName -> M Val
 primType fc nm = case lookup nm !(get) of
       Just (MkEntry _ name ty PrimTCon) => pure $ VRef fc name PrimTCon [<]
       _ => error fc "Primitive type \{show nm} not in scope"
@@ -465,16 +465,16 @@ findSplit (x :: xs) = findSplit xs
 
 -- TODO, we may need to filter these against the type to rule out
 -- impossible cases
-getConstructors : Context -> FC -> Val -> M (List (String, Nat, Tm))
+getConstructors : Context -> FC -> Val -> M (List (QName, Nat, Tm))
 getConstructors ctx scfc (VRef fc nm _ _) = do
   names <- lookupTCon nm
   traverse lookupDCon names
   where
-    lookupTCon : String -> M (List String)
+    lookupTCon : QName -> M (List QName)
     lookupTCon str = case lookup nm !get of
         (Just (MkEntry _ name type (TCon names))) => pure names
         _ => error scfc "Not a type constructor \{nm}"
-    lookupDCon : String -> M (String, Nat, Tm)
+    lookupDCon : QName -> M (QName, Nat, Tm)
     lookupDCon nm = do
       case lookup nm !get of
         (Just (MkEntry _ name type (DCon k str))) => pure (name, k, type)
@@ -552,7 +552,7 @@ updateContext ctx ((k, val) :: cs) =
 
 -- ok, so this is a single constructor, CaseAlt
 -- return Nothing if dcon doesn't unify with scrut
-buildCase : Context -> Problem -> String -> Val -> (String, Nat, Tm) -> M (Maybe CaseAlt)
+buildCase : Context -> Problem -> String -> Val -> (QName, Nat, Tm) -> M (Maybe CaseAlt)
 buildCase ctx prob scnm scty (dcName, arity, ty) = do
   debug "CASE \{scnm} match \{dcName} ty \{pprint (names ctx) ty}"
   vty <- eval [] CBN ty
@@ -684,7 +684,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         else pure $ (nm, pat) :: !(makeConstr xs pats)
 
     -- replace constraint with constraints on parameters, or nothing if non-matching clause
-    rewriteConstraint : String -> List Bind -> List Constraint -> List Constraint -> M (Maybe (List Constraint))
+    rewriteConstraint : QName -> List Bind -> List Constraint -> List Constraint -> M (Maybe (List Constraint))
     rewriteConstraint sctynm vars [] acc = pure $ Just acc
     rewriteConstraint sctynm vars (c@(nm, y) :: xs) acc =
       if nm == scnm
@@ -709,7 +709,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
                   Nothing => error fc "Internal Error: DCon \{nm} not found"
         else rewriteConstraint sctynm vars xs (c :: acc)
 
-    rewriteClause : String -> List Bind -> Clause -> M (Maybe Clause)
+    rewriteClause : QName -> List Bind -> Clause -> M (Maybe Clause)
     rewriteClause sctynm vars (MkClause fc cons pats expr) = do
       Just cons <- rewriteConstraint sctynm vars cons [] | _ => pure Nothing
       pure $ Just $ MkClause fc cons pats expr
@@ -728,10 +728,10 @@ mkPat top (RAs fc as tm, icit) =
     t => error fc "Can't put as on non-constructor \{show tm}"
 mkPat top (tm, icit) = do
   case splitArgs tm [] of
-    ((RVar fc nm), b) => case lookup nm top of
+    ((RVar fc nm), b) => case lookupRaw nm top of
                 (Just (MkEntry _ name type (DCon k str))) =>
                   -- TODO check arity, also figure out why we need reverse
-                  pure $ PatCon fc icit nm !(traverse (mkPat top) b) Nothing
+                  pure $ PatCon fc icit name !(traverse (mkPat top) b) Nothing
                 -- This fires when a global is shadowed by a pattern var
                 -- Just _ => error (getFC tm) "\{show nm} is not a data constructor"
                 _ => case b of
@@ -897,10 +897,18 @@ buildLitCases ctx prob fc scnm scty = do
       Nothing => True
       _ => False
 
-litTyName : Literal -> String
-litTyName (LString str) = "String"
-litTyName (LInt i) = "Int"
-litTyName (LChar c) = "Char"
+-- TODO - figure out if these need to be in Prelude or have a special namespace
+-- If we lookupRaw "String", we could get different answers in different contexts.
+-- maybe Hardwire this one
+stringType : QName
+stringType = QN ["Prim"] "String"
+intType = QN ["Prim"] "Int"
+charType = QN ["Prim"] "Char"
+
+litTyName : Literal -> QName
+litTyName (LString str) = stringType
+litTyName (LInt i) = intType
+litTyName (LChar c) = charType
 
 renameContext : String -> String -> Context -> Context
 renameContext from to ctx = { types $= go } ctx
@@ -976,7 +984,7 @@ undo prev ((DoExpr fc tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm 
 -- undo ((DoExpr fc tm) :: xs) = pure $ RApp fc (RApp fc (RVar fc "_>>_") tm Explicit) !(undo xs) Explicit
 undo prev ((DoLet fc nm tm) :: xs) = RLet fc nm (RImplicit fc) tm <$> undo fc xs
 undo prev ((DoArrow fc left@(RVar fc' nm) right []) :: xs) =
-  case lookup nm !get of
+  case lookupRaw nm !get of
     Just _ => do
       let nm = "$sc"
       rest <- pure $ RCase fc (RVar fc nm) [MkAlt left !(undo fc xs)]
@@ -1074,10 +1082,10 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
 infer ctx (RVar fc nm) = go 0 ctx.types
   where
     go : Nat -> Vect n (String, Val)  -> M  (Tm, Val)
-    go i [] = case lookup nm !(get) of
+    go i [] = case lookupRaw nm !(get) of
       Just (MkEntry _ name ty def) => do
         debug "lookup \{name} as \{show def}"
-        pure (Ref fc nm def, !(eval [] CBN ty))
+        pure (Ref fc name def, !(eval [] CBN ty))
       Nothing => error fc "\{show nm} not in scope"
     go i ((x, ty) :: xs) = if x == nm then pure $ (Bnd fc i, ty)
       else go (i + 1) xs
@@ -1148,8 +1156,8 @@ infer ctx (RImplicit fc) = do
   tm <- freshMeta ctx fc vty Normal
   pure (tm, vty)
 
-infer ctx (RLit fc (LString str)) = pure (Lit fc (LString str), !(primType fc "String"))
-infer ctx (RLit fc (LInt i)) = pure (Lit fc (LInt i), !(primType fc "Int"))
-infer ctx (RLit fc (LChar c)) = pure (Lit fc (LChar c), !(primType fc "Char"))
+infer ctx (RLit fc (LString str)) = pure (Lit fc (LString str), !(primType fc stringType))
+infer ctx (RLit fc (LInt i)) = pure (Lit fc (LInt i), !(primType fc intType))
+infer ctx (RLit fc (LChar c)) = pure (Lit fc (LChar c), !(primType fc charType))
 infer ctx (RAs fc _ _) = error fc "@ can only be used in patterns"
 infer ctx tm = error (getFC tm) "Implement infer \{show tm}"

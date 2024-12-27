@@ -202,6 +202,8 @@ jsIdent id = if elem id keywords then text ("$" ++ id) else text $ pack $ fix (u
     fix (x :: xs) =
       if isAlphaNum x || x == '_' then
         x :: fix xs
+      -- make qualified names more readable
+      else if x == '.' then '_' :: fix xs
       else if x == '$' then
         '$' :: '$' :: fix xs
       else
@@ -256,12 +258,12 @@ mkArgs : Nat -> List String -> List String
 mkArgs Z acc = acc
 mkArgs (S k) acc = mkArgs k ("h\{show k}" :: acc)
 
-dcon : String -> Nat -> Doc
-dcon nm Z = stmtToDoc $ JConst nm $ LitObject [("tag", LitString nm)]
-dcon nm arity =
+dcon : QName -> Nat -> Doc
+dcon qn@(QN ns nm) Z = stmtToDoc $ JConst (show qn) $ LitObject [("tag", LitString nm)]
+dcon qn@(QN ns nm) arity =
   let args := mkArgs arity []
       obj := ("tag", LitString nm) :: map (\x => (x, Var x)) args
-  in stmtToDoc $ JConst nm (JLam args (JReturn (LitObject obj)))
+  in stmtToDoc $ JConst (show qn) (JLam args (JReturn (LitObject obj)))
 
 -- use iife to turn stmts into expr
 maybeWrap : JSStmt Return -> JSExp
@@ -273,38 +275,47 @@ entryToDoc (MkEntry _ name ty (Fn tm)) = do
   debug "compileFun \{pprint [] tm}"
   ct <- compileFun tm
   let exp = maybeWrap $ termToJS empty ct JReturn
-  pure $ text "const" <+> jsIdent name <+> text "=" <+/> expToDoc exp ++ ";"
+  pure $ text "const" <+> jsIdent (show name) <+> text "=" <+/> expToDoc exp ++ ";"
 entryToDoc (MkEntry _ name type Axiom) = pure ""
 entryToDoc (MkEntry _ name type (TCon strs)) = pure $ dcon name (piArity type)
 entryToDoc (MkEntry _ name type (DCon arity str)) = pure $ dcon name arity
 entryToDoc (MkEntry _ name type PrimTCon) = pure $ dcon name (piArity type)
-entryToDoc (MkEntry _ name _ (PrimFn src _)) = pure $ text "const" <+> jsIdent name <+> "=" <+> text src
+entryToDoc (MkEntry _ name _ (PrimFn src _)) = pure $ text "const" <+> jsIdent (show name) <+> "=" <+> text src
 
 ||| This version (call `reverse . snd <$> process "main" ([],[])`) will do dead
 ||| code elimination, but the Prelude js primitives are reaching for
 ||| stuff like True, False, MkUnit, fs which get eliminated
-process : (List String, List Doc) -> String -> M (List String, List Doc)
+process : (List QName, List Doc) -> QName -> M (List QName, List Doc)
 process (done,docs) nm = do
   let False = nm `elem` done | _ => pure (done,docs)
   top <- get
   case TopContext.lookup nm top of
     Nothing => error emptyFC "\{nm} not in scope"
     Just entry@(MkEntry _ name ty (PrimFn src uses)) => do
-      (done,docs) <- foldlM process (nm :: done, docs) uses
+      (done,docs) <- foldlM assign (nm :: done, docs) uses
       pure (done, !(entryToDoc entry) :: docs)
     Just (MkEntry _ name ty (Fn tm)) => do
                 debug "compileFun \{pprint [] tm}"
                 ct <- compileFun tm
                 -- If ct has zero arity and is a compount expression, this fails..
                 let exp = maybeWrap $ termToJS empty ct JReturn
-                let doc = text "const" <+> jsIdent name <+> text "=" <+/> expToDoc exp ++ ";"
+                let doc = text "const" <+> jsIdent (show name) <+> text "=" <+/> expToDoc exp ++ ";"
                 (done,docs) <- walkTm tm (nm :: done, docs)
                 pure (done, doc :: docs)
-
     Just entry => pure (nm :: done, !(entryToDoc entry) :: docs)
   where
-    walkTm : Tm -> (List String, List Doc) -> M (List String, List Doc)
-    walkAlt : (List String, List Doc) -> CaseAlt -> M (List String, List Doc)
+    assign : (List QName, List Doc) -> String -> M (List QName, List Doc)
+    assign (done, docs) nm = case lookupRaw nm !get of
+      Nothing => pure (done, docs)
+      (Just (MkEntry fc name type def)) => do
+        let tag = QN [] nm
+        let False = tag `elem` done | _ => pure (done,docs)
+        (done,docs) <- process (done, docs) name
+        let doc = text "const" <+> jsIdent nm <+> text "=" <+> jsIdent (show name) ++ ";"
+        pure (tag :: done, doc :: docs)
+
+    walkTm : Tm -> (List QName, List Doc) -> M (List QName, List Doc)
+    walkAlt : (List QName, List Doc) -> CaseAlt -> M (List QName, List Doc)
     walkAlt acc (CaseDefault t) = walkTm t acc
     walkAlt acc (CaseCons name args t) = walkTm t acc
     walkAlt acc (CaseLit lit t) = walkTm t acc
@@ -322,10 +333,13 @@ export
 compile : M (List Doc)
 compile = do
   top <- get
-  case lookup "main" top of
-    Just _ => reverse . snd <$> process ([],[]) "main"
+  case lookupRaw "main" top of
+    Just (MkEntry fc name type def) => do
+      tmp <- snd <$> process ([],[]) name
+      let exec = stmtToDoc $ JPlain $ Apply (Var $ show name) []
+      pure $ reverse (exec :: tmp)
     -- If there is no main, compile everything for the benefit of the playground
     Nothing => do
       top <- get
-      traverse entryToDoc top.defs
+      traverse entryToDoc $ map snd $ SortedMap.toList top.defs
 

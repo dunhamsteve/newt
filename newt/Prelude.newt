@@ -235,10 +235,6 @@ infixr 7 _++_
 class Concat a where
   _++_ : a → a → a
 
-ptype String
-ptype Int
-ptype Char
-
 pfunc sconcat : String → String → String := `(x,y) => x + y`
 instance Concat String where
   _++_ = sconcat

@@ -1,6 +1,6 @@
 module Let
 
-ptype Int
+
 
 foo : Int -> Int
 foo n = let x = 42 in x
