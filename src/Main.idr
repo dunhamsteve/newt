@@ -93,14 +93,14 @@ fastReadFile fn = do
 
 
 ||| New style loader, one def at a time
-processModule : String -> List String -> String -> M String
-processModule base stk name = do
+processModule : FC -> String -> List String -> String -> M String
+processModule importFC base stk name = do
   top <- get
   let False := elem name top.loaded | _ => pure ""
   modify { loaded $= (name::) }
   let fn = if base == "" then name ++ ".newt" else base ++ "/" ++ name ++ ".newt"
   Right src <- fastReadFile $ fn
-    | Left err => fail "error reading \{fn}: \{show err}"
+    | Left err => fail "ERROR at \{show importFC}: error reading \{fn}: \{show err}"
   let Right toks = tokenise fn src
     | Left err => fail (showError src err)
 
@@ -119,7 +119,7 @@ processModule base stk name = do
     -- we could use `fc` if it had a filename in it
 
     when (name' `elem` stk) $ error emptyFC "import loop \{show name} -> \{show name'}"
-    processModule base (name :: stk) name'
+    processModule fc base (name :: stk) name'
 
   top <- get
   mc <- readIORef top.metas
@@ -163,7 +163,7 @@ processFile fn = do
   processDecl ["Prim"] (PType emptyFC "String" Nothing)
   processDecl ["Prim"] (PType emptyFC "Char" Nothing)
 
-  src <- processModule dir [] name
+  src <- processModule emptyFC dir [] name
   top <- get
   -- dumpContext top
 

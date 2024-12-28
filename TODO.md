@@ -3,6 +3,10 @@
 
 More comments in code! This is getting big enough that I need to re-find my bearings when fixing stuff.
 
+- [ ] tokenizer
+- [ ] string interpolation
+- [ ] pattern matching lambda
+  - I kept wanting this in AoC and use it a lot in the newt code
 - [ ] editor - indent newline on let with no in
   - I've seen this done in vi for Idris, but it seems non-trivial in vscode.
 - [x] Move on to next decl in case of error
@@ -47,8 +51,9 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [ ] **Translate newt to newt**
   - [x] Support @ on the LHS
   - [x] if / then / else sugar
-  - [ ] `data Foo = A | B` sugar
+  - [x] `data Foo = A | B` sugar
   - [x] records
+  - [ ] record sugar? (detailed above)
   - [x] where
   - [ ] add namespaces
   - [ ] magic nat?
@@ -58,7 +63,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [x] Strategy to avoid three copies of `Prelude.newt` in this source tree
 - [ ] `mapM` needs inference help when scrutinee (see Day2.newt)
   - Meta hasn't been solved yet. It's Normal, but maybe our delayed solving of Auto plays into it. Idris will peek at LHS of CaseAlts to guess the type if it doesn't have one.
-- [ ] Can't skip an auto. We need `{{_}}` to be auto or `%search` syntax.
+- [ ] Can't skip an auto. We need `{{_}}` to be auto or have a `%search` syntax.
 - [x] add filenames to FC
 - [ ] Add full ranges to FC
 - [x] maybe use backtick for javascript so we don't highlight strings as JS
@@ -74,9 +79,6 @@ More comments in code! This is getting big enough that I need to re-find my bear
   - maybe a file listing jobs, whether they are known broken, optional expected output, optional expected JS execution output.
 - [x] forall / ∀ sugar (Maybe drop this, issues with `.` and `{A}` works fine)
 - [x] Bad module name error has FC 0,0 instead of the module or name
-- [ ] ~~Remove context lambdas when printing solutions (show names from context)~~
-  - maybe build list of names and strip λ, then call pprint with names
-  - I've removed solution printing, so this is moot
 - [ ] Revisit substitution in case building
 - [x] Check for shadowing when declaring dcon
   - Handles the forward decl in `Zoo1.newt`, but we'll need different syntax if
@@ -131,7 +133,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [x] implicit patterns
 - [x] operators
 - [x] pair syntax (via comma operator)
-- [ ] `data` sugar: `data Maybe a = Nothing | Just a`
+- [x] `data` sugar: `data Maybe a = Nothing | Just a`
 - [x] matching on operators
   - [x] top level
   - [x] case statements

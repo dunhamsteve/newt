@@ -138,7 +138,7 @@ fill [] = Empty
 fill [x] = x
 fill (x :: y :: xs) = (flatten x <+> fill (flatten y :: xs)) `Alt` (x </> fill (y :: xs))
 
-||| separate with space
+||| separate with comma
 export
 commaSep : List Doc -> Doc
 commaSep = folddoc (\a, b => a ++ text "," <+/> b)

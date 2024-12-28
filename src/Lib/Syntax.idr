@@ -120,6 +120,7 @@ data Decl
   | Def FC Name (List (Raw, Raw)) -- (List Clause)
   | DCheck FC Raw Raw
   | Data FC Name Raw (List Decl)
+  | ShortData FC Raw (List Raw)
   | PType FC Name (Maybe Raw)
   | PFunc FC Name (List String) Raw String
   | PMixFix FC (List Name) Nat Fixity
@@ -133,6 +134,7 @@ HasFC Decl where
   getFC (Def x str xs) = x
   getFC (DCheck x tm tm1) = x
   getFC (Data x str tm xs) = x
+  getFC (ShortData x _ _) = x
   getFC (PType x str mtm) = x
   getFC (PFunc x str _ tm str1) = x
   getFC (PMixFix x strs k y) = x
@@ -182,6 +184,7 @@ Show Decl where
   show (Data _ str xs ys) = foo ["Data", show str, show xs, show ys]
   show (DCheck _ x y) = foo ["DCheck", show x, show y]
   show (PType _ name ty) = foo ["PType", name, show ty]
+  show (ShortData _ lhs sigs) = foo ["ShortData", show lhs, show sigs]
   show (PFunc _ nm uses ty src) = foo ["PFunc", nm, show uses, show ty, show src]
   show (PMixFix _ nms prec fix) = foo ["PMixFix", show nms, show prec, show fix]
   show (Class _ nm tele decls) = foo ["Class",  nm, "...", show $ map show decls]
@@ -280,6 +283,9 @@ Pretty Raw where
 prettyBind : (BindInfo, Raw) -> Doc
 prettyBind (BI _ nm icit quant, ty) = wrap icit (text (show quant ++ nm) <+> text ":" <+> pretty ty)
 
+pipeSep : List Doc -> Doc
+pipeSep = folddoc (\a, b => a <+/> text "|" <+> b)
+
 export
 Pretty Decl where
   pretty (TypeSig _ nm ty) = spread (map text nm) <+> text ":" <+> nest 2 (pretty ty)
@@ -295,6 +301,7 @@ Pretty Decl where
   pretty (Class _ nm tele decls) = text "class" <+> text nm <+> ":" <+> spread (map prettyBind tele)
     <+> (nest 2 $ text "where" </> stack (map pretty decls))
   pretty (Instance _ _ _) = text "TODO pretty Instance"
+  pretty (ShortData _ lhs sigs) = text "data" <+> pretty lhs <+> "=" <+> pipeSep (map pretty sigs)
 
 export
 Pretty Module where

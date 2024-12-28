@@ -65,11 +65,6 @@ bronKerbosch g rs (p :: ps) xs =
     best a Nothing = a
     best (Just a) (Just b) = if length a < length b then Just b else Just a
 
-joinBy : String → List String → String
-joinBy _ Nil = ""
-joinBy _ (x :: Nil) = x
-joinBy s (x :: y :: xs) = joinBy s ((x ++ s ++ y) :: xs)
-
 run : String -> IO Unit
 run fn = do
   putStrLn fn

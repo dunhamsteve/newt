@@ -140,6 +140,11 @@ mutual
   export many : Parser a -> Parser (List a)
   many p = some p <|> pure []
 
+-- one or more `a` seperated by `s`
+export
+sepBy : Parser s -> Parser a -> Parser (List a)
+sepBy s a = (::) <$> a <*> many (s *> a)
+
 export
 getPos : Parser FC
 getPos = P $ \toks, com, ops, indent => case toks of
@@ -196,7 +201,7 @@ token' k = pred (\t => t.val.kind == k) "Expected a \{show k} token"
 export
 keyword' : String -> Parser ()
 -- FIXME make this an appropriate whitelist
-keyword' kw = ignore $ pred (\t => t.val.text == kw && t.val.kind /= Character) "Expected \{kw}"
+keyword' kw = ignore $ pred (\t => t.val.text == kw && (t.val.kind == Keyword || t.val.kind == Symbol || t.val.kind == Number)) "Expected \{kw}"
 
 ||| expect indented token of given kind
 export

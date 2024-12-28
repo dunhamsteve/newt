@@ -30,12 +30,6 @@ quoteString str = pack $ encode (unpack str) [< '"']
       let v : Nat = cast c in
       if v < 32 then encode cs (acc :< '\\' :< 'u' :< hexDigit (div v 4096) :< hexDigit (div v 256) :< hexDigit (div v 16) :< hexDigit v )
       else encode cs (acc :< c)
-      -- else if v < 128 then encode cs (acc :< c)
-      -- if v < 32 then encode cs (acc :< '\\' :< 'x' :< hexDigit (div v 16) :< hexDigit v )
-      -- else if v < 128 then encode cs (acc :< c)
-      -- -- TODO unicode
-      -- else if v < 256 then encode cs (acc :< '\\' :< 'x' :< hexDigit (div v 16) :< hexDigit v )
-      -- else encode cs (acc :< '\\' :< 'u' :< hexDigit (div v 4096) :< hexDigit (div v 256) :< hexDigit (div v 16) :< hexDigit v )
 
 public export
 data Json : Type where

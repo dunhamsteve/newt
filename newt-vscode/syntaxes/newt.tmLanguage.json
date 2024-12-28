@@ -28,9 +28,12 @@
     },
     {
       "name": "string.newt",
+      "match": "'(.|\\\\.)'"
+    },
+    {
+      "name": "string.newt",
       "begin": "\"",
       "end": "\""
     }
-
   ]
 }

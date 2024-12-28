@@ -8,8 +8,8 @@ import Lib.Common
 keywords : List String
 keywords = ["let", "in", "where", "case", "of", "data", "U", "do",
             "ptype", "pfunc", "module", "infixl", "infixr", "infix",
-            "∀", "forall",
-            "class", "instance",
+            "∀", "forall", "import", "uses",
+            "class", "instance", "record", "constructor",
             "if", "then", "else",
             "$", "λ", "?", "@",
              "->", "→", ":", "=>", ":=", "=", "<-", "\\", "_", "|"]

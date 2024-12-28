@@ -110,7 +110,8 @@ export let newtTokens: monaco.languages.IMonarchLanguage = {
           },
         },
       ],
-
+      // char literal, but I don't think there is a class for that.
+      [/'\\?.'/, "string"],
       [/\d+/, "number"],
 
       // strings
@@ -125,7 +126,7 @@ export let newtTokens: monaco.languages.IMonarchLanguage = {
     string: [
       [/[^\\"]+/, "string"],
       // [/@escapes/, "string.escape"],
-      [/\\./, "string.escape.invalid"],
+      // [/\\./, "string.escape.invalid"],
       [/"/, { token: "string.quote", bracket: "@close", next: "@pop" }],
     ],
     whitespace: [

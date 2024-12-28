@@ -174,16 +174,17 @@ letExpr = do
   alts <- startBlock $ someSame $ letAssign
   keyword' "in"
   scope <- typeExpr
-  pure $ foldl (\ acc, (n,fc,v) => RLet fc n (RImplicit fc) v acc) scope (reverse alts)
+  pure $ foldl (\ acc, (n,fc,ty,v) => RLet fc n (fromMaybe (RImplicit fc) ty) v acc) scope (reverse alts)
   where
-    letAssign : Parser (Name,FC,Raw)
+    letAssign : Parser (Name,FC,Maybe Raw,Raw)
     letAssign = do
       fc <- getPos
       name <- ident
       -- TODO type assertion
+      ty <- optional (keyword ":" *> typeExpr)
       keyword "="
       t <- typeExpr
-      pure (name,fc,t)
+      pure (name,fc,ty,t)
 
 pLamArg : Parser (Icit, String, Maybe Raw)
 pLamArg = (Implicit,,) <$> braces (ident <|> uident) <*> optional (sym ":" >> typeExpr)
@@ -441,13 +442,21 @@ parsePFunc = do
   pure $ PFunc fc nm (fromMaybe [] uses) ty src
 
 
+parseShortData : Parser Decl
+parseShortData = do
+  fc <- getPos
+  keyword "data"
+  lhs <- typeExpr
+  keyword "="
+  sigs <- sepBy (keyword "|") typeExpr
+  pure $ ShortData fc lhs sigs
+
 export
 parseData : Parser Decl
 parseData = do
   fc <- getPos
-  keyword "data"
-  name <- uident <|> ident <|> token MixFix
-  keyword ":"
+  -- commit when we hit ":"
+  name <- try $ (keyword "data" *> (uident <|> ident <|> token MixFix) <* keyword ":")
   ty <- typeExpr
   keyword "where"
   decls <- startBlock $ manySame $ parseSig
@@ -500,7 +509,7 @@ parseNorm = DCheck <$> getPos <* keyword "#check" <*> typeExpr <* keyword ":" <*
 export
 parseDecl : Parser Decl
 parseDecl = parseMixfix <|> parsePType <|> parsePFunc
-  <|> parseNorm <|> parseData <|> parseSig <|> parseDef
+  <|> parseNorm <|> parseData <|> parseShortData <|> parseSig <|> parseDef
   <|> parseClass <|> parseInstance <|> parseRecord
 
 

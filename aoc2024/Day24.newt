@@ -126,7 +126,6 @@ check : List Gate → List Int → String → Either (String × String) Unit
 check gates Nil carry = Right MkUnit
 check gates (bit :: bits) carry = do
   let xl = label 'x' bit
-  let yl = label 'x' bit
   let (Just a1) = matchIn xl And | _ => fail $ "no a1 " ++ show bit
   let (Just x1) = matchIn xl Xor | _ => fail $ "no x1 " ++ show bit
   -- just peel of the carry for bit0
@@ -173,11 +172,6 @@ trampoline gates acc = do
     Left (a,b) => do
       putStrLn $ "SWAP " ++ a ++ " and " ++ b
       trampoline (map (swapPins a b) gates) (a :: b :: acc)
-
-joinBy : String → List String → String
-joinBy _ Nil = ""
-joinBy _ (x :: Nil) = x
-joinBy s (x :: y :: xs) = joinBy s ((x ++ s ++ y) :: xs)
 
 run : String -> IO Unit
 run fn = do

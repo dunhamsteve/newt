@@ -92,17 +92,6 @@ public export
 HasFC BindInfo where
   getFC (BI fc _ _ _) = fc
 
--- do we just admit string names for these and let the prim functions
--- sort it out?
--- I'd like Int / String to have syntax
-
-data PrimType = StringType | IntType
-
-data PrimVal : Type where
-  PrimString : String -> PrimVal
-  PrimInt : Int -> PrimVal
-  PrimChar : Char -> PrimVal
-
 public export
 data Tm : Type
 

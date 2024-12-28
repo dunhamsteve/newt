@@ -6,8 +6,7 @@ id x = x
 the : (a : U) → a → a
 the _ a = a
 
-data Bool : U where
-  True False : Bool
+data Bool = True | False
 
 not : Bool → Bool
 not True = False
@@ -33,9 +32,7 @@ infixl 6 _/=_
 _/=_ : ∀ a. {{Eq a}} → a → a → Bool
 a /= b = not (a == b)
 
-data Nat : U where
-  Z : Nat
-  S : Nat -> Nat
+data Nat = Z | S Nat
 
 pred : Nat → Nat
 pred Z = Z
@@ -46,22 +43,17 @@ instance Eq Nat where
   S n == S m = n == m
   x == y = False
 
-data Maybe : U -> U where
-  Just : ∀ a. a -> Maybe a
-  Nothing : ∀ a. Maybe a
+
+data Maybe a = Just a | Nothing
 
 fromMaybe : ∀ a. a → Maybe a → a
 fromMaybe a Nothing = a
 fromMaybe _ (Just a) = a
 
-data Either : U -> U -> U where
-  Left : {0 a b : U} -> a -> Either a b
-  Right : {0 a b : U} -> b -> Either a b
+data Either a b = Left a | Right b
 
 infixr 7 _::_
-data List : U -> U where
-  Nil : ∀ A. List A
-  _::_ : ∀ A. A → List A → List A
+data List a = Nil | a :: List a
 
 length : ∀ a. List a → Nat
 length Nil = Z
@@ -69,9 +61,7 @@ length (x :: xs) = S (length xs)
 
 
 infixl 7 _:<_
-data SnocList : U → U where
-  Lin : ∀ A. SnocList A
-  _:<_ : ∀ A. SnocList A → A → SnocList A
+data SnocList a = Lin | SnocList a :< a
 
 -- 'chips'
 infixr 6 _<>>_ _<><_
@@ -90,8 +80,7 @@ xs <>< (y :: ys) = (xs :< y) <>< ys
 
 infixr 8 _×_
 infixr 2 _,_
-data _×_ : U → U → U where
-  _,_ : ∀ A B. A → B → A × B
+data a × b = (a,b)
 
 fst : ∀ a b. a × b → a
 fst (a,b) = a
@@ -222,6 +211,8 @@ instance Mul Nat where
   Z * _ = Z
   S n * m = m + n * m
 
+pfunc mod : Int → Int → Int := `(a,b) => a % b`
+
 infixl 7 _-_
 class Sub a where
   _-_ : a → a → a
@@ -252,9 +243,7 @@ instance Eq String where
 instance Eq Char where
   a == b = jsEq a b
 
-
-data Unit : U where
-  MkUnit : Unit
+data Unit = MkUnit
 
 ptype Array : U → U
 pfunc listToArray : {a : U} -> List a -> Array a := `
@@ -324,8 +313,7 @@ pfunc replicate : Nat -> Char → String := `(n,c) => c.repeat(natToInt(n))`
 -- I don't want to use an empty type because it would be a proof of void
 ptype World
 
-data IORes : U -> U where
-  MkIORes : ∀ a. a -> World -> IORes a
+data IORes a = MkIORes a World
 
 IO : U -> U
 IO a = World -> IORes a
@@ -761,3 +749,16 @@ instance ∀ a. {{Eq a}} → Eq (List a) where
 find : ∀ a. (a → Bool) → List a → Maybe a
 find f Nil = Nothing
 find f (x :: xs) = if f x then Just x else find f xs
+
+-- TODO this would be faster, but less pure as a primitive
+-- fastConcat might be a good compromise
+joinBy : String → List String → String
+joinBy _ Nil = ""
+joinBy _ (x :: Nil) = x
+joinBy s (x :: y :: xs) = joinBy s ((x ++ s ++ y) :: xs)
+
+snoc : ∀ a. List a → a → List a
+snoc xs x = xs ++ (x :: Nil)
+
+instance ∀ a b. {{Show a}} {{Show b}} → Show (a × b) where
+  show (a,b) = "(" ++ show a ++ "," ++ show b ++ ")"

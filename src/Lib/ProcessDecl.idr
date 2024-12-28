@@ -416,6 +416,28 @@ processDecl ns (Instance instfc ty decls) = do
     apply (VPi fc nm icit rig a b) (x :: xs) = apply !(b $$ x) xs
     apply x (y :: xs) = error instfc "expected pi type \{show x}"
 
+processDecl ns (ShortData fc lhs sigs) = do
+  (nm,args) <- getArgs lhs []
+  let ty = foldr (\ (fc,n), a => (RPi fc (BI fc n Explicit Many) (RU fc) a)) (RU fc) args
+  cons <- traverse (mkDecl args []) sigs
+  let dataDecl = Data fc nm ty cons
+  putStrLn "SHORTDATA"
+  putStrLn "\{pretty dataDecl}"
+  processDecl ns dataDecl
+  where
+    getArgs : Raw -> List (FC, String) -> M (String, List (FC, String))
+    getArgs (RVar fc1 nm) acc = pure (nm, acc)
+    getArgs (RApp _ t (RVar fc' nm) _) acc = getArgs t ((fc', nm) :: acc)
+    getArgs tm _ = error (getFC tm) "Expected contructor application, got: \{show tm}"
+
+    mkDecl : List (FC, Name) -> List Raw -> Raw -> M Decl
+    mkDecl args acc (RVar fc' name) = do
+      let base = foldr (\ ty, acc => RPi (getFC ty) (BI (getFC ty) "_" Explicit Many) ty acc) lhs acc
+      let ty = foldr (\ (fc,nm), acc => RPi fc (BI fc nm Implicit Zero) (RU fc) acc) base args
+      pure $ TypeSig fc' [name] ty
+    mkDecl args acc (RApp fc' t u icit) = mkDecl args (u :: acc) t
+    mkDecl args acc tm = error (getFC tm) "Expected contructor application, got: \{show tm}"
+
 processDecl ns (Data fc nm ty cons) = do
   putStrLn "-----"
   putStrLn "Data \{nm}"

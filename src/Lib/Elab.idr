@@ -24,7 +24,6 @@ collectDecl ((Def fc nm cl) :: rest@(Def _ nm' cl' :: xs)) =
   else (Def fc nm cl :: collectDecl rest)
 collectDecl (x :: xs) = x :: collectDecl xs
 
-
 -- renaming
 -- dom gamma ren
 data Pden = PR Nat Nat (List Nat)
@@ -724,7 +723,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
       Just cons <- rewriteConstraint sctynm vars cons [] | _ => pure Nothing
       pure $ Just $ MkClause fc cons pats expr
 
-
+export
 splitArgs : Raw -> List (Raw, Icit) -> (Raw, List (Raw, Icit))
 splitArgs (RApp fc t u icit) args = splitArgs t ((u, icit) :: args)
 splitArgs tm args = (tm, args)
