@@ -1,0 +1,21 @@
+module TestMap
+
+import SortedMap
+
+main : IO Unit
+main = do
+  let m = updateMap 2 0 EmptyMap
+  debugLog $ toList m
+  debugLog $ toList $ deleteMap 2 m
+  debugLog $ toList $ updateMap 2 3 m
+  debugLog $ toList $ updateMap 1 3 m
+  let x = 4 :: 1 :: 5 :: 7 :: 2 :: 9 :: 3 :: 10 :: 6 :: 0 :: 11 :: 12 :: 13 :: 20 :: 14 :: 16 :: 17 :: 8 :: Nil
+  let m = foldl (\ m x => updateMap x MkUnit m) EmptyMap x
+  debugLog $ toList m
+  debugLog $ leftMost m
+  debugLog $ rightMost m
+  _ <- for x $ \ n => do
+    putStrLn $ "ohne " ++ show n
+    -- debugLog $ m
+    debugLog $ map fst $ toList $ deleteMap n m
+  putStrLn ""

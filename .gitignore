@@ -2,6 +2,7 @@ build/
 *.*~ATTIC
 \#*
 *~
+*.swp
 *.log
 *.agda
 *.agdai
@@ -9,3 +10,4 @@ build/
 input.txt
 node_modules
 mkday.py
+tmp

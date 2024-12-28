@@ -1,8 +1,9 @@
 #!/bin/sh
-SAMPLES=$(find playground/samples -name "*.newt")
+mkdir -p tmp
+echo "Test AoC 2024 solutions"
 total=0
 failed=0
-for fn in tests/*.newt ; do
+for fn in  aoc2024/Day*.newt; do
   total=$((total + 1))
   echo Test $fn
   bn=$(basename $fn)
@@ -26,6 +27,8 @@ for fn in tests/*.newt ; do
     fi
   fi
 done
+
 echo "Total tests: $total"
 echo "Failed tests: $failed"
+
 

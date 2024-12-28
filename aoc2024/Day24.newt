@@ -177,7 +177,6 @@ run : String -> IO Unit
 run fn = do
   putStrLn fn
   text <- readFile fn
-  putStrLn text
   let (Right (wires, gates)) = parseFile text | Left msg => putStrLn $ "fail: " ++ msg
   let state = foldMap const EmptyMap wires
   let gateMap = foldMap const EmptyMap $ map (\ gate => (out gate, gate)) gates

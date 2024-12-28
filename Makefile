@@ -16,6 +16,9 @@ build/exec/newt.min.js: ${SRCS}
 test: build/exec/newt
 	scripts/test
 
+aoctest: build/exec/newt
+	scripts/aoc
+
 vscode:
 	cd newt-vscode && vsce package && code --install-extension *.vsix
 

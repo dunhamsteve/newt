@@ -55,7 +55,6 @@ run : String -> IO Unit
 run fn = do
   putStrLn fn
   text <- readFile fn
-  putStrLn text
   let chunks = parseFile text
   let (locks,keys) = splitKeys chunks Nil Nil
   debugLog (length locks, length keys)
