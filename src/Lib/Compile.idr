@@ -186,17 +186,21 @@ termToJS env (CCase t alts) f =
 
 keywords : List String
 keywords = [
-  "var", "true", "false", "let", "case", "switch", "if", "then", "else", "String",
-  "function", "void", "undefined", "null", "await", "async", "return", "const",
-  "Number", "default", "for", "while", "Function", "Array", "BigInt"
+  "break", "case", "catch", "continue", "debugger", "default", "delete", "do", "else",
+  "finally", "for", "function", "if", "in", "instanceof", "new", "return", "switch",
+  "this", "throw", "try", "typeof", "var", "void", "while", "with",
+  "class", "const", "enum", "export", "extends", "import", "super",
+  "implements", "interface", "let", "package", "private", "protected", "public",
+  "static", "yield",
+  "null", "true", "false",
+  -- might not be a big issue with namespaces on names now.
+  "String", "Number", "Array", "BigInt"
 ]
 
 ||| escape identifiers for js
 jsIdent : String -> Doc
 jsIdent id = if elem id keywords then text ("$" ++ id) else text $ pack $ fix (unpack id)
   where
-
-
     fix : List Char -> List Char
     fix [] = []
     fix (x :: xs) =

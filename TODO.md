@@ -4,6 +4,7 @@
 More comments in code! This is getting big enough that I need to re-find my bearings when fixing stuff.
 
 - [ ] editor - indent newline on let with no in
+  - I've seen this done in vi for Idris, but it seems non-trivial in vscode.
 - [x] Move on to next decl in case of error
 - [x] for parse error, seek to col 0 token and process next decl
 - [ ] record initialization sugar, e.g. `{ x := 1, y := 2 }`
