@@ -93,8 +93,10 @@ export let newtTokens: monaco.languages.IMonarchLanguage = {
   specialOps: ["=>", "->", ":", "=", ":=", "<-"],
   tokenizer: {
     root: [
+      // char literal, but I don't think there is a class for that.
+      [/'\\?.'/, "string"],
       [
-        /[a-z_$'][\w$]*/,
+        /[a-z_$][\w$']*/,
         { cases: { "@keywords": "keyword", "@default": "identifier" } },
       ],
       [/[A-Z][\w\$]*/, "type.identifier"],
@@ -110,8 +112,7 @@ export let newtTokens: monaco.languages.IMonarchLanguage = {
           },
         },
       ],
-      // char literal, but I don't think there is a class for that.
-      [/'\\?.'/, "string"],
+
       [/\d+/, "number"],
 
       // strings
