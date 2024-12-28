@@ -52,7 +52,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
   - [x] where
   - [ ] add namespaces
   - [ ] magic nat?
-- [ ] rework `unify` case tree
+- [x] rework `unify` case tree
   - Idris needs help with the case tree to keep code size down, do it in stages, one dcon at a time.
   - I'm not sure it can go a few steps deep and have a default hanging off the side, so we may need to put the default case in another function ourselves.
 - [x] Strategy to avoid three copies of `Prelude.newt` in this source tree
