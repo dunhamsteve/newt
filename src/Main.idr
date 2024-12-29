@@ -9,7 +9,6 @@ import Data.List1
 import Data.String
 import Data.Vect
 import Data.IORef
--- import Lib.Elab
 import Lib.Common
 import Lib.Compile
 import Lib.Parser
@@ -18,7 +17,7 @@ import Lib.Parser.Impl
 import Lib.Prettier
 import Lib.ProcessDecl
 import Lib.Token
-import Lib.Tokenizer2
+import Lib.Tokenizer
 import Lib.TopContext
 import Lib.Types
 import Lib.Syntax

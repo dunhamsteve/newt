@@ -44,7 +44,7 @@ runP (P f) = f
 -- FIXME no filename, also half the time it is pointing at the token after the error
 error : String -> TokenList -> String -> Error
 error fn [] msg = E (MkFC fn (0,0)) msg
-error fn ((MkBounded val isIrrelevant (MkBounds line col _ _)) :: _) msg = E (MkFC fn (line,col)) msg
+error fn ((MkBounded val (MkBounds line col _ _)) :: _) msg = E (MkFC fn (line,col)) msg
 
 export
 parse : String -> Parser a -> TokenList -> Either Error a

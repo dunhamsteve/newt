@@ -1,8 +1,26 @@
 module Lib.Token
 
--- TODO replace this with own lexer
+public export
+record Bounds where
+  constructor MkBounds
+  startLine : Int
+  startCol : Int
+  endLine : Int
+  endCol : Int
 
-import public Text.Lexer
+export
+Eq Bounds where
+  (MkBounds sl sc el ec) == (MkBounds sl' sc' el' ec') =
+      sl == sl'
+   && sc == sc'
+   && el == el'
+   && ec == ec'
+
+public export
+record WithBounds ty where
+  constructor MkBounded
+  val : ty
+  bounds : Bounds
 
 public export
 data Kind
@@ -47,34 +65,31 @@ Show Kind where
 
 export
 Eq Kind where
-  Ident   == Ident = True
-  UIdent  == UIdent = True
-  Keyword == Keyword = True
-  MixFix  == MixFix = True
-  Number  == Number = True
-  Character == Character = True
-  Symbol  == Symbol = True
-  Space   == Space = True
-  LBrace  == LBrace = True
-  Semi    == Semi   = True
-  RBrace  == RBrace = True
-  StringKind == StringKind = True
-  JSLit == JSLit = True
-  Projection == Projection = True
-  _ == _ = False
+  a == b = show a == show b
+
+public export
+record Token where
+  constructor Tok
+  kind : Kind
+  text : String
+
 
 export
-Show k => Show (Token k) where
+Show Token where
   show (Tok k v) = "<\{show k}:\{show v}>"
 
 public export
 BTok : Type
-BTok = WithBounds (Token Kind)
+BTok = WithBounds Token
 
 export
 value : BTok -> String
-value (MkBounded (Tok _ s) _ _) = s
+value (MkBounded (Tok _ s) _) = s
 
 export
 kind : BTok -> Kind
-kind (MkBounded (Tok k s) _ _) = k
+kind (MkBounded (Tok k s) _) = k
+
+export
+start : BTok -> (Int, Int)
+start (MkBounded _ (MkBounds l c _ _)) = (l,c)
