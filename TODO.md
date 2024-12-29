@@ -4,10 +4,7 @@
 More comments in code! This is getting big enough that I need to re-find my bearings when fixing stuff.
 
 - [x] tokenizer that can be ported to newt
-- [ ] string interpolation
-
-- [ ] editor - indent newline on let with no in
-  - I've seen this done in vi for Idris, but it seems non-trivial in vscode.
+- [ ] string interpolation?
 - [x] Move on to next decl in case of error
 - [x] for parse error, seek to col 0 token and process next decl
 - [ ] record update sugar, syntax TBD
