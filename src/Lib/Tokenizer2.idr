@@ -15,7 +15,9 @@ keywords = ["let", "in", "where", "case", "of", "data", "U", "do",
             "∀", "forall", "import", "uses",
             "class", "instance", "record", "constructor",
             "if", "then", "else",
-            "$", "λ", "?", "@",
+            -- it would be nice to find a way to unkeyword "." so it could be
+            -- used as an operator too
+            "$", "λ", "?", "@", ".",
              "->", "→", ":", "=>", ":=", "=", "<-", "\\", "_", "|"]
 
 -- This makes a big case tree...
@@ -38,6 +40,7 @@ tokenise' sl sc toks chars = case chars of
   '/' :: '-' :: cs => blockComment sl (sc + 2) toks cs
   '`' :: cs => doBacktick sl (sc + 1) toks cs [<]
   '"' :: cs => doQuote sl (sc + 1) toks cs [<]
+  '.' :: cs => doRest sl (sc + 1) toks cs Projection isIdent (Lin :< '.')
   '-' :: c :: cs => if isDigit c
     then doRest sl (sc + 2) toks cs Number isDigit (Lin :< '-' :< c)
     else doRest sl (sc + 1) toks (c :: cs) Ident isIdent (Lin :< '-')
@@ -47,6 +50,9 @@ tokenise' sl sc toks chars = case chars of
   where
     isIdent : Char -> Bool
     isIdent c = not (isSpace c || elem c standalone)
+
+    isUIdent : Char -> Bool
+    isUIdent c = isIdent c || c == '.'
 
     doBacktick : Int -> Int -> SnocList BTok -> List Char -> SnocList Char -> Either Error (List BTok)
     doBacktick l c toks Nil acc = Left $ E (MkFC "" (l,c)) "EOF in backtick string"

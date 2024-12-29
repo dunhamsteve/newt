@@ -389,7 +389,13 @@ parseSig : Parser Decl
 parseSig = TypeSig <$> getPos <*> try (some (ident <|> uident) <* keyword ":") <*> typeExpr
 
 parseImport : Parser Import
-parseImport = MkImport <$> getPos <* keyword "import" <*> uident
+parseImport = do
+  fc <- getPos
+  keyword "import"
+  ident <- uident
+  rest <- many $ token Projection
+  let name = joinBy "" (ident :: rest)
+  pure $ MkImport fc name
 
 -- Do we do pattern stuff now? or just name = lambda?
 -- TODO multiple names
@@ -523,7 +529,14 @@ parseDecl = parseMixfix <|> parsePType <|> parsePFunc
 
 export
 parseModHeader : Parser (FC, String)
-parseModHeader = sameLevel (keyword "module") >> withPos uident
+parseModHeader = do
+  sameLevel (keyword "module")
+  fc <- getPos
+  name <- uident
+  rest <- many $ token Projection
+  -- FIXME use QName
+  let name = joinBy "" (name :: rest)
+  pure (fc, name)
 
 export
 parseImports : Parser (List Import)
@@ -535,6 +548,9 @@ parseMod = do
   startBlock $ do
     keyword "module"
     name <- uident
+    rest <- many $ token Projection
+    -- FIXME use QName
+    let name = joinBy "" (name :: rest)
     imports <- manySame $ parseImport
     decls <- manySame $ parseDecl
     pure $ MkModule name imports decls

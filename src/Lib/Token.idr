@@ -18,6 +18,7 @@ data Kind
   | Space
   | Comment
   | Pragma
+  | Projection
   -- not doing Layout.idr
   | LBrace
   | Semi
@@ -42,6 +43,7 @@ Show Kind where
   show Pragma  = "Pragma"
   show StringKind = "String"
   show JSLit = "JSLit"
+  show Projection = "Projection"
 
 export
 Eq Kind where
@@ -58,6 +60,7 @@ Eq Kind where
   RBrace  == RBrace = True
   StringKind == StringKind = True
   JSLit == JSLit = True
+  Projection == Projection = True
   _ == _ = False
 
 export

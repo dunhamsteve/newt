@@ -93,12 +93,14 @@ fastReadFile fn = do
 
 
 ||| New style loader, one def at a time
-processModule : FC -> String -> List String -> String -> M String
-processModule importFC base stk name = do
+processModule : FC -> String -> List String -> QName -> M String
+processModule importFC base stk qn@(QN ns nm) = do
   top <- get
+  -- TODO make top.loaded a List QName
+  let name = joinBy "." (snoc ns nm)
   let False := elem name top.loaded | _ => pure ""
   modify { loaded $= (name::) }
-  let fn = if base == "" then name ++ ".newt" else base ++ "/" ++ name ++ ".newt"
+  let fn = (String.joinBy "/" (base :: ns)) ++ "/" ++ nm ++ ".newt"
   Right src <- fastReadFile $ fn
     | Left err => fail "ERROR at \{show importFC}: error reading \{fn}: \{show err}"
   let Right toks = tokenise fn src
@@ -107,19 +109,23 @@ processModule importFC base stk name = do
   let Right ((nameFC, modName), ops, toks) := partialParse fn parseModHeader top.ops toks
     | Left (err, toks) => fail (showError src err)
 
-
   putStrLn "module \{modName}"
-  let True = name == modName
-    | _ => fail "ERROR at \{show nameFC}: module name \{show modName} doesn't match file name \{show fn}"
   let ns = forget $ split (== '.') modName
+  let (path, modName') = unsnoc $ split (== '.') modName
+  let bparts = split (== '/') base
+  let True = qn == QN path modName'
+    | _ => fail "ERROR at \{show nameFC}: module name \{show modName} doesn't match file name \{show fn}"
+
   let Right (imports, ops, toks) := partialParse fn parseImports ops toks
     | Left (err, toks) => fail (showError src err)
 
   for_ imports $ \ (MkImport fc name') => do
+    let (a,b) = unsnoc $ split (== '.') name'
+    let qname = QN a b
     -- we could use `fc` if it had a filename in it
-
     when (name' `elem` stk) $ error emptyFC "import loop \{show name} -> \{show name'}"
-    processModule fc base (name :: stk) name'
+
+    processModule fc base (name :: stk) qname
 
   top <- get
   mc <- readIORef top.metas
@@ -153,18 +159,31 @@ processFile : String -> M ()
 processFile fn = do
   putStrLn "*** Process \{fn}"
   let parts = split (== '/') fn
-  let file = last parts
-  let dirs = init parts
+  let (dirs,file) = unsnoc parts
   let dir = if dirs == Nil then "." else joinBy "/" dirs
   let (name,ext) = splitFileName file
   putStrLn "\{show dir} \{show name} \{show ext}"
 
+  top <- get
+  Right src <- fastReadFile $ fn
+    | Left err => fail "ERROR at \{fn}:(0, 0): error reading \{fn}: \{show err}"
+  let Right toks = tokenise fn src
+    | Left err => fail (showError src err)
+  let Right ((nameFC, modName), ops, toks) := partialParse fn parseModHeader top.ops toks
+    | Left (err, toks) => fail (showError src err)
+  let ns = forget $ split (== '.') modName
+  let (path, modName') = unsnoc $ split (== '.') modName
+  let True = modName' == name
+    | False => fail "ERROR at \{fn}:(0, 0): module name \{modName'} doesn't match \{name}"
+  let Right base = baseDir (Lin <>< dirs) (Lin <>< path)
+    | Left err => fail "ERROR at \{show nameFC}: \{err}"
+  let base = if base == "" then "." else base
   -- declare internal primitives
   processDecl ["Prim"] (PType emptyFC "Int" Nothing)
   processDecl ["Prim"] (PType emptyFC "String" Nothing)
   processDecl ["Prim"] (PType emptyFC "Char" Nothing)
 
-  src <- processModule emptyFC dir [] name
+  src <- processModule emptyFC base [] (QN path modName')
   top <- get
   -- dumpContext top
 
@@ -174,6 +193,14 @@ processFile fn = do
         putStrLn (showError src err)
       exitFailure
   pure ()
+
+  where
+    baseDir : SnocList String -> SnocList String -> Either String String
+    baseDir dirs Lin = Right $ joinBy "/" (dirs <>> [])
+    baseDir (dirs :< d) (ns :< n) = if d == n
+      then baseDir dirs ns
+      else Left "module path doesn't match directory"
+    baseDir Lin _ = Left "module path doesn't match directory"
 
 cmdLine : List String -> M (Maybe String, List String)
 cmdLine [] = pure (Nothing, [])
