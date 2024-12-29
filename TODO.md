@@ -3,14 +3,13 @@
 
 More comments in code! This is getting big enough that I need to re-find my bearings when fixing stuff.
 
-- [ ] tokenizer
+- [x] tokenizer that can be ported to newt
 - [ ] string interpolation
 
 - [ ] editor - indent newline on let with no in
   - I've seen this done in vi for Idris, but it seems non-trivial in vscode.
 - [x] Move on to next decl in case of error
 - [x] for parse error, seek to col 0 token and process next decl
-- [ ] record initialization sugar, e.g. `{ x := 1, y := 2 }`
 - [ ] record update sugar, syntax TBD
   - I think I'm going to hold off on this for now as it requires the type to elaborate. This ends up at the head of an app, which typically is inferred. We'd need a special case somewhere that infers its argument instead.
 - [ ] Change `Ord` to be more like Idris - LT / EQ / GT (and entail equality)

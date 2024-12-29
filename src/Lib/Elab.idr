@@ -984,7 +984,7 @@ showDef : Context -> List String -> Nat -> Val -> M String
 showDef ctx names n v@(VVar _ n' [<]) =  if n == n' then pure "" else pure "= \{pprint names !(quote ctx.lvl v)}"
 showDef ctx names n v = pure "= \{pprint names !(quote ctx.lvl v)}"
 
-
+-- desugar do
 undo : FC -> List DoStmt -> M Raw
 undo prev [] = error prev "do block must end in expression"
 undo prev ((DoExpr fc tm) :: Nil) = pure tm

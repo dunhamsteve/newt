@@ -18,7 +18,7 @@ import Lib.Parser.Impl
 import Lib.Prettier
 import Lib.ProcessDecl
 import Lib.Token
-import Lib.Tokenizer
+import Lib.Tokenizer2
 import Lib.TopContext
 import Lib.Types
 import Lib.Syntax
@@ -152,10 +152,11 @@ processModule importFC base stk name = do
 processFile : String -> M ()
 processFile fn = do
   putStrLn "*** Process \{fn}"
-  let parts = splitPath fn
-  let file = fromMaybe "" $ last' parts
-  let dir = fromMaybe "./" $ parent fn
-  let (name,ext) = splitFileName (fromMaybe "" $ last' parts)
+  let parts = split (== '/') fn
+  let file = last parts
+  let dirs = init parts
+  let dir = if dirs == Nil then "." else joinBy "/" dirs
+  let (name,ext) = splitFileName file
   putStrLn "\{show dir} \{show name} \{show ext}"
 
   -- declare internal primitives

@@ -80,7 +80,7 @@ hundred : _
 hundred = mul ten ten
 
 -- Leibniz equality
-Eq : {A: U} -> A -> A -> U
+Eq : {A : U} -> A -> A -> U
 Eq = \{A} x y => (P : A -> U) -> P x -> P y
 
 refl : {A : U} {x : A} -> Eq x x

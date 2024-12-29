@@ -84,22 +84,18 @@ rawTokens
   -- { is singleton except for {{
   <|> match (exact "{{" <|> exact "}}") (Tok Keyword)
   -- need to make this an ident
-  <|> match (exact ",") (checkKW)
+  <|> match (exact ",") (Tok Ident)
   -- for now, our lambda slash is singleton
-  <|> match (singleton) (Tok Symbol)
-  -- TODO Drop MixFix token type when we support if_then_else_
   <|> match (exact "_,_" <|> exact "_._") (Tok MixFix)
-  -- REVIEW - expect non-alpha after?
   <|> match (opt (exact "-") <+> some digit) (Tok Number)
-  -- for module names and maybe type constructors
   <|> match (charLit) (Tok Character . unquoteChar)
   <|> match (is '#' <+> many alpha) (Tok Pragma)
   <|> match (lineComment (exact "--")) (Tok Space)
   <|> match (blockComment (exact "/-") (exact "-/")) (Tok Space)
-  <|> match (upper <+> many identMore) checkUKW
   <|> match (btick <+> manyUntil btick any <+> btick) (Tok JSLit . trimJS)
   <|> match (quo <+> manyUntil quo (esc any <|> any) <+> quo) (Tok StringKind . unquote)
-  -- accept almost everything, but
+  <|> match (singleton) (Tok Symbol)
+  <|> match (upper <+> many identMore) checkUKW
   <|> match (some (non (space <|> singleton))) checkKW
 
 notSpace : WithBounds (Token Kind) -> Bool
