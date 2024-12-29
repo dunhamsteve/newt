@@ -1,7 +1,5 @@
 module Main
 
-import Control.Monad.Error.Either
-import Control.Monad.Error.Interface
 import Lib.Types
 import Lib.ProcessDecl
 import Lib.TopContext

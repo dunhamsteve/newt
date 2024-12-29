@@ -36,7 +36,7 @@ findMatches ctx ty ((MkEntry _ name type def) :: xs) = do
   -- FIXME we're restoring state, but the INFO logs have already been emitted
   -- Also redo this whole thing to run during elab, recheck constraints, etc.
   mc <- readIORef top.metas
-  catchError {e=Error} (do
+  catchError(do
       -- TODO sort out the FC here
       let fc = getFC ty
       debug "TRY \{name} : \{pprint [] type} for \{show ty}"
@@ -64,7 +64,7 @@ contextMatches ctx ty = go (zip ctx.env (toList ctx.types))
       let True = isCandidate ty type | False => go xs
       top <- get
       mc <- readIORef top.metas
-      catchError {e=Error} (do
+      catchError(do
           debug "TRY context \{nm} : \{pprint (names ctx) type} for \{show ty}"
           unifyCatch (getFC ty) ctx ty vty
           mc' <- readIORef top.metas

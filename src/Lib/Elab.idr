@@ -1,9 +1,5 @@
 module Lib.Elab
 
-import Control.Monad.Error.Either
-import Control.Monad.Error.Interface
-import Control.Monad.State
-import Control.Monad.Identity
 import Lib.Parser.Impl
 import Lib.Prettier
 import Data.List
@@ -169,7 +165,7 @@ rename meta ren lvl v = go ren lvl v
             go ren lvl !(vappSpine val sp)
           _ => do
             debug "rename: \{show ix} is unsolved"
-            catchError {e=Error} (goSpine ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc ix (errorMsg err))
+            catchError (goSpine ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc ix (errorMsg err))
     go ren lvl (VLam fc n icit rig t) = pure (Lam fc n icit rig !(go (lvl :: ren) (S lvl) !(t $$ VVar fc lvl [<])))
     go ren lvl (VPi fc n icit rig ty tm) = pure (Pi fc n icit rig !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar emptyFC lvl [<])))
     go ren lvl (VU fc) = pure (U fc)
@@ -215,7 +211,7 @@ solve env m sp t = do
   -- force unlet
   hack <- quote l t
   t <- eval env CBN hack
-  catchError {e=Error} (do
+  catchError (do
     tm <- rename m ren l t
 
     let tm = lams (length sp) (reverse ctx_.boundNames) tm
@@ -288,7 +284,7 @@ unify env mode t u = do
     unifyRef t'@(VRef fc k def sp)  u'@(VRef fc' k' def' sp') =
       -- unifySpine is a problem for cmp (S x) (S y) =?= cmp x y
         do
-        -- catchError {e = Error} (unifySpine env mode (k == k') sp sp') $ \ err => do
+        -- catchError(unifySpine env mode (k == k') sp sp') $ \ err => do
             Nothing <- tryEval env t'
               | Just v => do
               debug "tryEval \{show t'} to \{show v}"
@@ -577,7 +573,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   -- We get unification constraints from matching the data constructors
   -- codomain with the scrutinee type
   debug "unify dcon cod with scrut\n  \{show ty'}\n  \{show scty}"
-  Just res <- catchError {e = Error} (Just <$> unify ctx'.env Pattern ty' scty)
+  Just res <- catchError(Just <$> unify ctx'.env Pattern ty' scty)
               (\err => do
                   debug "SKIP \{dcName} because unify error \{errorMsg err}"
                   pure Nothing)
@@ -621,7 +617,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         pure $ Just $ CaseCons dcName (map getName vars) tm
 
     _ => do
-        Right res <- tryError {e = Error} (unify ctx'.env Pattern ty' scty)
+        Right res <- tryError (unify ctx'.env Pattern ty' scty)
           | Left err => do
             debug "SKIP \{dcName} because unify error \{errorMsg err}"
             pure Nothing

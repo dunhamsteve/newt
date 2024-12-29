@@ -5,7 +5,6 @@ import Lib.Parser.Impl
 import Lib.Prettier
 import Lib.Types
 import Lib.TopContext
-import Control.Monad.Error.Interface
 
 import Data.IORef
 import Data.Fin
@@ -74,7 +73,7 @@ tryEval : Env -> Val -> M (Maybe Val)
 tryEval env (VRef fc k _ sp) =
   case lookup k !(get) of
       Just (MkEntry _ name ty (Fn tm)) =>
-        catchError {e=Error} (
+        catchError (
             do
             debug "app \{name} to \{show sp}"
             vtm <- eval [] CBN tm

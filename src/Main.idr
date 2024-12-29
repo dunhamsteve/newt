@@ -1,9 +1,5 @@
 module Main
 
--- import Control.App
-import Control.Monad.Error.Either
-import Control.Monad.Error.Interface
-import Control.Monad.State
 import Data.List
 import Data.List1
 import Data.String
@@ -151,7 +147,7 @@ processModule importFC base stk qn@(QN ns nm) = do
     -- tryParseDecl :
     tryProcessDecl : List String -> Decl -> M ()
     tryProcessDecl ns decl = do
-      Left err <- tryError {e=Error} $ processDecl ns decl | _ => pure ()
+      Left err <- tryError $ processDecl ns decl | _ => pure ()
       addError err
 
 processFile : String -> M ()
@@ -235,7 +231,7 @@ main : IO ()
 main = do
   -- we'll need to reset for each file, etc.
   ctx <- empty
-  Right _  <- runEitherT $ runStateT ctx $ main'
+  Right _  <- runM main' ctx
     | Left err => do
         putStrLn "ERROR at \{show $ getFC err}: \{errorMsg err}"
         exitFailure

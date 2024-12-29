@@ -4,10 +4,6 @@ module Lib.Types
 import public Lib.Common
 import public Lib.Prettier
 
-import public Control.Monad.Error.Either
-import public Control.Monad.Error.Interface
-import public Control.Monad.State
-
 import Data.Fin
 import Data.IORef
 import Data.List
@@ -494,9 +490,79 @@ export
 names : Context -> List String
 names ctx = toList $ map fst ctx.types
 
+-- public export
+-- M : Type -> Type
+-- M = (StateT TopContext (EitherT Error IO))
+
 public export
-M : Type -> Type
-M = (StateT TopContext (EitherT Error IO))
+record M a where
+  constructor MkM
+  runM : TopContext -> IO (Either Error (TopContext, a))
+
+export
+Functor M where
+  map f (MkM run) = MkM $ \tc => do
+    result <- run tc
+    case result of
+      Left err => pure $ Left err
+      Right (tc', a) => pure $ Right (tc', f a)
+
+export
+Applicative M where
+  pure x = MkM $ \tc => pure $ Right (tc, x)
+  (MkM f) <*> (MkM x) = MkM $ \tc => do
+    resultF <- f tc
+    case resultF of
+      Left err => pure $ Left err
+      Right (tc', f') => do
+        resultX <- x tc'
+        case resultX of
+          Left err => pure $ Left err
+          Right (tc'', x') => pure $ Right (tc'', f' x')
+
+export
+Monad M where
+  (MkM x) >>= f = MkM $ \tc => do
+    resultX <- x tc
+    case resultX of
+      Left err => pure $ Left err
+      Right (tc', a) => runM (f a) tc'
+
+export
+HasIO M where
+  liftIO io = MkM $ \tc => do
+    result <- io
+    pure $ Right (tc, result)
+
+export
+throwError : Error -> M a
+throwError err = MkM $ \_ => pure $ Left err
+
+export
+catchError : M a -> (Error -> M a) -> M a
+catchError (MkM ma) handler = MkM $ \tc => do
+  result <- ma tc
+  case result of
+    Left err => runM (handler err) tc
+    Right (tc', a) => pure $ Right (tc', a)
+
+export
+tryError : M a -> M (Either Error a)
+tryError ma = catchError (map Right ma) (pure . Left)
+
+export
+get : M TopContext
+get = MkM $ \ tc => pure $ Right (tc, tc)
+
+export
+put : TopContext -> M ()
+put tc = MkM $ \_ => pure $ Right (tc, ())
+
+export
+modify : (TopContext -> TopContext) -> M ()
+modify f = do
+  tc <- get
+  put (f tc)
 
 ||| Force argument and print if verbose is true
 export
