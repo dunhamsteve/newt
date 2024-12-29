@@ -33,7 +33,7 @@
   ],
   "onEnterRules": [
     {
-      "beforeText": "\\b(where|of)$",
+      "beforeText": "\\b(where|of|case)$",
       "action": { "indent": "indent" }
     },
     {

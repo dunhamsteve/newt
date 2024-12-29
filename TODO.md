@@ -5,14 +5,14 @@ More comments in code! This is getting big enough that I need to re-find my bear
 
 - [ ] tokenizer
 - [ ] string interpolation
-- [ ] pattern matching lambda
-  - I kept wanting this in AoC and use it a lot in the newt code
+
 - [ ] editor - indent newline on let with no in
   - I've seen this done in vi for Idris, but it seems non-trivial in vscode.
 - [x] Move on to next decl in case of error
 - [x] for parse error, seek to col 0 token and process next decl
 - [ ] record initialization sugar, e.g. `{ x := 1, y := 2 }`
 - [ ] record update sugar, syntax TBD
+  - I think I'm going to hold off on this for now as it requires the type to elaborate. This ends up at the head of an app, which typically is inferred. We'd need a special case somewhere that infers its argument instead.
 - [ ] Change `Ord` to be more like Idris - LT / EQ / GT (and entail equality)
 - [ ] Keep a `compare` function on `SortedMap` (like lean)
 - [x] keymap for monaco
@@ -128,7 +128,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [x] there is some zero argument application in generated code
 - [x] get equality.newt to work
   - [x] broken again because I added J, probably need to constrain scrutinee to value
-- [ ] Bad FC for missing case in where clause (probably from ctx)
+- [x] Bad FC for missing case in where clause (probably from ctx)
 - [x] inline metas.  Maybe zonk after TC/elab
 - [x] implicit patterns
 - [x] operators
@@ -137,7 +137,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [x] matching on operators
   - [x] top level
   - [x] case statements
-- [ ] Lean / Agda ⟨ ⟩ (does agda do this or just lean?)
+- [ ] Lean ⟨ ⟩ anonymous constructors
 - [ ] Lean-like .map, etc? (resolve name in namespace of target type, etc)
 - [x] autos / typeclass resolution
   - [x] very primitive version in place, not higher order, search at end
@@ -167,6 +167,11 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [ ] magic newtype? (drop them in codegen)
 - [x] vscode: syntax highlighting for String
 - [ ] add `pop` or variant of `pfunc` that maps to an operator, giving the js operator and precedence on RHS
+- [ ] consider moving caselet, etc. desugaring out of the parser
+- [ ] pattern matching lambda
+  - I kept wanting this in AoC and use it a lot in the newt code
+  - This conflicts with current code (unused?) that allows telescope information in lambdas
+  - For now, I'll implement `\case`
 
 ### Parsing
 

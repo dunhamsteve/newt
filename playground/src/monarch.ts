@@ -40,13 +40,7 @@ export let newtConfig: monaco.languages.LanguageConfiguration = {
       },
     },
     {
-      beforeText: /\bwhere$/,
-      action: {
-        indentAction: monaco.languages.IndentAction.Indent,
-      },
-    },
-    {
-      beforeText: /\bof$/,
+      beforeText: /\b(where|of|case)$/,
       action: {
         indentAction: monaco.languages.IndentAction.Indent,
       },

@@ -789,7 +789,7 @@ checkWhere ctx decls body ty = do
   -- context could hold a Name -> Val (not Tm because levels) to help with that
   -- e.g. "go" -> (VApp ... (VApp (VRef "ns.go") ...)
   -- But I'll attempt letrec first
-  tm <- buildTree ctx' (MkProb clauses' vty)
+  tm <- buildTree ({ fc := defFC} ctx') (MkProb clauses' vty)
   vtm <- eval ctx'.env CBN tm
   -- Should we run the rest with the definition in place?
   -- I'm wondering if switching from bind to define will mess with metas

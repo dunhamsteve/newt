@@ -40,7 +40,6 @@ export function activate(context: vscode.ExtensionContext) {
         if (err && err.code !== 1)
           vscode.window.showErrorMessage(`newt error: ${err}`);
 
-
         // extract errors and messages from stdout
         const lines = stdout.split("\n");
         const diagnostics: vscode.Diagnostic[] = [];
@@ -70,17 +69,13 @@ export function activate(context: vscode.ExtensionContext) {
             console.log("top data", topData);
           }
           const match = line.match(
-            /(INFO|ERROR) at (.*):\((\d+), (\d+)\):\s*(.*)/
+            /(INFO|WARN|ERROR) at (.*):\((\d+), (\d+)\):\s*(.*)/
           );
           if (match) {
             let [_full, kind, file, line, column, message] = match;
-            // FIXME - check filename against current
-            console.log("********", file, fileName);
-
             let lnum = Number(line);
             let cnum = Number(column);
-            if (file !== fileName)
-              lnum = cnum = 0;
+            if (file !== fileName) lnum = cnum = 0;
 
             let start = new vscode.Position(lnum, cnum);
             // we don't have the full range, so grab the surrounding word
@@ -88,21 +83,17 @@ export function activate(context: vscode.ExtensionContext) {
             let range =
               document.getWordRangeAtPosition(start) ??
               new vscode.Range(start, end);
-            // heuristics to grab the entire message:
-            // anything indented
-            // Context:, or Goal: are part of PRINTME
-            // unexpected / expecting appear in parse errors
-            while (lines[i + 1]?.match(/^(  )/))
-              message += "\n" + lines[++i];
+            // anything indented after the ERROR/INFO line are part of
+            // the message
+            while (lines[i + 1]?.match(/^(  )/)) message += "\n" + lines[++i];
 
-            const severity =
-              kind === "ERROR"
-                ? vscode.DiagnosticSeverity.Error
-                : vscode.DiagnosticSeverity.Information;
+            let severity;
+
+            if (kind === "ERROR") severity = vscode.DiagnosticSeverity.Error;
+            else if (kind === "WARN") severity = vscode.DiagnosticSeverity.Warning;
+            else severity = vscode.DiagnosticSeverity.Information;
             const diag = new vscode.Diagnostic(range, message, severity);
-            if (kind === "ERROR" || lnum > 0)
-              diagnostics.push(diag);
-
+            if (kind === "ERROR" || lnum > 0) diagnostics.push(diag);
           }
         }
         diagnosticCollection.set(vscode.Uri.file(fileName), diagnostics);
@@ -116,9 +107,7 @@ export function activate(context: vscode.ExtensionContext) {
       const editor = vscode.window.activeTextEditor;
       if (editor) {
         const document = editor.document;
-        if (document.fileName.endsWith(".newt"))
-          checkDocument(document);
-
+        if (document.fileName.endsWith(".newt")) checkDocument(document);
       }
     }
   );
@@ -148,7 +137,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.languages.registerHoverProvider(
-      {language: 'newt'},
+      { language: "newt" },
       {
         provideHover(document, position, token) {
           if (!topData) return null;
@@ -161,7 +150,7 @@ export function activate(context: vscode.ExtensionContext) {
             return null;
           }
           return new vscode.Hover(`${entry.name} : ${entry.type}`);
-        }
+        },
       }
     )
   );
@@ -171,17 +160,13 @@ export function activate(context: vscode.ExtensionContext) {
   vscode.workspace.onDidSaveTextDocument((document) => {
     if (document.fileName.endsWith(".newt"))
       vscode.commands.executeCommand("newt-vscode.check");
-
   });
   vscode.workspace.onDidOpenTextDocument((document) => {
     if (document.fileName.endsWith(".newt"))
       vscode.commands.executeCommand("newt-vscode.check");
-
   });
   for (let document of vscode.workspace.textDocuments)
-    if (document.fileName.endsWith(".newt"))
-      checkDocument(document);
-
+    if (document.fileName.endsWith(".newt")) checkDocument(document);
 
   context.subscriptions.push(diagnosticCollection);
 }

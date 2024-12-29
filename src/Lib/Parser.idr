@@ -165,7 +165,8 @@ parseOp = do
   pure res
 
 
-
+-- TODO case let? We see to only have it for `do`
+-- try (keyword "let" >> sym "(")
 
 export
 letExpr : Parser Raw
@@ -221,6 +222,13 @@ caseExpr = do
   alts <- startBlock $ someSame $ caseAlt
   pure $ RCase fc sc alts
 
+caseLamExpr : Parser Raw
+caseLamExpr = do
+  fc <- getPos
+  try ((keyword "\\" <|> keyword "λ") *> keyword "case")
+  alts <- startBlock $ someSame $ caseAlt
+  pure $ RLam fc (BI fc "$case" Explicit Many) $ RCase fc (RVar fc "$case") alts
+
 doExpr : Parser Raw
 doStmt : Parser DoStmt
 
@@ -247,7 +255,6 @@ doCaseLet = do
   pat <- typeExpr
   sym ")"
   keyword "="
-  -- arrow <- (False <$ keyword "=" <|> True <$ keyword "<-")
   sc <- typeExpr
   alts <- startBlock $ manySame $ sym "|" *> caseAlt
   bodyFC <- getPos
@@ -287,6 +294,7 @@ term' : Parser Raw
 term' =  caseExpr
     <|> caseLet
     <|> letExpr
+    <|> caseLamExpr
     <|> lamExpr
     <|> doExpr
     <|> ifThenElse

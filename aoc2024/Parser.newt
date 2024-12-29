@@ -30,12 +30,12 @@ fail msg = \ cs => Left msg
 
 -- TODO, case builder isn't expanding Parser Unit to count lambdas
 eof : Parser Unit
-eof = \ cs => case cs of
+eof = \case
   Nil => Right (MkUnit, Nil)
   _ =>  Left "expected eof"
 
 satisfy : (Char → Bool) → Parser Char
-satisfy pred = λ cs => case cs of
+satisfy pred = \case
   Nil => Left "unexpected EOF"
   (c :: cs) => if pred c then Right (c, cs) else Left ("did not expect " ++ show c)
 
