@@ -418,7 +418,7 @@ processDecl ns (Instance instfc ty decls) = do
 
 processDecl ns (ShortData fc lhs sigs) = do
   (nm,args) <- getArgs lhs []
-  let ty = foldr (\ (fc,n), a => (RPi fc (BI fc n Explicit Many) (RU fc) a)) (RU fc) args
+  let ty = foldr (\ (fc,n), a => (RPi fc (BI fc n Explicit Zero) (RU fc) a)) (RU fc) args
   cons <- traverse (mkDecl args []) sigs
   let dataDecl = Data fc nm ty cons
   putStrLn "SHORTDATA"
