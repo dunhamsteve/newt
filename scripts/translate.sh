@@ -15,6 +15,7 @@ find src -type f -name '*.idr' | while read -r file; do
       s/\bType\b/U/g;
       s/\binterface\b/class/g;
       s/import public/import/g;
+      s/^\s*covering//g;
       s/^export//g;
       s/^public export//g;
       s/\(([A-Z]\w+), ?([^)]+)\)/(\1 × \2)/g;
@@ -23,10 +24,13 @@ find src -type f -name '*.idr' | while read -r file; do
       # patterns would be another option, but
       # we would need to handle overlapping ones
       s/\[\]/Nil/g;
+      s/\{-/\/-/g;
+      s/-\}/-\//g;
       s/\[<\]/Lin/g;
       s/\[<([^\],]+)\]/(Lin :< \1)/g;
       s/\[([^\],]+)\]/(\1 :: Nil)/g;
       s/^([A-Z].*where)/instance \1/g;
+      s/^data (.*:\s*\w+)$/\1/g;
     ' "$file" > "$output_file"
   fi
 done

@@ -12,7 +12,6 @@ import Data.SortedMap
 import Data.String
 import Data.Vect
 
-
 public export
 data QName : Type where
   QN : List String -> String -> QName
@@ -127,7 +126,7 @@ data Tm : Type where
   -- InsMeta : Nat -> List BD -> Tm
   Lam : FC -> Name -> Icit -> Quant -> Tm -> Tm
   App : FC -> Tm -> Tm -> Tm
-  U   : FC -> Tm
+  UU   : FC -> Tm
   Pi  : FC -> Name -> Icit -> Quant -> Tm -> Tm -> Tm
   Case : FC -> Tm -> List CaseAlt -> Tm
   -- need type?
@@ -146,7 +145,7 @@ HasFC Tm where
   getFC (Meta fc k) = fc
   getFC (Lam fc str _ _ t) = fc
   getFC (App fc t u) = fc
-  getFC (U fc) = fc
+  getFC (UU fc) = fc
   getFC (Pi fc str icit quant t u) = fc
   getFC (Case fc t xs) = fc
   getFC (Lit fc _) = fc
@@ -157,13 +156,15 @@ HasFC Tm where
 covering
 Show Tm
 
-public export covering
+public export
+covering
 Show CaseAlt where
   show (CaseDefault tm) = "_ => \{show tm}"
   show (CaseCons nm args tm) = "\{nm} \{unwords args} => \{show tm}"
   show (CaseLit lit tm) = "\{show lit} => \{show tm}"
 
-public export covering
+public export
+covering
 Show Tm where
   show (Bnd _ k) = "(Bnd \{show k})"
   show (Ref _ str _) = "(Ref \{show str})"
@@ -171,7 +172,7 @@ Show Tm where
   show (App _ t u) = "(\{show t} \{show u})"
   show (Meta _ i) = "(Meta \{show i})"
   show (Lit _ l) = "(Lit \{show l})"
-  show (U _) = "U"
+  show (UU _) = "U"
   show (Pi _ str Explicit rig t u) = "(Pi (\{show rig}\{str} : \{show t}) => \{show u})"
   show (Pi _ str Implicit rig t u) = "(Pi {\{show rig}\{str} : \{show t}} => \{show u})"
   show (Pi _ str Auto rig t u) = "(Pi {{\{show rig}\{str} : \{show t}}} => \{show u})"
@@ -202,7 +203,7 @@ Eq (Tm) where
   (Ref _ x _) == Ref _ y _ = x == y
   (Lam _ n _ _ t) == Lam _ n' _ _ t' = t == t'
   (App _ t u) == App _ t' u' = t == t' && u == u'
-  (U _) == (U _) = True
+  (UU _) == (UU _) = True
   (Pi _ n icit rig t u) == (Pi _ n' icit' rig' t' u') = icit == icit' && rig == rig' && t == t' && u == u'
   _ == _ = False
 
@@ -239,7 +240,7 @@ pprint names tm = go 0 names tm
     go p names (Meta _ k) = text "?m:\{show k}"
     go p names (Lam _ nm icit quant t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> go 0 (nm :: names) t
     go p names (App _ t u) = parens 0 p $ go 0 names t <+> go 1 names u
-    go p names (U _) = "U"
+    go p names (UU _) = "U"
     go p names (Pi _ nm Auto rig t u) = parens 0 p $
       text "{{" ++ text (show rig) <+> text nm <+> ":" <+> go 0 names t <+> "}}" <+> "->" <+> go 0 (nm :: names) u
     go p names (Pi _ nm Implicit rig t u) = parens 0 p $
@@ -280,12 +281,22 @@ data Val : Type where
   -- we'll need to look this up in ctx with IO
   VMeta : FC -> (ix : Nat) -> (sp : SnocList Val) -> Val
   VLam : FC -> Name -> Icit -> Quant -> Closure -> Val
-  VPi : FC -> Name -> Icit -> Quant -> (a : Lazy Val) -> (b : Closure) -> Val
+  VPi : FC -> Name -> Icit -> Quant -> (a : Val) -> (b : Closure) -> Val
   VLet : FC -> Name -> Val -> Val -> Val
   VLetRec : FC -> Name -> Val -> Val -> Val -> Val
   VU : FC -> Val
   VErased : FC -> Val
   VLit : FC -> Literal -> Val
+
+public export
+Env : Type
+Env = List Val
+
+public export
+data Mode = CBN | CBV
+
+public export
+data Closure = MkClosure Env Tm
 
 public export
 getValFC : Val -> FC
@@ -307,7 +318,8 @@ HasFC Val where getFC = getValFC
 
 Show Closure
 
-covering export
+covering
+export
 Show Val where
   show (VVar _ k [<]) = "%var\{show k}"
   show (VVar _ k sp) = "(%var\{show k} \{unwords $ map show (sp <>> [])})"
@@ -317,6 +329,7 @@ Show Val where
   show (VLam _ str icit quant x) = "(%lam \{show quant}\{str} \{show x})"
   show (VPi fc str Implicit rig x y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{show  y})"
   show (VPi fc str Explicit rig x y) = "(%pi (\{show rig} \{str} : \{show  x}). \{show  y})"
+  show (VPi fc str Auto rig x y) = "(%pi {{\{show rig} \{str} : \{show  x}}}. \{show  y})"
   show (VCase fc sc alts) = "(%case \{show sc} ...)"
   show (VU _) = "U"
   show (VLit _ lit) = show lit
@@ -324,46 +337,9 @@ Show Val where
   show (VLetRec _ nm ty a b) = "(%letrec \{show nm} : \{show ty} = \{show a} in \{show b}"
   show (VErased _) = "ERASED"
 
-public export
-Env : Type
-Env = List Val
-
-public export
-data Mode = CBN | CBV
-
-public export
-data Closure = MkClosure Env Tm
-
 covering
 Show Closure where
   show (MkClosure xs t) = "(%cl [\{show $ length xs} env] \{show t})"
-{-
-smalltt
-
-smalltt gets into weird haskell weeds in eval - shifting top level to the left
-and tagging meta vs top with a bit.
-
-I think something subtle is going on with laziness on Elaboration.hs:300
-yeah, and define is even inlined.
-
-So it has a top context, and clears out almost everything for processing a def in
-a different kind of context.
-
-we very much need an idea of local context for metas. I don't want to abstract over
-the entire program.
-
-So I guess we have top and local then?
-
-With haskell syntax. I think we can have Axiom for claims and rewrite to def later.
-
-Hmm, so given ezoo, if I'm going simple, I could keep BDs short, and use the normal
-context. (Zoo4.lean:222) I'd probably still need an undefined/axiom marker as a value?
-
-ok, so with just one context, Env is List Val and we're getting Tm back from type checking.
-
-Can I get val back? Do we need to quote? What happens if we don't?
-
--}
 
 record Context
 
@@ -403,7 +379,7 @@ Show Def where
   show (DCon k tyname) = "DCon \{show k} \{show tyname}"
   show (Fn t) = "Fn \{show t}"
   show (PrimTCon) = "PrimTCon"
-  show (PrimFn src uses) = "PrimFn \{show src} \{show uses}"
+  show (PrimFn src used) = "PrimFn \{show src} \{show used}"
 
 ||| entry in the top level context
 public export
@@ -483,7 +459,8 @@ Show MetaEntry where
   show (Unsolved pos k ctx ty kind constraints) = "Unsolved \{show pos} \{show k} \{show kind} : \{show ty} \{show ctx.bds} cs \{show $ length constraints}"
   show (Solved _ k x) = "Solved \{show k} \{show x}"
 
-export withPos : Context -> FC -> Context
+export
+withPos : Context -> FC -> Context
 withPos ctx fc = { fc := fc } ctx
 
 export

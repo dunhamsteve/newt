@@ -168,7 +168,7 @@ rename meta ren lvl v = go ren lvl v
             catchError (goSpine ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc ix (errorMsg err))
     go ren lvl (VLam fc n icit rig t) = pure (Lam fc n icit rig !(go (lvl :: ren) (S lvl) !(t $$ VVar fc lvl [<])))
     go ren lvl (VPi fc n icit rig ty tm) = pure (Pi fc n icit rig !(go ren lvl ty) !(go (lvl :: ren) (S lvl) !(tm $$ VVar emptyFC lvl [<])))
-    go ren lvl (VU fc) = pure (U fc)
+    go ren lvl (VU fc) = pure (UU fc)
     go ren lvl (VErased fc) = pure (Erased fc)
     -- for now, we don't do solutions with case in them.
     go ren lvl (VCase fc sc alts) = error fc "Case in solution"
@@ -1127,7 +1127,7 @@ infer ctx (RApp fc t u icit) = do
   u <- check ctx u a
   pure (App fc t u, !(b $$ !(eval ctx.env CBN u)))
 
-infer ctx (RU fc) = pure (U fc, VU fc) -- YOLO
+infer ctx (RU fc) = pure (UU fc, VU fc) -- YOLO
 infer ctx (RPi _ (BI fc nm icit quant) ty ty2) = do
   ty' <- check ctx ty (VU fc)
   vty' <- eval ctx.env CBN ty'

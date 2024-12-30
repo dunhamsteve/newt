@@ -474,7 +474,7 @@ processDecl ns (Data fc nm ty cons) = do
   -- logMetas mstart
   where
     checkDeclType : Tm -> M ()
-    checkDeclType (U _) = pure ()
+    checkDeclType (UU _) = pure ()
     checkDeclType (Pi _ str icit rig t u) = checkDeclType u
     checkDeclType _ = error fc "data type doesn't return U"
 

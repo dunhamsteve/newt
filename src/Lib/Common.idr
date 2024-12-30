@@ -135,7 +135,7 @@ Show Fixity where
 public export
 record OpDef where
   constructor MkOp
-  name : String
+  opname : String
   prec : Int
   fix : Fixity
   isPrefix : Bool

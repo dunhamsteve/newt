@@ -129,9 +129,9 @@ compileTerm tm@(App _ _ _) with (funArgs tm)
         debug "apply other \{pprint [] t}"
         t' <- compileTerm t
         args' <- traverse compileTerm args
-        apply t' args' [<] 0 (U emptyFC)
+        apply t' args' [<] 0 (UU emptyFC)
         -- error (getFC t) "Don't know how to apply \{showTm t}"
-compileTerm (U _) = pure $ CRef "U"
+compileTerm (UU _) = pure $ CRef "U"
 compileTerm (Pi _ nm icit rig t u) = pure $ CApp (CRef "PiType") [ !(compileTerm t), CLam nm !(compileTerm u)] Z
 compileTerm (Case _ t alts) = do
   t' <- compileTerm t

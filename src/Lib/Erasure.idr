@@ -71,7 +71,7 @@ erase env t sp = case t of
   (Pi fc nm icit rig u v) => do
     u' <- erase env u []
     v' <- erase ((nm, Many, Just u) :: env) v []
-    eraseSpine env (Pi fc nm icit rig u' v') sp (Just $ U emptyFC)
+    eraseSpine env (Pi fc nm icit rig u' v') sp (Just $ UU emptyFC)
   -- leaving as-is for now, we don't know the quantity of the apps
   (Meta fc k) => pure t
   (Case fc u alts) => do
@@ -93,7 +93,7 @@ erase env t sp = case t of
       -- This is working, but empty FC
       Just (nm, Zero, ty) => error fc "used erased value \{show nm} (FIXME FC may be wrong here)"
       Just (nm, Many, ty) => eraseSpine env t sp ty
-  (U fc) => eraseSpine env t sp (Just $ U fc)
+  (UU fc) => eraseSpine env t sp (Just $ UU fc)
   (Lit fc lit) => eraseSpine env t sp Nothing
   Erased fc => error fc "erased value in relevant context" -- eraseSpine env t sp Nothing
 

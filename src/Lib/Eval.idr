@@ -136,7 +136,7 @@ bind v env = v :: env
 
 eval env mode (Ref fc x def) = pure $ VRef fc x def [<]
 eval env mode (App _ t u) = vapp !(eval env mode t) !(eval env mode u)
-eval env mode (U fc) = pure (VU fc)
+eval env mode (UU fc) = pure (VU fc)
 eval env mode (Erased fc) = pure (VErased fc)
 eval env mode (Meta fc i) =
   case !(lookupMeta i) of
@@ -182,7 +182,7 @@ quote l (VLam fc x icit rig t) = pure $ Lam fc x icit rig !(quote (S l) !(t $$ V
 quote l (VPi fc x icit rig a b) = pure $ Pi fc x icit rig !(quote l a) !(quote (S l) !(b $$ VVar emptyFC l [<]))
 quote l (VLet fc nm t u) = pure $ Let fc nm !(quote l t) !(quote (S l) u)
 quote l (VLetRec fc nm ty t u) = pure $ LetRec fc nm !(quote l ty) !(quote (S l) t) !(quote (S l) u)
-quote l (VU fc) = pure (U fc)
+quote l (VU fc) = pure (UU fc)
 quote l (VRef fc n def sp) = quoteSp l (Ref fc n def) sp
 quote l (VCase fc sc alts) = pure $ Case fc !(quote l sc) alts
 quote l (VLit fc lit) = pure $ Lit fc lit
@@ -234,7 +234,7 @@ appSpine t (x :: xs) = appSpine (App (getFC t) t x) xs
 tweakFC : FC -> Tm -> Tm
 tweakFC fc (Bnd fc1 k) = Bnd fc k
 tweakFC fc (Ref fc1 nm x) = Ref fc nm x
-tweakFC fc (U fc1) = U fc
+tweakFC fc (UU fc1) = UU fc
 tweakFC fc (Meta fc1 k) = Meta fc k
 tweakFC fc (Lam fc1 nm icit rig t) = Lam fc nm icit rig t
 tweakFC fc (App fc1 t u) = App fc t u
@@ -276,7 +276,7 @@ zonk top l env t = case t of
   (Let fc nm t u) => Let fc nm <$> zonk top l env t <*> zonkBind top l env u
   (LetRec fc nm ty t u) => LetRec fc nm <$> zonk top l env ty <*> zonkBind top l env t <*> zonkBind top l env u
   (Case fc sc alts) => Case fc <$> zonk top l env sc <*> traverse (zonkAlt top l env) alts
-  U fc => pure $ U fc
+  UU fc => pure $ UU fc
   Lit fc lit => pure $ Lit fc lit
   Bnd fc ix => pure $ Bnd fc ix
   Ref fc ix def => pure $ Ref fc ix def

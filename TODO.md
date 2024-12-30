@@ -5,6 +5,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
 
 - [x] tokenizer that can be ported to newt
 - [ ] string interpolation?
+- [ ] mutual recursion in where?
 - [x] Move on to next decl in case of error
 - [x] for parse error, seek to col 0 token and process next decl
 - [ ] record update sugar, syntax TBD
@@ -25,7 +26,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [ ] default implementations (use them if nothing is defined, where do we store them?) e.g. Ord compare, <, etc in Idris
   - I may need to actually store some details on interfaces rather than reverse engineer from type.
 - [x] syntax for negative integers
-- [ ] White box tests in `test` directory
+- [ ] White box tests in `test` directory (I can't get this to work right with pack et al)
 - [x] Put worker in iframe on safari
 - [ ] Warnings or errors for missing definitions
 - [ ] Add the type name to dcon so confusion detection in case split is simpler
