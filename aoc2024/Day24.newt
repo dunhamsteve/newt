@@ -18,7 +18,7 @@ instance Eq Op where
   _ == _ = False
 
 record Gate where
-  constructor GT
+  constructor MkG
   in1 : String
   in2 : String
   op : Op
@@ -49,7 +49,7 @@ parseFile text = do
     parseGate s = do
       let (in1 :: op :: in2 :: _ :: out :: Nil) = split s " " | _ => Left $ "bad gate: " ++ s
       op <- getOp op
-      Right $ GT in1 in2 op out
+      Right $ MkG in1 in2 op out
 
 
 State : U
@@ -114,10 +114,10 @@ range : Int → Int → List Int
 range a b = if a < b then a :: range (a + 1) b else Nil
 
 swapPins : String → String → Gate → Gate
-swapPins a g (GT i1 i2 op out) =
-  if out == a then GT i1 i2 op g
-  else if out == g then GT i1 i2 op a
-  else GT i1 i2 op out
+swapPins a g (MkG i1 i2 op out) =
+  if out == a then MkG i1 i2 op g
+  else if out == g then MkG i1 i2 op a
+  else MkG i1 i2 op out
 
 fail : ∀ a. String -> a
 fail msg = let x = trace "FAIL" msg in ?

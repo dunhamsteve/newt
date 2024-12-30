@@ -1,8 +1,5 @@
 module Lib.Eval
 
--- For FC
-import Lib.Parser.Impl
-import Lib.Prettier
 import Lib.Types
 import Lib.TopContext
 
@@ -12,10 +9,6 @@ import Data.List
 import Data.SnocList
 import Data.Vect
 import Data.SortedMap
-
--- Need to wire in the metas...
--- if it's top / ctx / IORef, I also need IO...
--- if I want errors, I need m anyway.  I've already got an error down there.
 
 export
 eval : Env -> Mode -> Tm -> M Val

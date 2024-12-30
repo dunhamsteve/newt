@@ -72,7 +72,7 @@ dirVal East = 2
 dirVal West = 3
 
 instance Ord Dir where
-  a < b = dirVal a < dirVal b
+  compare a b = compare (dirVal a) (dirVal b)
 
 instance Eq Dir where
   a == b = dirVal a == dirVal b

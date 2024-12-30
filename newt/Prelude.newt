@@ -233,6 +233,7 @@ instance Concat String where
 
 pfunc jsEq uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a == b ? True : False`
 pfunc jsLT uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a < b ? True : False`
+
 pfunc jsShow : ∀ a . a → String := `(_,a) => ''+a`
 instance Eq Int where
   a == b = jsEq a b
@@ -662,39 +663,45 @@ tail : ∀ a. List a → List a
 tail Nil = Nil
 tail (x :: xs) = xs
 
---
+data Ordering = LT | EQ | GT
+instance Eq Ordering where
+  LT == LT = True
+  EQ == EQ = True
+  GT == GT = True
+  _ == _ = False
+
+-- FIXME There is a subtle issue here with shadowing if the file defines a GT in its own namespace
+-- We end up chosing that an assigning to GT, which cause a lot of trouble.
+-- Prelude.GT is not in scope, because we've depended on the other one.
+pfunc jsCompare uses (LT EQ GT) : ∀ a. a → a → Ordering := `(_, a, b) => a == b ? EQ : a < b ? LT : GT`
 
 infixl 6 _<_ _<=_ _>_
 class Ord a where
-  -- isEq : Eq a
-  _<_ : a → a → Bool
+  compare : a → a → Ordering
 
-_<=_ : ∀ a. {{Eq a}} {{Ord a}} → a → a → Bool
-a <= b = a == b || a < b
+_<_ : ∀ a. {{Ord a}} -> a → a → Bool
+a < b = compare a b == LT
+
+_<=_ : ∀ a. {{Ord a}} → a → a → Bool
+a <= b = compare a b /= GT
 
 _>_ : ∀ a. {{Ord a}} → a → a → Bool
-a > b = b < a
+a > b = compare a b == GT
 
 search : ∀ cl. {{cl}} -> cl
 search {{x}} = x
 
 instance Ord Nat where
-  -- isEq = search
-  _ < Z = False
-  Z < S _ = True
-  S n < S m = n < m
-
+  compare Z Z = EQ
+  compare _ Z = GT
+  compare Z (S _) = LT
+  compare (S n) (S m) = compare n m
 
 instance Ord Int where
-  -- isEq = ?
-  x < y = ltInt x y
+  compare a b = jsCompare a b
 
 instance Ord Char where
-  x < y = jsLT x y
-
--- foo : ∀ a. {{Ord a}} -> a -> Bool
--- foo a = a == a
-
+  compare a b = jsCompare a b
 
 flip : ∀ a b c. (a → b → c) → (b → a → c)
 flip f b a = f a b
@@ -724,7 +731,7 @@ ite : ∀ a. Bool → a → a → a
 ite c t e = if c then t else e
 
 instance Ord String where
-  a < b = jsLT a b
+  compare a b = jsCompare a b
 
 instance Cast Int Nat where
   cast n = intToNat n
@@ -738,8 +745,10 @@ swap (a,b) = (b,a)
 instance ∀ a b. {{Eq a}} {{Eq b}} → Eq (a × b) where
   (a,b) == (c,d) = a == c && b == d
 
-instance ∀ a b. {{Eq a}} {{Ord a}} {{Ord b}} → Ord (a × b) where
-  (a,b) < (c,d) = if a == c then b < d else a < c
+instance ∀ a b. {{Ord a}} {{Ord b}} → Ord (a × b) where
+  compare (a,b) (c,d) = case compare a c of
+    EQ => compare b d
+    res => res
 
 instance ∀ a. {{Eq a}} → Eq (List a) where
   Nil == Nil = True

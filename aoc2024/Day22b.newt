@@ -26,7 +26,7 @@ instance Sub BigInt where a - b = subbi a b
 instance Cast Int BigInt where cast x = itobi x
 instance Eq BigInt where a == b = jsEq a b
 instance Show BigInt where show = jsShow
-instance Ord BigInt where a < b = jsLT a b
+instance Ord BigInt where compare a b = jsCompare a b
 
 -- base: 30s
 -- switching from tuple to int: 8 s

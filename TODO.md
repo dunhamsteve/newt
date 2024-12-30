@@ -9,7 +9,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [x] for parse error, seek to col 0 token and process next decl
 - [ ] record update sugar, syntax TBD
   - I think I'm going to hold off on this for now as it requires the type to elaborate. This ends up at the head of an app, which typically is inferred. We'd need a special case somewhere that infers its argument instead.
-- [ ] Change `Ord` to be more like Idris - LT / EQ / GT (and entail equality)
+- [x] Change `Ord` to be more like Idris - LT / EQ / GT (and entail equality)
 - [ ] Keep a `compare` function on `SortedMap` (like lean)
 - [x] keymap for monaco
 - [x] SortedMap.newt issue in `where`

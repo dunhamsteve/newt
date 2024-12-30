@@ -28,7 +28,7 @@ instance Eq Dir where
   a == b = show a == show b
 
 instance Ord Dir where
-  a < b = show a < show b
+  compare a b = compare (show a) (show b)
 
 Done : U
 Done = SortedMap (Point × Dir) Unit

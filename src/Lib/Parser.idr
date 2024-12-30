@@ -1,19 +1,11 @@
 module Lib.Parser
-import Lib.Types
-import Debug.Trace
+
+import Data.Maybe
 import Data.String
-
--- app: foo {a} a b
--- lam: λ {A} {b : A} (c : Blah) d e f => something
--- lam: \ {A} {b : A} (c : Blah) d e f => something
--- pi: (A : Set) -> {b : A} -> (c : Foo b) -> c -> bar d
--- pi: (A B : Set) {b : A} -> (c : Foo b) -> c -> bar d
-
-import Lib.Token
 import Lib.Parser.Impl
 import Lib.Syntax
-import Data.List
-import Data.Maybe
+import Lib.Token
+import Lib.Types
 
 ident = token Ident <|> token MixFix
 
@@ -103,10 +95,6 @@ pArg = do
     <|> (Auto,fc,) <$> dbraces typeExpr
 
 AppSpine = List (Icit,FC,Raw)
-
--- helper for debugging
-traceM : Monad m => String -> m ()
-traceM msg = trace msg $ pure ()
 
 pratt : Operators -> Int -> String -> Raw -> AppSpine -> Parser (Raw, AppSpine)
 pratt ops prec stop left spine = do
