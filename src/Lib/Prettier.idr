@@ -58,10 +58,10 @@ be fit acc w k ((i, (Text s)) :: xs) =
   if not fit || (k + length s < w)
      then (be fit (acc :< TEXT s) w (k + length s) xs)
      else Nothing
-be fit acc w k ((i, (Nest j x)) :: xs) = be fit acc w k ((i+j,x)::xs)
+be fit acc w k ((i, (Nest j x)) :: xs) = be fit acc w k ((i + j, x) :: xs)
 be fit acc w k ((i, (Seq x y)) :: xs) = be fit acc w k ((i,x) :: (i,y) :: xs)
 be fit acc w k ((i, (Alt x y)) :: xs) =
-  (acc <>>) <$> (be True [<] w k ((i,x)::xs) <|> be fit [<] w k ((i,y)::xs))
+  (acc <>>) <$> (be True [<] w k ((i,x) :: xs) <|> be fit [<] w k ((i,y) :: xs))
 
 best : Nat -> Nat -> Doc -> List Item
 best w k x = fromMaybe [] $ be False [<] w k [(0,x)]
@@ -142,10 +142,6 @@ fill (x :: y :: xs) = (flatten x <+> fill (flatten y :: xs)) `Alt` (x </> fill (
 export
 commaSep : List Doc -> Doc
 commaSep = folddoc (\a, b => a ++ text "," <+/> b)
-
-public export
-FromString Doc where
-  fromString = text
 
 ||| If we stick Doc into a String, try to avoid line-breaks via `flatten`
 public export

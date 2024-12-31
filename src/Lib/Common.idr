@@ -70,15 +70,15 @@ record FC where
 
 export
 ToJSON FC where
-  toJson (MkFC file (line,col)) = JsonObj [ ("file", toJson file), ("line", toJson line), ("col", toJson col)]
+  toJson (MkFC file (line,col)) = JsonObj (("file", toJson file) :: ("line", toJson line) :: ("col", toJson col) :: Nil)
 
 export
-(.line) : FC -> Int
-fc.line = fst fc.start
+fcLine : FC -> Int
+fcLine (MkFC file (l, c)) = l
 
 export
-(.col) : FC -> Int
-fc.col = snd fc.start
+fcCol : FC -> Int
+fcCol (MkFC file (l, c)) = c
 
 public export
 interface HasFC a where
@@ -108,18 +108,18 @@ showError src (E fc msg) = "ERROR at \{show fc}: \{msg}\n" ++ go 0 (lines src)
     go : Int -> List String -> String
     go l [] = ""
     go l (x :: xs) =
-      if l == fc.line then
-        "  \{x}\n  \{replicate (cast fc.col) ' '}^\n"
-      else if fc.line - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
+      if l == fcLine fc then
+        "  \{x}\n  \{replicate (cast $ fcCol fc) ' '}^\n"
+      else if fcLine fc - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
       else go (l + 1) xs
 showError src (Postpone fc ix msg) = "ERROR at \{show fc}: Postpone \{show ix} \{msg}\n" ++ go 0 (lines src)
   where
     go : Int -> List String -> String
     go l [] = ""
     go l (x :: xs) =
-      if l == fc.line then
-        "  \{x}\n  \{replicate (cast fc.col) ' '}^\n"
-      else if fc.line - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
+      if l == fcLine fc then
+        "  \{x}\n  \{replicate (cast $ fcCol fc) ' '}^\n"
+      else if fcLine fc - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
       else go (l + 1) xs
 
 public export

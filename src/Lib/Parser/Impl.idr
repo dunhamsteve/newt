@@ -190,8 +190,8 @@ indented (P p) = P $ \toks,com,ops,indent => case toks of
   [] => p toks com ops indent
   (t::_) =>
     let (tl,tc) = start t
-    in if tc > indent.col || tl == indent.line then p toks com ops indent
-    else Fail False (error indent.file toks "unexpected outdent") toks com ops
+    in if tc > fcCol indent || tl == fcLine indent then p toks com ops indent
+    else Fail False (error (file indent) toks "unexpected outdent") toks com ops
 
 ||| expect token of given kind
 export

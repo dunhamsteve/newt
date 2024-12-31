@@ -218,45 +218,45 @@ stmtToDoc : JSStmt e -> Doc
 
 expToDoc : JSExp -> Doc
 expToDoc (LitArray xs) = ?expToDoc_rhs_0
-expToDoc (LitObject xs) = text "{" <+> folddoc (\ a, e => a ++ ", " <+/> e) (map entry xs) <+> text "}"
+expToDoc (LitObject xs) = text "{" <+> folddoc (\ a, e => a ++ text ", " <+/> e) (map entry xs) <+> text "}"
   where
     entry : (String, JSExp) -> Doc
     -- TODO quote if needed
-    entry (nm, exp) = jsIdent nm ++ ":" <+> expToDoc exp
+    entry (nm, exp) = jsIdent nm ++ text ":" <+> expToDoc exp
 
 expToDoc (LitString str) = text $ quoteString str
 expToDoc (LitInt i) = text $ show i
 -- TODO add precedence
-expToDoc (Apply x@(JLam{}) xs) = text "(" ++ expToDoc x ++ ")" ++ "(" ++ nest 2 (commaSep (map expToDoc xs)) ++ ")"
-expToDoc (Apply x xs) = expToDoc x ++ "(" ++ nest 2 (commaSep (map expToDoc xs)) ++ ")"
+expToDoc (Apply x@(JLam{}) xs) = text "(" ++ expToDoc x ++ text ")" ++ text "(" ++ nest 2 (commaSep (map expToDoc xs)) ++ text ")"
+expToDoc (Apply x xs) = expToDoc x ++ text "(" ++ nest 2 (commaSep (map expToDoc xs)) ++ text ")"
 expToDoc (Var nm) = jsIdent nm
-expToDoc (JLam nms (JReturn exp)) = text "(" <+> commaSep (map jsIdent nms) <+> ") =>" <+> "(" ++ expToDoc exp ++ ")"
-expToDoc (JLam nms body) = text "(" <+> commaSep (map jsIdent nms) <+> ") =>" <+> bracket "{" (stmtToDoc body) "}"
+expToDoc (JLam nms (JReturn exp)) = text "(" <+> commaSep (map jsIdent nms) <+> text ") =>" <+> text "(" ++ expToDoc exp ++ text ")"
+expToDoc (JLam nms body) = text "(" <+> commaSep (map jsIdent nms) <+> text ") =>" <+> bracket "{" (stmtToDoc body) "}"
 expToDoc JUndefined = text "undefined"
-expToDoc (Index obj ix) = expToDoc obj ++ "[" ++ expToDoc ix ++ "]"
-expToDoc (Dot obj nm) = expToDoc obj ++ "." ++ jsIdent nm
+expToDoc (Index obj ix) = expToDoc obj ++ text "[" ++ expToDoc ix ++ text "]"
+expToDoc (Dot obj nm) = expToDoc obj ++ text "." ++ jsIdent nm
 
 caseBody : JSStmt e -> Doc
 caseBody stmt@(JReturn x) = nest 2 (line ++ stmtToDoc stmt)
 -- caseBody {e = Return} stmt@(JCase{}) = nest 2 (line ++ stmtToDoc stmt)
 caseBody {e} stmt@(JCase{}) = nest 2 (line ++ stmtToDoc stmt </> text "break;")
-caseBody stmt = line ++ "{" ++ nest 2 (line ++ stmtToDoc stmt </> text "break;") </> "}"
+caseBody stmt = line ++ text "{" ++ nest 2 (line ++ stmtToDoc stmt </> text "break;") </> text "}"
 
 altToDoc : JAlt -> Doc
-altToDoc (JConAlt nm stmt) = text "case" <+> text (quoteString nm) ++ ":" ++ caseBody stmt
-altToDoc (JDefAlt stmt) = text "default" ++ ":" ++ caseBody stmt
-altToDoc (JLitAlt a stmt) = text "case" <+> expToDoc a ++ ":" ++ caseBody stmt
+altToDoc (JConAlt nm stmt) = text "case" <+> text (quoteString nm) ++ text ":" ++ caseBody stmt
+altToDoc (JDefAlt stmt) = text "default" ++ text ":" ++ caseBody stmt
+altToDoc (JLitAlt a stmt) = text "case" <+> expToDoc a ++ text ":" ++ caseBody stmt
 
 stmtToDoc (JSnoc x y) = stmtToDoc x </> stmtToDoc y
-stmtToDoc (JPlain x) = expToDoc x ++ ";"
+stmtToDoc (JPlain x) = expToDoc x ++ text ";"
 -- I might not need these split yet.
-stmtToDoc (JLet nm body) = "let" <+> jsIdent nm ++ ";" </> stmtToDoc body
-stmtToDoc (JAssign nm expr) = jsIdent nm <+> "=" <+> expToDoc expr ++ ";"
-stmtToDoc (JConst nm x) = text "const" <+> jsIdent nm <+> nest 2 ("=" <+/> expToDoc x ++ ";")
-stmtToDoc (JReturn x) = text "return" <+> expToDoc x ++ ";"
-stmtToDoc (JError str) = text "throw new Error(" ++ text (quoteString str) ++ ");"
+stmtToDoc (JLet nm body) = text "let" <+> jsIdent nm ++ text ";" </> stmtToDoc body
+stmtToDoc (JAssign nm expr) = jsIdent nm <+> text "=" <+> expToDoc expr ++ text ";"
+stmtToDoc (JConst nm x) = text "const" <+> jsIdent nm <+> nest 2 (text "=" <+/> expToDoc x ++ text ";")
+stmtToDoc (JReturn x) = text "return" <+> expToDoc x ++ text ";"
+stmtToDoc (JError str) = text "throw new Error(" ++ text (quoteString str) ++ text ");"
 stmtToDoc (JCase sc alts) =
-  text "switch (" ++ expToDoc sc ++ ")" <+> bracket "{" (stack $ map altToDoc alts) "}"
+  text "switch (" ++ expToDoc sc ++ text ")" <+> bracket "{" (stack $ map altToDoc alts) "}"
 
 mkArgs : Nat -> List String -> List String
 mkArgs Z acc = acc
@@ -279,12 +279,12 @@ entryToDoc (MkEntry _ name ty (Fn tm)) = do
   debug "compileFun \{pprint [] tm}"
   ct <- compileFun tm
   let exp = maybeWrap $ termToJS empty ct JReturn
-  pure $ text "const" <+> jsIdent (show name) <+> text "=" <+/> expToDoc exp ++ ";"
-entryToDoc (MkEntry _ name type Axiom) = pure ""
+  pure $ text "const" <+> jsIdent (show name) <+> text "=" <+/> expToDoc exp ++ text ";"
+entryToDoc (MkEntry _ name type Axiom) = pure $ text ""
 entryToDoc (MkEntry _ name type (TCon strs)) = pure $ dcon name (piArity type)
 entryToDoc (MkEntry _ name type (DCon arity str)) = pure $ dcon name arity
 entryToDoc (MkEntry _ name type PrimTCon) = pure $ dcon name (piArity type)
-entryToDoc (MkEntry _ name _ (PrimFn src _)) = pure $ text "const" <+> jsIdent (show name) <+> "=" <+> text src
+entryToDoc (MkEntry _ name _ (PrimFn src _)) = pure $ text "const" <+> jsIdent (show name) <+> text "=" <+> text src
 
 ||| This version (call `reverse . snd <$> process "main" ([],[])`) will do dead
 ||| code elimination, but the Prelude js primitives are reaching for
@@ -303,7 +303,7 @@ process (done,docs) nm = do
                 ct <- compileFun tm
                 -- If ct has zero arity and is a compount expression, this fails..
                 let exp = maybeWrap $ termToJS empty ct JReturn
-                let doc = text "const" <+> jsIdent (show name) <+> text "=" <+/> expToDoc exp ++ ";"
+                let doc = text "const" <+> jsIdent (show name) <+> text "=" <+/> expToDoc exp ++ text ";"
                 (done,docs) <- walkTm tm (nm :: done, docs)
                 pure (done, doc :: docs)
     Just entry => pure (nm :: done, !(entryToDoc entry) :: docs)
@@ -315,7 +315,7 @@ process (done,docs) nm = do
         let tag = QN [] nm
         let False = tag `elem` done | _ => pure (done,docs)
         (done,docs) <- process (done, docs) name
-        let doc = text "const" <+> jsIdent nm <+> text "=" <+> jsIdent (show name) ++ ";"
+        let doc = text "const" <+> jsIdent nm <+> text "=" <+> jsIdent (show name) ++ text ";"
         pure (tag :: done, doc :: docs)
 
     walkTm : Tm -> (List QName, List Doc) -> M (List QName, List Doc)

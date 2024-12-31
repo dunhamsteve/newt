@@ -139,10 +139,10 @@ invert lvl sp = go sp []
 -- we have to "lift" the renaming when we go under a lambda
 -- I think that essentially means our domain ix are one bigger, since we're looking at lvl
 -- in the codomain, so maybe we can just keep that value
-rename : Nat -> List Nat -> Nat -> Val  -> M  Tm
+rename : Nat -> List Nat -> Nat -> Val  -> M Tm
 rename meta ren lvl v = go ren lvl v
   where
-    go : List Nat -> Nat -> Val  -> M  Tm
+    go : List Nat -> Nat -> Val  -> M Tm
     goSpine : List Nat -> Nat -> Tm -> SnocList Val  -> M Tm
     goSpine ren lvl tm [<] = pure tm
     goSpine ren lvl tm (xs :< x) = do
@@ -192,7 +192,7 @@ unify : Env -> UnifyMode -> Val -> Val  -> M UnifyResult
 ctx.boundNames = map snd $ filter (\x => fst x == Bound) $ toList $ zip ctx.bds (map fst ctx.types)
 
 export
-solve : Env -> (k : Nat) -> SnocList Val -> Val -> M  ()
+solve : Env -> (k : Nat) -> SnocList Val -> Val -> M ()
 solve env m sp t = do
   meta@(Unsolved metaFC ix ctx_ ty kind cons) <- lookupMeta m
     | _ => error (getFC t) "Meta \{show m} already solved! [solve]"
@@ -408,10 +408,10 @@ primType fc nm = case lookup nm !(get) of
       _ => error fc "Primitive type \{show nm} not in scope"
 
 export
-infer : Context -> Raw  -> M  (Tm, Val)
+infer : Context -> Raw  -> M (Tm, Val)
 
 export
-check : Context -> Raw -> Val  -> M  Tm
+check : Context -> Raw -> Val -> M Tm
 
 data Bind = MkBind String Icit Val
 
@@ -1086,7 +1086,7 @@ check ctx tm ty = case (tm, !(forceType ctx.env ty)) of
 
 infer ctx (RVar fc nm) = go 0 ctx.types
   where
-    go : Nat -> Vect n (String, Val)  -> M  (Tm, Val)
+    go : Nat -> Vect n (String, Val)  -> M (Tm, Val)
     go i [] = case lookupRaw nm !(get) of
       Just (MkEntry _ name ty def) => do
         debug "lookup \{name} as \{show def}"

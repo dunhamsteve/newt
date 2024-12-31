@@ -4,8 +4,13 @@
 More comments in code! This is getting big enough that I need to re-find my bearings when fixing stuff.
 
 - [x] tokenizer that can be ported to newt
+- [ ] Add default path for library, so we don't need symlinks everywhere and can write tests for the library
 - [ ] string interpolation?
+  - The tricky part here is the `}` - I need to run the normal tokenizer in a way that treats `}` specially.
+  - Idris handles `putStrLn "done \{ show $ add {x=1} 2}"` - it recurses for `{` `}` pairs.  Do we want that complexity?
+  - The mini version would be recurse on `{`, pop on `}` (and expect caller to handle), fail if we get to the top with a tokens remaining.
 - [ ] mutual recursion in where?
+  - need to scan sigs and then defs, will have to make sure Compile.idr puts them all in scope before processing each.
 - [x] Move on to next decl in case of error
 - [x] for parse error, seek to col 0 token and process next decl
 - [ ] record update sugar, syntax TBD
@@ -17,6 +22,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [x] fix "insufficient patterns", wire in M or Either String
 - [x] Matching _,_ when Maybe is expected should be an error
 - [ ] There are issues with matching inside do blocks, I think we need to guess scrutinee? I could imagine constraining metas too (e.g. if Just ... at ?m123 then ?m123 =?= Maybe ?m456)
+  - `newt/Fixme.newt` - I can drop `do` _and_ put `bind {IO}` to push it along. It may need to try to solve autos earlier and better.
   - Also, the root cause is tough to track down if there is a type error (this happens with `do` in Idris, too).
   - Part of it is the auto solutions are getting discarded because of an unrelated unification failure. Either auto shouldn't go as deep or should run earlier. Forgetting that lookupMap returns a (k,v) pair is a good example.
 - [ ] add error for non-linear pattern

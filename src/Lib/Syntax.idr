@@ -235,8 +235,8 @@ Pretty Pattern where
   -- FIXME - wrap Implicit with {}
   pretty (PatVar _ icit nm) = text nm
   pretty (PatCon _ icit nm args Nothing) = text (show nm) <+> spread (map pretty args)
-  pretty (PatCon _ icit nm args (Just as)) = text as ++ "@(" ++ text (show nm) <+> spread (map pretty args) ++ ")"
-  pretty (PatWild _icit) = "_"
+  pretty (PatCon _ icit nm args (Just as)) = text as ++ text "@(" ++ text (show nm) <+> spread (map pretty args) ++ text ")"
+  pretty (PatWild _icit) = text "_"
   pretty (PatLit _ lit) = pretty lit
 
 wrap : Icit -> Doc -> Doc
@@ -276,9 +276,9 @@ Pretty Raw where
     asDoc p (RImplicit _) = text "_"
     asDoc p (RHole _) = text "?"
     asDoc p (RDo _ stmts) = text "TODO - RDo"
-    asDoc p (RIf _ x y z) = par p 0 $ text "if" <+> asDoc 0 x <+/> "then" <+> asDoc 0 y <+/> "else" <+> asDoc 0 z
+    asDoc p (RIf _ x y z) = par p 0 $ text "if" <+> asDoc 0 x <+/> text "then" <+> asDoc 0 y <+/> text "else" <+> asDoc 0 z
     asDoc p (RWhere _ dd b) = text "TODO pretty where"
-    asDoc p (RAs _ nm x) = text nm ++ "@(" ++ asDoc 0 x ++ ")"
+    asDoc p (RAs _ nm x) = text nm ++ text "@(" ++ asDoc 0 x ++ text ")"
 
 prettyBind : (BindInfo, Raw) -> Doc
 prettyBind (BI _ nm icit quant, ty) = wrap icit (text (show quant ++ nm) <+> text ":" <+> pretty ty)
@@ -289,19 +289,19 @@ pipeSep = folddoc (\a, b => a <+/> text "|" <+> b)
 export
 Pretty Decl where
   pretty (TypeSig _ nm ty) = spread (map text nm) <+> text ":" <+> nest 2 (pretty ty)
-  pretty (Def _ nm clauses) = stack $ map (\(a,b) => pretty a <+> "=" <+> pretty b) clauses
+  pretty (Def _ nm clauses) = stack $ map (\(a,b) => pretty a <+> text "=" <+> pretty b) clauses
   pretty (Data _ nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map pretty xs))
-  pretty (DCheck _ x y) = text "#check" <+> pretty x <+> ":" <+> pretty y
-  pretty (PType _ nm ty) = text "ptype" <+> text nm <+> (maybe empty (\ty => ":" <+> pretty ty) ty)
-  pretty (PFunc _ nm [] ty src) = "pfunc" <+> text nm <+> ":" <+> nest 2 (pretty ty <+> ":=" <+/> text (show src))
-  pretty (PFunc _ nm uses ty src) = "pfunc" <+> text nm <+> "uses" <+> spread (map text uses) <+> ":" <+> nest 2 (pretty ty <+> ":=" <+/> text (show src))
+  pretty (DCheck _ x y) = text "#check" <+> pretty x <+> text ":" <+> pretty y
+  pretty (PType _ nm ty) = text "ptype" <+> text nm <+> (maybe empty (\ty => text ":" <+> pretty ty) ty)
+  pretty (PFunc _ nm [] ty src) = text "pfunc" <+> text nm <+> text ":" <+> nest 2 (pretty ty <+> text ":=" <+/> text (show src))
+  pretty (PFunc _ nm uses ty src) = text "pfunc" <+> text nm <+> text "uses" <+> spread (map text uses) <+> text ":" <+> nest 2 (pretty ty <+> text ":=" <+/> text (show src))
   pretty (PMixFix _ names prec fix) = text (show fix) <+> text (show prec) <+> spread (map text names)
-  pretty (Record _ nm tele cname decls) = text "record" <+> text nm <+> ":" <+> spread (map prettyBind tele)
+  pretty (Record _ nm tele cname decls) = text "record" <+> text nm <+> text ":" <+> spread (map prettyBind tele)
     <+> (nest 2 $ text "where" </> stack (maybe empty (\ nm' => text "constructor" <+> text nm') cname :: map pretty decls))
-  pretty (Class _ nm tele decls) = text "class" <+> text nm <+> ":" <+> spread (map prettyBind tele)
+  pretty (Class _ nm tele decls) = text "class" <+> text nm <+> text ":" <+> spread (map prettyBind tele)
     <+> (nest 2 $ text "where" </> stack (map pretty decls))
   pretty (Instance _ _ _) = text "TODO pretty Instance"
-  pretty (ShortData _ lhs sigs) = text "data" <+> pretty lhs <+> "=" <+> pipeSep (map pretty sigs)
+  pretty (ShortData _ lhs sigs) = text "data" <+> pretty lhs <+> text "=" <+> pipeSep (map pretty sigs)
 
 export
 Pretty Module where

@@ -771,3 +771,15 @@ snoc xs x = xs ++ (x :: Nil)
 
 instance ∀ a b. {{Show a}} {{Show b}} → Show (a × b) where
   show (a,b) = "(" ++ show a ++ "," ++ show b ++ ")"
+
+-- For now, I'm not having the compiler do this automatically
+
+Lazy : U → U
+Lazy a = Unit → a
+
+force : ∀ a. Lazy a → a
+force f = f MkUnit
+
+-- unlike Idris, user will have to write \ _ => ...
+when : ∀ f. {{Applicative f}} → Bool → Lazy (f Unit) → f Unit
+when b fa = if b then force fa else return MkUnit

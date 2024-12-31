@@ -17,6 +17,12 @@ find src -type f -name '*.idr' | while read -r file; do
       s/import public/import/g;
       s/^\s*covering//g;
       s/^export//g;
+      s/pure \(\)/pure MkUnit/;
+      s/M \(\)/M Unit/;
+      s/Parser \(\)/Parser Unit/;
+      s/OK \(\)/OK MkUnit/;
+      s/\bNat\b/Int/g;
+      s/(\s+when [^\$]+\$)(.*)/\1 \\ _ =>\2/;
       s/^public export//g;
       s/\(([A-Z]\w+), ?([^)]+)\)/(\1 × \2)/g;
       s/\|\|\|/--/;

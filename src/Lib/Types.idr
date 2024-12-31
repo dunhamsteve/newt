@@ -214,47 +214,46 @@ Eq (Tm) where
 -- maybe return Doc and have an Interpolation..
 -- If we need to flatten, case is going to get in the way.
 
+pprint' : Nat -> List String -> Tm -> Doc
+pprintAlt : Nat -> List String -> CaseAlt -> Doc
+pprintAlt p names (CaseDefault t) = text "_" <+> text "=>" <+> pprint' p ("_" :: names) t
+pprintAlt p names (CaseCons name args t) = text (show name) <+> spread (map text args) <+> (nest 2 $ text "=>" <+/> pprint' p (reverse args ++ names) t)
+-- `;` is not in surface syntax, but sometimes we print on one line
+pprintAlt p names (CaseLit lit t) = text (show lit) <+> (nest 2 $ text "=>" <+/> pprint' p names t ++ text ";")
+
+parens : Nat -> Nat -> Doc -> Doc
+parens a b doc = if a < b
+  then text "(" ++ doc ++ text ")"
+  else doc
+
+pprint' p names (Bnd _ k) = case getAt k names of
+  -- Either a bug or we're printing without names
+  Nothing => text "BND:\{show k}"
+  Just nm => text "\{nm}:\{show k}"
+pprint' p names (Ref _ str mt) = text (show str)
+pprint' p names (Meta _ k) = text "?m:\{show k}"
+pprint' p names (Lam _ nm icit quant t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> pprint' 0 (nm :: names) t
+pprint' p names (App _ t u) = parens 0 p $ pprint' 0 names t <+> pprint' 1 names u
+pprint' p names (UU _) = text "U"
+pprint' p names (Pi _ nm Auto rig t u) = parens 0 p $
+  text "{{" ++ text (show rig) <+> text nm <+> text ":" <+> pprint' 0 names t <+> text "}}" <+> text "->" <+> pprint' 0 (nm :: names) u
+pprint' p names (Pi _ nm Implicit rig t u) = parens 0 p $
+  text "{" ++ text (show rig) <+> text nm <+> text ":" <+> pprint' 0 names t <+> text "}" <+> text "->" <+> pprint' 0 (nm :: names) u
+pprint' p names (Pi _ "_" Explicit Many t u) =
+  parens 0 p $ pprint' 1 names t <+> text "->" <+> pprint' 0 ("_" :: names) u
+pprint' p names (Pi _ nm Explicit rig t u) = parens 0 p $
+  text "(" ++  text (show rig) <+> text nm <+> text ":" <+> pprint' 0 names t ++ text ")" <+> text "->" <+> pprint' 0 (nm :: names) u
+-- FIXME - probably way wrong on the names here.  There is implicit binding going on
+pprint' p names (Case _ sc alts) = parens 0 p $ text "case" <+> pprint' 0 names sc <+> text "of" ++ (nest 2 (line ++ stack (map (pprintAlt 0 names) alts)))
+pprint' p names (Lit _ lit) = text (show lit)
+pprint' p names (Let _ nm t u) = parens 0 p $ text "let" <+> text nm <+> text ":=" <+> pprint' 0 names t <+> text "in" </> (nest 2 $ pprint' 0 (nm :: names) u)
+pprint' p names (LetRec _ nm ty t u) = parens 0 p $ text "letrec" <+> text nm <+> text ":" <+> pprint' 0 names ty <+> text ":=" <+> pprint' 0 names t <+> text "in" </> (nest 2 $ pprint' 0 (nm :: names) u)
+pprint' p names (Erased _) = text "ERASED"
+
 ||| Pretty printer for Tm.
 export
 pprint : List String -> Tm -> Doc
-pprint names tm = go 0 names tm
-  where
-    parens : Nat -> Nat -> Doc -> Doc
-    parens a b doc = if a < b
-      then text "(" ++ doc ++ text ")"
-      else doc
-
-    go : Nat -> List String -> Tm -> Doc
-    goAlt : Nat -> List String -> CaseAlt -> Doc
-
-    goAlt p names (CaseDefault t) = "_" <+> "=>" <+> go p ("_" :: names) t
-    goAlt p names (CaseCons name args t) = text (show name) <+> spread (map text args) <+> (nest 2 $ "=>" <+/> go p (reverse args ++ names) t)
-    -- `;` is not in surface syntax, but sometimes we print on one line
-    goAlt p names (CaseLit lit t) = text (show lit) <+> (nest 2 $ "=>" <+/> go p names t ++ ";")
-
-    go p names (Bnd _ k) = case getAt k names of
-      -- Either a bug or we're printing without names
-      Nothing => text "BND:\{show k}"
-      Just nm => text "\{nm}:\{show k}"
-    go p names (Ref _ str mt) = text (show str)
-    go p names (Meta _ k) = text "?m:\{show k}"
-    go p names (Lam _ nm icit quant t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> go 0 (nm :: names) t
-    go p names (App _ t u) = parens 0 p $ go 0 names t <+> go 1 names u
-    go p names (UU _) = "U"
-    go p names (Pi _ nm Auto rig t u) = parens 0 p $
-      text "{{" ++ text (show rig) <+> text nm <+> ":" <+> go 0 names t <+> "}}" <+> "->" <+> go 0 (nm :: names) u
-    go p names (Pi _ nm Implicit rig t u) = parens 0 p $
-      text "{" ++ text (show rig) <+> text nm <+> ":" <+> go 0 names t <+> "}" <+> "->" <+> go 0 (nm :: names) u
-    go p names (Pi _ "_" Explicit Many t u) =
-      parens 0 p $ go 1 names t <+> "->" <+> go 0 ("_" :: names) u
-    go p names (Pi _ nm Explicit rig t u) = parens 0 p $
-      text "(" ++  text (show rig) <+> text nm <+> ":" <+> go 0 names t ++ ")" <+> "->" <+> go 0 (nm :: names) u
-    -- FIXME - probably way wrong on the names here.  There is implicit binding going on
-    go p names (Case _ sc alts) = parens 0 p $ text "case" <+> go 0 names sc <+> text "of" ++ (nest 2 (line ++ stack (map (goAlt 0 names) alts)))
-    go p names (Lit _ lit) = text (show lit)
-    go p names (Let _ nm t u) = parens 0 p $ text "let" <+> text nm <+> ":=" <+> go 0 names t <+> "in" </> (nest 2 $ go 0 (nm :: names) u)
-    go p names (LetRec _ nm ty t u) = parens 0 p $ text "letrec" <+> text nm <+> ":" <+> go 0 names ty <+> ":=" <+> go 0 names t <+> "in" </> (nest 2 $ go 0 (nm :: names) u)
-    go p names (Erased _) = "ERASED"
+pprint names tm = pprint' 0 names tm
 
 data Val : Type
 
@@ -532,34 +531,34 @@ get : M TopContext
 get = MkM $ \ tc => pure $ Right (tc, tc)
 
 export
-put : TopContext -> M ()
-put tc = MkM $ \_ => pure $ Right (tc, ())
+put : TopContext -> M Unit
+put tc = MkM $ \_ => pure $ Right (tc, MkUnit)
 
 export
-modify : (TopContext -> TopContext) -> M ()
+modify : (TopContext -> TopContext) -> M Unit
 modify f = do
   tc <- get
   put (f tc)
 
 ||| Force argument and print if verbose is true
 export
-debug : Lazy String -> M ()
+debug : Lazy String -> M Unit
 debug x = do
   top <- get
-  when top.verbose $ putStrLn x
+  when top.verbose $ putStrLn $ Force x
 
 export
-info : FC -> String -> M ()
+info : FC -> String -> M Unit
 info fc msg = putStrLn "INFO at \{show fc}: \{msg}"
 
 ||| Version of debug that makes monadic computation lazy
 export
-debugM : M String -> M ()
+debugM : M String -> M Unit
 debugM x = do
   top <- get
   when top.verbose $ do putStrLn !(x)
 
-export partial
+export
 Show Context where
   show ctx = "Context \{show $ map fst $ ctx.types}"
 
