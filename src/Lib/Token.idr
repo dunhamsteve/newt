@@ -42,6 +42,10 @@ data Kind
   | Semi
   | RBrace
   | EOI
+  | StartQuote
+  | EndQuote
+  | StartInterp
+  | EndInterp
 
 export
 Show Kind where
@@ -62,6 +66,10 @@ Show Kind where
   show StringKind = "String"
   show JSLit = "JSLit"
   show Projection = "Projection"
+  show StartQuote = "StartQuote"
+  show EndQuote = "EndQuote"
+  show StartInterp = "StartInterp"
+  show EndInterp = "EndInterp"
 
 export
 Eq Kind where

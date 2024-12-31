@@ -42,6 +42,29 @@ stringLit = do
   t <- token StringKind
   pure $ RLit fc (LString (cast t))
 
+
+-- typeExpr is term with arrows.
+export typeExpr : Parser Raw
+export term : (Parser Raw)
+
+interp : Parser Raw
+interp = token StartInterp *> term <* token EndInterp
+
+
+interpString : Parser Raw
+interpString = do
+  fc <- getPos
+  ignore $ token StartQuote
+  part <- term
+  parts <- many (stringLit <|> interp)
+  ignore $ token EndQuote
+  pure $ foldl append part parts
+  where
+    append : Raw -> Raw -> Raw
+    append t u =
+      let fc = getFC t in
+      (RApp fc (RApp fc (RVar fc "_++_") t Explicit) u Explicit)
+
 intLit : Parser Raw
 intLit = do
   fc <- getPos
@@ -56,11 +79,9 @@ charLit = do
   pure $ RLit fc (LChar $ assert_total $ strIndex v 0)
 
 lit : Parser Raw
-lit = intLit <|> stringLit <|> charLit
+lit = intLit <|> interpString <|> stringLit <|> charLit
 
--- typeExpr is term with arrows.
-export typeExpr : Parser Raw
-export term : (Parser Raw)
+
 
 -- helpful when we've got some / many and need FC for each
 withPos : Parser a -> Parser (FC, a)
