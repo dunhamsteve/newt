@@ -44,8 +44,10 @@ quoteTokenise ts@(TS el ec toks chars) sl sc acc = case chars of
         let tok = MkBounded (Tok EndInterp "}") (MkBounds el ec el (ec + 1))
         in quoteTokenise (TS el (ec + 1) (toks :< tok) cs) el (ec + 1) [<]
       cs => Left $ E (MkFC "" (el, ec)) "Expected '{'"
-  c :: cs => do
-    quoteTokenise (TS el (ec + 1) toks cs) sl sc (acc :< c)
+  -- TODO newline in string should be an error
+  '\\' :: 'n' :: cs => quoteTokenise (TS el (ec + 2) toks cs) sl sc (acc :< '\n')
+  '\\' :: c :: cs => quoteTokenise (TS el (ec + 2) toks cs) sl sc (acc :< c)
+  c :: cs => quoteTokenise (TS el (ec + 1) toks cs) sl sc (acc :< c)
   Nil => Left $ E (MkFC "" (el, ec)) "Expected '\"' at EOF"
 
   where
