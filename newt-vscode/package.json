@@ -37,6 +37,16 @@
         "language": "newt",
         "scopeName": "source.newt",
         "path": "./syntaxes/newt.tmLanguage.json"
+      },
+      {
+        "path": "./syntaxes/inject.json",
+        "scopeName": "newt.injection",
+        "injectTo": [
+          "text.html.markdown"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.idris": "newt"
+        }
       }
     ],
     "commands": [
