@@ -123,8 +123,8 @@ Monad Parser where
       (Fail fatal err xs x ops) => Fail fatal err xs x ops
 
 
-pred : (BTok -> Bool) -> String -> Parser String
-pred f msg = P $ \toks,com,ops,col =>
+satisfy : (BTok -> Bool) -> String -> Parser String
+satisfy f msg = P $ \toks,com,ops,col =>
   case toks of
     (t :: ts) => if f t then OK (value t) ts True ops else Fail False (error col.file toks "\{msg} at \{show $ kind t}:\{value t}") toks com ops
     [] => Fail False (error col.file toks "\{msg} at EOF") toks com ops
@@ -158,9 +158,9 @@ startBlock (P p) = P $ \toks,com,ops,indent => case toks of
   [] => p toks com ops indent
   (t :: _) =>
     -- If next token is at or before the current level, we've got an empty block
-    let (tl,tc) = start t
-        (MkFC file (line,col)) = indent
-    in p toks com ops (MkFC file (tl, ifThenElse (tc <= col) (col + 1) tc))
+    let (tl,tc) = start t in
+    let (MkFC file (line,col)) = indent in
+    p toks com ops (MkFC file (tl, ifThenElse (tc <= col) (col + 1) tc))
 
 ||| Assert that parser starts at our current column by
 ||| checking column and then updating line to match the current
@@ -196,12 +196,12 @@ indented (P p) = P $ \toks,com,ops,indent => case toks of
 ||| expect token of given kind
 export
 token' : Kind -> Parser String
-token' k = pred (\t => t.val.kind == k) "Expected a \{show k} token"
+token' k = satisfy (\t => t.val.kind == k) "Expected a \{show k} token"
 
 export
 keyword' : String -> Parser ()
 -- FIXME make this an appropriate whitelist
-keyword' kw = ignore $ pred (\t => t.val.text == kw && (t.val.kind == Keyword || t.val.kind == Symbol || t.val.kind == Number)) "Expected \{kw}"
+keyword' kw = ignore $ satisfy (\t => t.val.text == kw && (t.val.kind == Keyword || t.val.kind == Symbol || t.val.kind == Number)) "Expected \{kw}"
 
 ||| expect indented token of given kind
 export

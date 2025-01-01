@@ -43,7 +43,7 @@ lookupVar : Env -> Nat -> Maybe Val
 lookupVar env k = let l = length env in
   if k > l
     then Nothing
-    else case getAt ((l `minus` k) `minus` 1) env of
+    else case getAt (lvl2ix l k) env of
       Just v@(VVar fc k' sp) => if k == k' then Nothing else Just v
       Just v => Just v
       Nothing => Nothing
@@ -172,7 +172,7 @@ quoteSp lvl t (xs :< x) =
   pure $ App emptyFC !(quoteSp lvl t xs) !(quote lvl x)
 
 quote l (VVar fc k sp) = if k < l
-  then quoteSp l (Bnd fc ((l `minus` k) `minus` 1)) sp -- level to index
+  then quoteSp l (Bnd fc (lvl2ix l k )) sp -- level to index
   else ?borken
 quote l (VMeta fc i sp) =
   case !(lookupMeta i) of

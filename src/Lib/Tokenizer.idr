@@ -34,7 +34,7 @@ record TState where
 rawTokenise : TState -> Either Error TState
 
 quoteTokenise : TState -> Int -> Int -> SnocList Char -> Either Error TState
-quoteTokenise ts@(TS el ec toks chars) sl sc acc = case chars of
+quoteTokenise ts@(TS el ec toks chars) startl startc acc = case chars of
   '"' :: cs => Right (TS el ec (toks :< stok) chars)
   '\\' :: '{' :: cs => do
     let tok = MkBounded (Tok StartInterp "\\{") (MkBounds el ec el (ec + 2))
@@ -45,14 +45,15 @@ quoteTokenise ts@(TS el ec toks chars) sl sc acc = case chars of
         in quoteTokenise (TS el (ec + 1) (toks :< tok) cs) el (ec + 1) [<]
       cs => Left $ E (MkFC "" (el, ec)) "Expected '{'"
   -- TODO newline in string should be an error
-  '\\' :: 'n' :: cs => quoteTokenise (TS el (ec + 2) toks cs) sl sc (acc :< '\n')
-  '\\' :: c :: cs => quoteTokenise (TS el (ec + 2) toks cs) sl sc (acc :< c)
-  c :: cs => quoteTokenise (TS el (ec + 1) toks cs) sl sc (acc :< c)
+  '\n' :: cs => Left $ E (MkFC "" (el, ec)) "Newline in string"
+  '\\' :: 'n' :: cs => quoteTokenise (TS el (ec + 2) toks cs) startl startc (acc :< '\n')
+  '\\' :: c :: cs => quoteTokenise (TS el (ec + 2) toks cs) startl startc (acc :< c)
+  c :: cs => quoteTokenise (TS el (ec + 1) toks cs) startl startc (acc :< c)
   Nil => Left $ E (MkFC "" (el, ec)) "Expected '\"' at EOF"
 
   where
     stok : BTok
-    stok = MkBounded (Tok StringKind (pack $ acc <>> [])) (MkBounds sl sc el ec)
+    stok = MkBounded (Tok StringKind (pack $ acc <>> [])) (MkBounds startl startc el ec)
 
 
 
@@ -60,8 +61,6 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
   Nil => Right $ ts
   ' ' :: cs => rawTokenise (TS sl (sc + 1) toks cs)
   '\n' :: cs => rawTokenise (TS (sl + 1) 0 toks cs)
-  '{' :: '{' :: cs => rawTokenise (TS sl (sc + 2) (toks :< mktok False sl (sc + 2) Keyword "{{" ) cs)
-  '}' :: '}' :: cs => rawTokenise (TS sl (sc + 2) (toks :< mktok False sl (sc + 2) Keyword "}}" ) cs)
 
   '"' :: cs => do
     let tok = mktok False sl (sc + 1) StartQuote "\""
@@ -71,6 +70,13 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
         rawTokenise (TS sl (sc + 1) (toks :< tok) cs)
       cs => Left $ E (MkFC "" (sl, sc)) "Expected '\"'"
 
+  '{' :: '{' :: cs => do
+    let tok = mktok False sl (sc + 2) Keyword "{{"
+    (TS sl sc toks chars) <- rawTokenise (TS sl (sc + 2) (toks :< tok) cs)
+    case chars of
+      '}' :: '}' :: cs => let tok = mktok False sl (sc + 2) Keyword "}}" in
+        rawTokenise (TS sl (sc + 2) (toks :< tok) cs)
+      cs => Left $ E (MkFC "" (sl, sc)) "Expected '}}'"
 
   '}' :: cs => Right ts
   '{' :: cs => do
@@ -92,7 +98,6 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
   '-' :: '-' :: cs => lineComment (TS sl (sc + 2) toks cs)
   '/' :: '-' :: cs => blockComment (TS sl (sc + 2) toks cs)
   '`' :: cs => doBacktick (TS sl (sc + 1) toks cs) [<]
-  '"' :: cs => doQuote (TS sl (sc + 1) toks cs) [<]
   '.' :: cs => doRest (TS sl (sc + 1) toks cs) Projection isIdent (Lin :< '.')
   '-' :: c :: cs => if isDigit c
     then doRest (TS sl (sc + 2) toks cs) Number isDigit (Lin :< '-' :< c)

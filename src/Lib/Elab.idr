@@ -530,7 +530,7 @@ substVal k v tm = go tm
 updateContext : Context -> List (Nat, Val) -> M Context
 updateContext ctx [] = pure ctx
 updateContext ctx ((k, val) :: cs) =
-  let ix = (length ctx.env `minus` k) `minus` 1 in
+  let ix = lvl2ix (length ctx.env) k in
   case getAt ix ctx.env of
     (Just (VVar _ k' [<])) =>
       if k' /= k
@@ -593,16 +593,9 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         debug "case \{dcName} dotted \{show val}"
         when (length vars /= length sp) $ error emptyFC "\{show $ length vars} vars /= \{show $ length sp}"
 
-        -- TODO - do we need this one?
-        -- Constrain the scrutinee's variable to be dcon applied to args
-        -- let Just x = findIndex ((==scnm) . fst) ctx'.types
-        --   | Nothing => error ctx.fc "\{scnm} not is scope?"
-        -- let lvl = ((length ctx'.env) `minus` (cast x)) `minus` 1
-        -- let scon : (Nat, Val) = (lvl, VRef ctx.fc dcName (DCon arity dcName) sc)
-
         -- TODO - I think we need to define the context vars to sp via updateContext
 
-        let lvl = (length ctx'.env `minus` length vars)
+        let lvl = minus (length ctx'.env) (length vars)
         let scons = constrainSpine lvl (sp <>> []) -- REVIEW is this the right order?
         ctx' <- updateContext ctx' scons
 
@@ -625,7 +618,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         -- Constrain the scrutinee's variable to be dcon applied to args
         let Just x = findIndex ((==scnm) . fst) ctx'.types
           | Nothing => error ctx.fc "\{scnm} not is scope?"
-        let lvl = ((length ctx'.env) `minus` (cast x)) `minus` 1
+        let lvl = lvl2ix (length ctx'.env) (cast x)
         let scon : (Nat, Val) = (lvl, VRef ctx.fc dcName (DCon arity dcName) sc)
 
         debug "scty \{show scty}"
@@ -853,7 +846,7 @@ buildLitCase ctx prob fc scnm scty lit = do
   -- Constrain the scrutinee's variable to be lit value
   let Just ix = findIndex ((==scnm) . fst) ctx.types
     | Nothing => error ctx.fc "\{scnm} not is scope?"
-  let lvl = ((length ctx.env) `minus` (cast ix)) `minus` 1
+  let lvl = lvl2ix (length ctx.env) (cast ix)
   let scon : (Nat, Val) = (lvl, VLit fc lit)
   ctx' <- updateContext ctx [scon]
   let clauses = mapMaybe rewriteClause prob.clauses
@@ -942,13 +935,13 @@ buildTree ctx prob@(MkProb ((MkClause fc cons pats@(x :: xs) expr) :: cs) ty) =
 -- some of this is copied into check
 buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
   debug "buildTree \{show constraints} \{show expr}"
-  let Just (scnm, pat) := findSplit constraints
+  let Just (scnm, pat) = findSplit constraints
     | _ => do
       debug "checkDone \{show constraints}"
       checkDone ctx constraints expr ty
 
   debug "SPLIT on \{scnm} because \{show pat} \{show $ getFC pat}"
-  let Just (sctm, scty) := lookupName ctx scnm
+  let Just (sctm, scty) = lookupName ctx scnm
     | _ => error fc "Internal Error: can't find \{scnm} in environment"
 
   -- REVIEW We probably need to know this is a VRef before we decide to split on this slot..

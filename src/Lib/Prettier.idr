@@ -124,19 +124,20 @@ export
 bracket : String -> Doc -> String -> Doc
 bracket l x r = group (text l ++ nest 2 (line ++ x) ++ line ++ text r)
 
-export infixl 5 <+/>
+export
+infixl 5 <+/>
 
 ||| Either space or newline
 export
 (<+/>) : Doc -> Doc -> Doc
-x <+/> y = x ++ (text " " `Alt` line) ++ y
+x <+/> y = x ++ Alt (text " ") line ++ y
 
 ||| Reformat some docs to fill. Not sure if I want this precise behavior or not.
 export
 fill : List Doc -> Doc
 fill [] = Empty
 fill [x] = x
-fill (x :: y :: xs) = (flatten x <+> fill (flatten y :: xs)) `Alt` (x </> fill (y :: xs))
+fill (x :: y :: xs) = Alt (flatten x <+> fill (flatten y :: xs)) (x </> fill (y :: xs))
 
 ||| separate with comma
 export

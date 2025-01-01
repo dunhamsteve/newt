@@ -5,6 +5,10 @@ import Data.Nat
 import Data.Maybe
 import public Data.SortedMap
 
+public export
+lvl2ix : Nat -> Nat -> Nat
+lvl2ix l k = minus (minus l k) 1
+
 hexChars : List Char
 hexChars = unpack "0123456789ABCDEF"
 

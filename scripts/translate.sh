@@ -21,6 +21,7 @@ find src -type f -name '*.idr' | while read -r file; do
       s/M \(\)/M Unit/;
       s/Parser \(\)/Parser Unit/;
       s/OK \(\)/OK MkUnit/;
+      s/toks,\s*com,\s*ops,\s*col/toks com ops col/;
       s/\bNat\b/Int/g;
       s/(\s+when [^\$]+\$)(.*)/\1 \\ _ =>\2/;
       s/^public export//g;
@@ -30,6 +31,8 @@ find src -type f -name '*.idr' | while read -r file; do
       # patterns would be another option, but
       # we would need to handle overlapping ones
       s/\[\]/Nil/g;
+      s/ \. / ∘ /g;
+      s/\(([<>\/+]+)\)/_\1_/g;
       s/\{-/\/-/g;
       s/-\}/-\//g;
       s/\[<\]/Lin/g;
