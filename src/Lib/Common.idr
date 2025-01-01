@@ -5,6 +5,7 @@ import Data.Nat
 import Data.Maybe
 import public Data.SortedMap
 
+-- l is environment size, this works for both lvl2ix and ix2lvl
 public export
 lvl2ix : Nat -> Nat -> Nat
 lvl2ix l k = minus (minus l k) 1

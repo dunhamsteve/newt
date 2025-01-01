@@ -102,6 +102,7 @@ atom = RU <$> getPos <* keyword "U"
     -- <|> RVar <$> getPos <*> ident
     <|> asAtom
     <|> RVar <$> getPos <*> uident
+    <|> RVar <$> getPos <*> token Projection
     <|> lit
     <|> RImplicit <$> getPos <* keyword "_"
     <|> RHole <$> getPos <* keyword "?"
@@ -120,6 +121,7 @@ AppSpine = List (Icit,FC,Raw)
 pratt : Operators -> Int -> String -> Raw -> AppSpine -> Parser (Raw, AppSpine)
 pratt ops prec stop left spine = do
   (left, spine) <- runPrefix stop left spine
+  let spine = runProject spine
   case spine of
     [] => pure (left, [])
     ((Explicit, fc, tm@(RVar x nm)) :: rest) =>
@@ -130,9 +132,23 @@ pratt ops prec stop left spine = do
             else
               runRule p fix stop rule (RApp fc (RVar fc name) left Explicit) rest
           Just _ => fail "expected operator"
-          Nothing => pratt ops prec stop (RApp (getFC left) left tm Explicit) rest
+          Nothing =>
+            if isPrefixOf "." nm
+            then pratt ops prec stop (RApp (getFC tm) tm left Explicit) rest
+            else pratt ops prec stop (RApp (getFC left) left tm Explicit) rest
     ((icit, fc, tm) :: rest) => pratt ops prec stop (RApp (getFC left) left tm icit) rest
   where
+    -- we have a case above for when the next token is a projection, but
+    -- we need this to make projection bind tighter than app
+    runProject : AppSpine -> AppSpine
+    runProject (t@(Explicit, fc', tm) :: u@(Explicit, _, RVar fc nm) :: rest) =
+      if isPrefixOf "." nm
+        then runProject ((Explicit, fc', RApp fc (RVar fc nm) tm Explicit) :: rest)
+        else (t :: u :: rest)
+    runProject tms = tms
+
+    -- left has our partially applied operator and we're picking up args
+    -- for the rest of the `_`
     runRule : Int -> Fixity -> String -> List String -> Raw -> AppSpine -> Parser (Raw,AppSpine)
     runRule p fix stop [] left spine = pure (left,spine)
     runRule p fix stop [""] left spine = do
@@ -153,7 +169,7 @@ pratt ops prec stop left spine = do
           then runRule p fix stop rule (RApp (getFC left) left right Explicit) rest
           else fail "expected \{nm}"
 
-
+    -- run any prefix operators
     runPrefix : String -> Raw -> AppSpine -> Parser (Raw, AppSpine)
     runPrefix stop (RVar fc nm) spine =
       case lookup nm ops of
@@ -395,7 +411,7 @@ typeExpr
 
 export
 parseSig : Parser Decl
-parseSig = TypeSig <$> getPos <*> try (some (ident <|> uident) <* keyword ":") <*> typeExpr
+parseSig = TypeSig <$> getPos <*> try (some (ident <|> uident <|> token Projection) <* keyword ":") <*> typeExpr
 
 parseImport : Parser Import
 parseImport = do
@@ -498,7 +514,7 @@ parseRecord = do
   name <- uident
   teles <- many $ ebind <|> nakedBind
   keyword "where"
-  cname <- optional $ keyword "constructor" *> uident
+  cname <- optional $ keyword "constructor" *> (uident <|> token MixFix)
   decls <- startBlock $ manySame $ parseSig
   pure $ Record fc name (join teles) cname decls
 

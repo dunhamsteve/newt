@@ -500,11 +500,22 @@ processDecl ns (Record recordFC nm tele cname decls) = do
     -- we'll need to replace stuff like `len` with `len self`.
     let funType = teleToPi (impTele tele) $ RPi fc (BI fc "_" Explicit Many) tail ty
     let autoPat = foldl (\acc, (fc,nm,ty) => RApp fc acc (RVar fc nm) Explicit) (RVar recordFC dcName) fields
+
+    -- `fieldName` - consider dropping to keep namespace clean
     let lhs = foldl (\acc, (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc name) tele
     let lhs = RApp recordFC lhs autoPat Explicit
     let decl = Def fc name [(lhs, (RVar fc name))]
-
     putStrLn "\{name} : \{pretty funType}"
     putStrLn "\{pretty decl}"
     processDecl ns $ TypeSig fc [name] funType
     processDecl ns decl
+
+    -- `.fieldName`
+    let pname = "." ++ name
+    let lhs = foldl (\acc, (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc pname) tele
+    let lhs = RApp recordFC lhs autoPat Explicit
+    let pdecl = Def fc pname [(lhs, (RVar fc name))]
+    putStrLn "\{pname} : \{pretty funType}"
+    putStrLn "\{pretty pdecl}"
+    processDecl ns $ TypeSig fc [pname] funType
+    processDecl ns pdecl
