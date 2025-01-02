@@ -10,7 +10,6 @@ funArgs tm = go tm []
     go (App _ t u) args = go t (u :: args)
     go t args = (t, args)
 
-
 public export
 data Binder : Type where
   MkBind : FC -> String -> Icit -> Quant -> Tm -> Binder
@@ -19,9 +18,6 @@ data Binder : Type where
 export
 Show Binder where
   show (MkBind _ nm icit quant t) = "[\{show quant}\{nm} \{show icit} : ...]"
-
-data Foo : Type -> Type where
-  MkFoo : Nat -> Foo a
 
 export
 splitTele : Tm -> (Tm, List Binder)

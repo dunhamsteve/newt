@@ -11,16 +11,22 @@ find src -type f -name '*.idr' | while read -r file; do
   if [[ ! -f "$output_file" ]]; then
     echo "$file -> $output_file"
     perl -pe '
+      use strict;
+
       s/^%.*//;
       s/\bType\b/U/g;
       s/\binterface\b/class/g;
       s/import public/import/g;
-      s/^\s*covering//g;
+      s/\[\]/Nil/g;
+      s{\[([^<].*?)\]}{"(" . (join " ::", split /,/, $1) . " :: Nil)"}ge;
+      s/\bsym\b/symbol/g;
       s/^export//g;
+      s/^\s*covering//g;
       s/pure \(\)/pure MkUnit/;
       s/M \(\)/M Unit/;
       s/Parser \(\)/Parser Unit/;
       s/OK \(\)/OK MkUnit/;
+      s/ifThenElse/ite/;
       s/toks,\s*com,\s*ops,\s*col/toks com ops col/;
       s/\bNat\b/Int/g;
       s/(\s+when [^\$]+\$)(.*)/\1 \\ _ =>\2/;
@@ -30,16 +36,17 @@ find src -type f -name '*.idr' | while read -r file; do
       # maybe break down an add the sugar?
       # patterns would be another option, but
       # we would need to handle overlapping ones
-      s/\[\]/Nil/g;
+
       s/ \. / ∘ /g;
       s/\(([<>\/+]+)\)/_\1_/g;
       s/\{-/\/-/g;
       s/-\}/-\//g;
       s/\[<\]/Lin/g;
       s/\[<([^\],]+)\]/(Lin :< \1)/g;
-      s/\[([^\],]+)\]/(\1 :: Nil)/g;
+      # s/\[([^\],]+)\]/(\1 :: Nil)/g;
       s/^([A-Z].*where)/instance \1/g;
       s/^data (.*:\s*\w+)$/\1/g;
     ' "$file" > "$output_file"
   fi
 done
+rsync -av done/ port

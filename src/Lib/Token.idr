@@ -99,5 +99,5 @@ kind : BTok -> Kind
 kind (MkBounded (Tok k s) _) = k
 
 export
-start : BTok -> (Int, Int)
-start (MkBounded _ (MkBounds l c _ _)) = (l,c)
+getStart : BTok -> (Int, Int)
+getStart (MkBounded _ (MkBounds l c _ _)) = (l,c)

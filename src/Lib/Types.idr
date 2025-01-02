@@ -160,7 +160,7 @@ public export
 covering
 Show CaseAlt where
   show (CaseDefault tm) = "_ => \{show tm}"
-  show (CaseCons nm args tm) = "\{nm} \{unwords args} => \{show tm}"
+  show (CaseCons nm args tm) = "\{show nm} \{unwords args} => \{show tm}"
   show (CaseLit lit tm) = "\{show lit} => \{show tm}"
 
 public export
@@ -407,7 +407,7 @@ record TopContext where
   constructor MkTop
   -- We'll add a map later?
   defs : SortedMap QName TopEntry
-  metas : IORef MetaContext
+  metaCtx : IORef MetaContext
   verbose : Bool -- command line flag
   errors : IORef (List Error)
   ||| loaded modules
@@ -427,15 +427,7 @@ record Context where
   bds : Vect lvl BD          -- bound or defined
 
   -- FC to use if we don't have a better option
-  fc : FC
-
-setName : Context -> Nat -> String -> Context
-setName ctx ix name = case natToFin ix ctx.lvl of
-  Just ix' => { types $= updateAt ix' go  } ctx
-  Nothing => ctx
-  where
-    go : (String,Val) -> (String, Val)
-    go (a,b) = (name,b)
+  ctxFC : FC
 
 %name Context ctx
 
@@ -460,7 +452,7 @@ Show MetaEntry where
 
 export
 withPos : Context -> FC -> Context
-withPos ctx fc = { fc := fc } ctx
+withPos ctx fc = { ctxFC := fc } ctx
 
 export
 names : Context -> List String
@@ -584,9 +576,9 @@ export
 freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
 freshMeta ctx fc ty kind = do
   top <- get
-  mc <- readIORef top.metas
+  mc <- readIORef top.metaCtx
   debug "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
-  writeIORef top.metas $ { next $= S, metas $= (Unsolved fc mc.next ctx ty kind [] ::) } mc
+  writeIORef top.metaCtx $ { next $= S, metas $= (Unsolved fc mc.next ctx ty kind [] ::) } mc
   pure $ applyBDs 0 (Meta fc mc.next) ctx.bds
   where
     -- hope I got the right order here :)
@@ -599,8 +591,8 @@ freshMeta ctx fc ty kind = do
 export
 lookupMeta : Nat -> M MetaEntry
 lookupMeta ix = do
-  ctx <- get
-  mc <- readIORef ctx.metas
+  top <- get
+  mc <- readIORef top.metaCtx
   go mc.metas
   where
     go : List MetaEntry -> M MetaEntry

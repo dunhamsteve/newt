@@ -35,7 +35,7 @@ findMatches ctx ty ((MkEntry _ name type def) :: xs) = do
   -- let ctx = mkCtx (getFC ty)
   -- FIXME we're restoring state, but the INFO logs have already been emitted
   -- Also redo this whole thing to run during elab, recheck constraints, etc.
-  mc <- readIORef top.metas
+  mc <- readIORef top.metaCtx
   catchError(do
       -- TODO sort out the FC here
       let fc = getFC ty
@@ -46,12 +46,12 @@ findMatches ctx ty ((MkEntry _ name type def) :: xs) = do
       let (QN ns nm) = name
       tm <- check ctx (RVar fc nm) ty
       debug "Found \{pprint [] tm} for \{show ty}"
-      mc' <- readIORef top.metas
-      writeIORef top.metas mc
+      mc' <- readIORef top.metaCtx
+      writeIORef top.metaCtx mc
       ((tm, mc') ::) <$> findMatches ctx ty xs)
     (\ err => do
       debug "No match \{show ty} \{pprint [] type} \{showError "" err}"
-      writeIORef top.metas mc
+      writeIORef top.metaCtx mc
       findMatches ctx ty xs)
 
 contextMatches : Context -> Val -> M (List (Tm, MetaContext))
@@ -63,17 +63,17 @@ contextMatches ctx ty = go (zip ctx.env (toList ctx.types))
       type <- quote ctx.lvl vty
       let True = isCandidate ty type | False => go xs
       top <- get
-      mc <- readIORef top.metas
+      mc <- readIORef top.metaCtx
       catchError(do
           debug "TRY context \{nm} : \{pprint (names ctx) type} for \{show ty}"
           unifyCatch (getFC ty) ctx ty vty
-          mc' <- readIORef top.metas
-          writeIORef top.metas mc
+          mc' <- readIORef top.metaCtx
+          writeIORef top.metaCtx mc
           tm <- quote ctx.lvl tm
           ((tm, mc') ::) <$> go xs)
         (\ err => do
           debug "No match \{show ty} \{pprint (names ctx) type} \{showError "" err}"
-          writeIORef top.metas mc
+          writeIORef top.metaCtx mc
           go xs)
 
 -- FIXME - decide if we want to count Zero here
@@ -110,12 +110,12 @@ solveAutos mstart ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
         | res => do
           debug "FAILED to solve \{show ty}, matches: \{commaSep $ map (pprint [] . fst) res}"
           solveAutos mstart es
-      writeIORef top.metas mc
+      writeIORef top.metaCtx mc
       val <- eval ctx.env CBN tm
       debug "SOLUTION \{pprint [] tm} evaled to \{show val}"
       let sp = makeSpine ctx.lvl ctx.bds
       solve ctx.env k sp val
-      mc <- readIORef top.metas
+      mc <- readIORef top.metaCtx
       let mlen = length mc.metas `minus` mstart
       solveAutos mstart (take mlen mc.metas)
 solveAutos mstart (_ :: es) = solveAutos mstart es
@@ -140,7 +140,7 @@ logMetas : Nat -> M ()
 logMetas mstart = do
   -- FIXME, now this isn't logged for Sig / Data.
   top <- get
-  mc <- readIORef top.metas
+  mc <- readIORef top.metaCtx
   let mlen = length mc.metas `minus` mstart
   for_ (reverse $ take mlen mc.metas) $ \case
     (Solved fc k soln) => do
@@ -205,7 +205,7 @@ processDecl ns  (TypeSig fc names tm) = do
   putStrLn "-----"
 
   top <- get
-  mc <- readIORef top.metas
+  mc <- readIORef top.metaCtx
   let mstart = length mc.metas
   for_ names $ \nm => do
     let Nothing := lookupRaw nm top
@@ -238,7 +238,7 @@ processDecl ns (Def fc nm clauses) = do
   putStrLn "-----"
   putStrLn "Def \{show nm}"
   top <- get
-  mc <- readIORef top.metas
+  mc <- readIORef top.metaCtx
   let mstart = length mc.metas
   let Just entry = lookupRaw nm top
     | Nothing => throwError $ E fc "No declaration for \{nm}"
@@ -256,7 +256,7 @@ processDecl ns (Def fc nm clauses) = do
   tm <- buildTree (mkCtx fc) (MkProb clauses' vty)
   -- putStrLn "Ok \{pprint [] tm}"
 
-  mc <- readIORef top.metas
+  mc <- readIORef top.metaCtx
   let mlen = length mc.metas `minus` mstart
   solveAutos mstart (take mlen mc.metas)
   -- TODO - make nf that expands all metas and drop zonk
@@ -323,7 +323,7 @@ processDecl ns (Class classFC nm tele decls) = do
 
 
 processDecl ns (Instance instfc ty decls) = do
-  let decls = collectDecl decls
+
   putStrLn "-----"
   putStrLn "Instance \{pretty ty}"
   top <- get
@@ -342,6 +342,16 @@ processDecl ns (Instance instfc ty decls) = do
   -- or use "Monad\{show $ length defs}"
   let instname = interpolate $ pprint [] codomain
   let sigDecl = TypeSig instfc [instname] ty
+  -- This needs to be declared before processing the defs, but the defs need to be
+  -- declared before this - side effect is that a duplicate def is noted at the first
+  -- member
+  case lookupRaw instname top of
+    Just _ => pure MkUnit -- TODO check that the types match
+    Nothing => processDecl ns sigDecl
+
+  let (Just decls) = collectDecl <$> decls
+    | _ => do
+      debug "Forward declaration \{show sigDecl}"
 
   let (Ref _ tconName _, args) := funArgs codomain
     | (tm, _) => error tyFC "\{pprint [] codomain} doesn't appear to be a TCon application"
@@ -378,10 +388,7 @@ processDecl ns (Instance instfc ty decls) = do
        putStrLn $ render 80 $ pretty decl
        pure $ Just decl
      _ => pure Nothing
-  -- This needs to be declared before processing the defs, but the defs need to be
-  -- declared before this - side effect is that a duplicate def is noted at the first
-  -- member
-  processDecl ns sigDecl
+
   for_ (mapMaybe id defs) $ \decl => do
     -- debug because already printed above, but nice to have it near processing
     debug $ render 80 $ pretty decl
@@ -442,7 +449,7 @@ processDecl ns (Data fc nm ty cons) = do
   putStrLn "-----"
   putStrLn "Data \{nm}"
   top <- get
-  mc <- readIORef top.metas
+  mc <- readIORef top.metaCtx
   tyty <- check (mkCtx fc) ty (VU fc)
   case lookupRaw nm top of
     Just (MkEntry _ name type Axiom) => do
@@ -502,13 +509,13 @@ processDecl ns (Record recordFC nm tele cname decls) = do
     let autoPat = foldl (\acc, (fc,nm,ty) => RApp fc acc (RVar fc nm) Explicit) (RVar recordFC dcName) fields
 
     -- `fieldName` - consider dropping to keep namespace clean
-    let lhs = foldl (\acc, (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc name) tele
-    let lhs = RApp recordFC lhs autoPat Explicit
-    let decl = Def fc name [(lhs, (RVar fc name))]
-    putStrLn "\{name} : \{pretty funType}"
-    putStrLn "\{pretty decl}"
-    processDecl ns $ TypeSig fc [name] funType
-    processDecl ns decl
+    -- let lhs = foldl (\acc, (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc name) tele
+    -- let lhs = RApp recordFC lhs autoPat Explicit
+    -- let decl = Def fc name [(lhs, (RVar fc name))]
+    -- putStrLn "\{name} : \{pretty funType}"
+    -- putStrLn "\{pretty decl}"
+    -- processDecl ns $ TypeSig fc [name] funType
+    -- processDecl ns decl
 
     -- `.fieldName`
     let pname = "." ++ name

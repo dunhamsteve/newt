@@ -5,6 +5,8 @@ import Data.Maybe
 import Data.SnocList
 import Lib.TopContext
 
+public export
+EEnv : Type
 EEnv = List (String, Quant, Maybe Tm)
 
 -- TODO look into removing Nothing below, can we recover all of the types?
@@ -16,7 +18,7 @@ getType : Tm -> M (Maybe Tm)
 getType (Ref fc nm x) = do
   top <- get
   case lookup nm top of
-    Nothing => error fc "\{nm} not in scope"
+    Nothing => error fc "\{show nm} not in scope"
     (Just (MkEntry _ name type def)) => pure $ Just type
 getType tm = pure Nothing
 
@@ -44,8 +46,8 @@ doAlt : EEnv -> CaseAlt -> M CaseAlt
 doAlt env (CaseDefault t) = CaseDefault <$> erase env t []
 doAlt env (CaseCons name args t) = do
   top <- get
-  let Just (MkEntry _ str type def) = lookup name top
-    | _ => error emptyFC "\{name} dcon missing from context"
+  let (Just (MkEntry _ str type def)) = lookup name top
+    | _ => error emptyFC "\{show name} dcon missing from context"
   let env' = piEnv env type args
   CaseCons name args <$> erase env' t []
   where

@@ -123,7 +123,7 @@ processModule importFC base stk qn@(QN ns nm) = do
     processModule fc base (name :: stk) qname
 
   top <- get
-  mc <- readIORef top.metas
+  mc <- readIORef top.metaCtx
   -- REVIEW suppressing unsolved and solved metas from previous files
   -- I may want to know about (or fail early on) unsolved
   let mstart = length mc.metas

@@ -22,18 +22,15 @@
       "name": "string.js",
       "begin": "`",
       "end": "`",
-      "patterns": [
-        { "include": "source.js" }
-      ]
+      "patterns": [{ "include": "source.js" }]
     },
     {
-      "name": "string.newt",
+      "name": "string.single.newt",
       "match": "'(.|\\\\.)'"
     },
     {
-      "name": "string.newt",
-      "begin": "\"",
-      "end": "\""
+      "name": "string.double.newt",
+      "match": "\"(.|\\\\.)\""
     }
   ]
 }

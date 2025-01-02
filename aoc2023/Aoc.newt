@@ -9,19 +9,6 @@ nums' by s = map stringToInt $ filter (_/=_ "") $ split (trim s) by
 nums : String → List Int
 nums s = map stringToInt $ filter (_/=_ "") $ split (trim s) " "
 
-isDigit : Char -> Bool
-isDigit '0' = True
-isDigit '1' = True
-isDigit '2' = True
-isDigit '3' = True
-isDigit '4' = True
-isDigit '5' = True
-isDigit '6' = True
-isDigit '7' = True
-isDigit '8' = True
-isDigit '9' = True
-isDigit _ = False
-
 indexOf? : ∀ a. {{Eq a}} → a → List a → Maybe Nat
 indexOf? {a} z xs = go Z z xs
   where

@@ -3,6 +3,7 @@
 
 More comments in code! This is getting big enough that I need to re-find my bearings when fixing stuff.
 
+- [ ] report info in case of error
 - [x] tokenizer that can be ported to newt
 - [ ] Add default path for library, so we don't need symlinks everywhere and can write tests for the library
 - [ ] string interpolation?

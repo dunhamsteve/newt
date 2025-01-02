@@ -1,0 +1,18 @@
+module ForwardRecord
+
+import Prelude
+
+record Point where
+  x : Int
+  y : Int
+
+instance Show Point
+
+
+instance Show Point where
+  show pt = show pt.x ++ "," ++ show pt.y
+
+
+main : IO Unit
+main = do
+  printLn $ MkPoint 1 2

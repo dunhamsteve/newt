@@ -34,14 +34,13 @@ group x = Alt (flatten x) x
 
 -- TODO - we can accumulate snoc and cat all at once
 layout : List Item -> SnocList String -> String
-layout [] acc = fastConcat $ cast acc
+layout [] acc = fastConcat $ acc <>> []
 layout (LINE k :: x) acc = layout x (acc :< "\n" :< replicate k ' ')
 layout (TEXT str :: x) acc = layout x (acc :< str)
 
 ||| Whether a documents first line fits.
 fits : Nat -> List Item -> Bool
-fits 0 x = False
-fits w ((TEXT s) :: xs) = fits (w `minus` length s) xs
+fits w ((TEXT s) :: xs) = if length s < w then fits (w `minus` length s) xs else False
 fits w _ = True
 
 -- vs Wadler, we're collecting the left side as a SnocList to prevent

@@ -10,7 +10,7 @@ import Lib.Common
 import Data.String
 
 standalone : List Char
-standalone = unpack "()\\{}[],.@"
+standalone = unpack "()\\{}[,.@]"
 
 keywords : List String
 keywords = ["let", "in", "where", "case", "of", "data", "U", "do",
@@ -38,7 +38,7 @@ quoteTokenise ts@(TS el ec toks chars) startl startc acc = case chars of
   '"' :: cs => Right (TS el ec (toks :< stok) chars)
   '\\' :: '{' :: cs => do
     let tok = MkBounded (Tok StartInterp "\\{") (MkBounds el ec el (ec + 2))
-    (TS sl sc toks chars) <- rawTokenise $ TS el (ec + 2) (toks :< stok :< tok) cs
+    (TS el ec toks chars) <- rawTokenise $ TS el (ec + 2) (toks :< stok :< tok) cs
     case chars of
       '}' :: cs =>
         let tok = MkBounded (Tok EndInterp "}") (MkBounds el ec el (ec + 1))
@@ -94,7 +94,7 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
     let ch = ifThenElse (c == 'n') '\n' c
     in rawTokenise (TS sl (sc + 4) (toks :< mktok False sl (sc + 4) Character (singleton ch)) cs)
   '\'' :: c :: '\'' :: cs => rawTokenise (TS sl (sc + 3) (toks :< mktok False sl (sc + 3) Character (singleton c)) cs)
-  '#' :: cs => ?do_pragma -- we probably want to require at least one alpha?
+  '#' :: cs => doRest (TS sl (sc + 1) toks cs) Pragma isIdent (Lin :< '#')
   '-' :: '-' :: cs => lineComment (TS sl (sc + 2) toks cs)
   '/' :: '-' :: cs => blockComment (TS sl (sc + 2) toks cs)
   '`' :: cs => doBacktick (TS sl (sc + 1) toks cs) [<]
@@ -144,15 +144,6 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
       else
         let kind = if elem '_' acc then MixFix else kind in
         rawTokenise (TS l c (toks :< mktok True l (c - 1) kind (pack $ acc <>> [])) (ch :: cs))
-
-    doQuote : TState -> SnocList Char -> Either Error TState
-    -- should be an error..
-    doQuote (TS line col toks Nil) acc = ?missing_end_quote
-    doQuote (TS line col toks ('\\' :: 'n' :: cs)) acc = doQuote (TS line (col + 2) toks cs) (acc :< '\n')
-    doQuote (TS line col toks ('\\' :: c :: cs)) acc = doQuote (TS line (col + 2) toks cs) (acc :< c)
-    doQuote (TS line col toks ('\n' :: cs)) acc = ?error_newline_in_quote
-    doQuote (TS line col toks ('"' :: cs)) acc = rawTokenise (TS line (col + 1) (toks :< mktok False line (col + 1) StringKind (pack $ acc <>> [])) cs)
-    doQuote (TS line col toks (c :: cs)) acc = doQuote (TS line (col + 1) toks cs) (acc :< c)
 
     doChar : Char -> List Char ->  Either Error TState
     doChar c cs = if elem c standalone

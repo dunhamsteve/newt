@@ -50,6 +50,10 @@ fromMaybe : ∀ a. a → Maybe a → a
 fromMaybe a Nothing = a
 fromMaybe _ (Just a) = a
 
+maybe : ∀ a b. b → (a → b) → Maybe a → b
+maybe def f (Just a) = f a
+maybe def f Nothing = def
+
 data Either a b = Left a | Right b
 
 infixr 7 _::_
@@ -162,6 +166,10 @@ const a b = a
 
 _<*_ : ∀ f a b. {{Applicative f}} → f a → f b → f a
 fa <* fb = return const <*> fa <*> fb
+
+_*>_ : ∀ f a b. {{Functor f}} {{Applicative f}} → f a → f b → f b
+a *> b = map (const id) a <*> b
+
 
 class Traversable (t : U → U) where
   traverse : ∀ f a b. {{Applicative f}} → (a → f b) → t a → f (t b)
@@ -772,6 +780,9 @@ snoc xs x = xs ++ (x :: Nil)
 instance ∀ a b. {{Show a}} {{Show b}} → Show (a × b) where
   show (a,b) = "(" ++ show a ++ "," ++ show b ++ ")"
 
+instance ∀ a. {{Show a}} → Show (List a) where
+  show xs = joinBy ", " $ map show xs
+
 -- For now, I'm not having the compiler do this automatically
 
 Lazy : U → U
@@ -783,3 +794,39 @@ force f = f MkUnit
 -- unlike Idris, user will have to write \ _ => ...
 when : ∀ f. {{Applicative f}} → Bool → Lazy (f Unit) → f Unit
 when b fa = if b then force fa else return MkUnit
+
+instance ∀ a. {{Ord a}} → Ord (List a) where
+  compare Nil Nil = EQ
+  compare Nil ys = LT
+  compare xs Nil = GT
+  compare (x :: xs) (y :: ys) = case compare x y of
+    EQ => compare xs ys
+    c => c
+
+isSpace : Char -> Bool
+isSpace ' '    = True
+isSpace '\n'   = True
+isSpace _      = False
+
+isDigit : Char -> Bool
+isDigit '0' = True
+isDigit '1' = True
+isDigit '2' = True
+isDigit '3' = True
+isDigit '4' = True
+isDigit '5' = True
+isDigit '6' = True
+isDigit '7' = True
+isDigit '8' = True
+isDigit '9' = True
+isDigit _ = False
+
+isUpper : Char → Bool
+isUpper c = let o = ord c in 64 < o && o < 91
+
+ignore : ∀ f a. {{Functor f}} → f a → f Unit
+ignore = map (const MkUnit)
+
+instance ∀ a. {{Show a}} → Show (Maybe a) where
+  show Nothing = "Nothing"
+  show (Just a) = "Just {show a}"

@@ -97,9 +97,9 @@ export
 updateMeta : Nat -> (MetaEntry -> M MetaEntry) -> M ()
 updateMeta ix f = do
   top <- get
-  mc <- readIORef top.metas
+  mc <- readIORef top.metaCtx
   metas <- go mc.metas
-  writeIORef top.metas $ {metas := metas} mc
+  writeIORef top.metaCtx $ {metas := metas} mc
   where
     go : List MetaEntry -> M (List MetaEntry)
     go [] = error' "Meta \{show ix} not found"
@@ -110,7 +110,7 @@ export
 addConstraint : Env -> Nat -> SnocList Val -> Val -> M ()
 addConstraint env ix sp tm = do
   top <- get
-  mc <- readIORef top.metas
+  mc <- readIORef top.metaCtx
   updateMeta ix $ \case
     (Unsolved pos k a b c cons) => do
       debug "Add constraint m\{show ix} \{show sp} =?= \{show tm}"
@@ -605,7 +605,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         clauses <- mapMaybe id <$> traverse (rewriteClause sctynm vars) prob.clauses
         debug "and now:"
         for_ clauses $ (\x => debug "    \{show x}")
-        when (length clauses == 0) $ error ctx.fc "Missing case for \{dcName} splitting \{scnm}"
+        when (length clauses == 0) $ error ctx.ctxFC "Missing case for \{dcName} splitting \{scnm}"
         tm <- buildTree ctx' (MkProb clauses prob.ty)
         pure $ Just $ CaseCons dcName (map getName vars) tm
 
@@ -617,9 +617,9 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
 
         -- Constrain the scrutinee's variable to be dcon applied to args
         let Just x = findIndex ((==scnm) . fst) ctx'.types
-          | Nothing => error ctx.fc "\{scnm} not is scope?"
+          | Nothing => error ctx.ctxFC "\{scnm} not is scope?"
         let lvl = lvl2ix (length ctx'.env) (cast x)
-        let scon : (Nat, Val) = (lvl, VRef ctx.fc dcName (DCon arity dcName) sc)
+        let scon : (Nat, Val) = (lvl, VRef ctx.ctxFC dcName (DCon arity dcName) sc)
 
         debug "scty \{show scty}"
         debug "UNIFY results \{show res.constraints}"
@@ -643,7 +643,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         clauses <- mapMaybe id <$> traverse (rewriteClause sctynm vars) prob.clauses
         debug "and now:"
         for_ clauses $ (\x => debug "    \{show x}")
-        when (length clauses == 0) $ error ctx.fc "Missing case for \{dcName} splitting \{scnm}"
+        when (length clauses == 0) $ error ctx.ctxFC "Missing case for \{dcName} splitting \{scnm}"
         tm <- buildTree ctx' (MkProb clauses prob.ty)
         pure $ Just $ CaseCons dcName (map getName vars) tm
   where
@@ -667,15 +667,15 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
     makeConstr : List Bind -> List Pattern -> M (List (String, Pattern))
     makeConstr [] [] = pure $ []
     -- would need M in here to throw, and I'm building stuff as I go, I suppose I could <$>
-    makeConstr [] (pat :: pats) = error ctx.fc "too many patterns"
+    makeConstr [] (pat :: pats) = error ctx.ctxFC "too many patterns"
     makeConstr ((MkBind nm Implicit x) :: xs) [] = pure $ (nm, PatWild emptyFC Implicit) :: !(makeConstr xs [])
     makeConstr ((MkBind nm Auto x) :: xs) [] = pure $ (nm, PatWild emptyFC Auto) :: !(makeConstr xs [])
     -- FIXME need a proper error, but requires wiring M three levels down
-    makeConstr ((MkBind nm Explicit x) :: xs) [] = error ctx.fc "not enough patterns"
+    makeConstr ((MkBind nm Explicit x) :: xs) [] = error ctx.ctxFC "not enough patterns"
     makeConstr ((MkBind nm Explicit x) :: xs) (pat :: pats) =
       if getIcit pat == Explicit
         then pure $ (nm, pat) :: !(makeConstr xs pats)
-        else error ctx.fc "mismatch between Explicit and \{show $ getIcit pat}"
+        else error ctx.ctxFC "mismatch between Explicit and \{show $ getIcit pat}"
     makeConstr ((MkBind nm icit x) :: xs) (pat :: pats) =
       if getIcit pat /= icit -- Implicit/Explicit Implicit/Auto, etc
         then pure $ (nm, PatWild (getFC pat) icit) :: !(makeConstr xs (pat :: pats))
@@ -778,7 +778,7 @@ checkWhere ctx decls body ty = do
   -- context could hold a Name -> Val (not Tm because levels) to help with that
   -- e.g. "go" -> (VApp ... (VApp (VRef "ns.go") ...)
   -- But I'll attempt letrec first
-  tm <- buildTree ({ fc := defFC} ctx') (MkProb clauses' vty)
+  tm <- buildTree ({ ctxFC := defFC} ctx') (MkProb clauses' vty)
   vtm <- eval ctx'.env CBN tm
   -- Should we run the rest with the definition in place?
   -- I'm wondering if switching from bind to define will mess with metas
@@ -845,13 +845,13 @@ buildLitCase ctx prob fc scnm scty lit = do
 
   -- Constrain the scrutinee's variable to be lit value
   let Just ix = findIndex ((==scnm) . fst) ctx.types
-    | Nothing => error ctx.fc "\{scnm} not is scope?"
+    | Nothing => error ctx.ctxFC "\{scnm} not is scope?"
   let lvl = lvl2ix (length ctx.env) (cast ix)
   let scon : (Nat, Val) = (lvl, VLit fc lit)
   ctx' <- updateContext ctx [scon]
   let clauses = mapMaybe rewriteClause prob.clauses
 
-  when (length clauses == 0) $ error ctx.fc "Missing case for \{show lit} splitting \{scnm}"
+  when (length clauses == 0) $ error ctx.ctxFC "Missing case for \{show lit} splitting \{scnm}"
   tm <- buildTree ctx' (MkProb clauses prob.ty)
   pure $ CaseLit lit tm
 

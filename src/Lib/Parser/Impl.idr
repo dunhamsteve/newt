@@ -107,7 +107,7 @@ Applicative Parser where
 
 -- Second argument lazy so we don't have circular refs when defining parsers.
 export
-(<|>) : Parser a -> Lazy (Parser a) -> Parser a
+(<|>) : Parser a -> (Parser a) -> Parser a
 (P pa) <|> (P pb) = P $ \toks,com,ops,col =>
   case pa toks False ops col of
     OK a toks' _ ops => OK a toks' com ops
@@ -133,12 +133,11 @@ export
 commit : Parser ()
 commit = P $ \toks,com,ops,col => OK () toks True ops
 
-mutual
-  export some : Parser a -> Parser (List a)
-  some p = (::) <$> p <*> many p
 
-  export many : Parser a -> Parser (List a)
-  many p = some p <|> pure []
+export some : Parser a -> Parser (List a)
+export many : Parser a -> Parser (List a)
+some p = (::) <$> p <*> many p
+many p = some p <|> pure []
 
 -- one or more `a` seperated by `s`
 export
@@ -149,7 +148,7 @@ export
 getPos : Parser FC
 getPos = P $ \toks, com, ops, indent => case toks of
   [] => OK emptyFC toks com ops
-  (t :: ts) => OK (MkFC indent.file (start t)) toks com ops
+  (t :: ts) => OK (MkFC indent.file (getStart t)) toks com ops
 
 ||| Start an indented block and run parser in it
 export
@@ -158,7 +157,7 @@ startBlock (P p) = P $ \toks,com,ops,indent => case toks of
   [] => p toks com ops indent
   (t :: _) =>
     -- If next token is at or before the current level, we've got an empty block
-    let (tl,tc) = start t in
+    let (tl,tc) = getStart t in
     let (MkFC file (line,col)) = indent in
     p toks com ops (MkFC file (tl, ifThenElse (tc <= col) (col + 1) tc))
 
@@ -166,12 +165,12 @@ startBlock (P p) = P $ \toks,com,ops,indent => case toks of
 ||| checking column and then updating line to match the current
 export
 sameLevel : Parser a -> Parser a
-sameLevel (P p) = P $ \toks,com,ops,indent => case toks of
+sameLevel (P p) = P $ \toks, com, ops, indent => case toks of
   [] => p toks com ops indent
   (t :: _) =>
-    let (tl,tc) = start t
-        (MkFC file (line,col)) = indent
-    in if tc == col then p toks com ops ({start := (tl, col)} indent)
+    let (tl,tc) = getStart t in
+    let (MkFC file (line,col)) = indent in
+    if tc == col then p toks com ops (MkFC file (tl, col))
     else if col < tc then Fail False (error file toks "unexpected indent") toks com ops
     else Fail False (error file toks "unexpected indent") toks com ops
 
@@ -189,7 +188,7 @@ indented : Parser a -> Parser a
 indented (P p) = P $ \toks,com,ops,indent => case toks of
   [] => p toks com ops indent
   (t::_) =>
-    let (tl,tc) = start t
+    let (tl,tc) = getStart t
     in if tc > fcCol indent || tl == fcLine indent then p toks com ops indent
     else Fail False (error (file indent) toks "unexpected outdent") toks com ops
 

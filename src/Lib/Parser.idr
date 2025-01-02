@@ -7,12 +7,14 @@ import Lib.Syntax
 import Lib.Token
 import Lib.Types
 
+ident : Parser String
 ident = token Ident <|> token MixFix
 
+uident : Parser String
 uident = token UIdent
 
-parens : Parser a -> Parser a
-parens pa = do
+parenWrap : Parser a -> Parser a
+parenWrap pa = do
   sym "("
   t <- pa
   sym ")"
@@ -53,7 +55,7 @@ interp = token StartInterp *> term <* token EndInterp
 
 interpString : Parser Raw
 interpString = do
-  fc <- getPos
+  -- fc <- getPos
   ignore $ token StartQuote
   part <- term
   parts <- many (stringLit <|> interp)
@@ -63,7 +65,7 @@ interpString = do
     append : Raw -> Raw -> Raw
     append t u =
       let fc = getFC t in
-      (RApp fc (RApp fc (RVar fc "_++_") t Explicit) u Explicit)
+      (RApp (getFC t) (RApp fc (RVar fc "_++_") t Explicit) u Explicit)
 
 intLit : Parser Raw
 intLit = do
@@ -91,7 +93,7 @@ asAtom : Parser Raw
 asAtom = do
   fc <- getPos
   nm <- ident
-  asPat <- optional $ keyword "@" *> parens typeExpr
+  asPat <- optional $ keyword "@" *> parenWrap typeExpr
   case asPat of
     Just exp => pure $ RAs fc nm exp
     Nothing  => pure $ RVar fc nm
@@ -106,7 +108,7 @@ atom = RU <$> getPos <* keyword "U"
     <|> lit
     <|> RImplicit <$> getPos <* keyword "_"
     <|> RHole <$> getPos <* keyword "?"
-    <|> parens typeExpr
+    <|> parenWrap typeExpr
 
 -- Argument to a Spine
 pArg : Parser (Icit,FC,Raw)
@@ -121,6 +123,7 @@ AppSpine = List (Icit,FC,Raw)
 pratt : Operators -> Int -> String -> Raw -> AppSpine -> Parser (Raw, AppSpine)
 pratt ops prec stop left spine = do
   (left, spine) <- runPrefix stop left spine
+  let (left, spine) = projectHead left spine
   let spine = runProject spine
   case spine of
     [] => pure (left, [])
@@ -138,6 +141,14 @@ pratt ops prec stop left spine = do
             else pratt ops prec stop (RApp (getFC left) left tm Explicit) rest
     ((icit, fc, tm) :: rest) => pratt ops prec stop (RApp (getFC left) left tm icit) rest
   where
+    projectHead : Raw -> AppSpine -> (Raw, AppSpine)
+    projectHead t sp@((Explicit, fc', RVar fc nm) :: rest) =
+      if isPrefixOf "." nm
+        then projectHead (RApp fc (RVar fc nm) t Explicit) rest
+        else (t,sp)
+    projectHead t sp = (t, sp)
+
+    -- we need to check left/AppSpine first
     -- we have a case above for when the next token is a projection, but
     -- we need this to make projection bind tighter than app
     runProject : AppSpine -> AppSpine
@@ -176,8 +187,11 @@ pratt ops prec stop left spine = do
            -- TODO False should be an error here
          Just (MkOp name p fix True rule) => do
             runRule p fix stop rule (RVar fc name) spine
-         _ => pure (left, spine)
+         _ =>
+          pure (left, spine)
     runPrefix stop left spine = pure (left, spine)
+
+
 
 parseOp : Parser Raw
 parseOp = do
@@ -215,7 +229,7 @@ letExpr = do
 pLamArg : Parser (Icit, String, Maybe Raw)
 pLamArg = (Implicit,,) <$> braces (ident <|> uident) <*> optional (sym ":" >> typeExpr)
        <|> (Auto,,) <$> dbraces (ident <|> uident) <*> optional (sym ":" >> typeExpr)
-       <|> (Explicit,,) <$> parens (ident <|> uident) <*> optional (sym ":" >> typeExpr)
+       <|> (Explicit,,) <$> parenWrap (ident <|> uident) <*> optional (sym ":" >> typeExpr)
        <|> (Explicit,,Nothing) <$> (ident <|> uident)
        <|> (Explicit,"_",Nothing) <$ keyword "_"
 
@@ -473,7 +487,7 @@ parsePFunc = do
   fc <- getPos
   keyword "pfunc"
   nm <- ident
-  uses <- optional (keyword "uses" >> parens (many $ uident <|> ident <|> token MixFix))
+  uses <- optional (keyword "uses" >> parenWrap (many $ uident <|> ident <|> token MixFix))
   keyword ":"
   ty <- typeExpr
   keyword ":="
@@ -536,9 +550,11 @@ parseInstance = do
   fc <- getPos
   keyword "instance"
   ty <- typeExpr
-  keyword "where"
+  -- is it a forward declaration
+  (Just _) <- optional $ keyword "where"
+    | _ => pure $ Instance fc ty Nothing
   decls <- startBlock $ manySame $ parseDef
-  pure $ Instance fc ty decls
+  pure $ Instance fc ty (Just decls)
 
 -- Not sure what I want here.
 -- I can't get a Tm without a type, and then we're covered by the other stuff

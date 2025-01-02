@@ -40,7 +40,7 @@ Constraint = (String, Pattern)
 public export
 record Clause where
   constructor MkClause
-  fc : FC
+  clauseFC : FC
   -- I'm including the type of the left, so we can check pats and get the list of possibilities
   -- But maybe rethink what happens on the left.
   -- It's a VVar k or possibly a pattern.
@@ -60,7 +60,7 @@ public export
 data DoStmt : Type where
   DoExpr : (fc : FC) -> Raw -> DoStmt
   DoLet : (fc : FC) -> String -> Raw -> DoStmt
-  DoArrow : (fc: FC) -> Raw -> Raw -> List RCaseAlt -> DoStmt
+  DoArrow : (fc : FC) -> Raw -> Raw -> List RCaseAlt -> DoStmt
 
 data Decl : Type
 data Raw : Type where
@@ -125,7 +125,7 @@ data Decl
   | PFunc FC Name (List String) Raw String
   | PMixFix FC (List Name) Nat Fixity
   | Class FC Name Telescope (List Decl)
-  | Instance FC Raw (List Decl)
+  | Instance FC Raw (Maybe (List Decl))
   | Record FC Name Telescope (Maybe Name) (List Decl)
 
 public export
@@ -145,7 +145,7 @@ HasFC Decl where
 public export
 record Module where
   constructor MkModule
-  name : Name
+  modname : Name
   imports : List Import
   decls : List Decl
 
@@ -166,7 +166,8 @@ implementation Show Decl
 
 export Show Pattern
 
-export covering
+export
+covering
 Show Clause where
   show (MkClause fc cons pats expr) = show (fc, cons, pats, expr)
 
@@ -187,8 +188,8 @@ Show Decl where
   show (ShortData _ lhs sigs) = foo ["ShortData", show lhs, show sigs]
   show (PFunc _ nm uses ty src) = foo ["PFunc", nm, show uses, show ty, show src]
   show (PMixFix _ nms prec fix) = foo ["PMixFix", show nms, show prec, show fix]
-  show (Class _ nm tele decls) = foo ["Class",  nm, "...", show $ map show decls]
-  show (Instance _ nm decls) = foo ["Instance",  show nm, show $ map show decls]
+  show (Class _ nm tele decls) = foo ["Class",  nm, "...", (show $ map show decls)]
+  show (Instance _ nm decls) = foo ["Instance",  show nm, (show $ map show decls)]
   show (Record _ nm tele nm1 decls) = foo ["Record", show nm, show tele, show nm1, show decls]
 
 export covering
@@ -196,15 +197,16 @@ Show Module where
   show (MkModule name imports decls) = foo ["MkModule", show name, show imports, show decls]
 
 export
+covering
 Show Pattern where
   show (PatVar _ icit str) = foo ["PatVar", show icit, show str]
-  show (PatCon _ icit str xs as) = foo ["PatCon", show icit, show str, assert_total $ show xs, show as]
+  show (PatCon _ icit str xs as) = foo ["PatCon", show icit, show str, show xs, show as]
   show (PatWild _ icit) = foo ["PatWild", show icit]
   show (PatLit _ lit) = foo ["PatLit", show lit]
 
 covering
 Show RCaseAlt where
-  show (MkAlt x y)= foo ["MkAlt", show x, assert_total $ show y]
+  show (MkAlt x y)= foo ["MkAlt", show x, show y]
 
 covering
 Show Raw where
@@ -236,7 +238,7 @@ Pretty Pattern where
   pretty (PatVar _ icit nm) = text nm
   pretty (PatCon _ icit nm args Nothing) = text (show nm) <+> spread (map pretty args)
   pretty (PatCon _ icit nm args (Just as)) = text as ++ text "@(" ++ text (show nm) <+> spread (map pretty args) ++ text ")"
-  pretty (PatWild _icit) = text "_"
+  pretty (PatWild _ icit) = text "_"
   pretty (PatLit _ lit) = pretty lit
 
 wrap : Icit -> Doc -> Doc

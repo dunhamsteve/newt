@@ -24,13 +24,13 @@ testCase : M ()
 testCase = do
   -- need to get some defs in here
   top <- get
-  let ctx = mkCtx top.metas
+  let ctx = mkCtx top.metaCtx
   let e = emptyFC
   -- maybe easier to parse out this data.
   processDecl (Data e "Foo" (RU e) [])
 
   tree <- buildTree ctx (MkProb [] (VU emptyFC))
-  --ty <- check (mkCtx top.metas) tm (VU fc)
+  --ty <- check (mkCtx top.metaCtx) tm (VU fc)
   pure ()
 
 
