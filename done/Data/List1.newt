@@ -1,0 +1,10 @@
+module Data.List1
+
+import Prelude
+
+infixr 7 _:::_
+
+record List1 a where
+  constructor _:::_
+  head1 : a
+  tail1 : List a

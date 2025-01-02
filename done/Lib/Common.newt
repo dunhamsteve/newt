@@ -1,0 +1,154 @@
+module Lib.Common
+
+import Data.String
+import Data.Int
+import Data.Maybe
+import Data.SortedMap
+
+-- l is environment size, this works for both lvl2ix and ix2lvl
+
+lvl2ix : Int -> Int -> Int
+lvl2ix l k = l - k - 1
+
+hexChars : List Char
+hexChars = unpack "0123456789ABCDEF"
+
+-- export
+hexDigit : Int -> Char
+hexDigit v = fromMaybe ' ' (getAt (cast $ mod v 16) hexChars)
+
+
+toHex : Int -> List Char
+toHex 0 = Nil
+toHex v = snoc (toHex (div v 16)) (hexDigit v)
+
+
+quoteString : String -> String
+quoteString str = pack $ encode (unpack str) (Lin :<  '"')
+  where
+    encode : List Char -> SnocList Char -> List Char
+    encode Nil acc = acc <>> ('"' :: Nil)
+    encode ('"' :: cs) acc = encode cs (acc :< '\\' :< '"')
+    encode ('\n' :: cs) acc = encode cs (acc :< '\\' :< 'n')
+    encode ('\\' :: cs) acc = encode cs (acc :< '\\' :< '\\')
+    encode (c :: cs) acc =
+      let v : Int = cast c in
+      if v < 32 then encode cs (acc :< '\\' :< 'u' :< hexDigit (div v 4096) :< hexDigit (div v 256) :< hexDigit (div v 16) :< hexDigit v )
+      else encode cs (acc :< c)
+
+
+data Json : U where
+  JsonObj : List (String × Json) -> Json
+  JsonStr : String -> Json
+  JsonBool : Bool -> Json
+  JsonInt : Int -> Json
+  JsonArray : List Json -> Json
+
+
+renderJson : Json -> String
+renderJson (JsonObj xs) = "{" ++ joinBy "," (map renderPair xs) ++ "}"
+  where
+    renderPair : (String × Json) -> String
+    renderPair (k,v) = quoteString k ++ ":" ++ renderJson v
+renderJson (JsonStr str) = quoteString str
+renderJson (JsonBool x) = ite x "true" "false"
+renderJson (JsonInt i) = cast i
+renderJson (JsonArray xs) = "[" ++ joinBy "," (map renderJson xs) ++ "]"
+
+
+class ToJSON a where
+  toJson : a -> Json
+
+
+instance ToJSON String where
+  toJson = JsonStr
+
+
+instance ToJSON Int where
+  toJson = JsonInt
+
+
+record FC where
+  constructor MkFC
+  file : String
+  start : (Int × Int)
+
+
+instance ToJSON FC where
+  toJson (MkFC file (line,col)) = JsonObj (("file", toJson file) :: ("line", toJson line) :: ("col", toJson col) :: Nil)
+
+
+fcLine : FC -> Int
+fcLine (MkFC file (l, c)) = l
+
+
+fcCol : FC -> Int
+fcCol (MkFC file (l, c)) = c
+
+
+class HasFC a where
+  getFC : a -> FC
+
+
+
+
+emptyFC : FC
+emptyFC = MkFC "" (0,0)
+
+-- Error of a parse
+
+data Error
+  = E FC String
+  | Postpone FC Int String
+
+
+
+instance Show FC where
+  show fc = "\{fc.file}:\{show fc.start}"
+
+
+showError : String -> Error -> String
+showError src (E fc msg) = "ERROR at \{show fc}: \{msg}\n" ++ go 0 (lines src)
+  where
+    go : Int -> List String -> String
+    go l Nil = ""
+    go l (x :: xs) =
+      if l == fcLine fc then
+        "  \{x}\n  \{replicate (cast $ fcCol fc) ' '}^\n"
+      else if fcLine fc - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
+      else go (l + 1) xs
+showError src (Postpone fc ix msg) = "ERROR at \{show fc}: Postpone \{show ix} \{msg}\n" ++ go 0 (lines src)
+  where
+    go : Int -> List String -> String
+    go l Nil = ""
+    go l (x :: xs) =
+      if l == fcLine fc then
+        "  \{x}\n  \{replicate (cast $ fcCol fc) ' '}^\n"
+      else if fcLine fc - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
+      else go (l + 1) xs
+
+
+data Fixity = InfixL | InfixR | Infix
+
+
+instance Show Fixity where
+  show InfixL = "infixl"
+  show InfixR = "infixr"
+  show Infix = "infix"
+
+
+
+record OpDef where
+  constructor MkOp
+  opname : String
+  prec : Int
+  fix : Fixity
+  isPrefix : Bool
+  -- rule is everything after the first part of the operator, splitting on `_`
+  -- a normal infix operator will have a trailing `""` which will match to
+  -- prec / prec - 1
+  rule : List String
+
+
+Operators : U
+Operators = SortedMap String OpDef

@@ -1,0 +1,100 @@
+module Lib.Token
+
+import Prelude
+
+record Bounds where
+  constructor MkBounds
+  startLine : Int
+  startCol : Int
+  endLine : Int
+  endCol : Int
+
+
+instance Eq Bounds where
+  (MkBounds sl sc el ec) == (MkBounds sl' sc' el' ec') =
+      sl == sl'
+   && sc == sc'
+   && el == el'
+   && ec == ec'
+
+
+record WithBounds ty where
+  constructor MkBounded
+  val : ty
+  bounds : Bounds
+
+
+data Kind
+  = Ident
+  | UIdent
+  | Keyword
+  | MixFix
+  | Number
+  | Character
+  | StringKind
+  | JSLit
+  | Symbol
+  | Space
+  | Comment
+  | Pragma
+  | Projection
+  -- not doing Layout.idr
+  | LBrace
+  | Semi
+  | RBrace
+  | EOI
+  | StartQuote
+  | EndQuote
+  | StartInterp
+  | EndInterp
+
+
+instance Show Kind where
+  show Ident   = "Ident"
+  show UIdent   = "UIdent"
+  show Keyword = "Keyword"
+  show MixFix = "MixFix"
+  show Number  = "Number"
+  show Character  = "Character"
+  show Symbol  = "Symbol"
+  show Space  = "Space"
+  show LBrace  = "LBrace"
+  show Semi    = "Semi"
+  show RBrace  = "RBrace"
+  show Comment = "Comment"
+  show EOI     = "EOI"
+  show Pragma  = "Pragma"
+  show StringKind = "String"
+  show JSLit = "JSLit"
+  show Projection = "Projection"
+  show StartQuote = "StartQuote"
+  show EndQuote = "EndQuote"
+  show StartInterp = "StartInterp"
+  show EndInterp = "EndInterp"
+
+
+instance Eq Kind where
+  a == b = show a == show b
+
+
+record Token where
+  constructor Tok
+  kind : Kind
+  text : String
+
+
+
+instance Show Token where
+  show (Tok k v) = "<\{show k}:\{show v}>"
+
+
+BTok : U
+BTok = WithBounds Token
+
+
+value : BTok -> String
+value (MkBounded (Tok _ s) _) = s
+
+
+getStart : BTok -> (Int × Int)
+getStart (MkBounded _ (MkBounds l c _ _)) = (l,c)

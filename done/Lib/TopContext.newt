@@ -1,0 +1,62 @@
+module Lib.TopContext
+
+import Data.IORef
+import Data.SortedMap
+import Data.String
+import Lib.Types
+
+-- I want unique ids, to be able to lookup, update, and a Ref so
+-- I don't need good Context discipline. (I seem to have made mistakes already.)
+
+
+lookup : QName -> TopContext -> Maybe TopEntry
+lookup nm top = lookupMap' nm top.defs
+
+-- TODO - look at imported namespaces, and either have a map of imported names or search imported namespaces..
+
+lookupRaw : String -> TopContext -> Maybe TopEntry
+lookupRaw raw top = go $ toList top.defs
+  where
+    go : List (QName × TopEntry) -> Maybe TopEntry
+    go Nil = Nothing
+    go (((QN ns nm), entry) :: rest) = if nm == raw then Just entry else go rest
+
+-- Maybe pretty print?
+
+
+instance Show TopContext where
+  show (MkTop defs metas _ _ _ _) = "\nContext:\n (\{ joinBy "\n" $ map (show ∘ snd) $ toList defs} :: Nil)"
+
+-- TODO need to get class dependencies working
+emptyTop : ∀ io. {{Monad io}} {{HasIO io}} -> io TopContext
+emptyTop = do
+  mcctx <- newIORef (MC Nil 0)
+  errs <- newIORef $ the (List Error) Nil
+  pure $ MkTop EmptyMap mcctx False errs Nil EmptyMap
+
+
+setDef : QName -> FC -> Tm -> Def -> M Unit
+setDef name fc ty def = do
+  top <- get
+  let (Nothing) = lookupMap' name top.defs
+    | Just (MkEntry fc' nm' ty' def') => error fc "\{show name} is already defined at \{show fc'}"
+  modify $ \case
+    MkTop defs metaCtx verbose errors loaded ops =>
+      let defs = (updateMap name (MkEntry fc name ty def) top.defs) in
+      MkTop defs metaCtx verbose errors loaded ops
+
+
+updateDef : QName -> FC -> Tm -> Def -> M Unit
+updateDef name fc ty def = do
+  top <- get
+  let (Just (MkEntry fc' nm' ty' def')) = lookupMap' name top.defs
+    | Nothing => error fc "\{show name} not declared"
+  modify $ \case
+    MkTop defs metaCtx verbose errors loaded ops =>
+      let defs = (updateMap name (MkEntry fc' name ty def) defs) in
+      MkTop defs metaCtx verbose errors loaded ops
+
+addError : Error -> M Unit
+addError err = do
+  top <- get
+  modifyIORef top.errors (_::_ err)

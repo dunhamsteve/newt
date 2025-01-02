@@ -1,0 +1,11 @@
+module Data.String
+
+
+import Prelude
+
+class Interpolation a where
+  interpolate : a → String
+
+unwords : List String → String
+unwords stuff = joinBy " " stuff
+

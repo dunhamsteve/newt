@@ -1,0 +1,218 @@
+module Lib.Parser.Impl
+
+import Lib.Token
+import Lib.Common
+import Data.String
+import Data.Int
+import Data.List1
+import Data.SortedMap
+
+
+TokenList : U
+TokenList = List BTok
+
+-- Result of a parse
+
+data Result : U -> U where
+  OK : ∀ a. a -> (toks : TokenList) -> (com : Bool) -> Operators -> Result a
+  Fail : ∀ a. Bool -> Error -> (toks : TokenList) -> (com : Bool) -> Operators -> Result a
+
+
+instance Functor Result where
+  map f (OK a toks com ops) = OK (f a) toks com ops
+  map _ (Fail fatal err toks com ops) = Fail fatal err toks com ops
+
+-- So sixty just has a newtype function here now (probably for perf).
+-- A record might be more ergonomic, but would require a record impl before
+-- self hosting.
+
+-- FC is a line and column for indents. The idea being that we check
+-- either the col < tokCol or line == tokLine, enabling sameLevel.
+
+-- We need State for operators (or postpone that to elaboration)
+-- Since I've already built out the pratt stuff, I guess I'll
+-- leave it in the parser for now
+
+-- This is a Reader in FC, a State in Operators, Commit flag, TokenList
+
+
+data Parser a = P (TokenList -> Bool -> Operators -> (lc : FC) -> Result a)
+
+
+runP : ∀ a. Parser a -> TokenList -> Bool -> Operators -> FC -> Result a
+runP (P f) = f
+
+-- FIXME no filename, also half the time it is pointing at the token after the error
+perror : String -> TokenList -> String -> Error
+perror fn Nil msg = E (MkFC fn (0,0)) msg
+perror fn ((MkBounded val (MkBounds line col _ _)) :: _) msg = E (MkFC fn (line,col)) msg
+
+
+parse : ∀ a. String -> Parser a -> TokenList -> Either Error a
+parse fn pa toks = case runP pa toks False EmptyMap (MkFC fn (-1,-1)) of
+  Fail fatal err toks com ops => Left err
+  OK a Nil _ _ => Right a
+  OK a ts _ _ => Left (perror fn ts "Extra toks")
+
+-- Intended for parsing a top level declaration
+
+partialParse : ∀ a. String -> Parser a -> Operators -> TokenList -> Either (Error × TokenList) (a × Operators × TokenList)
+partialParse fn pa ops toks = case runP pa toks False ops (MkFC fn (0,0)) of
+  Fail fatal err toks com ops => Left (err, toks)
+  OK a ts _ ops => Right (a,ops,ts)
+
+-- I think I want to drop the typeclasses for v1
+
+
+try : ∀ a. Parser a -> Parser a
+try (P pa) = P $ \toks com ops col => case pa toks com ops col of
+  (Fail x err toks com ops) => Fail x err toks False ops
+  res => res
+
+
+fail : ∀ a. String -> Parser a
+fail msg = P $ \toks com ops col => Fail False (perror col.file toks msg) toks com ops
+
+
+fatal : ∀ a. String -> Parser a
+fatal msg = P $ \toks com ops col => Fail True (perror col.file toks msg) toks com ops
+
+
+getOps : Parser (Operators)
+getOps = P $ \ toks com ops col => OK ops toks com ops
+
+
+addOp : String -> Int -> Fixity -> Parser Unit
+addOp nm prec fix = P $ \ toks com ops col =>
+  let parts = split "_" nm in
+  case parts of
+    "" :: key :: rule => OK MkUnit toks com (updateMap key (MkOp nm prec fix False rule) ops)
+    key :: rule => OK MkUnit toks com (updateMap key (MkOp nm prec fix True rule) ops)
+    Nil => Fail True (perror col.file toks "Internal error parsing mixfix") toks com ops
+
+
+
+
+instance Functor Parser where
+  map f (P pa) = P $ \ toks com ops col => map f (pa toks com ops col)
+
+
+instance Applicative Parser where
+  return pa = P (\ toks com ops col => OK pa toks com ops)
+  P pab <*> P pa = P $ \toks com ops col =>
+    case pab toks com ops col of
+      Fail fatal err toks com ops => Fail fatal err toks com ops
+      OK f toks com ops =>
+        case pa toks com ops col of
+          (OK x toks com ops) => OK (f x) toks com ops
+          (Fail fatal err toks com ops) => Fail fatal err toks com ops
+
+-- Second argument lazy so we don't have circular refs when defining parsers.
+
+instance Alternative Parser where
+  (P pa) <|> (P pb) = P $ \toks com ops col =>
+    case pa toks False ops col of
+      OK a toks' _ ops => OK a toks' com ops
+      Fail True  err toks' com ops  => Fail True err toks' com ops
+      Fail fatal err toks' True ops => Fail fatal err toks' True ops
+      Fail fatal err toks' False ops => pb toks com ops col
+
+
+instance Monad Parser where
+  pure = return
+  bind (P pa) pab = P $ \toks com ops col =>
+    case pa toks com ops col of
+      (OK a toks com ops) => runP (pab a) toks com ops col
+      (Fail fatal err xs x ops) => Fail fatal err xs x ops
+
+
+satisfy : (BTok -> Bool) -> String -> Parser String
+satisfy f msg = P $ \toks com ops col =>
+  case toks of
+    (t :: ts) => if f t then OK (value t) ts True ops else Fail False (perror col.file toks "\{msg} at \{show t.val.kind}:\{value t}") toks com ops
+    Nil => Fail False (perror col.file toks "\{msg} at EOF") toks com ops
+
+
+commit : Parser Unit
+commit = P $ \toks com ops col => OK MkUnit toks True ops
+
+
+some : ∀ a. Parser a -> Parser (List a)
+many : ∀ a. Parser a -> Parser (List a)
+some p = _::_ <$> p <*> many p
+many p = some p <|> pure Nil
+
+-- one or more `a` seperated by `s`
+
+sepBy : ∀ s a. Parser s -> Parser a -> Parser (List a)
+sepBy s a = _::_ <$> a <*> many (s *> a)
+
+
+getPos : Parser FC
+getPos = P $ \toks com ops indent => case toks of
+  Nil => OK emptyFC toks com ops
+  (t :: ts) => OK (MkFC indent.file (getStart t)) toks com ops
+
+-- Start an indented block and run parser in it
+
+startBlock : ∀ a. Parser a -> Parser a
+startBlock (P p) = P $ \toks com ops indent => case toks of
+  Nil => p toks com ops indent
+  (t :: _) =>
+    -- If next token is at or before the current level, we've got an empty block
+    let (tl,tc) = getStart t in
+    let (MkFC file (line,col)) = indent in
+    p toks com ops (MkFC file (tl, ite (tc <= col) (col + 1) tc))
+
+-- Assert that parser starts at our current column by
+-- checking column and then updating line to match the current
+
+sameLevel : ∀ a. Parser a -> Parser a
+sameLevel (P p) = P $ \toks com ops indent => case toks of
+  Nil => p toks com ops indent
+  (t :: _) =>
+    let (tl,tc) = getStart t in
+    let (MkFC file (line,col)) = indent in
+    if tc == col then p toks com ops (MkFC file (tl, col))
+    else if col < tc then Fail False (perror file toks "unexpected indent") toks com ops
+    else Fail False (perror file toks "unexpected indent") toks com ops
+
+
+someSame : ∀ a. Parser a -> Parser (List a)
+someSame pa = some $ sameLevel pa
+
+
+manySame : ∀ a. Parser a -> Parser (List a)
+manySame pa = many $ sameLevel pa
+
+-- check indent on next token and run parser
+
+indented : ∀ a. Parser a -> Parser a
+indented (P p) = P $ \toks com ops indent => case toks of
+  Nil => p toks com ops indent
+  (t :: _) =>
+    let (tl,tc) = getStart t
+    in if tc > fcCol indent || tl == fcLine indent then p toks com ops indent
+    else Fail False (perror indent.file toks "unexpected outdent") toks com ops
+
+-- expect token of given kind
+
+token' : Kind -> Parser String
+token' k = satisfy (\t => t.val.kind == k) "Expected a \{show k} token"
+
+keyword' : String -> Parser Unit
+-- FIXME make this an appropriate whitelist
+keyword' kw = ignore $ satisfy (\t => t.val.text == kw && (t.val.kind == Keyword || t.val.kind == Symbol || t.val.kind == Number)) "Expected \{kw}"
+
+-- expect indented token of given kind
+
+token : Kind -> Parser String
+token = indented ∘ token'
+
+
+keyword : String -> Parser Unit
+keyword kw = indented $ keyword' kw
+
+symbol : String -> Parser Unit
+symbol = keyword
+

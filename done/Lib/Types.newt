@@ -1,0 +1,517 @@
+module Lib.Types
+
+-- For FC, Error
+import Lib.Common
+import Lib.Prettier
+
+import Data.Fin
+import Data.IORef
+import Data.List
+import Data.SnocList
+import Data.SortedMap
+import Data.String
+import Data.Vect
+
+data QName : U where
+  QN : List String -> String -> QName
+
+instance Eq QName where
+  QN ns n == QN ns' n' = n == n' && ns == ns'
+
+instance Show QName where
+  show (QN Nil n) = n
+  show (QN ns n) = joinBy "." ns ++ "." ++ n
+
+instance Interpolation QName where
+  interpolate = show
+
+instance Ord QName where
+  compare (QN ns nm) (QN ns' nm') = if ns == ns' then compare nm nm' else compare ns ns'
+
+Name : U
+Name = String
+
+data Icit = Implicit | Explicit | Auto
+
+instance Show Icit where
+  show Implicit = "Implicit"
+  show Explicit = "Explicit"
+  show Auto = "Auto"
+
+data BD = Bound | Defined
+
+instance Eq BD where
+  Bound == Bound = True
+  Defined == Defined = True
+  _ == _ = False
+
+instance Show BD where
+  show Bound = "bnd"
+  show Defined = "def"
+
+data Quant = Zero | Many
+
+instance Show Quant where
+  show Zero = "0 "
+  show Many = ""
+
+instance Eq Quant where
+  Zero == Zero = True
+  Many == Many = True
+  _ == _ = False
+
+-- We could make this polymorphic and use for environment...
+
+data BindInfo : U where
+  BI : (fc : FC) -> (name : Name) -> (icit : Icit) -> (quant : Quant) -> BindInfo
+
+instance HasFC BindInfo where
+  getFC (BI fc _ _ _) = fc
+
+Tm : U
+
+data Literal = LString String | LInt Int | LChar Char
+
+instance Show Literal where
+  show (LString str) = show str
+  show (LInt i) = show i
+  show (LChar c) = show c
+
+data CaseAlt : U where
+  CaseDefault : Tm -> CaseAlt
+  CaseCons : (name : QName) -> (args : List String) -> Tm ->  CaseAlt
+  CaseLit : Literal -> Tm ->  CaseAlt
+
+Def : U
+
+instance Eq Literal where
+  LString x == LString y = x == y
+  LInt x == LInt y = x == y
+  LChar x == LChar y = x == y
+  _ == _ = False
+
+data Tm : U where
+  Bnd : FC -> Int -> Tm
+  -- Maybe Def here instead of Maybe Tm, we'll have DCon, TCon, etc.
+  Ref : FC -> QName -> Def -> Tm
+  Meta : FC -> Int -> Tm
+  -- kovacs optimization, I think we can App out meta instead
+  -- InsMeta : Int -> List BD -> Tm
+  Lam : FC -> Name -> Icit -> Quant -> Tm -> Tm
+  App : FC -> Tm -> Tm -> Tm
+  UU   : FC -> Tm
+  Pi  : FC -> Name -> Icit -> Quant -> Tm -> Tm -> Tm
+  Case : FC -> Tm -> List CaseAlt -> Tm
+  -- need type?
+  Let : FC -> Name -> Tm -> Tm -> Tm
+  -- for desugaring where
+  LetRec : FC -> Name -> Tm -> Tm -> Tm -> Tm
+  Lit : FC -> Literal -> Tm
+  Erased : FC -> Tm
+
+instance HasFC Tm where
+  getFC (Bnd fc k) = fc
+  getFC (Ref fc str x) = fc
+  getFC (Meta fc k) = fc
+  getFC (Lam fc str _ _ t) = fc
+  getFC (App fc t u) = fc
+  getFC (UU fc) = fc
+  getFC (Pi fc str icit quant t u) = fc
+  getFC (Case fc t xs) = fc
+  getFC (Lit fc _) = fc
+  getFC (Let fc _ _ _) = fc
+  getFC (LetRec fc _ _ _ _) = fc
+  getFC (Erased fc) = fc
+
+showCaseAlt : CaseAlt → String
+
+instance Show Tm where
+  show (Bnd _ k) = "(Bnd \{show k})"
+  show (Ref _ str _) = "(Ref \{show str})"
+  show (Lam _ nm icit rig t) = "(\\ \{show rig}\{nm}  => \{show  t})"
+  show (App _ t u) = "(\{show t} \{show u})"
+  show (Meta _ i) = "(Meta \{show i})"
+  show (Lit _ l) = "(Lit \{show l})"
+  show (UU _) = "U"
+  show (Pi _ str Explicit rig t u) = "(Pi (\{show rig}\{str} : \{show t}) => \{show u})"
+  show (Pi _ str Implicit rig t u) = "(Pi {\{show rig}\{str} : \{show t}} => \{show u})"
+  show (Pi _ str Auto rig t u) = "(Pi {{\{show rig}\{str} : \{show t}}} => \{show u})"
+  show (Case _ sc alts) = "(Case \{show sc} \{show $ map showCaseAlt   alts})"
+  show (Let _ nm t u) = "(Let \{nm} \{show t} \{show u})"
+  show (LetRec _ nm ty t u) = "(LetRec \{nm} : \{show ty} \{show t} \{show u})"
+  show (Erased _) = "ERASED"
+
+
+showCaseAlt (CaseDefault tm) = "_ => \{show tm}"
+showCaseAlt (CaseCons nm args tm) = "\{show nm} \{unwords args} => \{show tm}"
+showCaseAlt (CaseLit lit tm) = "\{show lit} => \{show tm}"
+
+
+showTm : Tm -> String
+showTm = show
+
+-- I can't really show val because it's HOAS...
+
+-- TODO derive
+
+instance Eq Icit where
+  Implicit == Implicit = True
+  Explicit == Explicit = True
+  Auto == Auto = True
+  _ == _ = False
+
+-- Eq on Tm. We've got deBruijn indices, so I'm not comparing names
+
+instance Eq (Tm) where
+  -- (Local x) == (Local y) = x == y
+  (Bnd _ x) == (Bnd _ y) = x == y
+  (Ref _ x _) == Ref _ y _ = x == y
+  (Lam _ n _ _ t) == Lam _ n' _ _ t' = t == t'
+  (App _ t u) == App _ t' u' = t == t' && u == u'
+  (UU _) == (UU _) = True
+  (Pi _ n icit rig t u) == (Pi _ n' icit' rig' t' u') = icit == icit' && rig == rig' && t == t' && u == u'
+  _ == _ = False
+
+-- TODO App and Lam should have <+/> but we need to fix
+-- INFO pprint to `nest 2 ...`
+-- maybe return Doc and have an Interpolation..
+-- If we need to flatten, case is going to get in the way.
+
+pprint' : Int -> List String -> Tm -> Doc
+pprintAlt : Int -> List String -> CaseAlt -> Doc
+pprintAlt p names (CaseDefault t) = text "_" <+> text "=>" <+> pprint' p ("_" :: names) t
+pprintAlt p names (CaseCons name args t) = text (show name) <+> spread (map text args) <+> (nest 2 $ text "=>" <+/> pprint' p (reverse args ++ names) t)
+-- `;` is not in surface syntax, but sometimes we print on one line
+pprintAlt p names (CaseLit lit t) = text (show lit) <+> (nest 2 $ text "=>" <+/> pprint' p names t ++ text ";")
+
+parens : Int -> Int -> Doc -> Doc
+parens a b doc = if a < b
+  then text "(" ++ doc ++ text ")"
+  else doc
+
+pprint' p names (Bnd _ k) = case getAt (cast k) names of
+  -- Either a bug or we're printing without names
+  Nothing => text "BND:\{show k}"
+  Just nm => text "\{nm}:\{show k}"
+pprint' p names (Ref _ str mt) = text (show str)
+pprint' p names (Meta _ k) = text "?m:\{show k}"
+pprint' p names (Lam _ nm icit quant t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> pprint' 0 (nm :: names) t
+pprint' p names (App _ t u) = parens 0 p $ pprint' 0 names t <+> pprint' 1 names u
+pprint' p names (UU _) = text "U"
+pprint' p names (Pi _ nm Auto rig t u) = parens 0 p $
+  text "{{" ++ text (show rig) <+> text nm <+> text ":" <+> pprint' 0 names t <+> text "}}" <+> text "->" <+> pprint' 0 (nm :: names) u
+pprint' p names (Pi _ nm Implicit rig t u) = parens 0 p $
+  text "{" ++ text (show rig) <+> text nm <+> text ":" <+> pprint' 0 names t <+> text "}" <+> text "->" <+> pprint' 0 (nm :: names) u
+pprint' p names (Pi _ "_" Explicit Many t u) =
+  parens 0 p $ pprint' 1 names t <+> text "->" <+> pprint' 0 ("_" :: names) u
+pprint' p names (Pi _ nm Explicit rig t u) = parens 0 p $
+  text "(" ++  text (show rig) <+> text nm <+> text ":" <+> pprint' 0 names t ++ text ")" <+> text "->" <+> pprint' 0 (nm :: names) u
+-- FIXME - probably way wrong on the names here.  There is implicit binding going on
+pprint' p names (Case _ sc alts) = parens 0 p $ text "case" <+> pprint' 0 names sc <+> text "of" ++ (nest 2 (line ++ stack (map (pprintAlt 0 names) alts)))
+pprint' p names (Lit _ lit) = text (show lit)
+pprint' p names (Let _ nm t u) = parens 0 p $ text "let" <+> text nm <+> text ":=" <+> pprint' 0 names t <+> text "in" </> (nest 2 $ pprint' 0 (nm :: names) u)
+pprint' p names (LetRec _ nm ty t u) = parens 0 p $ text "letrec" <+> text nm <+> text ":" <+> pprint' 0 names ty <+> text ":=" <+> pprint' 0 names t <+> text "in" </> (nest 2 $ pprint' 0 (nm :: names) u)
+pprint' p names (Erased _) = text "ERASED"
+
+-- Pretty printer for Tm.
+
+pprint : List String -> Tm -> Doc
+pprint names tm = pprint' 0 names tm
+
+Val : U
+
+-- IS/TypeTheory.idr is calling this a Kripke function space
+-- Yaffle, IS/TypeTheory use a function here.
+-- Kovacs, Idris use Env and Tm
+
+-- in cctt kovacs refers to this choice as defunctionalization vs HOAS
+-- https://github.com/AndrasKovacs/cctt/blob/main/README.md#defunctionalization
+-- the tradeoff is access to internals of the function
+
+-- Yaffle is vars -> vars here
+
+Closure : U
+
+data Val : U where
+  -- This will be local / flex with spine.
+  VVar : FC -> (k : Int) -> (sp : SnocList Val) -> Val
+  VRef : FC -> (nm : QName) -> Def -> (sp : SnocList Val) -> Val
+  -- neutral case
+  VCase : FC -> (sc : Val) -> List CaseAlt -> Val
+  -- we'll need to look this up in ctx with IO
+  VMeta : FC -> (ix : Int) -> (sp : SnocList Val) -> Val
+  VLam : FC -> Name -> Icit -> Quant -> Closure -> Val
+  VPi : FC -> Name -> Icit -> Quant -> (a : Val) -> (b : Closure) -> Val
+  VLet : FC -> Name -> Val -> Val -> Val
+  VLetRec : FC -> Name -> Val -> Val -> Val -> Val
+  VU : FC -> Val
+  VErased : FC -> Val
+  VLit : FC -> Literal -> Val
+
+Env : U
+Env = List Val
+
+data Mode = CBN | CBV
+
+data Closure = MkClosure Env Tm
+
+getValFC : Val -> FC
+getValFC (VVar fc _ _) = fc
+getValFC (VRef fc _ _ _) = fc
+getValFC (VCase fc _ _) = fc
+getValFC (VMeta fc _ _) = fc
+getValFC (VLam fc _ _ _ _) = fc
+getValFC (VPi fc _ _ _ a b) = fc
+getValFC (VU fc) = fc
+getValFC (VErased fc) = fc
+getValFC (VLit fc _) = fc
+getValFC (VLet fc _ _ _) = fc
+getValFC (VLetRec fc _ _ _ _) = fc
+
+instance HasFC Val where getFC = getValFC
+
+showClosure : Closure → String
+
+instance Show Val where
+  show (VVar _ k Lin) = "%var\{show k}"
+  show (VVar _ k sp) = "(%var\{show k} \{unwords $ map show (sp <>> Nil)})"
+  show (VRef _ nm _ Lin) = show nm
+  show (VRef _ nm _ sp) = "(\{show nm} \{unwords $ map show (sp <>> Nil)})"
+  show (VMeta _ ix sp) = "(%meta \{show ix} (\{show $ snoclen sp} sp :: Nil))"
+  show (VLam _ str icit quant x) = "(%lam \{show quant}\{str} \{showClosure x})"
+  show (VPi fc str Implicit rig x y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{showClosure  y})"
+  show (VPi fc str Explicit rig x y) = "(%pi (\{show rig} \{str} : \{show  x}). \{showClosure  y})"
+  show (VPi fc str Auto rig x y) = "(%pi {{\{show rig} \{str} : \{show  x}}}. \{showClosure  y})"
+  show (VCase fc sc alts) = "(%case \{show sc} ...)"
+  show (VU _) = "U"
+  show (VLit _ lit) = show lit
+  show (VLet _ nm a b) = "(%let \{show nm} = \{show a} in \{show b}"
+  show (VLetRec _ nm ty a b) = "(%letrec \{show nm} : \{show ty} = \{show a} in \{show b}"
+  show (VErased _) = "ERASED"
+
+
+showClosure (MkClosure xs t) = "(%cl (\{show $ length xs} env :: Nil) \{show t})"
+
+-- instance Show Closure where
+--   show = showClosure
+
+Context : U
+
+data MetaKind = Normal | User | AutoSolve
+
+instance Show MetaKind where
+  show Normal = "Normal"
+  show User = "User"
+  show AutoSolve = "Auto"
+
+-- constrain meta applied to val to be a val
+
+data MConstraint = MkMc FC Env (SnocList Val) Val
+
+data MetaEntry = Unsolved FC Int Context Val MetaKind (List MConstraint) | Solved FC Int Val
+
+record MetaContext where
+  constructor MC
+  metas : List MetaEntry
+  next : Int
+
+data Def = Axiom | TCon (List QName) | DCon Int QName | Fn Tm | PrimTCon
+         | PrimFn String (List String)
+
+instance Show Def where
+  show Axiom = "axiom"
+  show (TCon strs) = "TCon \{show strs}"
+  show (DCon k tyname) = "DCon \{show k} \{show tyname}"
+  show (Fn t) = "Fn \{show t}"
+  show (PrimTCon) = "PrimTCon"
+  show (PrimFn src used) = "PrimFn \{show src} \{show used}"
+
+-- entry in the top level context
+
+record TopEntry where
+  constructor MkEntry
+  fc : FC
+  name : QName
+  type : Tm
+  def : Def
+
+-- FIXME snoc
+
+instance Show TopEntry where
+  show (MkEntry fc name type def) = "\{show name} : \{show type} := \{show def}"
+
+-- Top level context.
+-- Most of the reason this is separate is to have a different type
+-- `Def` for the entries.
+--
+-- The price is that we have names in addition to levels. Do we want to
+-- expand these during normalization?
+
+record TopContext where
+  constructor MkTop
+  -- We'll add a map later?
+  defs : SortedMap QName TopEntry
+  metaCtx : IORef MetaContext
+  verbose : Bool -- command line flag
+  errors : IORef (List Error)
+  -- loaded modules
+  loaded : List String
+  ops : Operators
+
+-- we'll use this for typechecking, but need to keep a TopContext around too.
+
+record Context where
+  constructor MkCtx
+  lvl : Int
+  -- shall we use lvl as an index?
+  env : Env                  -- Values in scope
+  types : List (String × Val) -- types and names in scope
+  -- so we'll try "bds" determines length of local context
+  bds : List BD          -- bound or defined
+
+  -- FC to use if we don't have a better option
+  ctxFC : FC
+
+-- add a binding to environment
+
+extend : Context -> String -> Val -> Context
+extend (MkCtx lvl env types bds ctxFC) name ty =
+  MkCtx (1 + lvl) (VVar emptyFC lvl Lin :: env) ((name,ty) :: types) (Bound :: bds) ctxFC
+
+-- I guess we define things as values?
+
+define : Context -> String -> Val -> Val -> Context
+define (MkCtx lvl env types bds ctxFC) name val ty =
+  MkCtx (1 + lvl) (val :: env) ((name,ty) :: types) (Defined :: bds) ctxFC
+
+instance Show MetaEntry where
+  show (Unsolved pos k ctx ty kind constraints) = "Unsolved \{show pos} \{show k} \{show kind} : \{show ty} \{show ctx.bds} cs \{show $ length constraints}"
+  show (Solved _ k x) = "Solved \{show k} \{show x}"
+
+withPos : Context -> FC -> Context
+withPos (MkCtx lvl env types bds ctxFC) fc = (MkCtx lvl env types bds fc)
+
+names : Context -> List String
+names ctx = map fst ctx.types
+
+-- public export
+-- M : U -> U
+-- M = (StateT TopContext (EitherT Error IO))
+
+record M a where
+  constructor MkM
+  runM : TopContext -> IO (Either Error (TopContext × a))
+
+instance Functor M where
+  map f (MkM run) = MkM $ \tc => bind {IO} (run tc) $ \case
+      Left err => pure $ Left err
+      Right (tc', a) => pure $ Right (tc', f a)
+
+instance Applicative M where
+  return x = MkM $ \tc => pure $ Right (tc, x)
+  (MkM f) <*> (MkM x) = MkM $ \tc => bind {IO} (f tc) $ \case
+      Left err => pure $ Left err
+      Right (tc', f') => bind {IO} (x tc') $ \case
+          Left err => pure $ Left err
+          Right (tc'', x') => pure $ Right (tc'', f' x')
+
+instance Monad M where
+  pure = return
+  bind (MkM x) f = MkM $ \tc => bind {IO} (x tc) $ \case
+      Left err => pure $ Left err
+      Right (tc', a) => runM (f a) tc'
+
+instance HasIO M where
+  liftIO io = MkM $ \tc => do
+    result <- io
+    pure $ Right (tc, result)
+
+throwError : ∀ a. Error -> M a
+throwError err = MkM $ \_ => pure $ Left err
+
+catchError : ∀ a. M a -> (Error -> M a) -> M a
+catchError (MkM ma) handler = MkM $ \tc => bind {IO} (ma tc) $ \case
+    Left err => runM (handler err) tc
+    Right (tc', a) => pure $ Right (tc', a)
+
+tryError : ∀ a. M a -> M (Either Error a)
+tryError ma = catchError (map Right ma) (pure ∘ Left)
+
+get : M TopContext
+get = MkM $ \ tc => pure $ Right (tc, tc)
+
+put : TopContext -> M Unit
+put tc = MkM $ \_ => pure $ Right (tc, MkUnit)
+
+modify : (TopContext -> TopContext) -> M Unit
+modify f = do
+  tc <- get
+  put (f tc)
+
+-- Force argument and print if verbose is true
+
+debug : Lazy String -> M Unit
+debug x = do
+  top <- get
+  when top.verbose $ \ _ => putStrLn $ force x
+
+info : FC -> String -> M Unit
+info fc msg = putStrLn "INFO at \{show fc}: \{msg}"
+
+-- Version of debug that makes monadic computation lazy
+
+debugM : M String -> M Unit
+debugM x = do
+  top <- get
+  when top.verbose $ \ _ => do
+    msg <- x
+    putStrLn msg
+
+instance Show Context where
+  show ctx = "Context \{show $ map fst $ ctx.types}"
+
+errorMsg : Error -> String
+errorMsg (E x str) = str
+errorMsg (Postpone x k str) = str
+
+instance HasFC Error where
+  getFC (E x str) = x
+  getFC (Postpone x k str) = x
+
+error : ∀ a. FC -> String -> M a
+error fc msg = throwError $ E fc msg
+
+error' : ∀ a. String -> M a
+error' msg = throwError $ E emptyFC msg
+
+freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
+freshMeta ctx fc ty kind = do
+  top <- get
+  mc <- readIORef top.metaCtx
+  debug $ \ _ => "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
+  writeIORef top.metaCtx $ MC (Unsolved fc mc.next ctx ty kind Nil :: mc.metas) (1 + mc.next)
+  pure $ applyBDs 0 (Meta fc mc.next) ctx.bds
+  where
+    -- hope I got the right order here :)
+    applyBDs : Int -> Tm -> List BD -> Tm
+    applyBDs k t Nil = t
+    -- review the order here
+    applyBDs k t (Bound :: xs) = App emptyFC (applyBDs (1 + k) t xs) (Bnd emptyFC k)
+    applyBDs k t (Defined :: xs) = applyBDs (1 + k) t xs
+
+lookupMeta : Int -> M MetaEntry
+lookupMeta ix = do
+  top <- get
+  mc <- readIORef top.metaCtx
+  go mc.metas
+  where
+    go : List MetaEntry -> M MetaEntry
+    go Nil = error' "Meta \{show ix} not found"
+    go (meta@(Unsolved _ k ys _ _ _) :: xs) = if k == ix then pure meta else go xs
+    go (meta@(Solved _ k x) :: xs) = if k == ix then pure meta else go xs
+
+-- we need more of topcontext later - Maybe switch it up so we're not passing
+-- around top
+
+mkCtx : FC -> Context
+mkCtx fc = MkCtx 0 Nil Nil Nil fc

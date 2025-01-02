@@ -46,8 +46,10 @@ stringLit = do
 
 
 -- typeExpr is term with arrows.
-export typeExpr : Parser Raw
-export term : (Parser Raw)
+export
+typeExpr : Parser Raw
+export
+term : (Parser Raw)
 
 interp : Parser Raw
 interp = token StartInterp *> term <* token EndInterp
@@ -86,8 +88,8 @@ lit = intLit <|> interpString <|> stringLit <|> charLit
 
 
 -- helpful when we've got some / many and need FC for each
-withPos : Parser a -> Parser (FC, a)
-withPos pa = (,) <$> getPos <*> pa
+addPos : Parser a -> Parser (FC, a)
+addPos pa = (,) <$> getPos <*> pa
 
 asAtom : Parser Raw
 asAtom = do
@@ -118,6 +120,7 @@ pArg = do
     <|> (Implicit,fc,) <$> braces typeExpr
     <|> (Auto,fc,) <$> dbraces typeExpr
 
+AppSpine : Type
 AppSpine = List (Icit,FC,Raw)
 
 pratt : Operators -> Int -> String -> Raw -> AppSpine -> Parser (Raw, AppSpine)
@@ -163,7 +166,9 @@ pratt ops prec stop left spine = do
     runRule : Int -> Fixity -> String -> List String -> Raw -> AppSpine -> Parser (Raw,AppSpine)
     runRule p fix stop [] left spine = pure (left,spine)
     runRule p fix stop [""] left spine = do
-      let pr = case fix of InfixR => p; _ => p + 1
+      let pr = case fix of
+                InfixR => p
+                _ => p + 1
       case spine of
                 ((_, fc, right) :: rest) => do
                   (right, rest) <- pratt ops pr stop right rest
@@ -239,7 +244,7 @@ lamExpr : Parser Raw
 lamExpr = do
   pos <- getPos
   keyword "\\" <|> keyword "λ"
-  args <- some $ withPos pLamArg
+  args <- some $ addPos pLamArg
   keyword "=>"
   scope <- typeExpr
   pure $ foldr (\(fc, icit, name, ty), sc => RLam pos (BI fc name icit Many) sc) scope args
@@ -304,7 +309,7 @@ doArrow : Parser DoStmt
 doArrow = do
   fc <- getPos
   left <- typeExpr
-  Just _ <- optional $ keyword "<-"
+  (Just _) <- optional $ keyword "<-"
     | _ => pure $ DoExpr fc left
   right <- term
   alts <- startBlock $ manySame $ sym "|" *> caseAlt
@@ -360,7 +365,7 @@ ebind = do
   -- don't commit until we see the ":"
   sym "("
   quant <- quantity
-  names <- try (some (withPos varname) <* sym ":")
+  names <- try (some (addPos varname) <* sym ":")
   ty <- typeExpr
   sym ")"
   pure $ map (\(pos, name) => (BI pos name Explicit quant, ty)) names
@@ -370,7 +375,7 @@ ibind = do
   -- I've gone back and forth on this, but I think {m a b} is more useful than {Nat}
   sym "{"
   quant <- quantity
-  names <- (some (withPos varname))
+  names <- (some (addPos varname))
   ty <- optional (sym ":" *> typeExpr)
   sym "}"
   pure $ map (\(pos,name) => (BI pos name Implicit quant, fromMaybe (RImplicit pos) ty)) names
@@ -379,7 +384,7 @@ abind : Parser Telescope
 abind = do
   -- for this, however, it would be nice to allow {{Monad A}}
   sym "{{"
-  name <- optional $ try (withPos varname <* sym ":")
+  name <- optional $ try (addPos varname <* sym ":")
   ty <- typeExpr
   sym "}}"
   case name of
@@ -394,7 +399,7 @@ arrow = sym "->" <|> sym "→"
 forAll : Parser Raw
 forAll = do
   keyword "forall" <|> keyword "∀"
-  all <- some (withPos varname)
+  all <- some (addPos varname)
   keyword "."
   scope <- typeExpr
   pure $ foldr (\ (fc, n), sc => RPi fc (BI fc n Implicit Zero) (RImplicit fc) sc) scope all
@@ -517,7 +522,7 @@ parseData = do
 
 nakedBind : Parser Telescope
 nakedBind = do
-  names <- some (withPos varname)
+  names <- some (addPos varname)
   pure $ map (\(pos,name) => (BI pos name Explicit Many, RImplicit pos)) names
 
 export
@@ -605,6 +610,7 @@ data ReplCmd =
 
 -- Eventually I'd like immediate actions in the file, like lean, but I
 -- also want to REPL to work and we can do that first.
-export parseRepl : Parser ReplCmd
+export
+parseRepl : Parser ReplCmd
 parseRepl = Def <$> parseDecl <|> Norm <$ keyword "#nf" <*> typeExpr
   <|> Check <$ keyword "#check" <*> typeExpr

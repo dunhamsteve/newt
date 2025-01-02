@@ -1,0 +1,12 @@
+module Data.Int
+
+import Prelude
+
+div : Int → Int → Int
+div a b = a / b
+
+instance Cast Char Int where
+  cast = ord
+
+instance Cast Int String where
+  cast = show

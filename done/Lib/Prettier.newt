@@ -1,0 +1,148 @@
+-- A prettier printer, Philip Wadler
+-- https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf
+module Lib.Prettier
+
+import Data.String
+import Data.Int
+import Data.Maybe
+
+-- `Doc` is a pretty printing document.  Constructors are private, use
+-- methods below.  `Alt` in particular has some invariants on it, see paper
+-- for details. (Something along the lines of "the first line of left is not
+-- bigger than the first line of the right".)
+
+data Doc = Empty | Line | Text String | Nest Int Doc | Seq Doc Doc | Alt Doc Doc
+
+-- The original paper had a List-like structure Doc (the above was DOC) which
+-- had Empty and a tail on Text and Line.
+data Item = TEXT String | LINE Int
+
+
+empty : Doc
+empty = Empty
+
+flatten : Doc -> Doc
+flatten Empty = Empty
+flatten (Seq x y) = Seq (flatten x) (flatten y)
+flatten (Nest i x) = flatten x
+flatten Line = Text " "
+flatten (Text str) = Text str
+flatten (Alt x y) = flatten x
+
+group : Doc -> Doc
+group x = Alt (flatten x) x
+
+-- TODO - we can accumulate snoc and cat all at once
+layout : List Item -> SnocList String -> String
+layout Nil acc = fastConcat $ acc <>> Nil
+layout (LINE k :: x) acc = layout x (acc :< "\n" :< replicate (cast k) ' ')
+layout (TEXT str :: x) acc = layout x (acc :< str)
+
+-- Whether a documents first line fits.
+fits : Int -> List Item -> Bool
+fits w ((TEXT s) :: xs) = if slen s < w then fits (w - slen s) xs else False
+fits w _ = True
+
+-- vs Wadler, we're collecting the left side as a SnocList to prevent
+-- blowing out the stack on the Text case.  The original had DOC as
+-- a Linked-List like structure (now List Item)
+
+-- I've now added a `fit` boolean to indicate if we should cut when we hit the line length
+-- Wadler was relying on laziness to stop the first branch before LINE if necessary
+be : Bool -> SnocList Item -> Int -> Int -> List (Int × Doc) -> Maybe (List Item)
+be fit acc w k Nil = Just (acc <>> Nil)
+be fit acc w k ((i, Empty) :: xs) = be fit acc w k xs
+be fit acc w k ((i, Line) :: xs) = (be False (acc :< LINE i) w i xs)
+be fit acc w k ((i, (Text s)) :: xs) =
+  if not fit || (k + slen s < w)
+     then (be fit (acc :< TEXT s) w (k + slen s) xs)
+     else Nothing
+be fit acc w k ((i, (Nest j x)) :: xs) = be fit acc w k ((i + j, x) :: xs)
+be fit acc w k ((i, (Seq x y)) :: xs) = be fit acc w k ((i,x) :: (i,y) :: xs)
+be fit acc w k ((i, (Alt x y)) :: xs) =
+  (_<>>_ acc) <$> (be True Lin w k ((i,x) :: xs) <|> be fit Lin w k ((i,y) :: xs))
+
+best : Int -> Int -> Doc -> List Item
+best w k x = fromMaybe Nil $ be False Lin w k ((0,x) :: Nil)
+
+-- Public class
+
+class Pretty a where
+  pretty : a -> Doc
+
+
+render : Int -> Doc -> String
+render w x = layout (best w 0 x) Lin
+
+
+instance Semigroup Doc where x <+> y = Seq x (Seq (Text " ") y)
+
+-- Match System.File so we don't get warnings
+
+infixl 5 _</>_
+
+
+line : Doc
+line = Line
+
+
+text : String -> Doc
+text = Text
+
+
+nest : Int -> Doc -> Doc
+nest = Nest
+
+instance Concat Doc where
+  x ++ y = Seq x y
+
+
+_</>_ : Doc -> Doc -> Doc
+x </> y = x ++ line ++ y
+
+-- fold, but doesn't emit extra nil
+
+folddoc : (Doc -> Doc -> Doc) -> List Doc -> Doc
+folddoc f Nil = Empty
+folddoc f (x :: Nil) = x
+folddoc f (x :: xs) = f x (folddoc f xs)
+
+-- separate with space
+
+spread : List Doc -> Doc
+spread = folddoc _<+>_
+
+-- separate with new lines
+
+stack : List Doc -> Doc
+stack = folddoc _</>_
+
+-- bracket x with l and r, indenting contents on new line
+
+bracket : String -> Doc -> String -> Doc
+bracket l x r = group (text l ++ nest 2 (line ++ x) ++ line ++ text r)
+
+
+infixl 5 _<+/>_
+
+-- Either space or newline
+
+_<+/>_ : Doc -> Doc -> Doc
+x <+/> y = x ++ Alt (text " ") line ++ y
+
+-- Reformat some docs to fill. Not sure if I want this precise behavior or not.
+
+fill : List Doc -> Doc
+fill Nil = Empty
+fill (x :: Nil) = x
+fill (x :: y :: xs) = Alt (flatten x <+> fill (flatten y :: xs)) (x </> fill (y :: xs))
+
+-- separate with comma
+
+commaSep : List Doc -> Doc
+commaSep = folddoc (\a b => a ++ text "," <+/> b)
+
+-- If we stick Doc into a String, try to avoid line-breaks via `flatten`
+
+instance Interpolation Doc where
+  interpolate = render 80 ∘ flatten

@@ -1,0 +1,14 @@
+module Data.SnocList
+
+import Prelude
+
+snoclen : ∀ a. SnocList a → Nat
+snoclen {a} xs = go xs Z
+  where
+    go : SnocList a → Nat → Nat
+    go Lin acc = acc
+    go (xs :< x) acc = go xs (S acc)
+
+snocelem : ∀ a. {{Eq a}} → a → SnocList a → Bool
+snocelem a Lin = False
+snocelem a (xs :< x) = if a == x then True else snocelem a xs

@@ -6,6 +6,10 @@ id x = x
 the : (a : U) → a → a
 the _ a = a
 
+const : ∀ a b. a → b → a
+const a b = a
+
+
 data Bool = True | False
 
 not : Bool → Bool
@@ -121,14 +125,19 @@ cong : {A B : U} {a b : A} -> (f : A -> B) -> a ≡ b -> f a ≡ f b
 sym : {A : U} -> {a b : A} -> a ≡ b -> b ≡ a
 sym Refl = Refl
 
+
+
 -- Functor
 
 class Functor (m : U → U) where
   map : {0 a b} → (a → b) → m a → m b
 
-infixr 4 _<$>_
+infixr 4 _<$>_ _<$_
 _<$>_ : {0 f} {{Functor f}} {0 a b} → (a → b) → f a → f b
 f <$> ma = map f ma
+
+_<$_ : ∀ f a b. {{Functor f}} → b → f a → f b
+a <$ b = const a <$> b
 
 instance Functor Maybe where
   map f Nothing = Nothing
@@ -161,8 +170,6 @@ class Applicative (f : U → U) where
   return : {0 a} → a → f a
   _<*>_ : {0 a b} -> f (a → b) → f a → f b
 
-const : ∀ a b. a → b → a
-const a b = a
 
 _<*_ : ∀ f a b. {{Applicative f}} → f a → f b → f a
 fa <* fb = return const <*> fa <*> fb
@@ -448,9 +455,15 @@ pfunc stringToInt : String → Int := `(s) => {
   return rval
 }`
 
+-- TODO - add Foldable
+
 foldl : ∀ A B. (B -> A -> B) -> B -> List A -> B
 foldl f acc Nil = acc
 foldl f acc (x :: xs) = foldl f (f acc x) xs
+
+foldr : ∀ a b. (a → b → b) → b → List a → b
+foldr f b Nil = b
+foldr f b (x :: xs) = f x (foldr f b xs)
 
 infixl 9 _∘_
 _∘_ : {A B C : U} -> (B -> C) -> (A -> B) -> A -> C
@@ -830,3 +843,9 @@ ignore = map (const MkUnit)
 instance ∀ a. {{Show a}} → Show (Maybe a) where
   show Nothing = "Nothing"
   show (Just a) = "Just {show a}"
+
+
+-- TODO
+
+pfunc isPrefixOf uses (True False): String → String → Bool := `(pfx, s) => s.startsWith(pfx) ? True : False`
+pfunc strIndex : String → Int → Char := `(s, ix) => s[ix]`
