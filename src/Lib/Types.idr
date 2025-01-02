@@ -572,21 +572,6 @@ export
 error' : String -> M a
 error' msg = throwError $ E emptyFC msg
 
-export
-freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
-freshMeta ctx fc ty kind = do
-  top <- get
-  mc <- readIORef top.metaCtx
-  debug "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
-  writeIORef top.metaCtx $ { next $= S, metas $= (Unsolved fc mc.next ctx ty kind [] ::) } mc
-  pure $ applyBDs 0 (Meta fc mc.next) ctx.bds
-  where
-    -- hope I got the right order here :)
-    applyBDs : Nat -> Tm -> Vect k BD -> Tm
-    applyBDs k t [] = t
-    -- review the order here
-    applyBDs k t (Bound :: xs) = App emptyFC (applyBDs (S k) t xs) (Bnd emptyFC k)
-    applyBDs k t (Defined :: xs) = applyBDs (S k) t xs
 
 export
 lookupMeta : Nat -> M MetaEntry
