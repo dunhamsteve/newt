@@ -351,6 +351,11 @@ Show MetaKind where
   show User = "User"
   show AutoSolve = "Auto"
 
+public export
+Eq MetaKind where
+  a == b = show a == show b
+
+
 -- constrain meta applied to val to be a val
 public export
 data MConstraint = MkMc FC Env (SnocList Val) Val

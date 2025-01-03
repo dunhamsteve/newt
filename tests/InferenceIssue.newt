@@ -1,0 +1,13 @@
+module InferenceIssue
+
+import Prelude
+
+something : String → Maybe (Either String String)
+
+foo : String → Maybe String
+foo s = do
+  bar <- something s
+  case bar of
+    Left x => Just x
+    Right y => Just y
+

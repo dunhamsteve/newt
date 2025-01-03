@@ -114,7 +114,7 @@ isCandidate _ _ = False
 
 -- This is a crude first pass
 export
-findMatches : Context -> Val -> List TopEntry -> M (List (Tm, MetaContext))
+findMatches : Context -> Val -> List TopEntry -> M (List String)
 findMatches ctx ty [] = pure []
 findMatches ctx ty ((MkEntry _ name type def) :: xs) = do
   let True = isCandidate ty type | False => findMatches ctx ty xs
@@ -133,19 +133,18 @@ findMatches ctx ty ((MkEntry _ name type def) :: xs) = do
       let (QN ns nm) = name
       tm <- check ctx (RVar fc nm) ty
       debug "Found \{pprint [] tm} for \{show ty}"
-      mc' <- readIORef top.metaCtx
       writeIORef top.metaCtx mc
-      ((tm, mc') ::) <$> findMatches ctx ty xs)
+      (nm ::) <$> findMatches ctx ty xs)
     (\ err => do
       debug "No match \{show ty} \{pprint [] type} \{showError "" err}"
       writeIORef top.metaCtx mc
       findMatches ctx ty xs)
 
 export
-contextMatches : Context -> Val -> M (List (Tm, MetaContext))
+contextMatches : Context -> Val -> M (List (Tm, Val))
 contextMatches ctx ty = go (zip ctx.env (toList ctx.types))
   where
-    go : List (Val, String, Val) -> M (List (Tm, MetaContext))
+    go : List (Val, String, Val) -> M (List (Tm, Val))
     go [] = pure []
     go ((tm, nm, vty) :: xs) = do
       type <- quote ctx.lvl vty
@@ -158,7 +157,7 @@ contextMatches ctx ty = go (zip ctx.env (toList ctx.types))
           mc' <- readIORef top.metaCtx
           writeIORef top.metaCtx mc
           tm <- quote ctx.lvl tm
-          ((tm, mc') ::) <$> go xs)
+          ((tm, vty) ::) <$> go xs)
         (\ err => do
           debug "No match \{show ty} \{pprint (names ctx) type} \{showError "" err}"
           writeIORef top.metaCtx mc
@@ -185,33 +184,51 @@ makeSpine 0 xs = ?fixme
 export
 solve : Env -> (k : Nat) -> SnocList Val -> Val -> M ()
 
+
 export
-solveAutos : Nat -> List MetaEntry -> M ()
-solveAutos mstart [] = pure ()
-solveAutos mstart ((Unsolved fc k ctx ty AutoSolve _) :: es) = do
-      debug "AUTO solving \{show k} : \{show ty}"
+trySolveAuto : MetaEntry -> M Bool
+trySolveAuto (Unsolved fc k ctx ty AutoSolve _) = do
+      debug "TRYAUTO solving \{show k} : \{show ty}"
       -- fill in solved metas in type
       x <- quote ctx.lvl ty
       ty <- eval ctx.env CBN x
       debug "AUTO ---> \{show ty}"
       -- we want the context here too.
       top <- get
-      [(tm, mc)] <- case !(contextMatches ctx ty) of
-            [] => findMatches ctx ty $ toList top.defs
-            xs => pure xs
+      [] <- contextMatches ctx ty
+          | [(tm, vty)] => do
+              unifyCatch (getFC ty) ctx ty vty
+              val <- eval ctx.env CBN tm
+              debug "SOLUTION \{pprint [] tm} evaled to \{show val}"
+              let sp = makeSpine ctx.lvl ctx.bds
+              solve ctx.env k sp val
+              pure True
+          | res => do
+              debug "FAILED to solve \{show ty}, matches: \{commaSep $ map (pprint [] . fst) res}"
+              pure False
+      [nm] <- findMatches ctx ty $ toList top.defs
         | res => do
-          debug "FAILED to solve \{show ty}, matches: \{commaSep $ map (pprint [] . fst) res}"
-          solveAutos mstart es
-      writeIORef top.metaCtx mc
+          debug "FAILED to solve \{show ty}, matches: \{show res}"
+          pure False
+      tm <- check ctx (RVar fc nm) ty
       val <- eval ctx.env CBN tm
       debug "SOLUTION \{pprint [] tm} evaled to \{show val}"
       let sp = makeSpine ctx.lvl ctx.bds
       solve ctx.env k sp val
-      mc <- readIORef top.metaCtx
-      let mlen = length mc.metas `minus` mstart
-      solveAutos mstart (take mlen mc.metas)
-solveAutos mstart (_ :: es) = solveAutos mstart es
+      pure True
+trySolveAuto _ = pure False
 
+export
+solveAutos : Nat -> List MetaEntry -> M ()
+solveAutos mstart [] = pure ()
+solveAutos mstart (entry :: es) = do
+      case !(trySolveAuto entry) of
+        False => solveAutos mstart es
+        True => do
+          top <- get
+          mc <- readIORef top.metaCtx
+          let mlen = length mc.metas `minus` mstart
+          solveAutos mstart (take mlen mc.metas)
 
 -- We need to switch to SortedMap here
 export
@@ -227,16 +244,34 @@ updateMeta ix f = do
     go (x@((Unsolved y k z w v ys)) :: xs) = if k == ix then (::xs) <$> f x else (x ::) <$> go xs
     go (x@((Solved _ k y)) :: xs) = if k == ix then (::xs) <$> f x else (x ::) <$> go xs
 
+
+checkAutos : Nat -> List MetaEntry -> M ()
+checkAutos ix Nil = pure ()
+checkAutos ix (entry@(Unsolved fc k ctx ty AutoSolve _) :: rest) = do
+  ty' <- quote ctx.lvl ty
+  when (usesMeta ty') $ ignore $ trySolveAuto entry
+  checkAutos ix rest
+  where
+    usesMeta : Tm -> Bool
+    usesMeta (App _ (Meta _ k) u) = if k == ix then True else usesMeta u
+    usesMeta (App _ _ u) = usesMeta u
+    usesMeta _ = False
+checkAutos ix (_ :: rest) = checkAutos ix rest
+
+
 export
 addConstraint : Env -> Nat -> SnocList Val -> Val -> M ()
 addConstraint env ix sp tm = do
-  top <- get
-  mc <- readIORef top.metaCtx
   updateMeta ix $ \case
     (Unsolved pos k a b c cons) => do
       debug "Add constraint m\{show ix} \{show sp} =?= \{show tm}"
       pure (Unsolved pos k a b c (MkMc (getFC tm) env sp tm :: cons))
     (Solved _ k tm) => error' "Meta \{show k} already solved [addConstraint]"
+  top <- get
+  mc <- readIORef top.metaCtx
+  checkAutos ix mc.metas
+  -- this loops too
+  -- solveAutos 0 mc.metas
   pure ()
 
 
@@ -511,6 +546,8 @@ freshMeta ctx fc ty kind = do
   debug "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
   let newmeta = Unsolved fc mc.next ctx ty kind []
   writeIORef top.metaCtx $ { next $= S, metas $= (newmeta ::) } mc
+  -- infinite loop - keeps trying Ord a => Ord (a \x a)
+  -- when (kind == AutoSolve) $ ignore $ trySolveAuto newmeta
   pure $ applyBDs 0 (Meta fc mc.next) ctx.bds
   where
     -- hope I got the right order here :)

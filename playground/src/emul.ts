@@ -121,6 +121,7 @@ export let shim: NodeShim = {
     },
     openSync(name: string, mode: string) {
       console.log("open", name, mode);
+      if (name.startsWith('./')) name = name.slice(2)
       let te = new TextEncoder();
 
       let fd = shim.fds.findIndex((x) => !x);

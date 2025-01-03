@@ -65,11 +65,13 @@ logMetas mstart = do
           debug "AUTO ---> \{show ty}"
           -- we want the context here too.
           top <- get
-          matches <- case !(contextMatches ctx ty) of
-            [] => findMatches ctx ty $ toList top.defs
-            xs => pure xs
+          -- matches <- case !(contextMatches ctx ty) of
+          --   [] => findMatches ctx ty $ toList top.defs
+          --   xs => pure xs
+          matches <- findMatches ctx ty $ toList top.defs
           -- TODO try putting mc into TopContext for to see if it gives better terms
-          pure $ "  \{show $ length matches} Solutions:" :: map (("  " ++) . interpolate . pprint (names ctx) . fst) matches
+          pure $ ["  \{show $ length matches} Solutions: \{show matches}"]
+          -- pure $ "  \{show $ length matches} Solutions:" :: map (("  " ++) . interpolate . pprint (names ctx) . fst) matches
 
         _ => pure []
       addError $ E fc $ unlines ([msg] ++ msgs ++ sols)
