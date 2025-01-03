@@ -24,6 +24,18 @@ record Gate where
   op : Op
   out : String
 
+in1 : Gate → String
+in1 g = g.in1
+
+in2 : Gate → String
+in2 g = g.in2
+
+out : Gate → String
+out g = g.out
+
+op : Gate → Op
+op g = g.op
+
 Wire : U
 Wire = String × Int
 

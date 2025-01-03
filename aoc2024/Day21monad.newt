@@ -81,7 +81,7 @@ getPaths interdit pt@(a,b) to@(c,d) =
 updateCost : Point × Point → Int → State Keypad Unit
 updateCost path cost = do
   kp <- get
-  put (KP (name kp) (start kp) (interdit kp) (updateMap path cost (costs kp)) (next kp))
+  put (KP (.name kp) (.start kp) (.interdit kp) (updateMap path cost (.costs kp)) (.next kp))
 
 keyPos : Dir → Point
 keyPos North = (0,1)
@@ -103,10 +103,10 @@ seqCost cur (pt :: pts) cost = do
 -- cost of best path from -> to in kp
 pathCost from to = do
   kp <- get {Keypad}
-  case lookupMap (from, to) (costs kp) of
+  case lookupMap (from, to) (.costs kp) of
     Just (_, cost) => pure {State Keypad} cost
     Nothing =>
-      let (path :: paths) = getPaths (interdit kp) from to | _ => ? in
+      let (path :: paths) = getPaths (.interdit kp) from to | _ => ? in
       case kp of
         (KP n s i c Nothing) => pure 1
         (KP n s i c (Just kp')) => do
@@ -125,7 +125,7 @@ pathCost from to = do
     mincost : List Dir → List (List Dir) → State Keypad Int
     mincost path paths = do
       kp <- get
-      cost <- seqCost (0,2) (xlate path $ start kp) 0
+      cost <- seqCost (0,2) (xlate path $ kp.start) 0
       case paths of
         Nil => pure cost
         (path :: paths) => do
@@ -163,13 +163,13 @@ run fn = do
   let rob1 = KP "r1" (0,2) (0,0) EmptyMap Nothing
   let robn = makeKeypad 2 rob1
   let kp = KP "kp" (3,2) (3,0) EmptyMap (Just robn)
-  let p1 = foldl _+_ 0 $ map (uncurry _*_) $ snd $ runState (traverse (runOne numpad) codes) kp
+  let p1 = foldl _+_ 0 $ map (uncurry _*_) $ snd $ .runState (traverse (runOne numpad) codes) kp
   putStrLn $ "part1 " ++ show p1
 
   let rob1 = KP "r1" (0,2) (0,0) EmptyMap Nothing
   let robn = makeKeypad 25 rob1
   let kp = KP "kp" (3,2) (3,0) EmptyMap (Just robn)
-  let p2 = foldl _+_ 0 $ map (uncurry _*_) $ snd $ runState (traverse (runOne numpad) codes) kp
+  let p2 = foldl _+_ 0 $ map (uncurry _*_) $ snd $ .runState (traverse (runOne numpad) codes) kp
   putStrLn $ "part2 " ++ show p2
 
 main : IO Unit

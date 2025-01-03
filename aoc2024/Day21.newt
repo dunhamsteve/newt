@@ -75,10 +75,10 @@ seqCost cur (pt :: pts) (kp, cost) =
 
 -- cost of best path from -> to in kp
 pathCost from to kp =
-  case lookupMap (from, to) (costs kp) of
+  case lookupMap (from, to) kp.costs of
     Just (_, cost) => (kp, cost)
     Nothing =>
-      let (path :: paths) = getPaths (interdit kp) from to | _ => ? in
+      let (path :: paths) = getPaths kp.interdit from to | _ => ? in
       case kp of
         (KP n s i c Nothing) => (kp, 1)
         (KP n s i c (Just kp')) =>
@@ -92,7 +92,7 @@ pathCost from to kp =
 
     mincost : List Dir → List (List Dir) → Keypad → Keypad × Int
     mincost path paths kp =
-      let (kp', cost) = seqCost (0,2) (xlate path $ start kp) (kp, 0) in
+      let (kp', cost) = seqCost (0,2) (xlate path kp.start) (kp, 0) in
       case paths of
         Nil => (kp', cost)
         (path :: paths) => let (kp', cost') = mincost path paths kp' in (kp', min cost cost')
