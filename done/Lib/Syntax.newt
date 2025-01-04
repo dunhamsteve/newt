@@ -115,8 +115,8 @@ data Decl
   | PFunc FC Name (List String) Raw String
   | PMixFix FC (List Name) Int Fixity
   | Class FC Name Telescope (List Decl)
-  | Instance FC Raw (List Decl)
-  | Record FC Name Telescope (Maybe Name) (Maybe (List Decl))
+  | Instance FC Raw (Maybe (List Decl))
+  | Record FC Name Telescope (Maybe Name) (List Decl)
 
 
 instance HasFC Decl where
@@ -277,8 +277,7 @@ instance Pretty Decl where
   pretty (PFunc _ nm Nil ty src) = text "pfunc" <+> text nm <+> text ":" <+> nest 2 (pretty ty <+> text ":=" <+/> text (show src))
   pretty (PFunc _ nm used ty src) = text "pfunc" <+> text nm <+> text "uses" <+> spread (map text used) <+> text ":" <+> nest 2 (pretty ty <+> text ":=" <+/> text (show src))
   pretty (PMixFix _ names prec fix) = text (show fix) <+> text (show prec) <+> spread (map text names)
-  pretty (Record _ nm tele cname Nothing) = text "record" <+> text nm <+> text ":" <+> spread (map prettyBind tele)
-  pretty (Record _ nm tele cname (Just decls)) = text "record" <+> text nm <+> text ":" <+> spread (map prettyBind tele)
+  pretty (Record _ nm tele cname decls) = text "record" <+> text nm <+> text ":" <+> spread (map prettyBind tele)
     <+> (nest 2 $ text "where" </> stack (maybe empty (\ nm' => text "constructor" <+> text nm') cname :: map pretty decls))
   pretty (Class _ nm tele decls) = text "class" <+> text nm <+> text ":" <+> spread (map prettyBind tele)
     <+> (nest 2 $ text "where" </> stack (map pretty decls))

@@ -23,9 +23,10 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [x] fix "insufficient patterns", wire in M or Either String
 - [x] Matching _,_ when Maybe is expected should be an error
 - [ ] There are issues with matching inside do blocks, I think we need to guess scrutinee? I could imagine constraining metas too (e.g. if Just ... at ?m123 then ?m123 =?= Maybe ?m456)
-  - `newt/Fixme.newt` - I can drop `do` _and_ put `bind {IO}` to push it along. It may need to try to solve autos earlier and better.
+  - ~~`newt/Fixme.newt` - I can drop `do` _and_ put `bind {IO}` to push it along. It may need to try to solve autos earlier and better.~~
   - Also, the root cause is tough to track down if there is a type error (this happens with `do` in Idris, too).
   - Part of it is the auto solutions are getting discarded because of an unrelated unification failure. Either auto shouldn't go as deep or should run earlier. Forgetting that lookupMap returns a (k,v) pair is a good example.
+  - I've gotten it to the point where things are solved for good code, but it still does poorly when there is an error. (Auto fails to solve and it doesn't get far enough to report error.)
 - [ ] add error for non-linear pattern
 - [ ] typeclass dependencies
   - need to flag internal functions to not search (or flag functions for search). I need to decide on syntax for this.

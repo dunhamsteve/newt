@@ -403,23 +403,26 @@ record M a where
   runM : TopContext -> IO (Either Error (TopContext × a))
 
 instance Functor M where
-  map f (MkM run) = MkM $ \tc => bind {IO} (run tc) $ \case
-      Left err => pure $ Left err
-      Right (tc', a) => pure $ Right (tc', f a)
+  map f (MkM run) = MkM $ \tc => do
+    (Right (tc', a))  <- (run tc)
+      | Left err => pure $ Left err
+    pure $ Right (tc', f a)
 
 instance Applicative M where
   return x = MkM $ \tc => pure $ Right (tc, x)
-  (MkM f) <*> (MkM x) = MkM $ \tc => bind {IO} (f tc) $ \case
-      Left err => pure $ Left err
-      Right (tc', f') => bind {IO} (x tc') $ \case
-          Left err => pure $ Left err
-          Right (tc'', x') => pure $ Right (tc'', f' x')
+  (MkM f) <*> (MkM x) = MkM $ \tc => do
+    Right (tc', f') <- f tc
+      | Left err => pure $ Left err
+    Right (tc'', x') <- x tc'
+      | Left err => pure $ Left err
+    pure $ Right (tc'', f' x')
 
 instance Monad M where
   pure = return
-  bind (MkM x) f = MkM $ \tc => bind {IO} (x tc) $ \case
-      Left err => pure $ Left err
-      Right (tc', a) => runM (f a) tc'
+  bind (MkM x) f = MkM $ \tc => do
+    (Right (tc', a)) <- x tc
+      | Left err => pure $ Left err
+    .runM (f a) tc'
 
 instance HasIO M where
   liftIO io = MkM $ \tc => do
@@ -430,9 +433,10 @@ throwError : ∀ a. Error -> M a
 throwError err = MkM $ \_ => pure $ Left err
 
 catchError : ∀ a. M a -> (Error -> M a) -> M a
-catchError (MkM ma) handler = MkM $ \tc => bind {IO} (ma tc) $ \case
-    Left err => runM (handler err) tc
-    Right (tc', a) => pure $ Right (tc', a)
+catchError (MkM ma) handler = MkM $ \tc => do
+  (Right (tc', a)) <- ma tc
+    | Left err => .runM (handler err) tc
+  pure $ Right (tc', a)
 
 tryError : ∀ a. M a -> M (Either Error a)
 tryError ma = catchError (map Right ma) (pure ∘ Left)

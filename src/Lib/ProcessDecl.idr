@@ -74,7 +74,8 @@ logMetas mstart = do
           -- pure $ "  \{show $ length matches} Solutions:" :: map (("  " ++) . interpolate . pprint (names ctx) . fst) matches
 
         _ => pure []
-      addError $ E fc $ unlines ([msg] ++ msgs ++ sols)
+      info fc $ unlines ([msg] ++ msgs ++ sols)
+      -- addError $ E fc $ unlines ([msg] ++ msgs ++ sols)
 
 
 -- Used for Class and Record
@@ -155,7 +156,7 @@ processDecl ns (Def fc nm clauses) = do
 
   mc <- readIORef top.metaCtx
   let mlen = length mc.metas `minus` mstart
-  solveAutos mstart (take mlen mc.metas)
+  solveAutos mstart
   -- TODO - make nf that expands all metas and drop zonk
   -- Day1.newt is a test case
   -- tm' <- nf [] tm

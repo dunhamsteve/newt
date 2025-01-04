@@ -139,7 +139,11 @@ commit = P $ \toks com ops col => OK MkUnit toks True ops
 
 some : ∀ a. Parser a -> Parser (List a)
 many : ∀ a. Parser a -> Parser (List a)
-some p = _::_ <$> p <*> many p
+
+some p = do
+  x <- p
+  xs <- many p
+  pure (x :: xs)
 many p = some p <|> pure Nil
 
 -- one or more `a` seperated by `s`

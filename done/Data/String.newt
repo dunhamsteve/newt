@@ -9,3 +9,5 @@ class Interpolation a where
 unwords : List String → String
 unwords stuff = joinBy " " stuff
 
+instance Cast String Int where
+  cast = stringToInt

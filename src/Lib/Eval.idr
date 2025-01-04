@@ -17,12 +17,14 @@ eval : Env -> Mode -> Tm -> M Val
 -- It would be nice if the environment were lazy.
 -- e.g. case is getting evaluated when passed to a function because
 -- of dependencies in pi-types, even if the dependency isn't used
+
+public export
+infixl 8 $$
+
 public export
 ($$) : {auto mode : Mode} -> Closure -> Val -> M Val
 ($$) {mode} (MkClosure env tm) u = eval (u :: env) mode tm
 
-public export
-infixl 8 $$
 
 export
 vapp : Val -> Val -> M Val

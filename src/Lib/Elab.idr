@@ -218,17 +218,42 @@ trySolveAuto (Unsolved fc k ctx ty AutoSolve _) = do
       pure True
 trySolveAuto _ = pure False
 
+-- export
+-- solveAutos : Nat -> List MetaEntry -> M ()
+-- solveAutos mstart [] = pure ()
+-- solveAutos mstart (entry :: es) = do
+--       res <- trySolveAuto entry
+--       -- idris is inlining this and blowing stack?
+--       if res
+--         then do
+--           top <- get
+--           mc <- readIORef top.metaCtx
+--           let mlen = length mc.metas `minus` mstart
+--           solveAutos mstart (take mlen mc.metas)
+--         else
+--           solveAutos mstart es
+
+
+-- Called from ProcessDecl, this was popping the stack, the tail call optimization doesn't
+-- handle the traversal of the entire meta list.  I've turned the restart into a trampoline
+-- and filtered it down to unsolved autos.
 export
-solveAutos : Nat -> List MetaEntry -> M ()
-solveAutos mstart [] = pure ()
-solveAutos mstart (entry :: es) = do
-      case !(trySolveAuto entry) of
-        False => solveAutos mstart es
-        True => do
-          top <- get
-          mc <- readIORef top.metaCtx
-          let mlen = length mc.metas `minus` mstart
-          solveAutos mstart (take mlen mc.metas)
+solveAutos : Nat -> M ()
+solveAutos mstart = do
+  top <- get
+  mc <- readIORef top.metaCtx
+  let mlen = length mc.metas `minus` mstart
+  res <- run $ filter isAuto (take mlen mc.metas)
+  if res then solveAutos mstart else pure ()
+  where
+    isAuto : MetaEntry -> Bool
+    isAuto (Unsolved fc k ctx x AutoSolve xs) = True
+    isAuto _ = False
+
+    run : List MetaEntry -> M Bool
+    run Nil = pure False
+    run (e :: es) =
+      if !(trySolveAuto e) then pure True else run es
 
 -- We need to switch to SortedMap here
 export
@@ -379,7 +404,13 @@ solve env m sp t = do
       MkMc fc env sp rhs => do
         val <- vappSpine soln sp
         debug "discharge l=\{show $ length env} \{(show val)} =?= \{(show rhs)}"
-        unify env Normal val rhs)
+        unify env Normal val rhs
+    mc <- readIORef top.metaCtx
+    -- stack ...
+    -- checkAutos ix mc.metas
+    pure MkUnit
+    )
+
     (\case
       Postpone fc ix msg => do
         -- let someone else solve this and then check again.
@@ -1116,6 +1147,22 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints [] expr) :: cs) ty) = do
 
   -- REVIEW We probably need to know this is a VRef before we decide to split on this slot..
   scty' <- unlet ctx.env scty >>= forceType ctx.env
+  -- TODO attempting to pick up Autos that could have been solved immediately
+  -- If we try on creation, we're looping at the moment, because of the possibility
+  -- of Ord a -> Ord b -> Ord (a \x b). Need to cut earlier when solving or switch to
+  -- Idris method...
+  scty' <- case scty' of
+    (VMeta fc1 ix sp) => do
+      case !(lookupMeta ix) of
+        (Solved _ k t) => forceType ctx.env scty'
+        (Unsolved _ k xs _ _ _) => do
+          top <- get
+          mc <- readIORef top.metaCtx
+          ignore $ solveAutos 0
+          forceType ctx.env scty'
+
+    _ => pure scty'
+
   case pat of
     PatCon fc _ _ _ as => do
       -- expand vars that may be solved, eval top level functions
