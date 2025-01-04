@@ -146,6 +146,9 @@ showCaseAlt (CaseDefault tm) = "_ => \{show tm}"
 showCaseAlt (CaseCons nm args tm) = "\{show nm} \{unwords args} => \{show tm}"
 showCaseAlt (CaseLit lit tm) = "\{show lit} => \{show tm}"
 
+instance Show CaseAlt where
+  show = showCaseAlt
+
 
 showTm : Tm -> String
 showTm = show
@@ -488,20 +491,20 @@ error fc msg = throwError $ E fc msg
 error' : ∀ a. String -> M a
 error' msg = throwError $ E emptyFC msg
 
-freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
-freshMeta ctx fc ty kind = do
-  top <- get
-  mc <- readIORef top.metaCtx
-  debug $ \ _ => "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
-  writeIORef top.metaCtx $ MC (Unsolved fc mc.next ctx ty kind Nil :: mc.metas) (1 + mc.next)
-  pure $ applyBDs 0 (Meta fc mc.next) ctx.bds
-  where
-    -- hope I got the right order here :)
-    applyBDs : Int -> Tm -> List BD -> Tm
-    applyBDs k t Nil = t
-    -- review the order here
-    applyBDs k t (Bound :: xs) = App emptyFC (applyBDs (1 + k) t xs) (Bnd emptyFC k)
-    applyBDs k t (Defined :: xs) = applyBDs (1 + k) t xs
+-- freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
+-- freshMeta ctx fc ty kind = do
+--   top <- get
+--   mc <- readIORef top.metaCtx
+--   debug $ \ _ => "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
+--   writeIORef top.metaCtx $ MC (Unsolved fc mc.next ctx ty kind Nil :: mc.metas) (1 + mc.next)
+--   pure $ applyBDs 0 (Meta fc mc.next) ctx.bds
+--   where
+--     -- hope I got the right order here :)
+--     applyBDs : Int -> Tm -> List BD -> Tm
+--     applyBDs k t Nil = t
+--     -- review the order here
+--     applyBDs k t (Bound :: xs) = App emptyFC (applyBDs (1 + k) t xs) (Bnd emptyFC k)
+--     applyBDs k t (Defined :: xs) = applyBDs (1 + k) t xs
 
 lookupMeta : Int -> M MetaEntry
 lookupMeta ix = do

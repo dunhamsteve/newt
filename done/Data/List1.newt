@@ -8,3 +8,20 @@ record List1 a where
   constructor _:::_
   head1 : a
   tail1 : List a
+
+split1 : String → String → List1 String
+split1 str by = case split str by of
+  Nil => str ::: Nil
+  x :: xs => x ::: xs
+
+unsnoc : ∀ a. List1 a → List a × a
+unsnoc {a} (x ::: xs) = go x xs
+  where
+    go : a → List a → List a × a
+    go x Nil = (Nil, x)
+    go x (y :: ys) = let (as, a) = go y ys in (x :: as, a)
+
+splitFileName : String → String × String
+splitFileName fn = case split1 fn "." of
+    part ::: Nil => (part, "")
+    xs => mapFst (joinBy ".") $ unsnoc xs

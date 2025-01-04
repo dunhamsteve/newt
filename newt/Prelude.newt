@@ -9,7 +9,7 @@ the _ a = a
 const : ∀ a b. a → b → a
 const a b = a
 
-
+data Unit = MkUnit
 data Bool = True | False
 
 not : Bool → Bool
@@ -185,8 +185,15 @@ instance Traversable List where
   traverse f Nil = return Nil
   traverse f (x :: xs) = return _::_ <*> f x <*> traverse f xs
 
+
+traverse_ : ∀ t f a b. {{Traversable t}} {{Applicative f}} → (a → f b) → t a → f Unit
+traverse_ f xs = return (const MkUnit) <*> traverse f xs
+
 for : {t : U → U} {f : U → U} → {{Traversable t}} {{appf : Applicative f}} → {a : U} → {b : U} → t a → (a → f b) → f (t b)
 for stuff fun = traverse fun stuff
+
+for_ : {t : U → U} {f : U → U} → {{Traversable t}} {{appf : Applicative f}} → {a : U} → {b : U} → t a → (a → f b) → f Unit
+for_ stuff fun = return (const MkUnit) <*> traverse fun stuff
 
 instance Applicative Maybe where
   return a = Just a
@@ -259,7 +266,7 @@ instance Eq String where
 instance Eq Char where
   a == b = jsEq a b
 
-data Unit = MkUnit
+
 
 ptype Array : U → U
 pfunc listToArray : {a : U} -> List a -> Array a := `
@@ -749,6 +756,10 @@ ordNub {a} {{ordA}} xs = go $ qsort _<_ xs
     go (a :: b :: xs) = if a == b then go (a :: xs) else a :: go (b :: xs)
     go t = t
 
+nub : ∀ a. {{Eq a}} → List a → List a
+nub Nil = Nil
+nub (x :: xs) = if elem x xs then nub xs else x :: nub xs
+
 ite : ∀ a. Bool → a → a → a
 ite c t e = if c then t else e
 
@@ -809,6 +820,9 @@ force f = f MkUnit
 when : ∀ f. {{Applicative f}} → Bool → Lazy (f Unit) → f Unit
 when b fa = if b then force fa else return MkUnit
 
+unless : ∀ f. {{Applicative f}} → Bool → Lazy (f Unit) → f Unit
+unless b fa = when (not b) fa
+
 instance ∀ a. {{Ord a}} → Ord (List a) where
   compare Nil Nil = EQ
   compare Nil ys = LT
@@ -838,6 +852,12 @@ isDigit _ = False
 isUpper : Char → Bool
 isUpper c = let o = ord c in 64 < o && o < 91
 
+isAlphaNum : Char → Bool
+isAlphaNum c = let o = ord c in
+  64 < o && o < 91 ||
+  47 < o && o < 58 ||
+  96 < o && o < 123
+
 ignore : ∀ f a. {{Functor f}} → f a → f Unit
 ignore = map (const MkUnit)
 
@@ -849,6 +869,7 @@ instance ∀ a. {{Show a}} → Show (Maybe a) where
 -- TODO
 
 pfunc isPrefixOf uses (True False): String → String → Bool := `(pfx, s) => s.startsWith(pfx) ? True : False`
+pfunc isSuffixOf uses (True False): String → String → Bool := `(pfx, s) => s.endsWith(pfx) ? True : False`
 pfunc strIndex : String → Int → Char := `(s, ix) => s[ix]`
 
 
@@ -861,3 +882,22 @@ getAt' i xs = getAt (cast i) xs
 length' : ∀ a. List a → Int
 length' Nil = 0
 length' (x :: xs) = 1 + length' xs
+
+unlines : List String → String
+unlines lines = joinBy "\n" lines
+
+-- TODO inherit Semigroup
+class Monoid a where
+  neutral : a
+
+findIndex' : ∀ a. (a → Bool) → List a → Maybe Int
+findIndex' {a} pred xs = go xs 0
+  where
+    go : List a → Int → Maybe Int
+    go Nil ix = Nothing
+    go (x :: xs) ix = if pred x then Just ix else go xs (ix + 1)
+
+pfunc fatalError : ∀ a. String → a := `(_, msg) => { throw new Error(msg) }`
+
+foldlM : ∀ m a e. {{Monad m}} → (a → e → m a) → a → List e → m a
+foldlM f a xs = foldl (\ ma b => ma >>= flip f b) (pure a) xs

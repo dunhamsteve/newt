@@ -18,7 +18,7 @@ find src -type f -name '*.idr' | while read -r file; do
       s/\binterface\b/class/g;
       s/import public/import/g;
       s/\[\]/Nil/g;
-      s{\[([^<].*?)\]}{"(" . (join " ::", split /,/, $1) . " :: Nil)"}ge;
+      s{\[([^<|][^()]*?)\]}{"(" . (join " ::", split /,/, $1) . " :: Nil)"}ge;
       s/\bsym\b/symbol/g;
       s/^export//g;
       s/^\s*covering//g;

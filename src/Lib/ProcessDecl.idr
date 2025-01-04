@@ -83,7 +83,7 @@ getSigs : List Decl -> List (FC, String, Raw)
 getSigs [] = []
 getSigs ((TypeSig _ [] _) :: xs) = getSigs xs
 getSigs ((TypeSig fc (nm :: nms) ty) :: xs) = (fc, nm, ty) :: getSigs xs
-getSigs (_:: xs) = getSigs xs
+getSigs (_ :: xs) = getSigs xs
 
 teleToPi : Telescope -> Raw -> Raw
 teleToPi [] end = end
@@ -272,8 +272,8 @@ processDecl ns (Instance instfc ty decls) = do
   conTele <- getFields !(apply vdcty args') env []
   -- declare individual functions, collect their defs
   defs <- for conTele $ \case
-     (MkBind fc nm Explicit rig ty) => do
-       let ty' = foldr (\(MkBind fc nm' icit rig ty'), acc => Pi fc nm' icit rig ty' acc) ty tele
+     (MkBinder fc nm Explicit rig ty) => do
+       let ty' = foldr (\(MkBinder fc nm' icit rig ty'), acc => Pi fc nm' icit rig ty' acc) ty tele
        let nm' = "\{instname},\{nm}"
        -- we're working with a Tm, so we define directly instead of processDecl
        let Just (Def fc name xs) = find (\case (Def y name xs) => name == nm; _ => False) decls
@@ -302,7 +302,7 @@ processDecl ns (Instance instfc ty decls) = do
     -- We're assuming they don't depend on each other.
     getFields : Val -> Env -> List Binder -> M (List Binder)
     getFields tm@(VPi fc nm Explicit rig ty sc) env bnds = do
-      bnd <- MkBind fc nm Explicit rig <$> quote (length env) ty
+      bnd <- MkBinder fc nm Explicit rig <$> quote (length env) ty
       getFields !(sc $$ VVar fc (length env) [<]) env (bnd :: bnds)
     getFields tm@(VPi fc nm _ rig ty sc) env bnds = getFields !(sc $$ VVar fc (length env) [<]) env bnds
     getFields tm xs bnds = pure $ reverse bnds
@@ -312,7 +312,7 @@ processDecl ns (Instance instfc ty decls) = do
     tenv (S k) = (VVar emptyFC k [<] :: tenv k)
 
     mkRHS : String -> List Binder -> Raw -> Raw
-    mkRHS instName (MkBind fc nm Explicit rig ty :: bs) tm = mkRHS instName bs (RApp fc tm (RVar fc "\{instName},\{nm}") Explicit)
+    mkRHS instName (MkBinder fc nm Explicit rig ty :: bs) tm = mkRHS instName bs (RApp fc tm (RVar fc "\{instName},\{nm}") Explicit)
     mkRHS instName (b :: bs) tm = mkRHS instName bs tm
     mkRHS instName [] tm = tm
 
@@ -364,7 +364,7 @@ processDecl ns (Data fc nm ty cons) = do
           -- We know it's in U because it's part of a checked Pi type
           let (codomain, tele) = splitTele dty
           -- for printing
-          let tnames = reverse $ map (\(MkBind _ nm _ _ _) => nm) tele
+          let tnames = reverse $ map (\(MkBinder _ nm _ _ _) => nm) tele
           let (Ref _ hn _, args) := funArgs codomain
             | (tm, _) => error (getFC tm) "expected \{nm} got \{pprint tnames tm}"
           when (hn /= QN ns nm) $

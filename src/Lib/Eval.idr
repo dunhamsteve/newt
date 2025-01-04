@@ -79,6 +79,7 @@ tryEval env (VRef fc k _ sp) = do
             val <- vappSpine vtm sp
             case val of
               VCase _ _ _ => pure Nothing
+              VLetRec _ _ _ _ _ => pure Nothing
               v => pure $ Just v)
             (\ _ => pure Nothing)
       _ => pure Nothing

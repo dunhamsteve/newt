@@ -1,0 +1,26 @@
+module Test.Parser
+
+import Prelude
+import Lib.Parser
+import Lib.Tokenizer
+import Node
+
+
+
+main : IO Unit
+main = do
+  let fn = "port/Lib/Parser.newt"
+  (Right text) <- readFile fn
+    | Left msg => putStrLn $ "ERROR: " ++ msg
+  let (Right toks) = tokenise fn text
+    | Left (E fc msg) => putStrLn msg
+    | _ => putStrLn "postpone error"
+  -- debugLog toks
+
+  let (OK a toks com ops) = runP parseMod toks False EmptyMap (MkFC fn (0,0))
+    | fail => debugLog fail
+  putStrLn "Module"
+  debugLog $ a
+  let (MkModule name imports decls) = a
+  let lines = map (render 90 ∘ pretty) decls
+  putStrLn $ joinBy "\n" lines

@@ -198,3 +198,6 @@ foldMap f m Nil = m
 foldMap f m ((a,b) :: xs) = case lookupMap a m of
   Nothing => foldMap f (updateMap a b m) xs
   Just (_, b') => foldMap f (updateMap a (f b' b) m) xs
+
+listValues : ∀ k v. SortedMap k v → List v
+listValues sm = map snd $ toList sm

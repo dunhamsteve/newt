@@ -1,0 +1,34 @@
+module Node
+
+import Prelude
+
+pfunc fs : JSObject := `require('fs')`
+pfunc getArgs : List String := `arrayToList(String, process.argv.slice(1))`
+pfunc readFile uses (fs MkIORes Left Right) : (fn : String) -> IO (Either String String) := `(fn) => (w) => {
+  let result
+  try {
+    let content = fs.readFileSync(fn, 'utf8')
+    result = Right(undefined, undefined, content)
+  } catch (e) {
+    let err = ""+e
+    result = Left(undefined, undefined, e)
+  }
+  return MkIORes(undefined, result, w)
+}`
+
+-- I wonder if I should automatically `uses` the constructors in the types
+pfunc writeFile uses (fs MkIORes MkUnit) : String → String → IO (Either String Unit) := `(fn, content) => {
+  let result
+  try {
+    fs.writeFileSync(fn, content, 'utf8')
+    result = Right(undefined, undefined, MkUnit)
+  } catch (e) {
+      let err = ""+e
+      result = Left(undefined, undefined, e)
+  }
+  return MkIORes(undefined, result, w)
+}`
+
+-- maybe System.exit or something, like the original putStrLn msg >> exitFailure
+pfunc exitFailure : ∀ a. String → a := `(_, msg) => { throw new Error(msg) }`
+
