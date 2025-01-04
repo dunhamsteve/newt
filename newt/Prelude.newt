@@ -534,6 +534,7 @@ getAt _ Nil = Nothing
 getAt Z (x :: xs) = Just x
 getAt (S k) (x :: xs) = getAt k xs
 
+
 splitOn : ∀ a. {{Eq a}} → a → List a → List (List a)
 splitOn {a} v xs = go Nil xs
   where
@@ -849,3 +850,14 @@ instance ∀ a. {{Show a}} → Show (Maybe a) where
 
 pfunc isPrefixOf uses (True False): String → String → Bool := `(pfx, s) => s.startsWith(pfx) ? True : False`
 pfunc strIndex : String → Int → Char := `(s, ix) => s[ix]`
+
+
+instance ∀ a. {{Show a}} → Show (SnocList a) where
+  show xs = show (xs <>> Nil)
+
+getAt' : ∀ a. Int → List a → Maybe a
+getAt' i xs = getAt (cast i) xs
+
+length' : ∀ a. List a → Int
+length' Nil = 0
+length' (x :: xs) = 1 + length' xs
