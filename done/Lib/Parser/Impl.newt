@@ -84,7 +84,7 @@ getOps = P $ \ toks com ops col => OK ops toks com ops
 
 addOp : String -> Int -> Fixity -> Parser Unit
 addOp nm prec fix = P $ \ toks com ops col =>
-  let parts = split "_" nm in
+  let parts = split nm "_" in
   case parts of
     "" :: key :: rule => OK MkUnit toks com (updateMap key (MkOp nm prec fix False rule) ops)
     key :: rule => OK MkUnit toks com (updateMap key (MkOp nm prec fix True rule) ops)

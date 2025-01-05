@@ -29,6 +29,14 @@ flatten Line = Text " "
 flatten (Text str) = Text str
 flatten (Alt x y) = flatten x
 
+noAlt : Doc -> Doc
+noAlt Empty = Empty
+noAlt (Seq x y) = Seq (noAlt x) (noAlt y)
+noAlt (Nest i x) = noAlt x
+noAlt Line = Line
+noAlt (Text str) = Text str
+noAlt (Alt x y) = noAlt x
+
 group : Doc -> Doc
 group x = Alt (flatten x) x
 

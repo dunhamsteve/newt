@@ -1,0 +1,35 @@
+#!/bin/sh
+mkdir -p tmp
+echo "Test AoC 2024 solutions"
+NCC="bun run newt.js"
+total=0
+failed=0
+for fn in  aoc2024/Day*.newt; do
+  total=$((total + 1))
+  echo Test $fn
+  bn=$(basename $fn)
+  $NCC $fn -o out.js > tmp/${bn}.compile
+  if [ $? != "0" ]; then
+    echo Compile failed for $fn
+    failed=$((failed + 1))
+    continue
+  fi
+  # if there is a golden file, run the code and compare output
+  if [ -f ${fn}.golden ]; then
+    bun run out.js > tmp/${bn}.out
+    if [ $? != "0" ]; then
+      echo Run failed for $fn
+      failed=$((failed + 1))
+      continue
+    fi
+    if ! diff -q tmp/${bn}.out ${fn}.golden; then
+      echo "Output mismatch for $fn"
+      failed=$((failed + 1))
+    fi
+  fi
+done
+
+echo "Total tests: $total"
+echo "Failed tests: $failed"
+
+

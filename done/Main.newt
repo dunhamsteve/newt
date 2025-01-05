@@ -55,7 +55,7 @@ writeSource fn = do
         ( "\"use strict\";"
         ::  "const PiType = (h0, h1) => ({ tag: \"PiType\", h0, h1 })"
         :: Nil)
-        ++ map (render 90) docs
+        ++ map (render 90 ∘ noAlt) docs
   (Right _) <- liftIO {M} $ writeFile fn src
     | Left err => exitFailure (show err)
   -- (Right _) <- chmodRaw fn 493 | Left err => exitFailure (show err)
@@ -150,6 +150,19 @@ baseDir (dirs :< d) (ns :< n) = if d == n
   else Left "module path doesn't match directory"
 baseDir Lin _ = Left "module path doesn't match directory"
 
+showErrors : String -> String -> M Unit
+showErrors fn src = do
+  top <- get
+  (Nil) <- liftIO {M} $ readIORef top.errors
+    | errors => do
+        ignore $ for errors $ \err =>
+          putStrLn (showError src err)
+        -- if err.file == fn
+        -- then putStrLn (showError src err)
+        -- else putStrLn (showError "" err)
+        exitFailure "Compile failed"
+  pure MkUnit
+
 
 processFile : String -> M Unit
 processFile fn = do
@@ -180,7 +193,7 @@ processFile fn = do
   processDecl ("Prim" :: Nil) (PType emptyFC "Int" Nothing)
   processDecl ("Prim" :: Nil) (PType emptyFC "String" Nothing)
   processDecl ("Prim" :: Nil) (PType emptyFC "Char" Nothing)
-  let base = "port" -- FIXME
+  let base = "aoc2024" -- FIXME
   src <- processModule emptyFC base Nil (QN path modName')
   top <- get
   -- -- dumpContext top
@@ -190,6 +203,7 @@ processFile fn = do
   --     for_ errors $ \err =>
   --       putStrLn (showError src err)
   --     exitFailure "Compile failed"
+  showErrors fn src
   pure MkUnit
 
 

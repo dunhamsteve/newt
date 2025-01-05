@@ -30,5 +30,8 @@ pfunc writeFile uses (fs MkIORes MkUnit) : String → String → IO (Either Stri
 }`
 
 -- maybe System.exit or something, like the original putStrLn msg >> exitFailure
-pfunc exitFailure : ∀ a. String → a := `(_, msg) => { throw new Error(msg) }`
+pfunc exitFailure : ∀ a. String → a := `(_, msg) => { 
+  console.log(msg);
+  process.exit(1);
+}`
 
