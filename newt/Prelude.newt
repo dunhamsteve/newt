@@ -532,9 +532,11 @@ drop Z xs = xs
 drop (S k) (x :: xs) = drop k xs
 
 take : ∀ a. Nat -> List a -> List a
-take Z xs = Nil
-take _ Nil = Nil
-take (S k) (x :: xs) = x :: take k xs
+take {a} n xs = go n xs Lin
+  where
+    go : Nat → List a → SnocList a → List a
+    go (S k) (x :: xs) acc = go k xs (acc :< x)
+    go _ _ acc = acc <>> Nil
 
 getAt : ∀ a. Nat → List a → Maybe a
 getAt _ Nil = Nothing
@@ -880,8 +882,11 @@ getAt' : ∀ a. Int → List a → Maybe a
 getAt' i xs = getAt (cast i) xs
 
 length' : ∀ a. List a → Int
-length' Nil = 0
-length' (x :: xs) = 1 + length' xs
+length' xs = go xs 0
+  where
+    go : ∀ a. List a → Int → Int
+    go Nil acc = acc
+    go (x :: xs) acc = go xs (acc + 1)
 
 unlines : List String → String
 unlines lines = joinBy "\n" lines

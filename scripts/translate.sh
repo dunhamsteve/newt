@@ -2,10 +2,10 @@
 
 # script to translate a file from idris to newt
 # this is just a first pass, hopefully
-mkdir -p port
+mkdir -p xlate
 
 find src -type f -name '*.idr' | while read -r file; do
-  output_file="port/${file#src/}"
+  output_file="xlate/${file#src/}"
   output_file="${output_file%.idr}.newt"
   mkdir -p "$(dirname "$output_file")"
   if [[ ! -f "$output_file" ]]; then
@@ -49,4 +49,4 @@ find src -type f -name '*.idr' | while read -r file; do
     ' "$file" > "$output_file"
   fi
 done
-rsync -av done/ port
+#rsync -av done/ xlate

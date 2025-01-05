@@ -257,7 +257,7 @@ solveAutos mstart = do
   top <- get
   mc <- readIORef top.metaCtx
   let mlen = length' mc.metas - mstart
-  res <- run $ filter isAuto (take (cast mlen) mc.metas)
+  res <- run $ filter isAuto (ite (mstart == 0) mc.metas $ take (cast mlen) mc.metas)
   if res then solveAutos mstart else pure MkUnit
   where
     isAuto : MetaEntry -> Bool

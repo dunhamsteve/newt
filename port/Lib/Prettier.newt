@@ -80,7 +80,7 @@ class Pretty a where
 
 
 render : Int -> Doc -> String
-render w x = layout (best w 0 x) Lin
+render w x = layout (best w 0 (noAlt x)) Lin
 
 
 instance Semigroup Doc where x <+> y = Seq x (Seq (Text " ") y)
