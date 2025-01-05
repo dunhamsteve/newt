@@ -106,7 +106,7 @@ processModule importFC base stk qn@(QN ns nm) = do
   let (Right (imports, ops, toks)) = partialParse fn parseImports ops toks
     | Left (err, toks) => exitFailure (showError src err)
 
-  for_ imports $ \case
+  for imports $ \case
     MkImport fc name' => do
       let (a,b) = unsnoc $ split1 name' "."
       let qname = QN a b
@@ -214,7 +214,7 @@ main' = do
   let (arg0 :: args) = getArgs
     | _ => error emptyFC "error reading args"
   (out, files) <- cmdLine args
-  traverse_ processFile files
+  traverse processFile files
 
   when (elem "--top" args) $ \ _ => do
     json <- jsonTopContext

@@ -185,15 +185,15 @@ instance Traversable List where
   traverse f Nil = return Nil
   traverse f (x :: xs) = return _::_ <*> f x <*> traverse f xs
 
-
-traverse_ : ∀ t f a b. {{Traversable t}} {{Applicative f}} → (a → f b) → t a → f Unit
-traverse_ f xs = return (const MkUnit) <*> traverse f xs
+-- something goes madly wrong with erasure in here.
+-- traverse_ : ∀ t f a b. {{Traversable t}} {{Applicative f}} → (a → f b) → t a → f Unit
+-- traverse_ f xs = return (const MkUnit) <*> traverse f xs
 
 for : {t : U → U} {f : U → U} → {{Traversable t}} {{appf : Applicative f}} → {a : U} → {b : U} → t a → (a → f b) → f (t b)
 for stuff fun = traverse fun stuff
 
-for_ : {t : U → U} {f : U → U} → {{Traversable t}} {{appf : Applicative f}} → {a : U} → {b : U} → t a → (a → f b) → f Unit
-for_ stuff fun = return (const MkUnit) <*> traverse fun stuff
+-- for_ : {t : U → U} {f : U → U} → {{Traversable t}} {{appf : Applicative f}} → {a : U} → {b : U} → t a → (a → f b) → f Unit
+-- for_ stuff fun = return (const MkUnit) <*> traverse fun stuff
 
 instance Applicative Maybe where
   return a = Just a
@@ -330,8 +330,8 @@ pfunc intToNat uses (Z S) : Int -> Nat := `(n) => {
 
 
 
-pfunc fastConcat : List String → String := `(xs) => listToArray(undefined, xs).join('')`
-pfunc replicate : Nat -> Char → String := `(n,c) => c.repeat(natToInt(n))`
+pfunc fastConcat uses (listToArray) : List String → String := `(xs) => listToArray(undefined, xs).join('')`
+pfunc replicate uses (natToInt) : Nat -> Char → String := `(n,c) => c.repeat(natToInt(n))`
 
 -- I don't want to use an empty type because it would be a proof of void
 ptype World

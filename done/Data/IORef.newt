@@ -7,7 +7,7 @@ import Prelude
 ptype IORef : U → U
 pfunc primNewIORef uses (MkIORes MkUnit) : ∀ a. a → IO (IORef a) := `(_, a) => (w) => MkIORes(undefined, [a], w)`
 pfunc primReadIORef uses (MkIORes MkUnit) : ∀ a. IORef a → IO a := `(_, ref) => (w) => MkIORes(undefined, ref[0], w)`
-pfunc primWriteIORef uses (MkIORes MkUnit) : ∀ a. IORef a → a → IO a := `(_, ref, a) => (w) => {
+pfunc primWriteIORef uses (MkIORes MkUnit) : ∀ a. IORef a → a → IO Unit := `(_, ref, a) => (w) => {
   ref[0] = a
   return MkIORes(undefined,MkUnit,w)
 }`
@@ -19,7 +19,7 @@ readIORef : ∀ io a. {{HasIO io}} → IORef a → io a
 readIORef ref = liftIO $ primReadIORef ref
 
 writeIORef : ∀ io a. {{HasIO io}} → IORef a -> a -> io Unit
-writeIORef ref a = liftIO $ writeIORef ref a
+writeIORef ref a = liftIO $ primWriteIORef ref a
 
 -- Idris HasIO constraints to monad, we don't have those constraints yet
 modifyIORef : ∀ io a. {{Monad io}} {{HasIO io}} → IORef a -> (a -> a) -> io Unit

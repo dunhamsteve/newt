@@ -1,6 +1,11 @@
 
 ## TODO
 
+- [x] get port to run
+  - [ ] something goes terribly wrong with traverse_ and for_ (related to erasure, I think)
+- [ ] sort through issues that came up during port
+- [ ] don't use `take` - it's not stack safe
+
 More comments in code! This is getting big enough that I need to re-find my bearings when fixing stuff.
 
 - [ ] report info in case of error

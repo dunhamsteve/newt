@@ -17,7 +17,7 @@ pfunc readFile uses (fs MkIORes Left Right) : (fn : String) -> IO (Either String
 }`
 
 -- I wonder if I should automatically `uses` the constructors in the types
-pfunc writeFile uses (fs MkIORes MkUnit) : String → String → IO (Either String Unit) := `(fn, content) => {
+pfunc writeFile uses (fs MkIORes MkUnit) : String → String → IO (Either String Unit) := `(fn, content) => (w) => {
   let result
   try {
     fs.writeFileSync(fn, content, 'utf8')

@@ -1,0 +1,7 @@
+module Hello
+
+import Prelude
+
+main : IO Unit
+main = do
+    putStrLn "hello, world"

@@ -122,7 +122,7 @@ processDecl ns  (TypeSig fc names tm) = do
   ty <- check (mkCtx fc) tm (VU fc)
   ty <- zonk top 0 Nil ty
   putStrLn "TypeSig \{unwords names} : \{render 90 $ pprint Nil ty}"
-  for_ names $ \nm => setDef (QN ns nm) fc ty Axiom
+  ignore $ for names $ \nm => setDef (QN ns nm) fc ty Axiom
   -- Zoo4eg has metas in TypeSig, need to decide if I want to support leaving them unsolved here
   -- logMetas mstart
 
@@ -444,7 +444,7 @@ processDecl ns (Record recordFC nm tele cname decls) = do
   putStrLn "Decl:"
   putStrLn $ render 90 $ pretty decl
   processDecl ns decl
-  for_ fields $ \case
+  ignore $ for fields $ \case
     (fc,name,ty) => do
       -- TODO dependency isn't handled yet
       -- we'll need to replace stuff like `len` with `len self`.
