@@ -1,7 +1,7 @@
 
 ## TODO
 
-- [ ] redo code to determine base path
+- [x] redo code to determine base path
 - [ ] save/load results of processing a module
   - [ ] keep each module separate in context
     - search would include imported modules, collect ops into and from modules

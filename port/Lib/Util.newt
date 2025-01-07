@@ -1,6 +1,7 @@
 module Lib.Util
 
 import Lib.Types
+import Data.List1
 
 
 funArgs : Tm -> (Tm × List Tm)
@@ -24,3 +25,28 @@ splitTele = go Nil
     go : List Binder -> Tm -> (Tm × List Binder)
     go ts (Pi fc nm icit quant t u) = go (MkBinder fc nm icit quant t :: ts) u
     go ts tm = (tm, reverse ts)
+
+
+
+getBaseDir : String → String → M (String × QName)
+getBaseDir fn modName = do
+  let (path, modName') = unsnoc $ split1 modName "."
+  let parts = split1 fn "/"
+  let (dirs,file) = unsnoc parts
+  let (name, ext) = splitFileName file
+
+  let parts = split1 fn "/"
+  let (dirs,file) = unsnoc parts
+  let (path, modName') = unsnoc $ split1 modName "."
+  unless (modName' == name) $ \ _ => error (MkFC fn (0,0)) "module name \{modName'} doesn't match \{name}"
+  let (Right base) = baseDir (Lin <>< dirs) (Lin <>< path)
+    | Left err => error (MkFC fn (0,0)) err
+  let base = if base == "" then "." else base
+  pure (base, QN path modName')
+  where
+    baseDir : SnocList String -> SnocList String -> Either String String
+    baseDir dirs Lin = Right $ joinBy "/" (dirs <>> Nil)
+    baseDir (dirs :< d) (ns :< n) = if d == n
+      then baseDir dirs ns
+      else Left "module path doesn't match directory"
+    baseDir Lin _ = Left "module path doesn't match directory"

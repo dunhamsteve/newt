@@ -165,14 +165,15 @@ processFile fn = do
   let dir = if dirs == Nil then "." else joinBy "/" dirs
   let (name, ext) = splitFileName file
   putStrLn "\{show dir} \{show name} \{show ext}"
+
   (Right src) <- liftIO {M} $ readFile fn
     | Left err => error (MkFC fn (0,0)) "error reading \{fn}: \{show err}"
   let (Right toks) = tokenise fn src
     | Left err => throwError err
   let (Right ((nameFC, modName), _, _)) = partialParse fn parseModHeader EmptyMap toks
     | Left (err,toks) => throwError err
-  let ns = split modName "."
-  let (path, modName') = unsnoc $ split1 modName "."
+
+  (base,qn) <- getBaseDir fn modName
 
   -- Any case splits after this point causes it to loop, no idea why
 
@@ -186,9 +187,8 @@ processFile fn = do
   processDecl ("Prim" :: Nil) (PType emptyFC "Int" Nothing)
   processDecl ("Prim" :: Nil) (PType emptyFC "String" Nothing)
   processDecl ("Prim" :: Nil) (PType emptyFC "Char" Nothing)
-  -- let base = "aoc2024" -- FIXME
-  let base = "port" -- FIXME
-  src <- processModule emptyFC base Nil (QN path modName')
+
+  src <- processModule emptyFC base Nil qn
   top <- get
   -- -- dumpContext top
 
