@@ -6,7 +6,6 @@ import Lib.Prettier
 import Lib.CompileExp
 import Lib.TopContext
 import Data.String
-import Data.Maybe
 import Data.Int
 
 data StKind = Plain | Return | Assign String

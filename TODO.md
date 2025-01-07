@@ -1,17 +1,27 @@
 
 ## TODO
 
+- [ ] redo code to determine base path
+- [ ] save/load results of processing a module
+  - [ ] keep each module separate in context
+    - search would include imported modules, collect ops into and from modules
+    - should I allow the idris assignment hack?
+    - >>> sort out metas (maybe push them up to the main list)
+    - eventually we may want to support resuming halfway through a file
+
 - [x] get port to run
-  - [ ] something goes terribly wrong with traverse_ and for_ (related to erasure, I think)
+  - [x] something goes terribly wrong with traverse_ and for_ (related to erasure, I think)
 - [ ] sort through issues that came up during port
-- [ ] don't use `take` - it's not stack safe
+- [x] ~~don't use `take` - it's not stack safe~~ The newt version is stack safe
+- [ ] move idris version into a bootstrap directory
+  - (Need Idris/chez or newt-in-newt to bootstrap!)
 
 More comments in code! This is getting big enough that I need to re-find my bearings when fixing stuff.
 
 - [ ] report info in case of error
 - [x] tokenizer that can be ported to newt
 - [ ] Add default path for library, so we don't need symlinks everywhere and can write tests for the library
-- [ ] string interpolation?
+- [x] string interpolation?
   - The tricky part here is the `}` - I need to run the normal tokenizer in a way that treats `}` specially.
   - Idris handles `putStrLn "done \{ show $ add {x=1} 2}"` - it recurses for `{` `}` pairs.  Do we want that complexity?
   - The mini version would be recurse on `{`, pop on `}` (and expect caller to handle), fail if we get to the top with a tokens remaining.
@@ -41,7 +51,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [x] syntax for negative integers
 - [ ] White box tests in `test` directory (I can't get this to work right with pack et al)
 - [x] Put worker in iframe on safari
-- [ ] Warnings or errors for missing definitions
+- [ ] Warnings or errors for missing definitions (e.g. on `Axiom` in codegen)
 - [ ] Add the type name to dcon so confusion detection in case split is simpler
 - [ ] Warnings or errors for unused cases
   - This is important when misspelled constructors become pattern vars

@@ -1,9 +1,7 @@
 module Main
 
-import Data.List
 import Data.List1
 import Data.String
-import Data.Vect
 import Data.IORef
 import Lib.Common
 import Lib.Compile
@@ -19,11 +17,6 @@ import Lib.Types
 import Lib.Syntax
 import Lib.Syntax
 import Node
--- import System
--- import System.Directory
--- import System.File
--- import System.Path
--- import Data.Buffer
 
 jsonTopContext : M Json
 jsonTopContext = do
@@ -155,7 +148,7 @@ showErrors fn src = do
   top <- get
   (Nil) <- liftIO {M} $ readIORef top.errors
     | errors => do
-        ignore $ for errors $ \err =>
+        for_ errors $ \err =>
           putStrLn (showError src err)
         -- if err.file == fn
         -- then putStrLn (showError src err)

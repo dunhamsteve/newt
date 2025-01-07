@@ -4,13 +4,10 @@ module Lib.Types
 import Lib.Common
 import Lib.Prettier
 
-import Data.Fin
 import Data.IORef
-import Data.List
 import Data.SnocList
 import Data.SortedMap
 import Data.String
-import Data.Vect
 
 data QName : U where
   QN : List String -> String -> QName
@@ -21,9 +18,6 @@ instance Eq QName where
 instance Show QName where
   show (QN Nil n) = n
   show (QN ns n) = joinBy "." ns ++ "." ++ n
-
-instance Interpolation QName where
-  interpolate = show
 
 instance Ord QName where
   compare (QN ns nm) (QN ns' nm') = if ns == ns' then compare nm nm' else compare ns ns'

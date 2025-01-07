@@ -2,9 +2,7 @@
 -- https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf
 module Lib.Prettier
 
-import Data.String
 import Data.Int
-import Data.Maybe
 
 -- `Doc` is a pretty printing document.  Constructors are private, use
 -- methods below.  `Alt` in particular has some invariants on it, see paper
@@ -150,7 +148,3 @@ fill (x :: y :: xs) = Alt (flatten x <+> fill (flatten y :: xs)) (x </> fill (y 
 commaSep : List Doc -> Doc
 commaSep = folddoc (\a b => a ++ text "," <+/> b)
 
--- If we stick Doc into a String, try to avoid line-breaks via `flatten`
-
-instance Interpolation Doc where
-  interpolate = render 80 ∘ flatten

@@ -2,7 +2,6 @@ module Lib.Common
 
 import Data.String
 import Data.Int
-import Data.Maybe
 import Data.SortedMap
 
 -- l is environment size, this works for both lvl2ix and ix2lvl

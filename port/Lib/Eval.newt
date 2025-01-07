@@ -4,10 +4,7 @@ import Lib.Types
 import Lib.TopContext
 
 import Data.IORef
-import Data.Fin
-import Data.List
 import Data.SnocList
-import Data.Vect
 import Data.SortedMap
 
 
@@ -252,7 +249,7 @@ nfv env t = eval env CBV t >>= quote (length' env)
 prvalCtx : {{ctx : Context}} -> Val -> M String
 prvalCtx {{ctx}} v = do
   tm <- quote ctx.lvl v
-  pure $ interpolate $ pprint (map fst ctx.types) tm
+  pure $ render 90 $ pprint (map fst ctx.types) tm
 
 -- REVIEW - might be easier if we inserted the meta without a bunch of explicit App
 -- I believe Kovacs is doing that.

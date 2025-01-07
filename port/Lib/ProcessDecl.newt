@@ -2,9 +2,6 @@ module Lib.ProcessDecl
 
 import Data.IORef
 import Data.String
-import Data.Vect
-import Data.List
-import Data.Maybe
 
 import Lib.Elab
 import Lib.Parser
@@ -78,7 +75,7 @@ logMetas mstart = do
           matches <- findMatches ctx ty $ map snd $ toList top.defs
           -- TODO try putting mc into TopContext for to see if it gives better terms
           pure $ ("  \{show $ length' matches} Solutions: \{show matches}" :: Nil)
-          -- pure $ "  \{show $ length' matches} Solutions:" :: map (("  " ++) ∘ interpolate ∘ pprint (names ctx) ∘ fst) matches
+          -- pure $ "  \{show $ length' matches} Solutions:" :: map (("  " ++) ∘ render 90 ∘ pprint (names ctx) ∘ fst) matches
 
         _ => pure Nil
       info fc $ unlines ((msg :: Nil) ++ msgs ++ sols)
@@ -262,7 +259,7 @@ processDecl ns (Instance instfc ty decls) = do
   -- ok so we need a name, a hack for now.
   -- Maybe we need to ask the user (e.g. `instance someName : Monad Foo where`)
   -- or use "Monad\{show $ length' defs}"
-  let instname = interpolate $ pprint Nil codomain
+  let instname = render 90 $ pprint Nil codomain
   let sigDecl = TypeSig instfc (instname :: Nil) ty
   -- This needs to be declared before processing the defs, but the defs need to be
   -- declared before this - side effect is that a duplicate def is noted at the first

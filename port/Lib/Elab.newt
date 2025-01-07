@@ -2,7 +2,6 @@ module Lib.Elab
 
 import Lib.Parser.Impl
 import Lib.Prettier
-import Data.List
 import Data.String
 import Data.IORef
 import Lib.Types
