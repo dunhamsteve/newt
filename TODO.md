@@ -37,7 +37,9 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [x] SortedMap.newt issue in `where`
 - [x] fix "insufficient patterns", wire in M or Either String
 - [x] Matching _,_ when Maybe is expected should be an error
-- [ ] There are issues with matching inside do blocks, I think we need to guess scrutinee? I could imagine constraining metas too (e.g. if Just ... at ?m123 then ?m123 =?= Maybe ?m456)
+- [ ] There are issues with matching inside do blocks
+    - I may have handled a lot of this by reworking autos to check just one level of constraints (with a 20% speedup)
+    - Do we need to guess scrutinee? Or we could refine a meta scrutinee type to match the constructor being split. This happens during checking for pi, where we create ?m -> ?m and unifiy it with the meta. Could we do the same in a case, where `Just ...` says the meta must be `Maybe ?m`?
   - ~~`newt/Fixme.newt` - I can drop `do` _and_ put `bind {IO}` to push it along. It may need to try to solve autos earlier and better.~~
   - Also, the root cause is tough to track down if there is a type error (this happens with `do` in Idris, too).
   - Part of it is the auto solutions are getting discarded because of an unrelated unification failure. Either auto shouldn't go as deep or should run earlier. Forgetting that lookupMap returns a (k,v) pair is a good example.

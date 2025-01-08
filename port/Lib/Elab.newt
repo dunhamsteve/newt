@@ -6,6 +6,7 @@ import Data.String
 import Data.IORef
 import Lib.Types
 import Lib.Eval
+import Lib.Util
 import Lib.TopContext
 import Lib.Syntax
 
@@ -137,7 +138,7 @@ findMatches ctx ty ((MkEntry _ name type def) :: xs) = do
   -- FIXME we're restoring state, but the INFO logs have already been emitted
   -- Also redo this whole thing to run during elab, recheck constraints, etc.
   mc <- readIORef top.metaCtx
-  catchError(do
+  catchError (do
       -- TODO sort out the FC here
       let fc = getFC ty
       debug $ \ _ => "TRY \{show name} : \{rpprint Nil type} for \{show ty}"
@@ -145,6 +146,9 @@ findMatches ctx ty ((MkEntry _ name type def) :: xs) = do
       -- tm <- check (mkCtx fc) (RVar fc name) ty
       -- FIXME RVar should optionally have qualified names
       let (QN ns nm) = name
+
+      let (cod, tele) = splitTele type
+      modifyIORef top.metaCtx $ \ mc => MC mc.metas mc.next CheckFirst
       tm <- check ctx (RVar fc nm) ty
       debug $ \ _ => "Found \{rpprint Nil tm} for \{show ty}"
       writeIORef top.metaCtx mc
@@ -276,7 +280,7 @@ updateMeta ix f = do
   top <- get
   mc <- readIORef top.metaCtx
   metas <- go mc.metas
-  writeIORef top.metaCtx $ MC metas mc.next
+  writeIORef top.metaCtx $ MC metas mc.next mc.mcmode
   where
     go : List MetaEntry -> M (List MetaEntry)
     go Nil = error' "Meta \{show ix} not found"
@@ -301,12 +305,14 @@ checkAutos ix (_ :: rest) = checkAutos ix rest
 
 addConstraint : Env -> Int -> SnocList Val -> Val -> M Unit
 addConstraint env ix sp tm = do
+  top <- get
+  mc <- readIORef top.metaCtx
+  let (CheckAll) = mc.mcmode | _ => pure MkUnit
   updateMeta ix $ \case
     (Unsolved pos k a b c cons) => do
       debug $ \ _ => "Add constraint m\{show ix} \{show sp} =?= \{show tm}"
       pure (Unsolved pos k a b c (MkMc (getFC tm) env sp tm :: cons))
     (Solved _ k tm) => error' "Meta \{show k} already solved (addConstraint :: Nil)"
-  top <- get
   mc <- readIORef top.metaCtx
   checkAutos ix mc.metas
   -- this loops too
@@ -401,6 +407,18 @@ unify : Env -> UnifyMode -> Val -> Val  -> M UnifyResult
 .boundNames : Context -> List String
 ctx.boundNames = map snd $ filter (\x => fst x == Bound) $ zip ctx.bds (map fst ctx.types)
 
+maybeCheck : M Unit -> M Unit
+maybeCheck action = do
+  top <- get
+  mc <- readIORef top.metaCtx
+  case mc.mcmode of
+    CheckAll => action
+    CheckFirst => do
+      modifyIORef top.metaCtx $ \ mc => MC mc.metas mc.next NoCheck
+      action
+      modifyIORef top.metaCtx $ \ mc => MC mc.metas mc.next CheckFirst
+    NoCheck => pure MkUnit
+
 solve env m sp t = do
   meta@(Unsolved metaFC ix ctx_ ty kind cons) <- lookupMeta m
     | _ => error (getFC t) "Meta \{show m} already solved! (solve :: Nil)"
@@ -429,7 +447,7 @@ solve env m sp t = do
     updateMeta m $ \case
       (Unsolved pos k _ _ _ cons) => pure $ Solved pos k soln
       (Solved _ k x) => error' "Meta \{show ix} already solved! (solve2 :: Nil)"
-    for cons $ \case
+    maybeCheck $ for_ cons $ \case
       MkMc fc env sp rhs => do
         val <- vappSpine soln sp
         debug $ \ _ => "discharge l=\{show $ length' env} \{(show val)} =?= \{(show rhs)}"
@@ -629,7 +647,7 @@ freshMeta ctx fc ty kind = do
   mc <- readIORef top.metaCtx
   debug $ \ _ => "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
   let newmeta = Unsolved fc mc.next ctx ty kind Nil
-  writeIORef top.metaCtx $ MC (newmeta :: mc.metas) (1 + mc.next)
+  writeIORef top.metaCtx $ MC (newmeta :: mc.metas) (1 + mc.next) mc.mcmode
   -- infinite loop - keeps trying Ord a => Ord (a \x a)
   -- when (kind == AutoSolve) $ \ _ => ignore $ trySolveAuto newmeta
   pure $ applyBDs 0 (Meta fc mc.next) ctx.bds

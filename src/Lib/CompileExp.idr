@@ -116,7 +116,7 @@ compileTerm (Meta _ k) = pure $ CRef "meta$\{show k}" -- FIXME
 compileTerm (Lam _ nm _ _ t) = pure $ CLam nm !(compileTerm t)
 compileTerm tm@(App _ _ _) with (funArgs tm)
   _ | (Meta _ k, args) = do
-        -- this will be undefined, should only happen for use metas
+        info (getFC tm) "Compiling an unsolved meta \{showTm tm}"
         pure $ CApp (CRef "Meta\{show k}") [] Z
   _ | (t@(Ref fc nm _), args) = do
         args' <- traverse compileTerm args

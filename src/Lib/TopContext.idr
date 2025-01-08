@@ -29,7 +29,7 @@ Show TopContext where
 
 public export
 empty : HasIO m => m TopContext
-empty = pure $ MkTop empty !(newIORef (MC [] 0)) False !(newIORef []) [] empty
+empty = pure $ MkTop empty !(newIORef (MC [] 0 CheckAll)) False !(newIORef []) [] empty
 
 public export
 setDef : QName -> FC -> Tm -> Def -> M ()

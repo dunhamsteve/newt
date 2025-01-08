@@ -307,10 +307,17 @@ data MConstraint = MkMc FC Env (SnocList Val) Val
 
 data MetaEntry = Unsolved FC Int Context Val MetaKind (List MConstraint) | Solved FC Int Val
 
+-- The purpose of this is to only check one level of constraints when trying an Auto solution
+-- The idea being we narrow it down to the likely solution, and let any consequent type error
+-- bubble up to the user, rather than have a type error wipe out all solutions.
+-- We also don't bother adding constraints if not in CheckAll mode
+data MetaMode = CheckAll | CheckFirst | NoCheck
+
 record MetaContext where
   constructor MC
   metas : List MetaEntry
   next : Int
+  mcmode : MetaMode
 
 data Def = Axiom | TCon (List QName) | DCon Int QName | Fn Tm | PrimTCon
          | PrimFn String (List String)
@@ -485,21 +492,6 @@ error fc msg = throwError $ E fc msg
 error' : ∀ a. String -> M a
 error' msg = throwError $ E emptyFC msg
 
--- freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
--- freshMeta ctx fc ty kind = do
---   top <- get
---   mc <- readIORef top.metaCtx
---   debug $ \ _ => "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
---   writeIORef top.metaCtx $ MC (Unsolved fc mc.next ctx ty kind Nil :: mc.metas) (1 + mc.next)
---   pure $ applyBDs 0 (Meta fc mc.next) ctx.bds
---   where
---     -- hope I got the right order here :)
---     applyBDs : Int -> Tm -> List BD -> Tm
---     applyBDs k t Nil = t
---     -- review the order here
---     applyBDs k t (Bound :: xs) = App emptyFC (applyBDs (1 + k) t xs) (Bnd emptyFC k)
---     applyBDs k t (Defined :: xs) = applyBDs (1 + k) t xs
-
 lookupMeta : Int -> M MetaEntry
 lookupMeta ix = do
   top <- get
@@ -510,9 +502,6 @@ lookupMeta ix = do
     go Nil = error' "Meta \{show ix} not found"
     go (meta@(Unsolved _ k ys _ _ _) :: xs) = if k == ix then pure meta else go xs
     go (meta@(Solved _ k x) :: xs) = if k == ix then pure meta else go xs
-
--- we need more of topcontext later - Maybe switch it up so we're not passing
--- around top
 
 mkCtx : FC -> Context
 mkCtx fc = MkCtx 0 Nil Nil Nil fc

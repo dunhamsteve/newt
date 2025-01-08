@@ -7,6 +7,7 @@ import Data.Vect
 import Data.String
 import Data.IORef
 import Lib.Types
+import Lib.Util
 import Lib.Eval
 import Lib.TopContext
 import Lib.Syntax
@@ -131,6 +132,8 @@ findMatches ctx ty ((MkEntry _ name type def) :: xs) = do
       -- tm <- check (mkCtx fc) (RVar fc name) ty
       -- FIXME RVar should optionally have qualified names
       let (QN ns nm) = name
+      let (cod, tele) = splitTele type
+      modifyIORef top.metaCtx { mcmode := CheckFirst }
       tm <- check ctx (RVar fc nm) ty
       debug "Found \{pprint [] tm} for \{show ty}"
       writeIORef top.metaCtx mc
@@ -287,12 +290,14 @@ checkAutos ix (_ :: rest) = checkAutos ix rest
 export
 addConstraint : Env -> Nat -> SnocList Val -> Val -> M ()
 addConstraint env ix sp tm = do
+  top <- get
+  mc <- readIORef top.metaCtx
+  let (CheckAll) = mc.mcmode | _ => pure ()
   updateMeta ix $ \case
     (Unsolved pos k a b c cons) => do
       debug "Add constraint m\{show ix} \{show sp} =?= \{show tm}"
       pure (Unsolved pos k a b c (MkMc (getFC tm) env sp tm :: cons))
     (Solved _ k tm) => error' "Meta \{show k} already solved [addConstraint]"
-  top <- get
   mc <- readIORef top.metaCtx
   checkAutos ix mc.metas
   -- this loops too
@@ -375,6 +380,19 @@ unify : Env -> UnifyMode -> Val -> Val  -> M UnifyResult
 (.boundNames) : Context -> List String
 ctx.boundNames = map snd $ filter (\x => fst x == Bound) $ toList $ zip ctx.bds (map fst ctx.types)
 
+
+maybeCheck : M () -> M ()
+maybeCheck action = do
+  top <- get
+  mc <- readIORef top.metaCtx
+  case mc.mcmode of
+    CheckAll => action
+    CheckFirst => do
+      modifyIORef top.metaCtx $ { mcmode := NoCheck }
+      action
+      modifyIORef top.metaCtx $ { mcmode := CheckFirst }
+    NoCheck => pure ()
+
 solve env m sp t = do
   meta@(Unsolved metaFC ix ctx_ ty kind cons) <- lookupMeta m
     | _ => error (getFC t) "Meta \{show m} already solved! [solve]"
@@ -403,7 +421,8 @@ solve env m sp t = do
     updateMeta m $ \case
       (Unsolved pos k _ _ _ cons) => pure $ Solved pos k soln
       (Solved _ k x) => error' "Meta \{show ix} already solved! [solve2]"
-    for_ cons $ \case
+
+    maybeCheck $ for_ cons $ \case
       MkMc fc env sp rhs => do
         val <- vappSpine soln sp
         debug "discharge l=\{show $ length env} \{(show val)} =?= \{(show rhs)}"

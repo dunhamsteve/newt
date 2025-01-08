@@ -363,13 +363,15 @@ data MConstraint = MkMc FC Env (SnocList Val) Val
 public export
 data MetaEntry = Unsolved FC Nat Context Val MetaKind (List MConstraint) | Solved FC Nat Val
 
+public export
+data MetaMode = CheckAll | CheckFirst | NoCheck
 
 public export
 record MetaContext where
   constructor MC
   metas : List MetaEntry
   next : Nat
-
+  mcmode : MetaMode
 
 public export
 data Def = Axiom | TCon (List QName) | DCon Nat QName | Fn Tm | PrimTCon
