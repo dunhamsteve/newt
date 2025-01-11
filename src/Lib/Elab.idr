@@ -889,11 +889,9 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
 
     makeConstr : List Bind -> List Pattern -> M (List (String, Pattern))
     makeConstr [] [] = pure $ []
-    -- would need M in here to throw, and I'm building stuff as I go, I suppose I could <$>
-    makeConstr [] (pat :: pats) = error ctx.ctxFC "too many patterns"
+    makeConstr [] (pat :: pats) = error (getFC pat) "too many patterns"
     makeConstr ((MkBind nm Implicit x) :: xs) [] = pure $ (nm, PatWild emptyFC Implicit) :: !(makeConstr xs [])
     makeConstr ((MkBind nm Auto x) :: xs) [] = pure $ (nm, PatWild emptyFC Auto) :: !(makeConstr xs [])
-    -- FIXME need a proper error, but requires wiring M three levels down
     makeConstr ((MkBind nm Explicit x) :: xs) [] = error ctx.ctxFC "not enough patterns"
     makeConstr ((MkBind nm Explicit x) :: xs) (pat :: pats) =
       if getIcit pat == Explicit

@@ -55,8 +55,9 @@ writeSource fn = do
   docs <- compile
   let src = unlines $
         [ "\"use strict\";"
-        ,  "const PiType = (h0, h1) => ({ tag: \"PiType\", h0, h1 })" ]
-        ++ map (render 90) docs
+        , "const PiType = (h0, h1) => ({ tag: \"PiType\", h0, h1 })"
+        , "const U = { tag: \"U\" };"
+        ] ++ map (render 90) docs
   Right _ <- writeFile fn src
     | Left err => fail (show err)
   Right _ <- chmodRaw fn 493 | Left err => fail (show err)

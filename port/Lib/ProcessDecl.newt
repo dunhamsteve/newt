@@ -139,7 +139,7 @@ processDecl ns  (PFunc fc nm used ty src) = do
     _ => pure MkUnit
   setDef (QN ns nm) fc ty' (PrimFn src used)
 
-processDecl ns (Def fc nm claused) = do
+processDecl ns (Def fc nm clauses) = do
   putStrLn "-----"
   putStrLn "Def \{show nm}"
   top <- get
@@ -155,16 +155,16 @@ processDecl ns (Def fc nm claused) = do
 
   debug $ \ _ => "\{nm} vty is \{show vty}"
 
-
   -- I can take LHS apart syntactically or elaborate it with an infer
-  claused' <- traverse (makeClause top) claused
-  tm <- buildTree (mkCtx fc) (MkProb claused' vty)
+  clauses' <- traverse makeClause clauses
+  tm <- buildTree (mkCtx fc) (MkProb clauses' vty)
   -- putStrLn "Ok \{render 90 $ pprint Nil tm}"
 
   mc <- readIORef top.metaCtx
   let mlen = length' mc.metas - mstart
   solveAutos mstart
   -- TODO - make nf that expands all metas and drop zonk
+  -- Idris2 doesn't expand metas for performance - a lot of these are dropped during erasure.
   -- Day1.newt is a test case
   -- tm' <- nf Nil tm
   tm' <- zonk top 0 Nil tm

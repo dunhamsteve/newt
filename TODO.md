@@ -1,6 +1,8 @@
 
 ## TODO
 
+- [ ] review pattern matching. goal is to have a sane context on the other end. secondary goal - bring it closer to the paper.
+
 - [x] redo code to determine base path
 - [ ] save/load results of processing a module
   - [ ] keep each module separate in context

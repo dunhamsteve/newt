@@ -951,7 +951,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
     makeConstr : List Bind -> List Pattern -> M (List (String × Pattern))
     makeConstr Nil Nil = pure $ Nil
     -- would need M in here to throw, and I'm building stuff as I go, I suppose I could <$>
-    makeConstr Nil (pat :: pats) = error ctx.ctxFC "too many patterns"
+    makeConstr Nil (pat :: pats) = error (getFC pat) "too many patterns"
     makeConstr ((MkBind nm Implicit x) :: xs) Nil = do
       rest <- makeConstr xs Nil
       pure $ (nm, PatWild emptyFC Implicit) :: rest
@@ -1017,19 +1017,21 @@ splitArgs (RApp fc t u icit) args = splitArgs t ((u, icit) :: args)
 splitArgs tm args = (tm, args)
 
 
-mkPat : TopContext -> (Raw × Icit) -> M Pattern
-mkPat top (RAs fc as tm, icit) = do
-  pat <- mkPat top (tm, icit)
+mkPat : (Raw × Icit) -> M Pattern
+mkPat (RAs fc as tm, icit) = do
+
+  pat <- mkPat (tm, icit)
   case pat of
     (PatCon fc icit nm args Nothing) => pure $ PatCon fc icit nm args (Just as)
     (PatCon fc icit nm args _) => error fc "Double as pattern \{show tm}"
     t => error fc "Can't put as on non-constructor \{show tm}"
-mkPat top (tm, icit) = do
+mkPat (tm, icit) = do
+  top <- get
   case splitArgs tm Nil of
     ((RVar fc nm), b) => case lookupRaw nm top of
                 (Just (MkEntry _ name type (DCon k str))) => do
                   -- TODO check arity, also figure out why we need reverse
-                  bpat <- traverse (mkPat top) b
+                  bpat <- traverse (mkPat) b
                   pure $ PatCon fc icit name bpat Nothing
                 -- This fires when a global is shadowed by a pattern var
                 -- Just _ => error (getFC tm) "\{show nm} is not a data constructor"
@@ -1044,10 +1046,10 @@ mkPat top (tm, icit) = do
 
 
 
-makeClause : TopContext -> (Raw × Raw) -> M Clause
-makeClause top (lhs, rhs) = do
+makeClause : (Raw × Raw) -> M Clause
+makeClause (lhs, rhs) = do
   let (nm, args) = splitArgs lhs Nil
-  pats <- traverse (mkPat top) args
+  pats <- traverse mkPat args
   pure $ MkClause (getFC lhs) Nil pats rhs
 
 
@@ -1069,7 +1071,7 @@ checkWhere ctx decls body ty = do
   unless (name == name') $ \ _ => error defFC "Expected def for \{name}"
   -- REVIEW is this right, cribbed from my top level code
   top <- get
-  clauses' <- traverse (makeClause top) clauses
+  clauses' <- traverse makeClause clauses
   vty <- eval ctx.env CBN funTy
   debug $ \ _ => "\{name} vty is \{show vty}"
   let ctx' = extend ctx name vty
@@ -1087,7 +1089,7 @@ checkWhere ctx decls body ty = do
   ty' <- checkWhere ctx' decls' body ty
   pure $ LetRec sigFC name funTy tm ty'
 
-
+-- checks the body after we're done with a case tree branch
 checkDone : Context -> List (String × Pattern) -> Raw -> Val -> M Tm
 checkDone ctx Nil body ty = do
   debug $ \ _ => "DONE-> check body \{show body} at \{show ty}"
@@ -1264,6 +1266,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
         (Unsolved _ k xs _ _ _) => do
           top <- get
           mc <- readIORef top.metaCtx
+          -- TODO - only hit the relevant ones
           ignore $ solveAutos 0
           forceType ctx.env scty'
 
@@ -1277,6 +1280,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
       -- default cases
       cons <- getConstructors ctx (getFC pat) scty'
       debug $ \ _ => "CONS \{show $ map fst cons}"
+      -- TODO collect the wild-card only cases into one
       alts <- traverse (buildCase ctx prob scnm scty') cons
       debug $ \ _ => "GOTALTS \{show alts}"
       when (length' (mapMaybe id alts) == 0) $ \ _ => error (fc) "no alts for \{show scty'}"
@@ -1353,7 +1357,7 @@ check ctx tm ty = do
       top <- get
       clauses <- for alts $ \case
         (MkAlt pat rawRHS) => do
-          pat' <- mkPat top (pat, Explicit)
+          pat' <- mkPat (pat, Explicit)
           pure $ MkClause (getFC pat) ((scnm, pat') :: Nil) Nil rawRHS
       -- buildCase expects scrutinee to be a name in the context, so we need to let it.
       -- if it's a Bnd and not shadowed we could skip the let, but that's messy.
