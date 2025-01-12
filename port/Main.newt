@@ -9,6 +9,7 @@ import Lib.Common
 import Lib.Compile
 import Lib.Parser
 import Lib.Elab
+import Lib.Util
 import Lib.Parser.Impl
 import Lib.Prettier
 import Lib.ProcessDecl
@@ -19,6 +20,16 @@ import Lib.Types
 import Lib.Syntax
 import Lib.Syntax
 import Node
+
+-- this was an experiment, prepping for dumping module information
+-- it ends up with out of memory dumping defs of some of the files.
+-- Prelude is 114MB pretty-printed... gzip to 1M
+pfunc dumpObject uses (MkIORes MkUnit fs): ∀ a. String → a → IO Unit := `(_,fn,a) => (w) => {
+  console.log(a)
+  let data = JSON.stringify(a, null, '  ')
+  fs.writeFileSync(fn, data)
+  return MkIORes(undefined, MkUnit, w)
+}`
 
 primNS : List String
 primNS = ("Prim" :: Nil)
@@ -130,12 +141,12 @@ processModule importFC base stk qn@(QN ns nm) = do
   putStrLn "process Decls"
   traverse (tryProcessDecl ns) (collectDecl decls)
 
-  -- update modules with result
+  -- update modules with result, leave the rest of context in case this is top file
   top <- get
   mc <- readIORef top.metaCtx
   let modules = updateMap modns (MkModCtx top.defs mc top.ops) top.modules
   freshMC <- newIORef (MC EmptyMap 0 CheckAll)
-  modify (\ top => MkTop modules Nil Nil EmptyMap freshMC top.verbose top.errors top.ops)
+  modify (\ top => MkTop modules top.imported top.ns top.defs top.metaCtx top.verbose top.errors top.ops)
 
   (Nil) <- liftIO {M} $ readIORef top.errors
     | errors => do
@@ -190,14 +201,6 @@ processFile fn = do
 
   (base,qn) <- getBaseDir fn modName
 
-  -- Any case splits after this point causes it to loop, no idea why
-
-  -- let (True) = modName' == name
-  --   | False => throwError $ E (MkFC fn (0,0)) "module name \{modName'} doesn't match \{name}"
-  -- let (Right base) = baseDir (Lin <>< dirs) (Lin <>< path)
-  --   | Left err => pure MkUnit -- exitFailure "ERROR at \{show nameFC}: \{err}"
-  -- let base = if base == "" then "." else base
-
   -- declare internal primitives
 
   processDecl primNS (PType emptyFC "Int" Nothing)
@@ -208,16 +211,9 @@ processFile fn = do
   let modules = updateMap primNS (MkModCtx top.defs (MC EmptyMap 0 CheckAll) top.ops) top.modules
   modify (\ top => MkTop modules (primNS :: Nil) Nil EmptyMap top.metaCtx top.verbose top.errors top.ops)
 
-
   src <- processModule emptyFC base Nil qn
   top <- get
-  -- -- dumpContext top
 
-  -- (Nil) <- liftIO {M} $ readIORef top.errors
-  --   | errors => do
-  --     for_ errors $ \err =>
-  --       putStrLn (showError src err)
-  --     exitFailure "Compile failed"
   showErrors fn src
   pure MkUnit
 
