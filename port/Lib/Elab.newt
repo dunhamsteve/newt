@@ -92,8 +92,8 @@ forceMeta : Val -> M Val
 forceMeta (VMeta fc ix sp) = do
   meta <- lookupMeta ix
   case meta of
-    (Unsolved pos k xs _ _ _) => pure (VMeta fc ix sp)
     (Solved _ k t) => vappSpine t sp >>= forceMeta
+    _ => pure (VMeta fc ix sp)
 forceMeta x = pure x
 
 
@@ -199,7 +199,7 @@ makeSpine k (Defined :: xs) = makeSpine (k - 1) xs
 makeSpine k (Bound :: xs) = makeSpine (k - 1) xs :< VVar emptyFC (k - 1) Lin
 
 
-solve : Env -> (k : Int) -> SnocList Val -> Val -> M Unit
+solve : Env -> QName -> SnocList Val -> Val -> M Unit
 
 
 
@@ -259,8 +259,8 @@ solveAutos : Int -> M Unit
 solveAutos mstart = do
   top <- get
   mc <- readIORef top.metaCtx
-  let mlen = length' mc.metas - mstart
-  res <- run $ filter isAuto (ite (mstart == 0) mc.metas $ take (cast mlen) mc.metas)
+
+  res <- run $ filter isAuto (listValues mc.metas)
   if res then solveAutos mstart else pure MkUnit
   where
     isAuto : MetaEntry -> Bool
@@ -275,20 +275,16 @@ solveAutos mstart = do
 
 -- We need to switch to SortedMap here
 
-updateMeta : Int -> (MetaEntry -> M MetaEntry) -> M Unit
+updateMeta : QName -> (MetaEntry -> M MetaEntry) -> M Unit
 updateMeta ix f = do
   top <- get
-  mc <- readIORef top.metaCtx
-  metas <- go mc.metas
-  writeIORef top.metaCtx $ MC metas mc.next mc.mcmode
-  where
-    go : List MetaEntry -> M (List MetaEntry)
-    go Nil = error' "Meta \{show ix} not found"
-    go (x@((Unsolved y k z w v ys)) :: xs) = if k == ix then (flip _::_ xs) <$> f x else (_::_ x) <$> go xs
-    go (x@((Solved _ k y)) :: xs) = if k == ix then (flip _::_ xs) <$> f x else (_::_ x) <$> go xs
+  mc <- readIORef {M} top.metaCtx
+  let (Just me) = lookupMap' ix mc.metas | Nothing => pure MkUnit
+  me <- f me
+  writeIORef top.metaCtx $ MC (updateMap ix me mc.metas) mc.next mc.mcmode
 
 
-checkAutos : Int -> List MetaEntry -> M Unit
+checkAutos : QName -> List MetaEntry -> M Unit
 checkAutos ix Nil = pure MkUnit
 checkAutos ix (entry@(Unsolved fc k ctx ty AutoSolve _) :: rest) = do
   ty' <- quote ctx.lvl ty
@@ -302,8 +298,7 @@ checkAutos ix (entry@(Unsolved fc k ctx ty AutoSolve _) :: rest) = do
 checkAutos ix (_ :: rest) = checkAutos ix rest
 
 
-
-addConstraint : Env -> Int -> SnocList Val -> Val -> M Unit
+addConstraint : Env -> QName -> SnocList Val -> Val -> M Unit
 addConstraint env ix sp tm = do
   top <- get
   mc <- readIORef top.metaCtx
@@ -313,8 +308,9 @@ addConstraint env ix sp tm = do
       debug $ \ _ => "Add constraint m\{show ix} \{show sp} =?= \{show tm}"
       pure (Unsolved pos k a b c (MkMc (getFC tm) env sp tm :: cons))
     (Solved _ k tm) => error' "Meta \{show k} already solved (addConstraint :: Nil)"
+    (OutOfScope) => error' "Meta \{show ix} out of scope"
   mc <- readIORef top.metaCtx
-  checkAutos ix mc.metas
+  checkAutos ix (listValues mc.metas)
   -- this loops too
   -- solveAutos 0 mc.metas
   pure MkUnit
@@ -341,9 +337,9 @@ invert lvl sp = go sp Nil
 -- I think that essentially means our domain ix are one bigger, since we're looking at lvl
 -- in the codomain, so maybe we can just keep that value
 
-rename : Int -> List Int -> Int -> Val  -> M Tm
+rename : QName -> List Int -> Int -> Val  -> M Tm
 
-renameSpine : Int -> List Int -> Int -> Tm -> SnocList Val  -> M Tm
+renameSpine : QName -> List Int -> Int -> Tm -> SnocList Val  -> M Tm
 renameSpine meta ren lvl tm Lin = pure tm
 renameSpine meta ren lvl tm (xs :< x) = do
   xtm <- rename meta ren lvl x
@@ -447,6 +443,7 @@ solve env m sp t = do
     updateMeta m $ \case
       (Unsolved pos k _ _ _ cons) => pure $ Solved pos k soln
       (Solved _ k x) => error' "Meta \{show ix} already solved! (solve2 :: Nil)"
+      OutOfScope => error' "Meta \{show ix} out of scope"
     maybeCheck $ for_ cons $ \case
       MkMc fc env sp rhs => do
         val <- vappSpine soln sp
@@ -646,11 +643,14 @@ freshMeta ctx fc ty kind = do
   top <- get
   mc <- readIORef top.metaCtx
   debug $ \ _ => "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
-  let newmeta = Unsolved fc mc.next ctx ty kind Nil
-  writeIORef top.metaCtx $ MC (newmeta :: mc.metas) (1 + mc.next) mc.mcmode
+  -- need the ns here
+  -- we were fudging this for v1
+  let qn = QN ("$meta" :: Nil) (show mc.next)
+  let newmeta = Unsolved fc qn ctx ty kind Nil
+  writeIORef top.metaCtx $ MC (updateMap qn newmeta mc.metas) (1 + mc.next) mc.mcmode
   -- infinite loop - keeps trying Ord a => Ord (a \x a)
   -- when (kind == AutoSolve) $ \ _ => ignore $ trySolveAuto newmeta
-  pure $ applyBDs 0 (Meta fc mc.next) ctx.bds
+  pure $ applyBDs 0 (Meta fc qn) ctx.bds
   where
     -- hope I got the right order here :)
     applyBDs : Int -> Tm -> List BD -> Tm
@@ -1269,6 +1269,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
           -- TODO - only hit the relevant ones
           ignore $ solveAutos 0
           forceType ctx.env scty'
+        OutOfScope => pure scty'
 
     _ => pure scty'
 

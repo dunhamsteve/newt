@@ -139,7 +139,12 @@ processModule importFC base stk qn@(QN ns nm) = do
 
   -- we don't want implict errors from half-processed functions
   -- but suppress them all on error for simplicity.
-  errors <- readIORef top.errors
+  [] <- readIORef top.errors
+    | errors => do
+      for_ errors $ \err =>
+        putStrLn (showError src err)
+      exitFailure
+
   if stk == [] then logMetas mstart else pure ()
   pure src
   where

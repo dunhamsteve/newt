@@ -96,11 +96,22 @@ emptyFC = MkFC "" (0,0)
 
 -- Error of a parse
 
+data QName : U where
+  QN : List String -> String -> QName
+
+instance Eq QName where
+  QN ns n == QN ns' n' = n == n' && ns == ns'
+
+instance Show QName where
+  show (QN Nil n) = n
+  show (QN ns n) = joinBy "." ns ++ "." ++ n
+
+instance Ord QName where
+  compare (QN ns nm) (QN ns' nm') = if ns == ns' then compare nm nm' else compare ns ns'
+
 data Error
   = E FC String
-  | Postpone FC Int String
-
-
+  | Postpone FC QName String
 
 instance Show FC where
   show fc = "\{fc.file}:\{show fc.start}"

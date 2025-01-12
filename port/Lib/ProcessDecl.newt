@@ -33,26 +33,18 @@ dumpEnv ctx =
         go names (1 + k) xs ("  \{n} = \{render 90 $ pprint names v'} : \{render 90 $ pprint names ty'}":: acc)
 
 
-logMetas : Int -> M Unit
-logMetas mstart = do
-  -- FIXME, now this isn't logged for Sig / Data.
-  top <- get
-  mc <- readIORef {M} top.metaCtx
-  let mlen = cast {Int} {Nat} $ length' mc.metas - mstart
-  ignore $ for (reverse $ take mlen mc.metas) $ \case
-    (Solved fc k soln) => do
-      -- TODO put a flag on this, vscode is getting overwhelmed and
-      -- dropping errors
-      --info fc "solve \{show k} as \{render 90 $ pprint Nil !(quote 0 soln)}"
-      pure MkUnit
-    (Unsolved fc k ctx ty User cons) => do
+logMetas : List MetaEntry -> M Unit
+logMetas Nil = pure MkUnit
+logMetas (OutOfScope :: rest) = logMetas rest
+logMetas (Solved fc k soln :: rest) = logMetas rest
+logMetas (Unsolved fc k ctx ty User cons :: rest) = do
       ty' <- quote ctx.lvl ty
       let names = map fst ctx.types
       env <- dumpEnv ctx
       let msg = "\{env}  -----------\n  \{render 90 $ pprint names ty'}"
       info fc "User Hole\n\{msg}"
-
-    (Unsolved fc k ctx ty kind cons) => do
+      logMetas rest
+logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
       ty' <- forceMeta ty
       tm <- quote ctx.lvl ty'
       -- Now that we're collecting errors, maybe we simply check at the end
@@ -79,7 +71,7 @@ logMetas mstart = do
 
         _ => pure Nil
       info fc $ unlines ((msg :: Nil) ++ msgs ++ sols)
-      -- addError $ E fc $ unlines ((msg :: Nil) ++ msgs ++ sols)
+      logMetas rest
 
 
 -- Used for Class and Record
@@ -120,8 +112,6 @@ processDecl ns  (TypeSig fc names tm) = do
   ty <- zonk top 0 Nil ty
   putStrLn "TypeSig \{unwords names} : \{render 90 $ pprint Nil ty}"
   ignore $ for names $ \nm => setDef (QN ns nm) fc ty Axiom
-  -- Zoo4eg has metas in TypeSig, need to decide if I want to support leaving them unsolved here
-  -- logMetas mstart
 
 processDecl ns (PType fc nm ty) = do
   top <- get
@@ -144,7 +134,6 @@ processDecl ns (Def fc nm clauses) = do
   putStrLn "Def \{show nm}"
   top <- get
   mc <- readIORef top.metaCtx
-  let mstart = length' mc.metas
   let (Just entry) = lookupRaw nm top
     | Nothing => throwError $ E fc "No declaration for \{nm}"
   let (MkEntry fc name ty Axiom) = entry
@@ -161,8 +150,7 @@ processDecl ns (Def fc nm clauses) = do
   -- putStrLn "Ok \{render 90 $ pprint Nil tm}"
 
   mc <- readIORef top.metaCtx
-  let mlen = length' mc.metas - mstart
-  solveAutos mstart
+  solveAutos 0
   -- TODO - make nf that expands all metas and drop zonk
   -- Idris2 doesn't expand metas for performance - a lot of these are dropped during erasure.
   -- Day1.newt is a test case
@@ -177,7 +165,6 @@ processDecl ns (Def fc nm clauses) = do
   when top.verbose $ \ _ => putStrLn "ERASED\n\{render 80 $ pprint Nil tm'}"
   debug $ \ _ => "Add def \{nm} \{render 90 $ pprint Nil tm'} : \{render 90 $ pprint Nil ty}"
   updateDef (QN ns nm) fc ty (Fn tm')
-  -- logMetas mstart
 
 processDecl ns (DCheck fc tm ty) = do
   putStrLn "----- DCheck"
@@ -414,7 +401,6 @@ processDecl ns (Data fc nm ty cons) = do
       decl => throwError $ E (getFC decl) "expected constructor declaration"
   putStrLn "setDef \{nm}  TCon \{show $ join cnames}"
   updateDef (QN ns nm) fc tyty (TCon (join cnames))
-  -- logMetas mstart
   where
     binderName : Binder → Name
     binderName (MkBinder _ nm _ _ _) = nm

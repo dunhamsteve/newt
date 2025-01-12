@@ -30,7 +30,7 @@ instance Show TopContext where
 -- TODO need to get class dependencies working
 emptyTop : ∀ io. {{Monad io}} {{HasIO io}} -> io TopContext
 emptyTop = do
-  mcctx <- newIORef (MC Nil 0 CheckAll)
+  mcctx <- newIORef (MC EmptyMap 0 CheckAll)
   errs <- newIORef $ the (List Error) Nil
   pure $ MkTop EmptyMap mcctx False errs Nil EmptyMap
 

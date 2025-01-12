@@ -9,19 +9,6 @@ import Data.SnocList
 import Data.SortedMap
 import Data.String
 
-data QName : U where
-  QN : List String -> String -> QName
-
-instance Eq QName where
-  QN ns n == QN ns' n' = n == n' && ns == ns'
-
-instance Show QName where
-  show (QN Nil n) = n
-  show (QN ns n) = joinBy "." ns ++ "." ++ n
-
-instance Ord QName where
-  compare (QN ns nm) (QN ns' nm') = if ns == ns' then compare nm nm' else compare ns ns'
-
 Name : U
 Name = String
 
@@ -88,9 +75,7 @@ data Tm : U where
   Bnd : FC -> Int -> Tm
   -- Maybe Def here instead of Maybe Tm, we'll have DCon, TCon, etc.
   Ref : FC -> QName -> Def -> Tm
-  Meta : FC -> Int -> Tm
-  -- kovacs optimization, I think we can App out meta instead
-  -- InsMeta : Int -> List BD -> Tm
+  Meta : FC -> QName -> Tm
   Lam : FC -> Name -> Icit -> Quant -> Tm -> Tm
   App : FC -> Tm -> Tm -> Tm
   UU   : FC -> Tm
@@ -236,7 +221,7 @@ data Val : U where
   -- neutral case
   VCase : FC -> (sc : Val) -> List CaseAlt -> Val
   -- we'll need to look this up in ctx with IO
-  VMeta : FC -> (ix : Int) -> (sp : SnocList Val) -> Val
+  VMeta : FC -> QName -> (sp : SnocList Val) -> Val
   VLam : FC -> Name -> Icit -> Quant -> Closure -> Val
   VPi : FC -> Name -> Icit -> Quant -> (a : Val) -> (b : Closure) -> Val
   VLet : FC -> Name -> Val -> Val -> Val
@@ -305,7 +290,10 @@ instance Show MetaKind where
 
 data MConstraint = MkMc FC Env (SnocList Val) Val
 
-data MetaEntry = Unsolved FC Int Context Val MetaKind (List MConstraint) | Solved FC Int Val
+data MetaEntry
+  = Unsolved FC QName Context Val MetaKind (List MConstraint)
+  | Solved FC QName Val
+  | OutOfScope
 
 -- The purpose of this is to only check one level of constraints when trying an Auto solution
 -- The idea being we narrow it down to the likely solution, and let any consequent type error
@@ -315,7 +303,7 @@ data MetaMode = CheckAll | CheckFirst | NoCheck
 
 record MetaContext where
   constructor MC
-  metas : List MetaEntry
+  metas : SortedMap QName MetaEntry
   next : Int
   mcmode : MetaMode
 
@@ -391,6 +379,7 @@ define (MkCtx lvl env types bds ctxFC) name val ty =
 instance Show MetaEntry where
   show (Unsolved pos k ctx ty kind constraints) = "Unsolved \{show pos} \{show k} \{show kind} : \{show ty} \{show ctx.bds} cs \{show $ length constraints}"
   show (Solved _ k x) = "Solved \{show k} \{show x}"
+  show OutOfScope = "OutOfScope"
 
 withPos : Context -> FC -> Context
 withPos (MkCtx lvl env types bds ctxFC) fc = (MkCtx lvl env types bds fc)
@@ -492,16 +481,13 @@ error fc msg = throwError $ E fc msg
 error' : ∀ a. String -> M a
 error' msg = throwError $ E emptyFC msg
 
-lookupMeta : Int -> M MetaEntry
+lookupMeta : QName -> M MetaEntry
 lookupMeta ix = do
   top <- get
-  mc <- readIORef top.metaCtx
-  go mc.metas
-  where
-    go : List MetaEntry -> M MetaEntry
-    go Nil = error' "Meta \{show ix} not found"
-    go (meta@(Unsolved _ k ys _ _ _) :: xs) = if k == ix then pure meta else go xs
-    go (meta@(Solved _ k x) :: xs) = if k == ix then pure meta else go xs
+  mc <- readIORef {M} top.metaCtx
+  case lookupMap' ix mc.metas of
+    Just meta => pure meta
+    Nothing => pure OutOfScope
 
 mkCtx : FC -> Context
 mkCtx fc = MkCtx 0 Nil Nil Nil fc

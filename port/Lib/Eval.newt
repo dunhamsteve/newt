@@ -93,8 +93,9 @@ forceType : Env -> Val -> M Val
 forceType env (VMeta fc ix sp) = do
   meta <- lookupMeta ix
   case meta of
-    (Unsolved x k xs _ _ _) => pure (VMeta fc ix sp)
     (Solved _ k t) => vappSpine t sp >>= forceType env
+    _ => pure (VMeta fc ix sp)
+
 forceType env x = do
   Just x' <- tryEval env x
     | _ => pure x
@@ -158,8 +159,8 @@ eval env mode (Erased fc) = pure (VErased fc)
 eval env mode (Meta fc i) = do
   meta <- lookupMeta i
   case meta of
-        (Unsolved _ k xs _ _ _) => pure $ VMeta fc i Lin
         (Solved _ k t) => pure $ t
+        _ => pure $ VMeta fc i Lin
 eval env mode (Lam fc x icit rig t) = pure $ VLam fc x icit rig (MkClosure env t)
 eval env mode (Pi fc x icit rig a b) = do
   a' <- eval env mode a
@@ -207,8 +208,8 @@ quote l (VVar fc k sp) = if k < l
 quote l (VMeta fc i sp) = do
   meta <- lookupMeta i
   case meta of
-        (Unsolved _ k xs _ _ _) => quoteSp l (Meta fc i) sp
         (Solved _ k t) => vappSpine t sp >>= quote l
+        _ => quoteSp l (Meta fc i) sp
 quote l (VLam fc x icit rig t) = do
   val <- t $$ VVar emptyFC l Lin
   tm <- quote (1 + l) val
@@ -308,7 +309,7 @@ zonkApp top l env t@(Meta fc k) sp = do
       foo <- vappSpine v (Lin <>< sp')
       debug $ \ _ =>  "-> result is \{show foo}"
       tweakFC fc <$> quote l foo
-    (Unsolved x j xs _ _ _) => pure $ appSpine t sp
+    _ => pure $ appSpine t sp
 zonkApp top l env t sp = do
   t' <- zonk top l env t
   pure $ appSpine t' sp

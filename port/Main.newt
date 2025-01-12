@@ -110,26 +110,21 @@ processModule importFC base stk qn@(QN ns nm) = do
 
   top <- get
   mc <- readIORef top.metaCtx
-  -- REVIEW suppressing unsolved and solved metas from previous files
-  -- I may want to know about (or exitFailure early on) unsolved
-  let mstart = length mc.metas
-  -- let Right (decls, ops, toks) = partialParse fn (manySame parseDecl) top.ops toks
-  --   | Left (err, toks) => exitFailure (showError src err)
+
   (decls, ops) <- parseDecls fn top.ops toks Lin
   modify (\ top => MkTop top.defs top.metaCtx top.verbose top.errors top.loaded ops)
   putStrLn "process Decls"
 
   traverse (tryProcessDecl ns) (collectDecl decls)
 
-  -- we don't want implict errors from half-processed functions
-  -- but suppress them all on error for simplicity.
-  errors <- readIORef top.errors
-  if stk == Nil then logMetas (cast mstart) else pure MkUnit
+  (Nil) <- liftIO {M} $ readIORef top.errors
+    | errors => do
+        for_ errors $ \err =>
+          putStrLn (showError src err)
+        exitFailure "Compile failed"
+  if stk == Nil then logMetas $ reverse $ listValues mc.metas else pure MkUnit
   pure src
   where
-
-    -- parseDecls :
-    -- tryParseDecl :
     tryProcessDecl : List String -> Decl -> M Unit
     tryProcessDecl ns decl = do
       Left err <- tryError $ processDecl ns decl | _ => pure MkUnit
