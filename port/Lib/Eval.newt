@@ -1,5 +1,8 @@
 module Lib.Eval
 
+import Prelude
+import Lib.Common
+import Lib.Prettier
 import Lib.Types
 import Lib.TopContext
 

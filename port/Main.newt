@@ -1,8 +1,10 @@
 module Main
 
+import Prelude
 import Data.List1
 import Data.String
 import Data.IORef
+import Data.SortedMap
 import Lib.Common
 import Lib.Compile
 import Lib.Parser
@@ -17,6 +19,9 @@ import Lib.Types
 import Lib.Syntax
 import Lib.Syntax
 import Node
+
+primNS : List String
+primNS = ("Prim" :: Nil)
 
 jsonTopContext : M Json
 jsonTopContext = do
@@ -77,9 +82,10 @@ processModule : FC -> String -> List String -> QName -> M String
 processModule importFC base stk qn@(QN ns nm) = do
   top <- get
   -- TODO make top.loaded a List QName
-  let name = joinBy "." (snoc ns nm)
-  let (False) = elem name top.loaded | _ => pure ""
-  modify (\ top => MkTop top.defs top.metaCtx top.verbose top.errors (name :: top.loaded)top.ops)
+  let modns = (snoc ns nm)
+  let name = joinBy "." modns
+  let (Nothing) = lookupMap modns top.modules | _ => pure ""
+  modify (\ top => MkTop (updateMap modns emptyModCtx top.modules) top.imported top.ns top.defs top.metaCtx top.verbose top.errors top.ops)
   let fn = (joinBy "/" (base :: ns)) ++ "/" ++ nm ++ ".newt"
   (Right src) <- liftIO {M} $ readFile fn
     | Left err => exitFailure "ERROR at \{show importFC}: error reading \{fn}: \{show err}"
@@ -99,7 +105,7 @@ processModule importFC base stk qn@(QN ns nm) = do
   let (Right (imports, ops, toks)) = partialParse fn parseImports ops toks
     | Left (err, toks) => exitFailure (showError src err)
 
-  for imports $ \case
+  imported <- for imports $ \case
     MkImport fc name' => do
       let (a,b) = unsnoc $ split1 name' "."
       let qname = QN a b
@@ -107,15 +113,29 @@ processModule importFC base stk qn@(QN ns nm) = do
       when (elem name' stk) $ \ _ => error emptyFC "import loop \{show name} -> \{show name'}"
 
       processModule fc base (name :: stk) qname
+      pure $ split name' "."
+
+  let imported = snoc imported primNS
+
+  -- I guess we should empty defs now instead of at the end?
+
+  putStrLn $ "MODNS " ++ show modns
+  top <- get
+  (decls, ops) <- parseDecls fn top.ops toks Lin
 
   top <- get
-  mc <- readIORef top.metaCtx
-
-  (decls, ops) <- parseDecls fn top.ops toks Lin
-  modify (\ top => MkTop top.defs top.metaCtx top.verbose top.errors top.loaded ops)
+  freshMC <- newIORef (MC EmptyMap 0 CheckAll)
+  -- set imported, mod, freshMC, ops  before processing
+  modify (\ top => MkTop top.modules imported modns EmptyMap freshMC top.verbose top.errors ops)
   putStrLn "process Decls"
-
   traverse (tryProcessDecl ns) (collectDecl decls)
+
+  -- update modules with result
+  top <- get
+  mc <- readIORef top.metaCtx
+  let modules = updateMap modns (MkModCtx top.defs mc top.ops) top.modules
+  freshMC <- newIORef (MC EmptyMap 0 CheckAll)
+  modify (\ top => MkTop modules Nil Nil EmptyMap freshMC top.verbose top.errors top.ops)
 
   (Nil) <- liftIO {M} $ readIORef top.errors
     | errors => do
@@ -179,9 +199,15 @@ processFile fn = do
   -- let base = if base == "" then "." else base
 
   -- declare internal primitives
-  processDecl ("Prim" :: Nil) (PType emptyFC "Int" Nothing)
-  processDecl ("Prim" :: Nil) (PType emptyFC "String" Nothing)
-  processDecl ("Prim" :: Nil) (PType emptyFC "Char" Nothing)
+
+  processDecl primNS (PType emptyFC "Int" Nothing)
+  processDecl primNS (PType emptyFC "String" Nothing)
+  processDecl primNS (PType emptyFC "Char" Nothing)
+
+  top <- get
+  let modules = updateMap primNS (MkModCtx top.defs (MC EmptyMap 0 CheckAll) top.ops) top.modules
+  modify (\ top => MkTop modules (primNS :: Nil) Nil EmptyMap top.metaCtx top.verbose top.errors top.ops)
+
 
   src <- processModule emptyFC base Nil qn
   top <- get
@@ -200,7 +226,7 @@ cmdLine : List String -> M (Maybe String × List String)
 cmdLine Nil = pure (Nothing, Nil)
 cmdLine ("--top" :: args) = cmdLine args -- handled later
 cmdLine ("-v" :: args) = do
-  modify (\ top => MkTop top.defs top.metaCtx True top.errors top.loaded top.ops)
+  modify (\ top => MkTop top.modules top.imported top.ns top.defs top.metaCtx True top.errors top.ops)
   cmdLine args
 cmdLine ("-o" :: fn :: args) = do
   (out, files) <- cmdLine args

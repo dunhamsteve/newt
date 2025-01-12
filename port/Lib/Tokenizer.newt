@@ -7,7 +7,7 @@ module Lib.Tokenizer
 
 -- Newt is having a rough time dealing with do blocks for Either in here
 --
-
+import Prelude
 import Lib.Token
 import Lib.Common
 import Data.String

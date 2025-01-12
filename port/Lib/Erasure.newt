@@ -1,5 +1,7 @@
 module Lib.Erasure
 
+import Prelude
+import Lib.Common
 import Lib.Types
 import Data.SnocList
 import Lib.TopContext

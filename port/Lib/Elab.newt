@@ -1,14 +1,19 @@
 module Lib.Elab
 
+import Prelude
+import Lib.Common
 import Lib.Parser.Impl
 import Lib.Prettier
 import Data.String
+import Data.SnocList
 import Data.IORef
-import Lib.Types
+import Data.SortedMap
 import Lib.Eval
 import Lib.Util
 import Lib.TopContext
+-- FIXME Def is shadowing...
 import Lib.Syntax
+import Lib.Types
 
 
 vprint : Context -> Val -> M String
@@ -223,7 +228,11 @@ trySolveAuto (Unsolved fc k ctx ty AutoSolve _) = do
           | res => do
               debug $ \ _ => "FAILED to solve \{show ty}, matches: \{render 90 $ commaSep $ map (pprint Nil ∘ fst) res}"
               pure False
-      (nm :: Nil) <- findMatches ctx ty $ map snd $ toList top.defs
+      let te = listValues top.defs
+      let rest = map {List} (\ x => listValues x.modDefs) $
+            mapMaybe (flip lookupMap' top.modules) top.imported
+
+      (nm :: Nil) <- findMatches ctx ty $ join (te :: rest)
         | res => do
           debug $ \ _ => "FAILED to solve \{show ty}, matches: \{show res}"
           pure False
@@ -307,7 +316,7 @@ addConstraint env ix sp tm = do
     (Unsolved pos k a b c cons) => do
       debug $ \ _ => "Add constraint m\{show ix} \{show sp} =?= \{show tm}"
       pure (Unsolved pos k a b c (MkMc (getFC tm) env sp tm :: cons))
-    (Solved _ k tm) => error' "Meta \{show k} already solved (addConstraint :: Nil)"
+    (Solved _ k tm) => error' "Meta \{show k} already solved [addConstraint]"
     (OutOfScope) => error' "Meta \{show ix} out of scope"
   mc <- readIORef top.metaCtx
   checkAutos ix (listValues mc.metas)
@@ -417,7 +426,7 @@ maybeCheck action = do
 
 solve env m sp t = do
   meta@(Unsolved metaFC ix ctx_ ty kind cons) <- lookupMeta m
-    | _ => error (getFC t) "Meta \{show m} already solved! (solve :: Nil)"
+    | _ => error (getFC t) "Meta \{show m} already solved! [solve]"
   debug $ \ _ => "SOLVE \{show m} \{show kind} lvl \{show $ length' env} sp \{show sp} is \{show t}"
   let size = length $ filter (\x => x == Bound) ctx_.bds
   debug $ \ _ => "\{show m} size is \{show size} sps \{show $ snoclen sp}"
@@ -442,7 +451,7 @@ solve env m sp t = do
 
     updateMeta m $ \case
       (Unsolved pos k _ _ _ cons) => pure $ Solved pos k soln
-      (Solved _ k x) => error' "Meta \{show ix} already solved! (solve2 :: Nil)"
+      (Solved _ k x) => error' "Meta \{show ix} already solved! [solve2]"
       OutOfScope => error' "Meta \{show ix} out of scope"
     maybeCheck $ for_ cons $ \case
       MkMc fc env sp rhs => do
@@ -645,7 +654,7 @@ freshMeta ctx fc ty kind = do
   debug $ \ _ => "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
   -- need the ns here
   -- we were fudging this for v1
-  let qn = QN ("$meta" :: Nil) (show mc.next)
+  let qn = QN top.ns "$m\{show mc.next}"
   let newmeta = Unsolved fc qn ctx ty kind Nil
   writeIORef top.metaCtx $ MC (updateMap qn newmeta mc.metas) (1 + mc.next) mc.mcmode
   -- infinite loop - keeps trying Ord a => Ord (a \x a)
@@ -1445,8 +1454,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
         Nothing => error fc "\{show nm} not in scope"
     go i ((x, ty) :: xs) = if x == nm then pure $ (Bnd fc i, ty)
       else go (i + 1) xs
--- FIXME tightens up output but hardcodes a name
--- infer ctx (RApp fc (RVar _ "_$_") u icit) = infer ctx u
+
 infer ctx (RApp fc t u icit) = do
   -- If the app is explicit, add any necessary metas
   (icit, t, tty) <- case the Icit icit of

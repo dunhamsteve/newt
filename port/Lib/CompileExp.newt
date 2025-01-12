@@ -7,6 +7,8 @@
 -- I could make names unique (e.q. on lambdas), but I might want that to vary per backend?
 module Lib.CompileExp
 
+import Prelude
+import Lib.Common
 import Lib.Types -- Name / Tm
 import Lib.TopContext
 import Lib.Prettier

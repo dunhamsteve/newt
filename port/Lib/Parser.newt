@@ -2,6 +2,9 @@ module Lib.Parser
 
 -- NOW Still working on this.
 
+import Prelude
+import Lib.Common
+import Data.SortedMap
 import Data.String
 import Lib.Parser.Impl
 import Lib.Syntax

@@ -1,10 +1,12 @@
 module Lib.Parser.Impl
 
+import Prelude
 import Lib.Token
 import Lib.Common
 import Data.String
 import Data.Nat
 import Data.List1
+import Data.SortedMap
 
 public export
 TokenList : Type

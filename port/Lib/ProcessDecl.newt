@@ -1,13 +1,17 @@
 module Lib.ProcessDecl
 
+import Prelude
 import Data.IORef
 import Data.String
 
+import Lib.Common
 import Lib.Elab
 import Lib.Parser
 import Lib.Syntax
+import Data.SortedMap
 import Lib.TopContext
 import Lib.Eval
+import Lib.Prettier
 import Lib.Types
 import Lib.Util
 import Lib.Erasure

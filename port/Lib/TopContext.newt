@@ -3,6 +3,8 @@ module Lib.TopContext
 import Data.IORef
 import Data.SortedMap
 import Data.String
+import Prelude
+import Lib.Common
 import Lib.Types
 
 -- I want unique ids, to be able to lookup, update, and a Ref so
@@ -10,29 +12,39 @@ import Lib.Types
 
 
 lookup : QName -> TopContext -> Maybe TopEntry
-lookup nm top = lookupMap' nm top.defs
+lookup qn@(QN ns nm) top =
+  case lookupMap' qn top.defs of
+    Just entry => Just entry
+    Nothing => case lookupMap' ns top.modules of
+      Just mod => lookupMap' qn mod.modDefs
+      Nothing => Nothing
 
 -- TODO - look at imported namespaces, and either have a map of imported names or search imported namespaces..
 
 lookupRaw : String -> TopContext -> Maybe TopEntry
-lookupRaw raw top = go $ toList top.defs
+lookupRaw raw top =
+  case lookupMap' (QN top.ns raw) top.defs of
+    Just entry => Just entry
+    Nothing => go top.imported
   where
-    go : List (QName × TopEntry) -> Maybe TopEntry
+    go : List (List String) → Maybe TopEntry
     go Nil = Nothing
-    go (((QN ns nm), entry) :: rest) = if nm == raw then Just entry else go rest
-
--- Maybe pretty print?
+    go (ns :: nss) = case lookupMap' ns top.modules of
+      Nothing => go nss
+      Just mod => case lookupMap' (QN ns raw) mod.modDefs of
+        Just entry => Just entry
+        Nothing => go nss
 
 
 instance Show TopContext where
-  show (MkTop defs metas _ _ _ _) = "\nContext:\n (\{ joinBy "\n" $ map (show ∘ snd) $ toList defs} :: Nil)"
+  show (MkTop _ _ _ defs metas _ _ _) = "\nContext:\n (\{ joinBy "\n" $ map (show ∘ snd) $ toList defs} :: Nil)"
 
 -- TODO need to get class dependencies working
 emptyTop : ∀ io. {{Monad io}} {{HasIO io}} -> io TopContext
 emptyTop = do
   mcctx <- newIORef (MC EmptyMap 0 CheckAll)
   errs <- newIORef $ the (List Error) Nil
-  pure $ MkTop EmptyMap mcctx False errs Nil EmptyMap
+  pure $ MkTop EmptyMap Nil Nil EmptyMap mcctx False errs EmptyMap
 
 
 setDef : QName -> FC -> Tm -> Def -> M Unit
@@ -41,9 +53,9 @@ setDef name fc ty def = do
   let (Nothing) = lookupMap' name top.defs
     | Just (MkEntry fc' nm' ty' def') => error fc "\{show name} is already defined at \{show fc'}"
   modify $ \case
-    MkTop defs metaCtx verbose errors loaded ops =>
+    MkTop mods imp ns defs metaCtx verbose errors ops =>
       let defs = (updateMap name (MkEntry fc name ty def) top.defs) in
-      MkTop defs metaCtx verbose errors loaded ops
+      MkTop mods imp ns defs metaCtx verbose errors ops
 
 
 updateDef : QName -> FC -> Tm -> Def -> M Unit
@@ -52,9 +64,9 @@ updateDef name fc ty def = do
   let (Just (MkEntry fc' nm' ty' def')) = lookupMap' name top.defs
     | Nothing => error fc "\{show name} not declared"
   modify $ \case
-    MkTop defs metaCtx verbose errors loaded ops =>
+    MkTop mods imp ns defs metaCtx verbose errors ops =>
       let defs = (updateMap name (MkEntry fc' name ty def) defs) in
-      MkTop defs metaCtx verbose errors loaded ops
+      MkTop mods imp ns defs metaCtx verbose errors ops
 
 addError : Error -> M Unit
 addError err = do

@@ -1,6 +1,6 @@
 module Lib.Types
 
--- For FC, Error
+import Prelude
 import Lib.Common
 import Lib.Prettier
 
@@ -332,6 +332,14 @@ record TopEntry where
 instance Show TopEntry where
   show (MkEntry fc name type def) = "\{show name} : \{show type} := \{show def}"
 
+record ModContext where
+  constructor MkModCtx
+  modDefs : SortedMap QName TopEntry
+  -- Do we need this if everything solved is zonked?
+  modMetaCtx : MetaContext
+  -- longer term maybe drop this, put the operator decls in ctxDefs and collect them on import
+  ctxOps : Operators
+
 -- Top level context.
 -- Most of the reason this is separate is to have a different type
 -- `Def` for the entries.
@@ -339,15 +347,26 @@ instance Show TopEntry where
 -- The price is that we have names in addition to levels. Do we want to
 -- expand these during normalization?
 
+-- A placeholder while walking through dependencies of a module
+emptyModCtx : ModContext
+emptyModCtx = MkModCtx EmptyMap (MC EmptyMap 0 NoCheck) EmptyMap
+
 record TopContext where
   constructor MkTop
-  -- We'll add a map later?
+  -- maybe we use a String instead of List String for the left of QN
+  -- I'm putting a dummy entry in
+  modules : SortedMap (List String) ModContext
+  imported : List (List String)
+
+  -- current module
+  ns : List String
   defs : SortedMap QName TopEntry
   metaCtx : IORef MetaContext
+
+  -- Global values
   verbose : Bool -- command line flag
   errors : IORef (List Error)
-  -- loaded modules
-  loaded : List String
+  -- what do we do here? we can accumulate for now, but we'll want to respect import
   ops : Operators
 
 -- we'll use this for typechecking, but need to keep a TopContext around too.
@@ -482,12 +501,18 @@ error' : ∀ a. String -> M a
 error' msg = throwError $ E emptyFC msg
 
 lookupMeta : QName -> M MetaEntry
-lookupMeta ix = do
+lookupMeta ix@(QN ns nm) = do
   top <- get
   mc <- readIORef {M} top.metaCtx
   case lookupMap' ix mc.metas of
     Just meta => pure meta
-    Nothing => pure OutOfScope
+    Nothing => case lookupMap' ns top.modules of
+      Nothing => 
+          error emptyFC "missing module: \{show ns}"
+      Just mod => case lookupMap' ix mod.modMetaCtx.metas of
+        Nothing => 
+          error emptyFC "missing meta: \{show ix}"
+        Just entry => pure entry 
 
 mkCtx : FC -> Context
 mkCtx fc = MkCtx 0 Nil Nil Nil fc

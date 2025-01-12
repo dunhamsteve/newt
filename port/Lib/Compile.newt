@@ -1,12 +1,15 @@
 -- TODO Audit how much "outside" stuff could pile up in the continuation.
 module Lib.Compile
 
+import Prelude
+import Lib.Common
 import Lib.Types
 import Lib.Prettier
 import Lib.CompileExp
 import Lib.TopContext
 import Data.String
 import Data.Int
+import Data.SortedMap
 
 data StKind = Plain | Return | Assign String
 
