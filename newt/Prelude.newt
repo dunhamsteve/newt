@@ -284,7 +284,7 @@ pfunc aget : {0 a : U} -> Array a -> Int -> a := `(a, arr, ix) => arr[ix]`
 pfunc aempty : {0 a : U} -> Unit -> Array a := `() => []`
 
 pfunc arrayToList uses (Nil _::_) : {0 a} → Array a → List a := `(a,arr) => {
-  let rval = Nil(a)
+  let rval = Nil(null)
   for (let i = arr.length - 1;i >= 0; i--) {
     rval = _$3A$3A_(a, arr[i], rval)
   }
@@ -294,7 +294,7 @@ pfunc arrayToList uses (Nil _::_) : {0 a} → Array a → List a := `(a,arr) => 
 
 
 -- for now I'll run this in JS
-pfunc lines uses (arrayToList) : String → List String := `(s) => arrayToList(undefined,s.split('\n'))`
+pfunc lines uses (arrayToList) : String → List String := `(s) => arrayToList(null,s.split('\n'))`
 
 pfunc p_strHead : (s : String) -> Char := `(s) => s[0]`
 pfunc p_strTail : (s : String) -> String := `(s) => s[0]`
@@ -302,9 +302,9 @@ pfunc p_strTail : (s : String) -> String := `(s) => s[0]`
 pfunc trim : String -> String := `s => s.trim()`
 pfunc split uses (Nil _::_) : String -> String -> List String := `(s, by) => {
   let parts = s.split(by)
-  let rval = Nil(String)
+  let rval = Nil(null)
   parts.reverse()
-  parts.forEach(p => { rval = _$3A$3A_(undefined, p, rval) })
+  parts.forEach(p => { rval = _$3A$3A_(null, p, rval) })
   return rval
 }`
 
@@ -329,7 +329,7 @@ pfunc intToNat uses (Z S) : Int -> Nat := `(n) => {
 
 
 
-pfunc fastConcat uses (listToArray) : List String → String := `(xs) => listToArray(undefined, xs).join('')`
+pfunc fastConcat uses (listToArray) : List String → String := `(xs) => listToArray(null, xs).join('')`
 pfunc replicate uses (natToInt) : Nat -> Char → String := `(n,c) => c.repeat(natToInt(n))`
 
 -- I don't want to use an empty type because it would be a proof of void
@@ -379,7 +379,7 @@ instance HasIO IO where
 
 pfunc primPutStrLn uses (MkIORes MkUnit) : String -> IO Unit := `(s) => (w) => {
   console.log(s)
-  return MkIORes(undefined,MkUnit,w)
+  return MkIORes(null,MkUnit,w)
 }`
 
 putStrLn : ∀ io. {{HasIO io}} -> String -> io Unit
@@ -401,8 +401,8 @@ pfunc chr : Int → Char := `(c) => String.fromCharCode(c)`
 
 pfunc unpack uses (Nil _::_) : String -> List Char
   := `(s) => {
-    let acc = Nil(undefined)
-    for (let i = s.length - 1; 0 <= i; i--) acc = _$3A$3A_(undefined, s[i], acc)
+    let acc = Nil(null)
+    for (let i = s.length - 1; 0 <= i; i--) acc = _$3A$3A_(null, s[i], acc)
     return acc
 }`
 
@@ -418,7 +418,7 @@ pfunc pack : List Char → String := `(cs) => {
 
 pfunc debugStr uses (natToInt listToArray) : ∀ a. a → String := `(_, obj) => {
   const go = (obj) => {
-    if (obj === undefined) return "_"
+    if (obj === null) return "_"
     if (typeof obj == 'bigint') return ''+obj
     if (obj.tag === '_,_') {
       let rval = '('
@@ -429,7 +429,7 @@ pfunc debugStr uses (natToInt listToArray) : ∀ a. a → String := `(_, obj) =>
       return rval + go(obj) + ')'
     }
     if (obj?.tag === '_::_' || obj?.tag === 'Nil') {
-      let stuff = listToArray(undefined,obj)
+      let stuff = listToArray(null,obj)
       return '['+(stuff.map(go).join(', '))+']'
     }
     if (obj instanceof Array) {
@@ -620,20 +620,20 @@ instance Div Double where x / y = divDouble x y
 ptype IOArray : U → U
 
 pfunc newArray uses (MkIORes) : ∀ a. Int → a → IO (IOArray a) :=
-  `(_, n, v) => (w) => MkIORes(undefined,Array(n).fill(v),w)`
-pfunc arrayGet : ∀ a. IOArray a → Int → IO a := `(_, arr, ix) => w => MkIORes(undefined, arr[ix], w)`
+  `(_, n, v) => (w) => MkIORes(null,Array(n).fill(v),w)`
+pfunc arrayGet : ∀ a. IOArray a → Int → IO a := `(_, arr, ix) => w => MkIORes(null, arr[ix], w)`
 pfunc arraySet uses (MkUnit) : ∀ a. IOArray a → Int → a → IO Unit := `(_, arr, ix, v) => w => {
   arr[ix] = v
-  return MkIORes(undefined, MkUnit, w)
+  return MkIORes(null, MkUnit, w)
 }`
-pfunc arraySize uses (MkIORes) : ∀ a. IOArray a → IO Int := `(_, arr) => w => MkIORes(undefined, arr.length, w)`
+pfunc arraySize uses (MkIORes) : ∀ a. IOArray a → IO Int := `(_, arr) => w => MkIORes(null, arr.length, w)`
 
 pfunc ioArrayToList uses (Nil _::_ MkIORes) : {0 a} → IOArray a → IO (List a) := `(a,arr) => w => {
-  let rval = Nil(a)
+  let rval = Nil(null)
   for (let i = arr.length - 1;i >= 0; i--) {
     rval = _$3A$3A_(a, arr[i], rval)
   }
-  return MkIORes(undefined, rval, w)
+  return MkIORes(null, rval, w)
 }`
 
 pfunc listToIOArray uses (MkIORes) : {0 a} → List a → IO (Array a) := `(a,list) => w => {
@@ -642,7 +642,7 @@ pfunc listToIOArray uses (MkIORes) : {0 a} → List a → IO (Array a) := `(a,li
     rval.push(list.h1)
     list = list.h2
   }
-  return MkIORes(undefined,rval,w)
+  return MkIORes(null,rval,w)
 }`
 
 class Cast a b where

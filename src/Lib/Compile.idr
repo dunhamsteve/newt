@@ -232,7 +232,7 @@ expToDoc (Apply x xs) = expToDoc x ++ text "(" ++ nest 2 (commaSep (map expToDoc
 expToDoc (Var nm) = jsIdent nm
 expToDoc (JLam nms (JReturn exp)) = text "(" <+> commaSep (map jsIdent nms) <+> text ") =>" <+> text "(" ++ expToDoc exp ++ text ")"
 expToDoc (JLam nms body) = text "(" <+> commaSep (map jsIdent nms) <+> text ") =>" <+> bracket "{" (stmtToDoc body) "}"
-expToDoc JUndefined = text "undefined"
+expToDoc JUndefined = text "null"
 expToDoc (Index obj ix) = expToDoc obj ++ text "[" ++ expToDoc ix ++ text "]"
 expToDoc (Dot obj nm) = expToDoc obj ++ text "." ++ jsIdent nm
 

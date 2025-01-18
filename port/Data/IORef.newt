@@ -5,11 +5,11 @@ import Prelude
 -- We should test this at some point
 
 ptype IORef : U → U
-pfunc primNewIORef uses (MkIORes MkUnit) : ∀ a. a → IO (IORef a) := `(_, a) => (w) => MkIORes(undefined, [a], w)`
-pfunc primReadIORef uses (MkIORes MkUnit) : ∀ a. IORef a → IO a := `(_, ref) => (w) => MkIORes(undefined, ref[0], w)`
+pfunc primNewIORef uses (MkIORes MkUnit) : ∀ a. a → IO (IORef a) := `(_, a) => (w) => MkIORes(null, [a], w)`
+pfunc primReadIORef uses (MkIORes MkUnit) : ∀ a. IORef a → IO a := `(_, ref) => (w) => MkIORes(null, ref[0], w)`
 pfunc primWriteIORef uses (MkIORes MkUnit) : ∀ a. IORef a → a → IO Unit := `(_, ref, a) => (w) => {
   ref[0] = a
-  return MkIORes(undefined,MkUnit,w)
+  return MkIORes(null,MkUnit,w)
 }`
 
 newIORef : ∀ io a. {{HasIO io}} → a → io (IORef a)
