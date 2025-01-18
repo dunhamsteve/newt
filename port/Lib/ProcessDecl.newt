@@ -263,7 +263,7 @@ processDecl ns (Instance instfc ty decls) = do
     | _ => do
       debug $ \ _ => "Forward declaration \{show sigDecl}"
 
-  let (Ref _ tconName _, args) = funArgs codomain
+  let (Ref _ tconName, args) = funArgs codomain
     | (tm, _) => error tyFC "\{render 90 $ pprint Nil codomain} doesn't appear to be a TCon application"
   let (Just (MkEntry _ name type (TCon cons))) = lookup tconName top
     | _ => error tyFC "\{show tconName} is not a type constructor"
@@ -394,7 +394,7 @@ processDecl ns (Data fc nm ty cons) = do
           let (codomain, tele) = splitTele dty
           -- for printing
           let tnames = reverse $ map binderName tele
-          let (Ref _ hn _, args) = funArgs codomain
+          let (Ref _ hn, args) = funArgs codomain
             | (tm, _) => error (getFC tm) "expected \{nm} got \{render 90 $ pprint tnames tm}"
           when (hn /= QN ns nm) $ \ _ =>
             error (getFC codomain) "Constructor codomain is \{render 90 $ pprint tnames codomain} rather than \{nm}"

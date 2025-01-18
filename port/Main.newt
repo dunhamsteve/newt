@@ -21,16 +21,6 @@ import Lib.Syntax
 import Lib.Syntax
 import Node
 
--- this was an experiment, prepping for dumping module information
--- it ends up with out of memory dumping defs of some of the files.
--- Prelude is 114MB pretty-printed... gzip to 1M
-pfunc dumpObject uses (MkIORes MkUnit fs): ∀ a. String → a → IO Unit := `(_,fn,a) => (w) => {
-  console.log(a)
-  let data = JSON.stringify(a, null, '  ')
-  fs.writeFileSync(fn, data)
-  return MkIORes(undefined, MkUnit, w)
-}`
-
 primNS : List String
 primNS = ("Prim" :: Nil)
 
@@ -127,8 +117,6 @@ processModule importFC base stk qn@(QN ns nm) = do
       pure $ split name' "."
 
   let imported = snoc imported primNS
-
-  -- I guess we should empty defs now instead of at the end?
 
   putStrLn $ "MODNS " ++ show modns
   top <- get

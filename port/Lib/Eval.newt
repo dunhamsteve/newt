@@ -30,7 +30,7 @@ _$$_ (MkClosure env tm) u = eval (u :: env) CBN tm
 vapp : Val -> Val -> M Val
 vapp (VLam _ _ _ _ t) u = t $$ u
 vapp (VVar fc k sp) u = pure $ VVar fc k (sp :< u)
-vapp (VRef fc nm def sp) u = pure $ VRef fc nm def (sp :< u)
+vapp (VRef fc nm sp) u = pure $ VRef fc nm (sp :< u)
 vapp (VMeta fc k sp) u = pure $ VMeta fc k (sp :< u)
 vapp t u = error' "impossible in vapp \{show t} to \{show u}\n"
 
@@ -67,7 +67,7 @@ unlet env x = pure x
 
 
 tryEval : Env -> Val -> M (Maybe Val)
-tryEval env (VRef fc k _ sp) = do
+tryEval env (VRef fc k sp) = do
   top <- get
   case lookup k top of
       Just (MkEntry _ name ty (Fn tm)) =>
@@ -105,7 +105,7 @@ forceType env x = do
   forceType env x'
 
 evalCase : Env -> Mode -> Val -> List CaseAlt -> M (Maybe Val)
-evalCase env mode sc@(VRef _ nm _ sp) (cc@(CaseCons name nms t) :: xs) = do
+evalCase env mode sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
   top <- get
   if nm == name
     then do
@@ -152,7 +152,7 @@ evalCase env mode sc cc = do
 
 -- TODO maybe add glueing
 
-eval env mode (Ref fc x def) = pure $ VRef fc x def Lin
+eval env mode (Ref fc x) = pure $ VRef fc x Lin
 eval env mode (App _ t u) = do
   t' <- eval env mode t
   u' <- eval env mode u
@@ -232,7 +232,7 @@ quote l (VLetRec fc nm ty t u) = do
   u' <- quote (1 + l) u
   pure $ LetRec fc nm ty' t' u'
 quote l (VU fc) = pure (UU fc)
-quote l (VRef fc n def sp) = quoteSp l (Ref fc n def) sp
+quote l (VRef fc n sp) = quoteSp l (Ref fc n) sp
 quote l (VCase fc sc alts) = do
   sc' <- quote l sc
   pure $ Case fc sc' alts
@@ -286,7 +286,7 @@ appSpine t (x :: xs) = appSpine (App (getFC t) t x) xs
 -- For errors, I think we want to pretend the code has been typed in place
 tweakFC : FC -> Tm -> Tm
 tweakFC fc (Bnd fc1 k) = Bnd fc k
-tweakFC fc (Ref fc1 nm x) = Ref fc nm x
+tweakFC fc (Ref fc1 nm) = Ref fc nm
 tweakFC fc (UU fc1) = UU fc
 tweakFC fc (Meta fc1 k) = Meta fc k
 tweakFC fc (Lam fc1 nm icit rig t) = Lam fc nm icit rig t
@@ -339,5 +339,5 @@ zonk top l env t = case t of
   UU fc => pure $ UU fc
   Lit fc lit => pure $ Lit fc lit
   Bnd fc ix => pure $ Bnd fc ix
-  Ref fc ix def => pure $ Ref fc ix def
+  Ref fc ix => pure $ Ref fc ix
   Erased fc => pure $ Erased fc

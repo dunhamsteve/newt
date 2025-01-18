@@ -15,7 +15,7 @@ EEnv = List (String × Quant × Maybe Tm)
 -- check App at type
 
 getType : Tm -> M (Maybe Tm)
-getType (Ref fc nm x) = do
+getType (Ref fc nm) = do
   top <- get
   case lookup nm top of
     Nothing => error fc "\{show nm} not in scope"
@@ -63,7 +63,7 @@ doAlt env (CaseLit lit t) = CaseLit lit <$> erase env t Nil
 -- This is a little fuzzy because we don't have all of the types.
 erase env t sp = case t of
   (App fc u v) => erase env u ((fc,v) :: sp)
-  (Ref fc nm x) => do
+  (Ref fc nm) => do
     top <- get
     case lookup nm top of
       Nothing => error fc "\{show nm} not in scope"

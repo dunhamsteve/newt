@@ -74,7 +74,7 @@ instance Eq Literal where
 data Tm : U where
   Bnd : FC -> Int -> Tm
   -- Maybe Def here instead of Maybe Tm, we'll have DCon, TCon, etc.
-  Ref : FC -> QName -> Def -> Tm
+  Ref : FC -> QName -> Tm
   Meta : FC -> QName -> Tm
   Lam : FC -> Name -> Icit -> Quant -> Tm -> Tm
   App : FC -> Tm -> Tm -> Tm
@@ -90,7 +90,7 @@ data Tm : U where
 
 instance HasFC Tm where
   getFC (Bnd fc k) = fc
-  getFC (Ref fc str x) = fc
+  getFC (Ref fc str) = fc
   getFC (Meta fc k) = fc
   getFC (Lam fc str _ _ t) = fc
   getFC (App fc t u) = fc
@@ -106,7 +106,7 @@ showCaseAlt : CaseAlt → String
 
 instance Show Tm where
   show (Bnd _ k) = "(Bnd \{show k})"
-  show (Ref _ str _) = "(Ref \{show str})"
+  show (Ref _ str) = "(Ref \{show str})"
   show (Lam _ nm icit rig t) = "(\\ \{show rig}\{nm}  => \{show  t})"
   show (App _ t u) = "(\{show t} \{show u})"
   show (Meta _ i) = "(Meta \{show i})"
@@ -147,7 +147,7 @@ instance Eq Icit where
 instance Eq (Tm) where
   -- (Local x) == (Local y) = x == y
   (Bnd _ x) == (Bnd _ y) = x == y
-  (Ref _ x _) == Ref _ y _ = x == y
+  (Ref _ x) == Ref _ y = x == y
   (Lam _ n _ _ t) == Lam _ n' _ _ t' = t == t'
   (App _ t u) == App _ t' u' = t == t' && u == u'
   (UU _) == (UU _) = True
@@ -175,7 +175,7 @@ pprint' p names (Bnd _ k) = case getAt (cast k) names of
   -- Either a bug or we're printing without names
   Nothing => text "BND:\{show k}"
   Just nm => text "\{nm}:\{show k}"
-pprint' p names (Ref _ str mt) = text (show str)
+pprint' p names (Ref _ str) = text (show str)
 pprint' p names (Meta _ k) = text "?m:\{show k}"
 pprint' p names (Lam _ nm icit quant t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> pprint' 0 (nm :: names) t
 pprint' p names (App _ t u) = parens 0 p $ pprint' 0 names t <+> pprint' 1 names u
@@ -217,7 +217,7 @@ Closure : U
 data Val : U where
   -- This will be local / flex with spine.
   VVar : FC -> (k : Int) -> (sp : SnocList Val) -> Val
-  VRef : FC -> (nm : QName) -> Def -> (sp : SnocList Val) -> Val
+  VRef : FC -> (nm : QName) -> (sp : SnocList Val) -> Val
   -- neutral case
   VCase : FC -> (sc : Val) -> List CaseAlt -> Val
   -- we'll need to look this up in ctx with IO
@@ -239,7 +239,7 @@ data Closure = MkClosure Env Tm
 
 getValFC : Val -> FC
 getValFC (VVar fc _ _) = fc
-getValFC (VRef fc _ _ _) = fc
+getValFC (VRef fc _ _) = fc
 getValFC (VCase fc _ _) = fc
 getValFC (VMeta fc _ _) = fc
 getValFC (VLam fc _ _ _ _) = fc
@@ -257,8 +257,8 @@ showClosure : Closure → String
 instance Show Val where
   show (VVar _ k Lin) = "%var\{show k}"
   show (VVar _ k sp) = "(%var\{show k} \{unwords $ map show (sp <>> Nil)})"
-  show (VRef _ nm _ Lin) = show nm
-  show (VRef _ nm _ sp) = "(\{show nm} \{unwords $ map show (sp <>> Nil)})"
+  show (VRef _ nm Lin) = show nm
+  show (VRef _ nm sp) = "(\{show nm} \{unwords $ map show (sp <>> Nil)})"
   show (VMeta _ ix sp) = "(%meta \{show ix} (\{show $ snoclen sp} sp :: Nil))"
   show (VLam _ str icit quant x) = "(%lam \{show quant}\{str} \{showClosure x})"
   show (VPi fc str Implicit rig x y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{showClosure  y})"
@@ -507,12 +507,12 @@ lookupMeta ix@(QN ns nm) = do
   case lookupMap' ix mc.metas of
     Just meta => pure meta
     Nothing => case lookupMap' ns top.modules of
-      Nothing => 
+      Nothing =>
           error emptyFC "missing module: \{show ns}"
       Just mod => case lookupMap' ix mod.modMetaCtx.metas of
-        Nothing => 
+        Nothing =>
           error emptyFC "missing meta: \{show ix}"
-        Just entry => pure entry 
+        Just entry => pure entry
 
 mkCtx : FC -> Context
 mkCtx fc = MkCtx 0 Nil Nil Nil fc

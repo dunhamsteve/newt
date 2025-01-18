@@ -106,7 +106,7 @@ apply t ts acc Z ty = go (CApp t (acc <>> Nil) 0) ts
 
 compileTerm (Bnd _ k) = pure $ CBnd k
 -- need to eta expand to arity
-compileTerm t@(Ref fc nm _) = do
+compileTerm t@(Ref fc nm) = do
   top <- get
   let (Just (MkEntry _ _ type _)) = lookup nm top
           | Nothing => error fc "Undefined name \{show nm}"
@@ -119,7 +119,7 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
   (Meta _ k, args) => do
         info (getFC tm) "Compiling an unsolved meta \{show tm}"
         pure $ CApp (CRef "Meta\{show k}") Nil 0
-  (t@(Ref fc nm _), args) => do
+  (t@(Ref fc nm), args) => do
         args' <- traverse compileTerm args
         arity <- arityForName fc nm
         top <- get

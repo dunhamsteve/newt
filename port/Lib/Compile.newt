@@ -300,7 +300,7 @@ walkAlt acc (CaseCons name args t) = walkTm t acc
 walkAlt acc (CaseLit lit t) = walkTm t acc
 
 
-walkTm (Ref x nm y) acc = process acc nm
+walkTm (Ref x nm) acc = process acc nm
 walkTm (Lam x str _ _ t) acc = walkTm t acc
 walkTm (App x t u) acc = walkTm u acc >>= walkTm t
 walkTm (Pi x str icit y t u) acc = walkTm u acc >>= walkTm t
