@@ -3,20 +3,23 @@
 
 Newt is a dependently typed programming language that compiles to javascript. It is
 my first attempt to write a dependent typed language. It is inspired by Idris,
-Elaboration Zoo, pi-forall, and various tutorials.
+Elaboration Zoo, pi-forall, and other tutorials.
 
-I'm still learning how this stuff is done, so it's a bit of a mess. But I'm going to
-work with the garage door up.
+It has inductive types, dependent pattern matching, a typeclass-like mechanism, compiles
+to javascript, and is self hosted. There is a browser playground and vscode extension.
 
-The goal is to have inductive types, pattern matching, compile to javascript, and be
-self hosted. Ideally I could build a little browser "playground" to compile, view
-output, and run code.
+The web playground can be at https://dunhamsteve.github.io/newt. The top left corner
+has a dropdown with some samples. Currently the web playground is using the Idris-built
+version of newt because most browsers lack tail call optimization.
 
-The repository is tagging `.newt` files as Agda to convince github to highlight them.
+The directory `port` contains a port of newt to itself. Currently it needs to be run by `bun` rather than `node` because `newt` does not do any transformations for TCO and JavaScriptCore is the only javascript implementation that does TCO.
 
-There is a web playground at https://dunhamsteve.github.io/newt. The top left corner
-has a dropdown with some samples. At the moment, it shows generated code, but doesn't
-execute it.
+## Sample code
+
+- `port` contains a copy of newt written in newt
+- `newt` contains miscellaneous files
+- `aoc2024` contains solutions for 2024 Advent of Code in newt
+- `tests` contains some test cases.
 
 ## Building
 
@@ -29,6 +32,8 @@ The web playground is in playground.
 - `npm install` will pull down dependencies.
 - `./build` will build the web workers and install sample files (`make` must be run in root first).
 - `npx vite` will run the dev server.
+
+# Implementation details
 
 ## Overview
 
