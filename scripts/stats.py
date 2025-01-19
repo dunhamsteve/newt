@@ -1,7 +1,10 @@
+#!/usr/bin/env python3
+import sys
+fn = sys.argv[1]
 stats = {}
 acc = ''
 name = ''
-for line in open('newt.js'):
+for line in open(fn):
     if line.startswith('const'):
         if name: stats[name] = len(acc)
         acc = line

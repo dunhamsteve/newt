@@ -453,6 +453,13 @@ catchError (MkM ma) handler = MkM $ \tc => do
 tryError : ∀ a. M a -> M (Either Error a)
 tryError ma = catchError (map Right ma) (pure ∘ Left)
 
+filterM : ∀ a. (a → M Bool) → List a → M (List a)
+filterM pred Nil = pure Nil
+filterM pred (x :: xs) = do
+  check <- pred x
+  if check then _::_ x <$> filterM pred xs else filterM pred xs
+
+
 get : M TopContext
 get = MkM $ \ tc => pure $ Right (tc, tc)
 

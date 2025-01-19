@@ -343,7 +343,7 @@ IO a = World -> IORes a
 instance Monad IO where
   bind ma mab = \ w => case ma w of
     MkIORes a w => mab a w
-  pure x = \ w => MkIORes x w
+  pure = MkIORes
 
 bindList : ∀ a b. List a → (a → List b) → List b
 

@@ -1,0 +1,28 @@
+module Serialize
+
+import Prelude
+import Node
+import Lib.Common
+import Lib.Types
+import Data.SortedMap
+
+-- this was an experiment, prepping for dumping module information
+-- it ends up with out of memory dumping defs of some of the files.
+-- Prelude is 114MB pretty-printed... gzip to 1M
+pfunc dumpObject uses (MkIORes MkUnit fs): ∀ a. String → a → IO Unit := `(_,fn,a) => (w) => {
+  try {
+    let {EncFile} = require('./serializer')
+    let enc = EncFile.encode(a)
+    fs.writeFileSync(fn, enc)
+  } catch (e) {}
+  return MkIORes(null, MkUnit, w)
+}`
+
+-- for now, include src and use that to see if something changed
+dumpModule : QName → String → ModContext → M Unit
+dumpModule qn src mod = do
+  let fn = "build/\{show qn}.newtmod"
+  let defs = listValues mod.modDefs
+  let ops = toList mod.ctxOps
+  let mctx = toList mod.modMetaCtx.metas
+  liftIO $ dumpObject fn (src,defs,ops,mctx)

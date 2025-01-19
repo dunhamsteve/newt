@@ -20,6 +20,7 @@ import Lib.Types
 import Lib.Syntax
 import Lib.Syntax
 import Node
+import Serialize
 
 primNS : List String
 primNS = ("Prim" :: Nil)
@@ -132,7 +133,11 @@ processModule importFC base stk qn@(QN ns nm) = do
   -- update modules with result, leave the rest of context in case this is top file
   top <- get
   mc <- readIORef top.metaCtx
-  let modules = updateMap modns (MkModCtx top.defs mc top.ops) top.modules
+
+  let mod = MkModCtx top.defs mc top.ops
+  dumpModule qn src mod
+
+  let modules = updateMap modns mod top.modules
   freshMC <- newIORef (MC EmptyMap 0 CheckAll)
   modify (\ top => MkTop modules top.imported top.ns top.defs top.metaCtx top.verbose top.errors top.ops)
 

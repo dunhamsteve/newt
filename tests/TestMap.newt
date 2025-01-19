@@ -1,5 +1,6 @@
 module TestMap
 
+import Prelude
 import SortedMap
 
 main : IO Unit

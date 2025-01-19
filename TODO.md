@@ -5,9 +5,12 @@
 - [ ] review pattern matching. goal is to have a sane context on the other end. secondary goal - bring it closer to the paper.
 
 - [x] redo code to determine base path
+- [x] emit only one branch for default case when splitting inductives
 - [ ] save/load results of processing a module
   - [x] keep each module separate in context
-    - [x] search would include imported modules, collect ops into and from modules
+  - [x] search would include imported modules, collect ops into and from modules
+  - [x] serialize modules
+  - [ ] deserialize modules if up to date
     - should I allow the idris cross module assignment hack?
     - >>> sort out metas (maybe push them up to the main list)
     - eventually we may want to support resuming halfway through a file

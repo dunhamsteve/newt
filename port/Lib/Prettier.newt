@@ -4,6 +4,9 @@ module Lib.Prettier
 import Prelude
 import Data.Int
 
+-- TODO I broke this when I converted from Nat to Int, and we're disabling it
+-- by flattening the Doc for now.
+
 -- `Doc` is a pretty printing document.  Constructors are private, use
 -- methods below.  `Alt` in particular has some invariants on it, see paper
 -- for details. (Something along the lines of "the first line of left is not

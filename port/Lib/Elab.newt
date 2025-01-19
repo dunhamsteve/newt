@@ -848,6 +848,25 @@ updateContext ctx ((k, val) :: cs) =
     replaceV Z x (y :: xs) = x :: xs
     replaceV (S k) x (y :: xs) = y :: replaceV k x xs
 
+checkCase : Context → Problem → String → Val → (QName × Int × Tm) → M Bool
+checkCase ctx prob scnm scty (dcName, arity, ty) = do
+  vty <- eval Nil CBN ty
+  (ctx', ty', vars, sc) <- extendPi ctx (vty) Lin Lin
+  (Just res) <- catchError (Just <$> unify ctx'.env UPattern ty' scty)
+              (\err => do
+                  debug $ \ _ => "SKIP \{show dcName} because unify error \{errorMsg err}"
+                  pure Nothing)
+    | _ => pure False
+
+  (Right res) <- tryError (unify ctx'.env UPattern ty' scty)
+          | Left err => do
+            debug $ \ _ => "SKIP \{show dcName} because unify error \{errorMsg err}"
+            pure False
+
+  case lookupDef ctx scnm of
+    Just val@(VRef fc nm sp) => pure $ nm == dcName
+    _ => pure True
+
 -- ok, so this is a single constructor, CaseAlt
 -- return Nothing if dcon doesn't unify with scrut
 buildCase : Context -> Problem -> String -> Val -> (QName × Int × Tm) -> M (Maybe CaseAlt)
@@ -1152,6 +1171,12 @@ getLits nm ((MkClause fc cons pats expr) :: cs) = case find ((_==_ nm) ∘ fst) 
   Just (_, (PatLit _ lit)) => lit :: getLits nm cs
   _ => getLits nm cs
 
+-- collect constructors that are matched on
+matchedConstructors : String → List Clause → List QName
+matchedConstructors nm Nil = Nil
+matchedConstructors nm ((MkClause fc cons pats expr) :: cs) = case find ((_==_ nm) ∘ fst) cons of
+  Just (_, (PatCon _ _ dcon _ _)) => dcon :: matchedConstructors nm cs
+  _ => matchedConstructors nm cs
 
 -- then build a lit case for each of those
 
@@ -1189,7 +1214,18 @@ buildLitCase ctx prob fc scnm scty lit = do
       cons <- rewriteConstraint cons Nil
       pure $ MkClause fc cons pats expr
 
-
+buildDefault : Context → Problem → FC → String → M CaseAlt
+buildDefault ctx prob fc scnm = do
+  let defclauses = filter isDefault prob.clauses
+  when (length' defclauses == 0) $ \ _ => error fc "no default for literal slot on \{show scnm}"
+  CaseDefault <$> buildTree ctx (MkProb defclauses prob.ty)
+  where
+    isDefault : Clause -> Bool
+    isDefault cl = case find ((_==_ scnm) ∘ fst) cl.cons of
+      Just (_, (PatVar _ _ _)) => True
+      Just (_, (PatWild _ _)) => True
+      Nothing => True
+      _ => False
 
 buildLitCases : Context -> Problem -> FC -> String -> Val -> M (List CaseAlt)
 buildLitCases ctx prob fc scnm scty = do
@@ -1289,12 +1325,26 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
       -- this is per the paper, but it would be nice to coalesce
       -- default cases
       cons <- getConstructors ctx (getFC pat) scty'
-      debug $ \ _ => "CONS \{show $ map fst cons}"
-      -- TODO collect the wild-card only cases into one
-      alts <- traverse (buildCase ctx prob scnm scty') cons
+      let matched = matchedConstructors scnm prob.clauses
+      let (hit,miss) = partition (flip elem matched ∘ fst) cons
+      -- need to check miss is possible
+      miss' <- filterM (checkCase ctx prob scnm scty') miss
+
+      debug $ \ _ => "CONS \{show $ map fst cons} matched \{show matched} miss \{show miss} miss' \{show miss'}"
+
+      -- process constructors with matches
+      alts <- traverse (buildCase ctx prob scnm scty') hit
       debug $ \ _ => "GOTALTS \{show alts}"
-      when (length' (mapMaybe id alts) == 0) $ \ _ => error (fc) "no alts for \{show scty'}"
-      pure $ Case fc sctm (mapMaybe id alts)
+      let alts' = mapMaybe id alts
+      when (length' alts' == 0) $ \ _ => error (fc) "no alts for \{show scty'}"
+      -- build a default case for missed constructors
+      case miss' of
+        Nil => pure $ Case fc sctm (mapMaybe id alts)
+        _ => do
+        -- ctx prob fc scnm
+          default <- buildDefault ctx prob fc scnm
+          pure $ Case fc sctm (snoc alts' default)
+
     PatLit fc v => do
       let tyname = litTyName v
       case scty' of
