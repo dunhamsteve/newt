@@ -976,31 +976,29 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
     -- We get a list of clauses back (a Problem) and then solve that
     -- If they all fail, we have a coverage issue. (Assuming the constructor is valid)
 
-    makeConstr : List Bind -> List Pattern -> M (List (String × Pattern))
-    makeConstr Nil Nil = pure $ Nil
-    -- would need M in here to throw, and I'm building stuff as I go, I suppose I could <$>
-    makeConstr Nil (pat :: pats) = error (getFC pat) "too many patterns"
-    makeConstr ((MkBind nm Implicit x) :: xs) Nil = do
-      rest <- makeConstr xs Nil
+    makeConstr : FC -> List Bind -> List Pattern -> M (List (String × Pattern))
+    makeConstr fc Nil Nil = pure $ Nil
+    makeConstr fc Nil (pat :: pats) = error (getFC pat) "too many patterns"
+    makeConstr fc ((MkBind nm Implicit x) :: xs) Nil = do
+      rest <- makeConstr fc xs Nil
       pure $ (nm, PatWild emptyFC Implicit) :: rest
-    makeConstr ((MkBind nm Auto x) :: xs) Nil = do
-      rest <- makeConstr xs Nil
+    makeConstr fc ((MkBind nm Auto x) :: xs) Nil = do
+      rest <- makeConstr fc xs Nil
       pure $ (nm, PatWild emptyFC Auto) :: rest
-    -- FIXME need a proper error, but requires wiring M three levels down
-    makeConstr ((MkBind nm Explicit x) :: xs) Nil = error ctx.ctxFC "not enough patterns"
-    makeConstr ((MkBind nm Explicit x) :: xs) (pat :: pats) =
+    makeConstr fc ((MkBind nm Explicit x) :: xs) Nil = error fc "not enough patterns"
+    makeConstr fc ((MkBind nm Explicit x) :: xs) (pat :: pats) =
       if getIcit pat == Explicit
         then do
-          rest <- makeConstr xs pats
+          rest <- makeConstr fc xs pats
           pure $ (nm, pat) :: rest
         else error ctx.ctxFC "mismatch between Explicit and \{show $ getIcit pat}"
-    makeConstr ((MkBind nm icit x) :: xs) (pat :: pats) =
+    makeConstr fc ((MkBind nm icit x) :: xs) (pat :: pats) =
       if getIcit pat /= icit -- Implicit/Explicit Implicit/Auto, etc
         then do
-          rest <- makeConstr xs (pat :: pats)
+          rest <- makeConstr fc xs (pat :: pats)
           pure $ (nm, PatWild (getFC pat) icit) :: rest
         else do
-          rest <- makeConstr xs pats
+          rest <- makeConstr fc xs pats
           pure $ (nm, pat) :: rest
 
     -- replace constraint with constraints on parameters, or nothing if non-matching clause
@@ -1016,11 +1014,11 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
           PatCon fc icit nm ys as => if nm == dcName
             then case as of
               Nothing => do
-                rest <- makeConstr vars ys
+                rest <- makeConstr fc vars ys
                 pure $ Just $ rest ++ xs ++ acc
               -- putting this in constraints causes it to be renamed scnm -> nm' when we check body.
               Just nm' => do
-                rest <- makeConstr vars ys
+                rest <- makeConstr fc vars ys
                 pure $ Just $ (scnm, (PatVar fc icit nm')) :: rest ++ xs ++ acc
             else do
               -- TODO can we check this when we make the PatCon?
