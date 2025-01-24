@@ -25,7 +25,6 @@ public export
 ($$) : {auto mode : Mode} -> Closure -> Val -> M Val
 ($$) {mode} (MkClosure env tm) u = eval (u :: env) mode tm
 
-
 export
 vapp : Val -> Val -> M Val
 vapp (VLam _ _ _ _ t) u = t $$ u
@@ -40,8 +39,6 @@ vappSpine t [<] = pure t
 vappSpine t (xs :< x) = do
   rest <- vappSpine t xs
   vapp rest x
-
-
 
 lookupVar : Env -> Nat -> Maybe Val
 lookupVar env k = let l = length env in
@@ -84,7 +81,6 @@ tryEval env (VRef fc k _ sp) = do
             (\ _ => pure Nothing)
       _ => pure Nothing
 tryEval _ _ = pure Nothing
-
 
 -- Force far enough to compare types
 export
@@ -138,13 +134,6 @@ evalCase env mode sc cc = do
   debug "env is \{show env}"
   pure Nothing
 
--- So smalltt says:
---   Smalltt has the following approach:
---   - Top-level and local definitions are lazy.
---   - We instantiate Pi types during elaboration with lazy values.
---   - Applications headed by top-level variables are lazy.
---   - Any other function application is call-by-value during evaluation.
-
 -- TODO maybe add glueing
 
 eval env mode (Ref fc x def) = pure $ VRef fc x def [<]
@@ -191,7 +180,6 @@ eval env mode tm@(Case fc sc alts) = do
 
 export
 quote : (lvl : Nat) -> Val -> M Tm
-
 
 quoteSp : (lvl : Nat) -> Tm -> SnocList Val -> M Tm
 quoteSp lvl t [<] = pure t
@@ -250,20 +238,6 @@ prvalCtx v = do
   tm <- quote ctx.lvl v
   pure $ interpolate $ pprint (toList $ map fst ctx.types) tm
 
--- REVIEW - might be easier if we inserted the meta without a bunch of explicit App
--- I believe Kovacs is doing that.
-
--- we need to walk the whole thing
--- meta in Tm have a bunch of args, which should be the relevant
--- parts of the scope. So, meta has a bunch of lambdas, we've got a bunch of
--- args and we need to beta reduce, which seems like a lot of work for nothing
--- Could we put the "good bits" of the Meta in there and write it to Bnd directly
--- off of scope? I guess this might get dicey when a meta is another meta applied
--- to something.
-
--- ok, so we're doing something that looks lot like eval, having to collect args,
--- pull the def, and apply spine. Eval is trying for WHNF, so it doesn't walk the
--- whole thing. (We'd like to insert metas inside lambdas.)
 export
 zonk : TopContext -> Nat -> Env -> Tm -> M Tm
 

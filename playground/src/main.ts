@@ -227,8 +227,9 @@ const ABBREV: Record<string, string> = {
     '\\all': '∀',
     '\\\\': '\\',
     '\\==': '≡',
-    '\circ': '∘',
-    '\\_1': '₁',
+    '\\circ': '∘',
+    '\\1': '₁',
+    '\\2': '₂',
   }
 
 function Editor({ initialValue }: EditorProps) {

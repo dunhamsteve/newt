@@ -15,15 +15,12 @@ import Lib.TopContext
 import Lib.Syntax
 import Lib.Types
 
-
 vprint : Context -> Val -> M String
 vprint ctx v = do
   tm <- quote (length' ctx.env) v
   pure $ render 90 $ pprint (names ctx) tm
 
-
 -- collectDecl collects multiple Def for one function into one
-
 collectDecl : List Decl -> List Decl
 collectDecl Nil = Nil
 collectDecl ((Def fc nm cl) :: rest@(Def _ nm' cl' :: xs)) =
@@ -33,10 +30,6 @@ collectDecl (x :: xs) = x :: collectDecl xs
 
 rpprint : List String → Tm → String
 rpprint names tm = render 90 $ pprint names tm
-
--- renaming
--- dom gamma ren
-data Pden = PR Int Int (List Int)
 
 showCtx : Context -> M String
 showCtx ctx =
@@ -70,10 +63,7 @@ dumpCtx ctx = do
   let msg = unlines (reverse env) -- ++ "  -----------\n" ++ "  goal \{rpprint names ty'}"
   pure msg
 
-
-
 -- return Bnd and type for name
-
 lookupName : Context -> String  -> Maybe (Tm × Val)
 lookupName ctx name = go 0 ctx.types
   where
@@ -82,16 +72,12 @@ lookupName ctx name = go 0 ctx.types
     -- FIXME - we should stuff a Binder of some sort into "types"
     go ix ((nm, ty) :: xs) = if nm == name then Just (Bnd emptyFC ix, ty) else go (1 + ix) xs
 
-
 lookupDef : Context -> String  -> Maybe Val
 lookupDef ctx name = go 0 ctx.types ctx.env
   where
     go : Int -> List (String × Val) -> List Val -> Maybe Val
     go ix ((nm, ty) :: xs) (v :: vs) = if nm == name then Just v else go (1 + ix) xs vs
     go ix _ _ = Nothing
-
-
--- IORef for metas needs IO
 
 forceMeta : Val -> M Val
 forceMeta (VMeta fc ix sp) = do
@@ -100,7 +86,6 @@ forceMeta (VMeta fc ix sp) = do
     (Solved _ k t) => vappSpine t sp >>= forceMeta
     _ => pure (VMeta fc ix sp)
 forceMeta x = pure x
-
 
 record UnifyResult where
   constructor MkResult
@@ -115,10 +100,7 @@ instance Monoid UnifyResult where
 
 data UnifyMode = UNormal | UPattern
 
-
-
 check : Context -> Raw -> Val -> M Tm
-
 
 unifyCatch : FC -> Context -> Val -> Val -> M Unit
 
@@ -132,26 +114,18 @@ isCandidate (VRef _ nm _) (Ref fc nm') = nm == nm'
 isCandidate ty (App fc t u) = isCandidate ty t
 isCandidate _ _ = False
 
--- This is a crude first pass
-
 findMatches : Context -> Val -> List TopEntry -> M (List String)
 findMatches ctx ty Nil = pure Nil
 findMatches ctx ty ((MkEntry _ name type def) :: xs) = do
   let (True) = isCandidate ty type | False => findMatches ctx ty xs
   top <- get
-  -- let ctx = mkCtx (getFC ty)
-  -- FIXME we're restoring state, but the INFO logs have already been emitted
-  -- Also redo this whole thing to run during elab, recheck constraints, etc.
   mc <- readIORef top.metaCtx
   catchError (do
       -- TODO sort out the FC here
       let fc = getFC ty
       debug $ \ _ => "TRY \{show name} : \{rpprint Nil type} for \{show ty}"
       -- This check is solving metas, so we save mc below in case we want this solution
-      -- tm <- check (mkCtx fc) (RVar fc name) ty
-      -- FIXME RVar should optionally have qualified names
       let (QN ns nm) = name
-
       let (cod, tele) = splitTele type
       modifyIORef top.metaCtx $ \ mc => MC mc.metas mc.next CheckFirst
       tm <- check ctx (RVar fc nm) ty
@@ -162,7 +136,6 @@ findMatches ctx ty ((MkEntry _ name type def) :: xs) = do
       debug $ \ _ => "No match \{show ty} \{rpprint Nil type} \{showError "" err}"
       writeIORef top.metaCtx mc
       findMatches ctx ty xs)
-
 
 contextMatches : Context -> Val -> M (List (Tm × Val))
 contextMatches ctx ty = go (zip ctx.env ctx.types)
@@ -186,16 +159,10 @@ contextMatches ctx ty = go (zip ctx.env ctx.types)
           writeIORef top.metaCtx mc
           go xs)
 
-
 getArity : Tm -> Int
 getArity (Pi x str icit rig t u) = 1 + getArity u
 -- Ref or App (of type constructor) are valid
 getArity _ = 0
-
--- Can metas live in context for now?
--- We'll have to be able to add them, which might put gamma in a ref
-
-
 
 -- Makes the arg for `solve` when we solve an auto
 makeSpine : Int -> List BD -> SnocList Val
@@ -203,10 +170,7 @@ makeSpine k Nil = Lin
 makeSpine k (Defined :: xs) = makeSpine (k - 1) xs
 makeSpine k (Bound :: xs) = makeSpine (k - 1) xs :< VVar emptyFC (k - 1) Lin
 
-
 solve : Env -> QName -> SnocList Val -> Val -> M Unit
-
-
 
 trySolveAuto : MetaEntry -> M Bool
 trySolveAuto (Unsolved fc k ctx ty AutoSolve _) = do
@@ -244,33 +208,12 @@ trySolveAuto (Unsolved fc k ctx ty AutoSolve _) = do
       pure True
 trySolveAuto _ = pure False
 
--- export
--- solveAutos : Int -> List MetaEntry -> M Unit
--- solveAutos mstart Nil = pure MkUnit
--- solveAutos mstart (entry :: es) = do
---       res <- trySolveAuto entry
---       -- idris is inlining this and blowing stack?
---       if res
---         then do
---           top <- get
---           mc <- readIORef top.metaCtx
---           let mlen = length mc.metas `minus` mstart
---           solveAutos mstart (take mlen mc.metas)
---         else
---           solveAutos mstart es
-
-
--- Called from ProcessDecl, this was popping the stack, the tail call optimization doesn't
--- handle the traversal of the entire meta list.  I've turned the restart into a trampoline
--- and filtered it down to unsolved autos.
-
-solveAutos : Int -> M Unit
-solveAutos mstart = do
+solveAutos : M Unit
+solveAutos = do
   top <- get
   mc <- readIORef top.metaCtx
-
   res <- run $ filter isAuto (listValues mc.metas)
-  if res then solveAutos mstart else pure MkUnit
+  if res then solveAutos else pure MkUnit
   where
     isAuto : MetaEntry -> Bool
     isAuto (Unsolved fc k ctx x AutoSolve xs) = True
@@ -292,7 +235,6 @@ updateMeta ix f = do
   me <- f me
   writeIORef top.metaCtx $ MC (updateMap ix me mc.metas) mc.next mc.mcmode
 
-
 checkAutos : QName -> List MetaEntry -> M Unit
 checkAutos ix Nil = pure MkUnit
 checkAutos ix (entry@(Unsolved fc k ctx ty AutoSolve _) :: rest) = do
@@ -305,7 +247,6 @@ checkAutos ix (entry@(Unsolved fc k ctx ty AutoSolve _) :: rest) = do
     usesMeta (App _ _ u) = usesMeta u
     usesMeta _ = False
 checkAutos ix (_ :: rest) = checkAutos ix rest
-
 
 addConstraint : Env -> QName -> SnocList Val -> Val -> M Unit
 addConstraint env ix sp tm = do
@@ -320,10 +261,7 @@ addConstraint env ix sp tm = do
     (OutOfScope) => error' "Meta \{show ix} out of scope"
   mc <- readIORef top.metaCtx
   checkAutos ix (listValues mc.metas)
-  -- this loops too
-  -- solveAutos 0 mc.metas
   pure MkUnit
-
 
 -- return renaming, the position is the new VVar
 invert : Int -> SnocList Val -> M (List Int)
@@ -339,12 +277,6 @@ invert lvl sp = go sp Nil
           error fc "non-linear pattern: \{show sp}"
         else go xs (k :: acc)
     go (xs :< v) _ = error emptyFC "non-variable in pattern \{show v}"
-
-
--- REVIEW why am I converting to Tm?
--- we have to "lift" the renaming when we go under a lambda
--- I think that essentially means our domain ix are one bigger, since we're looking at lvl
--- in the codomain, so maybe we can just keep that value
 
 rename : QName -> List Int -> Int -> Val  -> M Tm
 
@@ -405,7 +337,6 @@ lams Z _ tm = tm
 -- REVIEW do we want a better FC, icity?, rig?
 lams (S k) Nil tm = Lam emptyFC "arg_\{show k}" Explicit Many (lams k Nil tm)
 lams (S k) (x :: xs) tm = Lam emptyFC x Explicit Many (lams k xs tm)
-
 
 unify : Env -> UnifyMode -> Val -> Val  -> M UnifyResult
 
@@ -484,7 +415,6 @@ unifySpine env mode True (xs :< x) (ys :< y) =
   -- I had idiom brackets here, technically fairly easy to desugar, but not adding at this time
   _<+>_ <$> unify env mode x y <*> unifySpine env mode True xs ys
 unifySpine env mode True _ _ = error emptyFC "meta spine length mismatch"
-
 
 unify env mode t u = do
   debug $ \ _ => "Unify lvl \{show $ length env}"
@@ -623,7 +553,6 @@ unify env mode t u = do
     unifyPattern t (VVar fc k Lin) = pure $ MkResult ((k, t) :: Nil)
     unifyPattern t u = unifyMeta t u
 
-
 unifyCatch fc ctx ty' ty = do
     res <- catchError (unify ctx.env UNormal ty' ty) $ \err => do
       let names = map fst ctx.types
@@ -645,7 +574,6 @@ unifyCatch fc ctx ty' ty = do
         let msg = msg ++ "\nconstraints \{show cs.constraints}"
         throwError (E fc msg)
         -- error fc "Unification yields constraints \{show cs.constraints}"
-
 
 freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
 freshMeta ctx fc ty kind = do
@@ -695,18 +623,14 @@ primType fc nm = do
       Just (MkEntry _ name ty PrimTCon) => pure $ VRef fc name Lin
       _ => error fc "Primitive type \{show nm} not in scope"
 
-
 infer : Context -> Raw  -> M (Tm × Val)
-
 
 data Bind = MkBind String Icit Val
 
 instance Show Bind where
   show (MkBind str icit x) = "\{str} \{show icit}"
 
-
 ---------------- Case builder
-
 
 record Problem where
   constructor MkProb
@@ -746,7 +670,6 @@ findSplit Nil = Nothing
 findSplit (x@(nm, PatCon _ _ _ _ _) :: xs) = Just x
 findSplit (x@(nm, PatLit _ val) :: xs) = Just x
 findSplit (x :: xs) = findSplit xs
-
 
 -- ***************
 -- right, I think we rewrite the names in the context before running raw and we're good to go?
@@ -810,7 +733,6 @@ substVal k v tm = go tm
     -- go (VCase x sc xs) = ?rhs_2
     -- go (VU x) = ?rhs_7
     -- go (VLit x y) = ?rhs_8
-
 
 -- need to turn k into a ground value
 
@@ -1037,15 +959,12 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
       Just cons <- rewriteConstraint sctynm vars cons Nil | _ => pure Nothing
       pure $ Just $ MkClause fc cons pats expr
 
-
 splitArgs : Raw -> List (Raw × Icit) -> (Raw × List (Raw × Icit))
 splitArgs (RApp fc t u icit) args = splitArgs t ((u, icit) :: args)
 splitArgs tm args = (tm, args)
 
-
 mkPat : (Raw × Icit) -> M Pattern
 mkPat (RAs fc as tm, icit) = do
-
   pat <- mkPat (tm, icit)
   case pat of
     (PatCon fc icit nm args Nothing) => pure $ PatCon fc icit nm args (Just as)
@@ -1070,15 +989,11 @@ mkPat (tm, icit) = do
     ((RLit fc y), b) => error fc "lit cannot be applied to arguments"
     (a,b) => error (getFC a) "expected pat var or constructor, got \{show a}"
 
-
-
 makeClause : (Raw × Raw) -> M Clause
 makeClause (lhs, rhs) = do
   let (nm, args) = splitArgs lhs Nil
   pats <- traverse mkPat args
   pure $ MkClause (getFC lhs) Nil pats rhs
-
-
 
 -- we'll want both check and infer, we're augmenting a context
 -- so probably a continuation:
@@ -1310,7 +1225,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
           top <- get
           mc <- readIORef top.metaCtx
           -- TODO - only hit the relevant ones
-          ignore $ solveAutos 0
+          solveAutos
           forceType ctx.env scty'
         OutOfScope => pure scty'
 
@@ -1364,7 +1279,6 @@ showDef ctx names n v@(VVar _ n' Lin) =  if n == n'
 showDef ctx names n v = do
   vv <- vprint ctx v
   pure "= \{vv}"
-  -- pure "= \{rpprint names !(quote ctx.lvl v)}"
 
 -- desugar do
 undo : FC -> List DoStmt -> M Raw
@@ -1445,7 +1359,6 @@ check ctx tm ty = do
     (t@(RLam _ (BI fc nm icit quant) tm), ty) => do
               pty <- prvalCtx ty
               error fc "Expected pi type, got \{pty}"
-
 
     (RLet fc nm ty v sc, rty) => do
       ty' <- check ctx ty (VU emptyFC)

@@ -472,7 +472,7 @@ foldr f b Nil = b
 foldr f b (x :: xs) = f x (foldr f b xs)
 
 infixl 9 _∘_
-_∘_ : {A B C : U} -> (B -> C) -> (A -> B) -> A -> C
+_∘_ : ∀ A B C. (B -> C) -> (A -> B) -> A -> C
 (f ∘ g) x = f (g x)
 
 

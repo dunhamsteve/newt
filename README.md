@@ -6,13 +6,13 @@ my first attempt to write a dependent typed language. It is inspired by Idris,
 Elaboration Zoo, pi-forall, and other tutorials.
 
 It has inductive types, dependent pattern matching, a typeclass-like mechanism, compiles
-to javascript, and is self hosted. There is a browser playground and vscode extension.
+to javascript, and is now written in itself. There is a browser playground and vscode extension.
 
 The web playground can be at https://dunhamsteve.github.io/newt. The top left corner
 has a dropdown with some samples. Currently the web playground is using the Idris-built
 version of newt because most browsers lack tail call optimization.
 
-The directory `port` contains a port of newt to itself. Currently it needs to be run by `bun` rather than `node` because `newt` does not do any transformations for TCO and JavaScriptCore is the only javascript implementation that does TCO.
+The directory `port` contains a port of newt to itself. Currently it needs to be run by `bun` rather than `node` because `bun` does tail call optimization.
 
 ## Sample code
 
@@ -46,19 +46,18 @@ doing `subst`.
 
 The raw syntax is `Raw`. This is elaborated to `Tm`. There is a top level context and a
 context during checking. The top level context uses names, and type checking uses deBruijn
-indices for `Tm` and levels for `Val`.  For compilation, this is converted to `CExp`, which works out how arity and closures will work, and then `JSExp` which is javascript AST.
+indices for `Tm` and levels for `Val`.  For compilation, this is converted to `CExp`, which works out how arity and closures will work, and then into `JSExp` which is javascript AST.
 
-I have `Let` in the core language. Partly because I'd like this to make it into javascript (only compute once), but also because it's being leveraged by the casetree stuff.
+I have `Let` in the core language. Partly because I'd like this to make it into javascript (only compute once), but also because it's being leveraged by the casetree stuff. The `where` clauses are turned into `LetRec` and locally defined functions, so I'm punting the lambda-lifting to javascript for now.
 
-I also have `Case` in the core language.
+`Case` is in the core language `Tm` and it can appear anywhere in the syntax tree.
 
 ## Case Tree
 
-I've got no idea what I'm doing here. I worked off of Jesper Cockx "Elaborating Dependent (Co)pattern Matching", leaving out codata for now.  I've now added matching primitives, requiring a default case. When splitting on inductive types it will break out all of the remaining cases and doesn't emit a default case.
+This is inspired by Jesper Cockx "Elaborating Dependent (Co)pattern Matching". I've left off codata for now, and I'm trying to do indexes on the types rather than having explicit equalities as arguments. I've also added matching on primitives, which require a default case. And when matching on inductive types, I collect the unmentioned, but relevant constructors into a single default case. This greatly improved performance and reduced the size of the emitted code.
+
 
 I'm essentially putting the constraints into the environment like `let`. This is a problem when stuff is already in `Val` form. Substitution into types in the context is done via quote/eval. I plan to revisit this.
-
-I intend to add the codata / copatterns from the paper, but haven't gotten to that yet.
 
 ## Evaluation
 
@@ -66,9 +65,11 @@ Following kovacs, I'm putting `VVar` into context env when I go under binders in
 
 ## Autos
 
-Newt has primitive auto implicits. They are denoted by double braces `{{}}` as in Agda. Newt will search for a function that returns a type in the same family, only has implicit and auto-implicit arguments, and unifies (satisfying any relevant constraints).
+Auto implicits are denoted by double braces `{{}}`.  They are solved by searching for functions that return a type heading by the same type constructor and have only implicit and auto implicit arguments. It tries to solve the implicit with each candidate by checking it against the type, allowing one level of constraint to be checked. If exactly one works, it will take that as a solution and proceed.
 
-This search can be used to manually create typeclasses.  `do` blocks are supported, desugaring to `>>=`, which it expects to be the `bind` of a Monad typeclass.
+Otherwise, we rarely solve the type because it contains metas with constraints that don't work with pattern unification (they have extra arguments).  I stop at one constraint to try to handle cases where a type mismatch gets turned into an auto failing to be solved.
+
+The sugar for `do` blocks uses the `>>=` operator, which is defined on the `Monad` interface in the `Prelude`.
 
 ## References
 

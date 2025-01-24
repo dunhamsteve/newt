@@ -154,7 +154,7 @@ processDecl ns (Def fc nm clauses) = do
   -- putStrLn "Ok \{render 90 $ pprint Nil tm}"
 
   mc <- readIORef top.metaCtx
-  solveAutos 0
+  solveAutos
   -- TODO - make nf that expands all metas and drop zonk
   -- Idris2 doesn't expand metas for performance - a lot of these are dropped during erasure.
   -- Day1.newt is a test case
