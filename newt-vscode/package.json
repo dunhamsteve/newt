@@ -54,7 +54,18 @@
         "command": "newt-vscode.check",
         "title": "Check newt file"
       }
-    ]
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Newt Configuration",
+      "properties": {
+        "newt.path": {
+          "type": "string",
+          "default": "build/exec/newt",
+          "description": "Path to the newt executable"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

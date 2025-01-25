@@ -804,7 +804,7 @@ snoc : ∀ a. List a → a → List a
 snoc xs x = xs ++ (x :: Nil)
 
 instance ∀ a b. {{Show a}} {{Show b}} → Show (a × b) where
-  show (a,b) = "(" ++ show a ++ "," ++ show b ++ ")"
+  show (a,b) = "(" ++ show a ++ ", " ++ show b ++ ")"
 
 instance ∀ a. {{Show a}} → Show (List a) where
   show xs = joinBy ", " $ map show xs
