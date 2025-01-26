@@ -364,7 +364,7 @@ record TopContext where
   metaCtx : IORef MetaContext
 
   -- Global values
-  verbose : Bool -- command line flag
+  verbose : Int -- command line flag
   errors : IORef (List Error)
   -- what do we do here? we can accumulate for now, but we'll want to respect import
   ops : Operators
@@ -473,10 +473,21 @@ modify f = do
 
 -- Force argument and print if verbose is true
 
-debug : Lazy String -> M Unit
-debug x = do
+log : Int -> Lazy String -> M Unit
+log lvl x = do
   top <- get
-  when top.verbose $ \ _ => putStrLn $ force x
+  when (lvl <= top.verbose) $ \ _ => putStrLn $ force x
+
+logM : Int → M String -> M Unit
+logM lvl x = do
+  top <- get
+  when (lvl <= top.verbose) $ \ _ => do
+    msg <- x
+    putStrLn msg
+
+-- deprecated for `log 2`
+debug : Lazy String -> M Unit
+debug x = log 2 x
 
 info : FC -> String -> M Unit
 info fc msg = putStrLn "INFO at \{show fc}: \{msg}"
@@ -484,11 +495,7 @@ info fc msg = putStrLn "INFO at \{show fc}: \{msg}"
 -- Version of debug that makes monadic computation lazy
 
 debugM : M String -> M Unit
-debugM x = do
-  top <- get
-  when top.verbose $ \ _ => do
-    msg <- x
-    putStrLn msg
+debugM x = logM 2 x
 
 instance Show Context where
   show ctx = "Context \{show $ map fst $ ctx.types}"

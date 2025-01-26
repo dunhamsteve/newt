@@ -97,7 +97,7 @@ processModule importFC base stk qn@(QN ns nm) = do
   let (Right ((nameFC, modName), ops, toks)) = partialParse fn parseModHeader top.ops toks
     | Left (err, toks) => exitFailure (showError src err)
 
-  putStrLn "module \{modName}"
+  log 1 $ \ _ => "scan imports for module \{modName}"
   let ns = split modName "."
   let (path, modName') = unsnoc $ split1 modName "."
   -- let bparts = split base "/"
@@ -119,7 +119,8 @@ processModule importFC base stk qn@(QN ns nm) = do
 
   let imported = snoc imported primNS
 
-  putStrLn $ "MODNS " ++ show modns
+  putStrLn "module \{modName}"
+  log 1 $ \ _ => "MODNS " ++ show modns
   top <- get
   (decls, ops) <- parseDecls fn top.ops toks Lin
 
@@ -127,7 +128,7 @@ processModule importFC base stk qn@(QN ns nm) = do
   freshMC <- newIORef (MC EmptyMap 0 CheckAll)
   -- set imported, mod, freshMC, ops  before processing
   modify (\ top => MkTop top.modules imported modns EmptyMap freshMC top.verbose top.errors ops)
-  putStrLn "process Decls"
+  log 1 $ \ _ => "process Decls"
   traverse (tryProcessDecl ns) (collectDecl decls)
 
   -- update modules with result, leave the rest of context in case this is top file
@@ -183,7 +184,7 @@ processFile fn = do
   let (dirs,file) = unsnoc parts
   let dir = if dirs == Nil then "." else joinBy "/" dirs
   let (name, ext) = splitFileName file
-  putStrLn "\{show dir} \{show name} \{show ext}"
+  log 1 $ \ _ => "\{show dir} \{show name} \{show ext}"
 
   (Right src) <- liftIO {M} $ readFile fn
     | Left err => error (MkFC fn (0,0)) "error reading \{fn}: \{show err}"
@@ -215,7 +216,7 @@ cmdLine : List String -> M (Maybe String × List String)
 cmdLine Nil = pure (Nothing, Nil)
 cmdLine ("--top" :: args) = cmdLine args -- handled later
 cmdLine ("-v" :: args) = do
-  modify (\ top => MkTop top.modules top.imported top.ns top.defs top.metaCtx True top.errors top.ops)
+  modify (\ top => MkTop top.modules top.imported top.ns top.defs top.metaCtx (top.verbose + 1) top.errors top.ops)
   cmdLine args
 cmdLine ("-o" :: fn :: args) = do
   (out, files) <- cmdLine args

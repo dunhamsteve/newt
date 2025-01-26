@@ -227,7 +227,7 @@ export class EncFile {
     const poolArray = this.pool.toUint8Array();
     const bufArray = this.buf.toUint8Array();
     const rval = new Uint8Array(poolArray.length + bufArray.length);
-    console.log('psize', poolArray.byteLength, poolArray.length)
+    // console.log('psize', poolArray.byteLength, poolArray.length)
     rval.set(poolArray);
     rval.set(bufArray, poolArray.length);
     return rval;
