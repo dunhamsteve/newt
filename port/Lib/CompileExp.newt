@@ -111,7 +111,10 @@ compileTerm t@(Ref fc nm) = do
   let (Just (MkEntry _ _ type _)) = lookup nm top
           | Nothing => error fc "Undefined name \{show nm}"
   arity <- arityForName fc nm
-  apply (CRef (show nm)) Nil Lin arity type
+  case arity of
+    -- we don't need tu curry functions that take one argument
+    (S Z) => pure $ CRef (show nm)
+    _ => apply (CRef (show nm)) Nil Lin arity type
 
 compileTerm (Meta _ k) = pure $ CRef "meta$\{show k}" -- FIXME
 compileTerm (Lam _ nm _ _ t) = CLam nm <$> compileTerm t
