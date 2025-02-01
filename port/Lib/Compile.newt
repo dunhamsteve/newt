@@ -278,86 +278,90 @@ maybeWrap : JSStmt Return -> JSExp
 maybeWrap (JReturn exp) = exp
 maybeWrap stmt = Apply (JLam Nil stmt) Nil
 
-entryToDoc : TopEntry -> M Doc
-entryToDoc (MkEntry _ name ty (Fn tm)) = do
+-- convert a Def to a Doc (compile to javascript)
+defToDoc : QName → Def → M Doc
+defToDoc name (Fn tm) = do
   debug $ \ _ => "compileFun \{render 90 $ pprint Nil tm}"
   ct <- compileFun tm
   let exp = maybeWrap $ termToJS emptyJSEnv ct JReturn
   pure $ text "const" <+> jsIdent (show name) <+> text "=" <+/> expToDoc exp ++ text ";"
-entryToDoc (MkEntry _ name type Axiom) = pure $ text ""
-entryToDoc (MkEntry _ name type (TCon strs)) = pure $ dcon name (piArity type)
-entryToDoc (MkEntry _ name type (DCon arity str)) = pure $ dcon name (cast arity)
-entryToDoc (MkEntry _ name type PrimTCon) = pure $ dcon name (piArity type)
-entryToDoc (MkEntry _ name _ (PrimFn src _)) = pure $ text "const" <+> jsIdent (show name) <+> text "=" <+> text src
+defToDoc name Axiom = pure $ text ""
+defToDoc name (DCon arity str) = pure $ dcon name (cast arity)
+defToDoc name (TCon arity strs) = pure $ dcon name (cast arity)
+defToDoc name (PrimTCon arity) = pure $ dcon name (cast arity)
+defToDoc name (PrimFn src _) = pure $ text "const" <+> jsIdent (show name) <+> text "=" <+> text src
 
-
-process : (List QName × List Doc) -> QName -> M (List QName × List Doc)
-walkTm : Tm -> (List QName × List Doc) -> M (List QName × List Doc)
-walkAlt : (List QName × List Doc) -> CaseAlt -> M (List QName × List Doc)
-
-walkAlt acc (CaseDefault t) = walkTm t acc
-walkAlt acc (CaseCons name args t) = walkTm t acc
-walkAlt acc (CaseLit lit t) = walkTm t acc
-
-
-walkTm (Ref x nm) acc = process acc nm
-walkTm (Lam x str _ _ t) acc = walkTm t acc
-walkTm (App x t u) acc = walkTm u acc >>= walkTm t
-walkTm (Pi x str icit y t u) acc = walkTm u acc >>= walkTm t
-walkTm (Let x str t u) acc = walkTm u acc >>= walkTm t
-walkTm (LetRec x str _ t u) acc = walkTm u acc >>=  walkTm t
-walkTm (Case x t alts) acc = foldlM walkAlt acc alts
-walkTm _ acc = pure acc
-
--- This version (call `reverse ∘ snd <$> process "main" (Nil × Nil)`) will do dead
--- code elimination, but the Prelude js primitives are reaching for
--- stuff like True, False, MkUnit, fs which get eliminated
-process (done,docs) nm = do
-  let (False) = elem nm done | _ => pure (done,docs)
-  top <- get
-  case lookup nm top of
-    Nothing => error emptyFC "\{show nm} not in scope"
-    Just entry@(MkEntry _ name ty (PrimFn src used)) => do
-      (done,docs) <- foldlM assign (nm :: done, docs) used
-      edoc <- entryToDoc entry
-      pure (done, edoc :: docs)
-    Just (MkEntry _ name ty (Fn tm)) => do
-                debug $ \ _ => "compileFun \{render 90 $ pprint Nil tm}"
-                ct <- compileFun tm
-                -- If ct has zero arity and is a compount expression, this fails..
-                let exp = maybeWrap $ termToJS emptyJSEnv ct JReturn
-                let doc = text "const" <+> jsIdent (show name) <+> text "=" <+/> expToDoc exp ++ text ";"
-                (done,docs) <- walkTm tm (nm :: done, docs)
-                pure (done, doc :: docs)
-    Just entry => do
-      edoc <- entryToDoc entry
-      pure (nm :: done, edoc :: docs)
+-- Collect the QNames used in a term
+getNames : Tm -> List QName -> List QName
+getNames (Ref x nm) acc = nm :: acc
+getNames (Lam x str _ _ t) acc = getNames t acc
+getNames (App x t u) acc = getNames u $ getNames t acc
+getNames (Pi x str icit y t u) acc = getNames u $ getNames t acc
+getNames (Let x str t u) acc = getNames u $ getNames t acc
+getNames (LetRec x str _ t u) acc = getNames u $  getNames t acc
+getNames (Case x t alts) acc = foldl getAltNames acc alts
   where
-    assign : (List QName × List Doc) -> String -> M (List QName × List Doc)
-    assign (done, docs) nm = do
-      top <- get
-      case lookupRaw nm top of
-        Nothing => pure (done, docs)
-        (Just (MkEntry fc name type def)) => do
-          let tag = QN Nil nm
-          let (False) = elem tag done | _ => pure (done,docs)
-          (done,docs) <- process (done, docs) name
-          let doc = text "const" <+> jsIdent nm <+> text "=" <+> jsIdent (show name) ++ text ";"
-          pure (tag :: done, doc :: docs)
+    getAltNames : List QName -> CaseAlt -> List QName
+    getAltNames acc (CaseDefault t) = getNames t acc
+    getAltNames acc (CaseCons name args t) = getNames t acc
+    getAltNames acc (CaseLit lit t) = getNames t acc
+getNames _ acc = acc
 
+-- returns a QName -> Def of in-use entries
+-- This will be what we work on for optimization passes
+getEntries : SortedMap QName Def → QName → M (SortedMap QName Def)
+getEntries acc name = do
+  top <- get
+  case lookup name top of
+    Nothing => do
+      putStrLn "bad name \{show name}"
+      pure acc
+    Just (MkEntry _ name type def@(Fn exp)) => case lookupMap' name acc of
+      Just _ => pure acc
+      Nothing =>
+        let acc = updateMap name def acc in
+        foldlM getEntries acc $ getNames exp Nil
+    Just (MkEntry _ name type def@(PrimFn _ used)) =>
+      let acc = updateMap name def acc in
+      foldlM getEntries acc used
+    Just entry => pure $ updateMap name entry.def acc
 
+-- sort names by dependencies
+-- In JS this is only really needed for references that don't fall
+-- under a lambda.
+sortedNames : SortedMap QName Def → QName → List QName
+sortedNames defs qn = go Nil Nil qn
+  where
+    go : List QName → List QName → QName → List QName
+    go loop acc qn =
+      -- O(n^2) it would be more efficient to drop qn from the map
+      if elem qn loop || elem qn acc then acc else
+      case lookupMap' qn defs of
+        Nothing => acc
+        Just (Fn tm) => qn :: foldl (go $ qn :: loop) acc (getNames tm Nil)
+        Just (PrimFn src used) => qn :: foldl (go $ qn :: loop) acc used
+        Just def => qn :: acc
 
+-- given a initial function, return a dependency-ordered list of javascript source
+process : QName → M (List Doc)
+process name = do
+  let wat = QN ("Prelude" :: Nil) "arrayToList"
+  entries <- getEntries EmptyMap name
+  let names = sortedNames entries name
+  for names $ \ nm => case lookupMap nm entries of
+      Nothing => error emptyFC "MISS \{show nm}"
+      Just _ => pure MkUnit
+  mapM (uncurry defToDoc) $ mapMaybe (\x => lookupMap x entries) names
 
 compile : M (List Doc)
 compile = do
   top <- get
   case lookupRaw "main" top of
     Just (MkEntry fc name type def) => do
-      tmp <- snd <$> process (Nil, Nil) name
+      tmp <- process name
+      -- tack on call to main function
       let exec = stmtToDoc $ JPlain $ Apply (Var $ show name) Nil
       pure $ reverse (exec :: tmp)
-    -- If there is no main, compile everything for the benefit of the playground
-    Nothing => do
-      top <- get
-      traverse entryToDoc $ map snd $ toList top.defs
-
+    Nothing =>
+      -- TODO maybe dump everything if there is no main
+      error emptyFC "No main function found"

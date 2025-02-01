@@ -1,6 +1,7 @@
 
 ## TODO
 
+- [ ] implement tail call optimization
 - [ ] `Def` is shadowed between Types and Syntax (TCon vs DCon), detect this
 - [ ] review pattern matching. goal is to have a sane context on the other end. secondary goal - bring it closer to the paper.
 

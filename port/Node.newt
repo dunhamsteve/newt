@@ -2,35 +2,36 @@ module Node
 
 import Prelude
 
-pfunc fs : JSObject := `require('fs')`
-pfunc getArgs : List String := `arrayToList(String, process.argv.slice(1))`
-pfunc readFile uses (fs MkIORes Left Right) : (fn : String) -> IO (Either String String) := `(fn) => (w) => {
+pfunc getArgs uses (arrayToList) : List String := `Prelude_arrayToList(null, process.argv.slice(1))`
+pfunc readFile uses (MkIORes Left Right) : (fn : String) -> IO (Either String String) := `(fn) => (w) => {
+  let fs = require('fs')
   let result
   try {
     let content = fs.readFileSync(fn, 'utf8')
-    result = Right(null, null, content)
+    result = Prelude_Right(null, null, content)
   } catch (e) {
     let err = ""+e
-    result = Left(null, null, e)
+    result = Prelude_Left(null, null, e)
   }
-  return MkIORes(null, result, w)
+  return Prelude_MkIORes(null, result, w)
 }`
 
 -- I wonder if I should automatically `uses` the constructors in the types
-pfunc writeFile uses (fs MkIORes MkUnit) : String → String → IO (Either String Unit) := `(fn, content) => (w) => {
+pfunc writeFile uses (MkIORes MkUnit) : String → String → IO (Either String Unit) := `(fn, content) => (w) => {
+  let fs = require('fs')
   let result
   try {
     fs.writeFileSync(fn, content, 'utf8')
-    result = Right(null, null, MkUnit)
+    result = Prelude_Right(null, null, Prelude_MkUnit)
   } catch (e) {
       let err = ""+e
-      result = Left(null, null, e)
+      result = Prelude_Left(null, null, e)
   }
-  return MkIORes(null, result, w)
+  return Prelude_MkIORes(null, result, w)
 }`
 
 -- maybe System.exit or something, like the original putStrLn msg >> exitFailure
-pfunc exitFailure : ∀ a. String → a := `(_, msg) => { 
+pfunc exitFailure : ∀ a. String → a := `(_, msg) => {
   console.log(msg);
   process.exit(1);
 }`

@@ -620,7 +620,7 @@ primType : FC -> QName -> M Val
 primType fc nm = do
   top <- get
   case lookup nm top of
-      Just (MkEntry _ name ty PrimTCon) => pure $ VRef fc name Lin
+      Just (MkEntry _ name ty (PrimTCon _)) => pure $ VRef fc name Lin
       _ => error fc "Primitive type \{show nm} not in scope"
 
 infer : Context -> Raw  -> M (Tm × Val)
@@ -688,7 +688,7 @@ getConstructors ctx scfc (VRef fc nm _) = do
     lookupTCon str = do
       top <- get
       case lookup nm top of
-        (Just (MkEntry _ name type (TCon names))) => pure names
+        (Just (MkEntry _ name type (TCon _ names))) => pure names
         _ => error scfc "Not a type constructor \{show nm}"
     lookupDCon : QName -> M (QName × Int × Tm)
     lookupDCon nm = do
@@ -1287,6 +1287,8 @@ undo prev ((DoExpr fc tm) :: Nil) = pure tm
 -- TODO decide if we want to use >> or just >>=
 undo prev ((DoExpr fc tm) :: xs) = do
   xs' <- undo fc xs
+  -- output is bigger, not sure if it helps inference or not
+  -- pure $ RApp fc (RApp fc (RVar fc "_>>_") tm Explicit) xs' Explicit
   pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc (BI fc "_" Explicit Many) xs') Explicit
 undo prev ((DoLet fc nm tm) :: xs) = RLet fc nm (RImplicit fc) tm <$> undo fc xs
 undo prev ((DoArrow fc left@(RVar fc' nm) right Nil) :: xs) = do

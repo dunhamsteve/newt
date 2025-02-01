@@ -9,13 +9,14 @@ import Data.SortedMap
 -- this was an experiment, prepping for dumping module information
 -- it ends up with out of memory dumping defs of some of the files.
 -- Prelude is 114MB pretty-printed... gzip to 1M
-pfunc dumpObject uses (MkIORes MkUnit fs): ∀ a. String → a → IO Unit := `(_,fn,a) => (w) => {
+pfunc dumpObject uses (MkIORes MkUnit): ∀ a. String → a → IO Unit := `(_,fn,a) => (w) => {
+  let fs = require('fs')
   try {
     let {EncFile} = require('./serializer')
     let enc = EncFile.encode(a)
     fs.writeFileSync(fn, enc)
   } catch (e) {}
-  return MkIORes(null, MkUnit, w)
+  return Prelude_MkIORes(null, Prelude_MkUnit, w)
 }`
 
 -- for now, include src and use that to see if something changed

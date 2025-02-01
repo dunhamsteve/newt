@@ -120,18 +120,19 @@ processDecl ns  (TypeSig fc names tm) = do
 processDecl ns (PType fc nm ty) = do
   top <- get
   ty' <- check (mkCtx fc) (maybe (RU fc) id ty) (VU fc)
-  setDef (QN ns nm) fc ty' PrimTCon
+  let arity = cast $ piArity ty'
+  setDef (QN ns nm) fc ty' (PrimTCon arity)
 
 processDecl ns  (PFunc fc nm used ty src) = do
   top <- get
   ty <- check (mkCtx fc) ty (VU fc)
   ty' <- nf Nil ty
   log 1 $ \ _ => "pfunc \{nm} : \{render 90 $ pprint Nil ty'} = \{show src}"
-  -- TODO wire through fc?
-  for used $ \ name => case lookupRaw name top of
+  -- TODO wire through fc for not in scope error
+  used' <- for used $ \ name => case lookupRaw name top of
     Nothing => error fc "\{name} not in scope"
-    _ => pure MkUnit
-  setDef (QN ns nm) fc ty' (PrimFn src used)
+    Just entry => pure entry.name
+  setDef (QN ns nm) fc ty' (PrimFn src used')
 
 processDecl ns (Def fc nm clauses) = do
   log 1 $ \ _ => "-----"
@@ -265,7 +266,7 @@ processDecl ns (Instance instfc ty decls) = do
 
   let (Ref _ tconName, args) = funArgs codomain
     | (tm, _) => error tyFC "\{render 90 $ pprint Nil codomain} doesn't appear to be a TCon application"
-  let (Just (MkEntry _ name type (TCon cons))) = lookup tconName top
+  let (Just (MkEntry _ name type (TCon _ cons))) = lookup tconName top
     | _ => error tyFC "\{show tconName} is not a type constructor"
   let (con :: Nil) = cons
     | _ => error tyFC "\{show tconName} has multiple constructors \{show cons}"
@@ -404,7 +405,8 @@ processDecl ns (Data fc nm ty cons) = do
           pure $ map (QN ns) names
       decl => throwError $ E (getFC decl) "expected constructor declaration"
   log 1 $ \ _ => "setDef \{nm}  TCon \{show $ join cnames}"
-  updateDef (QN ns nm) fc tyty (TCon (join cnames))
+  let arity = cast $ piArity tyty
+  updateDef (QN ns nm) fc tyty (TCon arity (join cnames))
   where
     binderName : Binder → Name
     binderName (MkBinder _ nm _ _ _) = nm

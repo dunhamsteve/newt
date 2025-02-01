@@ -48,9 +48,6 @@ lamArity (Lam _ _ _ _ t) = S (lamArity t)
 lamArity _ = Z
 
 
-piArity : Tm -> Nat
-piArity (Pi _ _ _ quant _ b) = S (piArity b)
-piArity _ = Z
 
 -- This is how much we want to curry at top level
 -- leading lambda Arity is used for function defs and metas
@@ -62,10 +59,10 @@ arityForName fc nm = do
   -- let the magic hole through for now (will generate bad JS)
     Nothing => error fc "Name \{show nm} not in scope"
     (Just (MkEntry _ name type Axiom)) => pure Z
-    (Just (MkEntry _ name type (TCon strs))) => pure $ piArity type
+    (Just (MkEntry _ name type (TCon arity strs))) => pure $ cast arity
     (Just (MkEntry _ name type (DCon k str))) => pure $ cast k
     (Just (MkEntry _ name type (Fn t))) => pure $ lamArity t
-    (Just (MkEntry _ name type (PrimTCon))) => pure $ piArity type
+    (Just (MkEntry _ name type (PrimTCon arity))) => pure $ cast arity
     -- Assuming a primitive can't return a function
     (Just (MkEntry _ name type (PrimFn t used))) => pure $ piArity type
 
@@ -76,8 +73,7 @@ compileTerm : Tm -> M CExp
 apply : CExp -> List CExp -> SnocList CExp -> Nat -> Tm -> M CExp
 -- out of args, make one up (fix that last arg)
 apply t Nil acc (S k) ty = pure $ CApp t (acc <>> Nil) (1 + cast k)
-  -- inserting Clam, index wrong?
-  -- CLam "eta\{show k}" !(apply t Nil (acc :< CBnd k) k ty)
+-- FIXME - this should be handled by Erasure.newt (wdiff of esbuild output says this is still used)
 apply t (x :: xs) acc (S k) (Pi y str icit Zero a b) =  apply t xs (acc :< CErased) k b
 apply t (x :: xs) acc (S k) (Pi y str icit Many a b) =  apply t xs (acc :< x) k b
 -- see if there is anything we have to handle here
@@ -90,19 +86,6 @@ apply t ts acc Z ty = go (CApp t (acc <>> Nil) 0) ts
     go (CApp t Nil 0) args = go t args
     go t Nil = pure t
     go t (arg :: args) = go (CApp t (arg :: Nil) 0) args
-
--- apply : CExp -> List CExp -> SnocList CExp -> Int -> M CExp
--- -- out of args, make one up
--- apply t Nil acc (S k) = pure $
---   CLam "eta\{show k}" !(apply t Nil (acc :< CBnd k) k)
--- apply t (x :: xs) acc (S k) = apply t xs (acc :< x) k
--- apply t ts acc 0 = go (CApp t (acc <>> Nil)) ts
---   where
---     go : CExp -> List CExp -> M CExp
---     -- drop zero arg call
---     go (CApp t Nil) args = go t args
---     go t Nil = pure t
---     go t (arg :: args) = go (CApp t (arg :: Nil)) args
 
 compileTerm (Bnd _ k) = pure $ CBnd k
 -- need to eta expand to arity
@@ -158,7 +141,6 @@ compileTerm (LetRec _ nm _ t u) = do
   u' <- compileTerm u
   pure $ CLetRec nm t' u'
 compileTerm (Erased _) = pure CErased
-
 
 compileFun : Tm -> M CExp
 compileFun tm = go tm Lin

@@ -53,7 +53,7 @@ lookupVar env k = let l = cast $ length env in
       Nothing => Nothing
 
 -- hoping to apply what we got via pattern matching
-
+-- TODO see if we can drop this after updating pattern matching
 unlet : Env -> Val -> M Val
 unlet env t@(VVar fc k sp) = case lookupVar env k of
       Just tt@(VVar fc' k' sp') => do
@@ -65,7 +65,7 @@ unlet env t@(VVar fc k sp) = case lookupVar env k of
         pure t
 unlet env x = pure x
 
-
+-- Try applying VRef to spine, back out if it is stuck
 tryEval : Env -> Val -> M (Maybe Val)
 tryEval env (VRef fc k sp) = do
   top <- get

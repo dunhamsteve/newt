@@ -106,7 +106,7 @@ _>>=_ : ∀ m a b. {{Monad m}} -> (m a) -> (a -> m b) -> m b
 ma >>= amb = bind ma amb
 
 _>>_ :  ∀ m a b. {{Monad m}} -> m a -> m b -> m b
-ma >> mb = ma >>= (\ _ => mb)
+ma >> mb = bind ma (\ _ => mb)
 
 join : ∀ m a. {{Monad m}} → m (m a) → m a
 join mma = mma >>= id
@@ -252,8 +252,8 @@ instance Concat String where
   _++_ = sconcat
 
 
-pfunc jsEq uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a == b ? True : False`
-pfunc jsLT uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a < b ? True : False`
+pfunc jsEq uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a == b ? Prelude_True : Prelude_False`
+pfunc jsLT uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a < b ? Prelude_True : Prelude_False`
 
 pfunc jsShow : ∀ a . a → String := `(_,a) => ''+a`
 instance Eq Int where
@@ -284,9 +284,9 @@ pfunc aget : {0 a : U} -> Array a -> Int -> a := `(a, arr, ix) => arr[ix]`
 pfunc aempty : {0 a : U} -> Unit -> Array a := `() => []`
 
 pfunc arrayToList uses (Nil _::_) : {0 a} → Array a → List a := `(a,arr) => {
-  let rval = Nil(null)
+  let rval = Prelude_Nil(null)
   for (let i = arr.length - 1;i >= 0; i--) {
-    rval = _$3A$3A_(a, arr[i], rval)
+    rval = Prelude__$3A$3A_(a, arr[i], rval)
   }
   return rval
 }`
@@ -294,7 +294,7 @@ pfunc arrayToList uses (Nil _::_) : {0 a} → Array a → List a := `(a,arr) => 
 
 
 -- for now I'll run this in JS
-pfunc lines uses (arrayToList) : String → List String := `(s) => arrayToList(null,s.split('\n'))`
+pfunc lines uses (arrayToList) : String → List String := `(s) => Prelude_arrayToList(null,s.split('\n'))`
 
 pfunc p_strHead : (s : String) -> Char := `(s) => s[0]`
 pfunc p_strTail : (s : String) -> String := `(s) => s[0]`
@@ -302,9 +302,9 @@ pfunc p_strTail : (s : String) -> String := `(s) => s[0]`
 pfunc trim : String -> String := `s => s.trim()`
 pfunc split uses (Nil _::_) : String -> String -> List String := `(s, by) => {
   let parts = s.split(by)
-  let rval = Nil(null)
+  let rval = Prelude_Nil(null)
   parts.reverse()
-  parts.forEach(p => { rval = _$3A$3A_(null, p, rval) })
+  parts.forEach(p => { rval = Prelude__$3A$3A_(null, p, rval) })
   return rval
 }`
 
@@ -322,15 +322,15 @@ pfunc natToInt : Nat -> Int := `(n) => {
 }`
 
 pfunc intToNat uses (Z S) : Int -> Nat := `(n) => {
-  let rval = Z
-  for (;n>0;n--) rval = S(rval);
+  let rval = Prelude_Z
+  for (;n>0;n--) rval = Prelude_S(rval);
   return rval;
 }`
 
 
 
-pfunc fastConcat uses (listToArray) : List String → String := `(xs) => listToArray(null, xs).join('')`
-pfunc replicate uses (natToInt) : Nat -> Char → String := `(n,c) => c.repeat(natToInt(n))`
+pfunc fastConcat uses (listToArray) : List String → String := `(xs) => Prelude_listToArray(null, xs).join('')`
+pfunc replicate uses (natToInt) : Nat -> Char → String := `(n,c) => c.repeat(Prelude_natToInt(n))`
 
 -- I don't want to use an empty type because it would be a proof of void
 ptype World
@@ -379,7 +379,7 @@ instance HasIO IO where
 
 pfunc primPutStrLn uses (MkIORes MkUnit) : String -> IO Unit := `(s) => (w) => {
   console.log(s)
-  return MkIORes(null,MkUnit,w)
+  return Prelude_MkIORes(null,Prelude_MkUnit,w)
 }`
 
 putStrLn : ∀ io. {{HasIO io}} -> String -> io Unit
@@ -401,8 +401,8 @@ pfunc chr : Int → Char := `(c) => String.fromCharCode(c)`
 
 pfunc unpack uses (Nil _::_) : String -> List Char
   := `(s) => {
-    let acc = Nil(null)
-    for (let i = s.length - 1; 0 <= i; i--) acc = _$3A$3A_(null, s[i], acc)
+    let acc = Prelude_Nil(null)
+    for (let i = s.length - 1; 0 <= i; i--) acc = Prelude__$3A$3A_(null, s[i], acc)
     return acc
 }`
 
@@ -429,14 +429,14 @@ pfunc debugStr uses (natToInt listToArray) : ∀ a. a → String := `(_, obj) =>
       return rval + go(obj) + ')'
     }
     if (obj?.tag === '_::_' || obj?.tag === 'Nil') {
-      let stuff = listToArray(null,obj)
+      let stuff = Prelude_listToArray(null,obj)
       return '['+(stuff.map(go).join(', '))+']'
     }
     if (obj instanceof Array) {
       return 'io['+(obj.map(go).join(', '))+']'
     }
     if (obj?.tag === 'S' || obj?.tag === 'Z') {
-      return ''+natToInt(obj)
+      return ''+Prelude_natToInt(obj)
     } else if (obj?.tag) {
       let rval = '('+obj.tag
       for(let i=0;;i++) {
@@ -480,7 +480,7 @@ pfunc addInt : Int → Int → Int := `(x,y) => x + y`
 pfunc mulInt : Int → Int → Int := `(x,y) => x * y`
 pfunc divInt : Int → Int → Int := `(x,y) => x / y | 0`
 pfunc subInt : Int → Int → Int := `(x,y) => x - y`
-pfunc ltInt uses (True False) : Int → Int → Bool := `(x,y) => x < y ? True : False`
+pfunc ltInt uses (True False) : Int → Int → Bool := `(x,y) => x < y ? Prelude_True : Prelude_False`
 
 instance Mul Int where
   x * y = mulInt x y
@@ -589,7 +589,7 @@ elem v (x :: xs) = if v == x then True else elem v xs
 -- TODO no empty value on my `Add`, I need a group..
 -- sum : ∀ a. {{Add a}} → List a → a
 -- sum xs = foldl _+_
-pfunc trace uses (debugStr) : ∀ a. String -> a -> a := `(_, msg, a) => { console.log(msg,debugStr(_,a)); return a }`
+pfunc trace uses (debugStr) : ∀ a. String -> a -> a := `(_, msg, a) => { console.log(msg,Prelude_debugStr(_,a)); return a }`
 
 mapMaybe : ∀ a b. (a → Maybe b) → List a → List b
 mapMaybe f Nil = Nil
@@ -620,20 +620,20 @@ instance Div Double where x / y = divDouble x y
 ptype IOArray : U → U
 
 pfunc newArray uses (MkIORes) : ∀ a. Int → a → IO (IOArray a) :=
-  `(_, n, v) => (w) => MkIORes(null,Array(n).fill(v),w)`
-pfunc arrayGet : ∀ a. IOArray a → Int → IO a := `(_, arr, ix) => w => MkIORes(null, arr[ix], w)`
-pfunc arraySet uses (MkUnit) : ∀ a. IOArray a → Int → a → IO Unit := `(_, arr, ix, v) => w => {
+  `(_, n, v) => (w) => Prelude_MkIORes(null, Prelude_Array(n).fill(v),w)`
+pfunc arrayGet : ∀ a. IOArray a → Int → IO a := `(_, arr, ix) => w => Prelude_MkIORes(null, arr[ix], w)`
+pfunc arraySet uses (MkIORes MkUnit) : ∀ a. IOArray a → Int → a → IO Unit := `(_, arr, ix, v) => w => {
   arr[ix] = v
-  return MkIORes(null, MkUnit, w)
+  return Prelude_MkIORes(null, Prelude_MkUnit, w)
 }`
-pfunc arraySize uses (MkIORes) : ∀ a. IOArray a → IO Int := `(_, arr) => w => MkIORes(null, arr.length, w)`
+pfunc arraySize uses (MkIORes) : ∀ a. IOArray a → IO Int := `(_, arr) => w => Prelude_MkIORes(null, arr.length, w)`
 
 pfunc ioArrayToList uses (Nil _::_ MkIORes) : {0 a} → IOArray a → IO (List a) := `(a,arr) => w => {
-  let rval = Nil(null)
+  let rval = Prelude_Nil(null)
   for (let i = arr.length - 1;i >= 0; i--) {
-    rval = _$3A$3A_(a, arr[i], rval)
+    rval = Prelude__$3A$3A_(a, arr[i], rval)
   }
-  return MkIORes(null, rval, w)
+  return Prelude_MkIORes(null, rval, w)
 }`
 
 pfunc listToIOArray uses (MkIORes) : {0 a} → List a → IO (Array a) := `(a,list) => w => {
@@ -642,7 +642,7 @@ pfunc listToIOArray uses (MkIORes) : {0 a} → List a → IO (Array a) := `(a,li
     rval.push(list.h1)
     list = list.h2
   }
-  return MkIORes(null,rval,w)
+  return Prelude_MkIORes(null,rval,w)
 }`
 
 class Cast a b where
@@ -703,7 +703,7 @@ instance Eq Ordering where
 -- FIXME There is a subtle issue here with shadowing if the file defines a GT in its own namespace
 -- We end up chosing that an assigning to GT, which cause a lot of trouble.
 -- Prelude.GT is not in scope, because we've depended on the other one.
-pfunc jsCompare uses (LT EQ GT) : ∀ a. a → a → Ordering := `(_, a, b) => a == b ? EQ : a < b ? LT : GT`
+pfunc jsCompare uses (LT EQ GT) : ∀ a. a → a → Ordering := `(_, a, b) => a == b ? Prelude_EQ : a < b ? Prelude_LT : Prelude_GT`
 
 infixl 6 _<_ _<=_ _>_
 class Ord a where
@@ -869,8 +869,8 @@ instance ∀ a. {{Show a}} → Show (Maybe a) where
 
 -- TODO
 
-pfunc isPrefixOf uses (True False): String → String → Bool := `(pfx, s) => s.startsWith(pfx) ? True : False`
-pfunc isSuffixOf uses (True False): String → String → Bool := `(pfx, s) => s.endsWith(pfx) ? True : False`
+pfunc isPrefixOf uses (True False): String → String → Bool := `(pfx, s) => s.startsWith(pfx) ? Prelude_True : Prelude_False`
+pfunc isSuffixOf uses (True False): String → String → Bool := `(pfx, s) => s.endsWith(pfx) ? Prelude_True : Prelude_False`
 pfunc strIndex : String → Int → Char := `(s, ix) => s[ix]`
 
 

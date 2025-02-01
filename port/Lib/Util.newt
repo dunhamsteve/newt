@@ -5,6 +5,10 @@ import Lib.Common
 import Lib.Types
 import Data.List1
 
+-- pi arity is primitive functions
+piArity : Tm -> Nat
+piArity (Pi _ _ _ quant _ b) = S (piArity b)
+piArity _ = Z
 
 funArgs : Tm -> (Tm × List Tm)
 funArgs tm = go tm Nil
