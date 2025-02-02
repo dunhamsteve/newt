@@ -118,7 +118,7 @@ findMatches : Context -> Val -> List TopEntry -> M (List String)
 findMatches ctx ty Nil = pure Nil
 findMatches ctx ty ((MkEntry _ name type def) :: xs) = do
   let (True) = isCandidate ty type | False => findMatches ctx ty xs
-  top <- get
+  top <- getTop
   mc <- readIORef top.metaCtx
   catchError (do
       -- TODO sort out the FC here
@@ -145,7 +145,7 @@ contextMatches ctx ty = go (zip ctx.env ctx.types)
     go ((tm, nm, vty) :: xs) = do
       type <- quote ctx.lvl vty
       let (True) = isCandidate ty type | False => go xs
-      top <- get
+      top <- getTop
       mc <- readIORef top.metaCtx
       catchError(do
           debug $ \ _ => "TRY context \{nm} : \{rpprint (names ctx) type} for \{show ty}"
@@ -180,7 +180,7 @@ trySolveAuto (Unsolved fc k ctx ty AutoSolve _) = do
       ty <- eval ctx.env CBN x
       debug $ \ _ => "AUTO ---> \{show ty}"
       -- we want the context here too.
-      top <- get
+      top <- getTop
       Nil <- contextMatches ctx ty
           | ((tm, vty) :: Nil) => do
               unifyCatch (getFC ty) ctx ty vty
@@ -210,7 +210,7 @@ trySolveAuto _ = pure False
 
 solveAutos : M Unit
 solveAutos = do
-  top <- get
+  top <- getTop
   mc <- readIORef top.metaCtx
   res <- run $ filter isAuto (listValues mc.metas)
   if res then solveAutos else pure MkUnit
@@ -229,7 +229,7 @@ solveAutos = do
 
 updateMeta : QName -> (MetaEntry -> M MetaEntry) -> M Unit
 updateMeta ix f = do
-  top <- get
+  top <- getTop
   mc <- readIORef {M} top.metaCtx
   let (Just me) = lookupMap' ix mc.metas | Nothing => pure MkUnit
   me <- f me
@@ -250,7 +250,7 @@ checkAutos ix (_ :: rest) = checkAutos ix rest
 
 addConstraint : Env -> QName -> SnocList Val -> Val -> M Unit
 addConstraint env ix sp tm = do
-  top <- get
+  top <- getTop
   mc <- readIORef top.metaCtx
   let (CheckAll) = mc.mcmode | _ => pure MkUnit
   updateMeta ix $ \case
@@ -345,7 +345,7 @@ ctx.boundNames = map snd $ filter (\x => fst x == Bound) $ zip ctx.bds (map fst 
 
 maybeCheck : M Unit -> M Unit
 maybeCheck action = do
-  top <- get
+  top <- getTop
   mc <- readIORef top.metaCtx
   case mc.mcmode of
     CheckAll => action
@@ -377,7 +377,7 @@ solve env m sp t = do
     tm <- rename m ren l t
 
     let tm = lams (snoclen sp) (reverse ctx_.boundNames) tm
-    top <- get
+    top <- getTop
     soln <- eval Nil CBN tm
 
     updateMeta m $ \case
@@ -471,7 +471,7 @@ unify env mode t u = do
     -- We _could_ look up the ref, eval against Nil and vappSpine...
     unifyRef t         u@(VRef fc' k' sp') = do
       debug $ \ _ => "expand \{show t} =?= %ref \{show k'}"
-      top <- get
+      top <- getTop
       case lookup k' top of
         Just (MkEntry _ name ty (Fn tm)) => do
           vtm <- eval Nil CBN tm
@@ -481,7 +481,7 @@ unify env mode t u = do
 
     unifyRef t@(VRef fc k sp) u = do
       debug $ \ _ => "expand %ref \{show k} \{show sp} =?= \{show u}"
-      top <- get
+      top <- getTop
       case lookup k top of
         Just (MkEntry _ name ty (Fn tm)) => do
           vtm <- eval Nil CBN tm
@@ -577,7 +577,7 @@ unifyCatch fc ctx ty' ty = do
 
 freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
 freshMeta ctx fc ty kind = do
-  top <- get
+  top <- getTop
   mc <- readIORef top.metaCtx
   debug $ \ _ => "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
   -- need the ns here
@@ -618,7 +618,7 @@ insert ctx tm ty = do
 
 primType : FC -> QName -> M Val
 primType fc nm = do
-  top <- get
+  top <- getTop
   case lookup nm top of
       Just (MkEntry _ name ty (PrimTCon _)) => pure $ VRef fc name Lin
       _ => error fc "Primitive type \{show nm} not in scope"
@@ -686,13 +686,13 @@ getConstructors ctx scfc (VRef fc nm _) = do
   where
     lookupTCon : QName -> M (List QName)
     lookupTCon str = do
-      top <- get
+      top <- getTop
       case lookup nm top of
         (Just (MkEntry _ name type (TCon _ names))) => pure names
         _ => error scfc "Not a type constructor \{show nm}"
     lookupDCon : QName -> M (QName × Int × Tm)
     lookupDCon nm = do
-      top <- get
+      top <- getTop
       case lookup nm top of
         (Just (MkEntry _ name type (DCon k str))) => pure (name, k, type)
         Just _ => error fc "Internal Error: \{show nm} is not a DCon"
@@ -944,7 +944,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
                 pure $ Just $ (scnm, (PatVar fc icit nm')) :: rest ++ xs ++ acc
             else do
               -- TODO can we check this when we make the PatCon?
-              top <- get
+              top <- getTop
               case lookup nm top of
                   (Just (MkEntry _ name type (DCon k tcname))) =>
                     if (tcname /= sctynm)
@@ -971,7 +971,7 @@ mkPat (RAs fc as tm, icit) = do
     (PatCon fc icit nm args _) => error fc "Double as pattern \{show tm}"
     t => error fc "Can't put as on non-constructor \{show tm}"
 mkPat (tm, icit) = do
-  top <- get
+  top <- getTop
   case splitArgs tm Nil of
     ((RVar fc nm), b) => case lookupRaw nm top of
                 (Just (MkEntry _ name type (DCon k str))) => do
@@ -1011,7 +1011,7 @@ checkWhere ctx decls body ty = do
     | _ => error sigFC "expected function definition after this signature"
   unless (name == name') $ \ _ => error defFC "Expected def for \{name}"
   -- REVIEW is this right, cribbed from my top level code
-  top <- get
+  top <- getTop
   clauses' <- traverse makeClause clauses
   vty <- eval ctx.env CBN funTy
   debug $ \ _ => "\{name} vty is \{show vty}"
@@ -1222,7 +1222,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
       case meta of
         (Solved _ k t) => forceType ctx.env scty'
         (Unsolved _ k xs _ _ _) => do
-          top <- get
+          top <- getTop
           mc <- readIORef top.metaCtx
           -- TODO - only hit the relevant ones
           solveAutos
@@ -1292,7 +1292,7 @@ undo prev ((DoExpr fc tm) :: xs) = do
   pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc (BI fc "_" Explicit Many) xs') Explicit
 undo prev ((DoLet fc nm tm) :: xs) = RLet fc nm (RImplicit fc) tm <$> undo fc xs
 undo prev ((DoArrow fc left@(RVar fc' nm) right Nil) :: xs) = do
-  top <- get
+  top <- getTop
   case lookupRaw nm top of
     Just _ => do
       let nm = "$sc"
@@ -1328,7 +1328,7 @@ check ctx tm ty = do
       debug $ \ _ => "SCTY \{show scty}"
 
       let scnm = fresh "sc"
-      top <- get
+      top <- getTop
       clauses <- for alts $ \case
         (MkAlt pat rawRHS) => do
           pat' <- mkPat (pat, Explicit)
@@ -1408,7 +1408,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
   where
     go : Int -> List (String × Val)  -> M (Tm × Val)
     go i Nil = do
-      top <- get
+      top <- getTop
       case lookupRaw nm top of
         Just (MkEntry _ name ty def) => do
           debug $ \ _ => "lookup \{show name} as \{show def}"

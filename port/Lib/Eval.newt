@@ -68,7 +68,7 @@ unlet env x = pure x
 -- Try applying VRef to spine, back out if it is stuck
 tryEval : Env -> Val -> M (Maybe Val)
 tryEval env (VRef fc k sp) = do
-  top <- get
+  top <- getTop
   case lookup k top of
       Just (MkEntry _ name ty (Fn tm)) =>
         catchError (
@@ -106,7 +106,7 @@ forceType env x = do
 
 evalCase : Env -> Mode -> Val -> List CaseAlt -> M (Maybe Val)
 evalCase env mode sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
-  top <- get
+  top <- getTop
   if nm == name
     then do
       debug $ \ _ =>  "ECase \{show nm} \{show sp} \{show nms} \{showTm t}"

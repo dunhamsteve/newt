@@ -3,7 +3,6 @@ module Lib.Syntax
 import Prelude
 import Lib.Common
 import Data.String
-import Lib.Parser.Impl
 import Lib.Prettier
 import Lib.Types
 

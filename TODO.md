@@ -1,10 +1,14 @@
 
 ## TODO
 
+Syntax -> Parser.Impl ?
+
 - [ ] implement tail call optimization
 - [ ] `Def` is shadowed between Types and Syntax (TCon vs DCon), detect this
 - [ ] review pattern matching. goal is to have a sane context on the other end. secondary goal - bring it closer to the paper.
 
+- [ ] rename for top level functions (and maybe stuff in scope, probably need LSP first)
+- [ ] warn on unused imports?
 - [x] redo code to determine base path
 - [x] emit only one branch for default case when splitting inductives
 - [ ] save/load results of processing a module

@@ -460,27 +460,27 @@ filterM pred (x :: xs) = do
   if check then _::_ x <$> filterM pred xs else filterM pred xs
 
 
-get : M TopContext
-get = MkM $ \ tc => pure $ Right (tc, tc)
+getTop : M TopContext
+getTop = MkM $ \ tc => pure $ Right (tc, tc)
 
-put : TopContext -> M Unit
-put tc = MkM $ \_ => pure $ Right (tc, MkUnit)
+putTop : TopContext -> M Unit
+putTop tc = MkM $ \_ => pure $ Right (tc, MkUnit)
 
-modify : (TopContext -> TopContext) -> M Unit
-modify f = do
-  tc <- get
-  put (f tc)
+modifyTop : (TopContext -> TopContext) -> M Unit
+modifyTop f = do
+  tc <- getTop
+  putTop (f tc)
 
 -- Force argument and print if verbose is true
 
 log : Int -> Lazy String -> M Unit
 log lvl x = do
-  top <- get
+  top <- getTop
   when (lvl <= top.verbose) $ \ _ => putStrLn $ force x
 
 logM : Int → M String -> M Unit
 logM lvl x = do
-  top <- get
+  top <- getTop
   when (lvl <= top.verbose) $ \ _ => do
     msg <- x
     putStrLn msg
@@ -516,7 +516,7 @@ error' msg = throwError $ E emptyFC msg
 
 lookupMeta : QName -> M MetaEntry
 lookupMeta ix@(QN ns nm) = do
-  top <- get
+  top <- getTop
   mc <- readIORef {M} top.metaCtx
   case lookupMap' ix mc.metas of
     Just meta => pure meta

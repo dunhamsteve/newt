@@ -27,7 +27,7 @@ primNS = ("Prim" :: Nil)
 
 jsonTopContext : M Json
 jsonTopContext = do
-  top <- get
+  top <- getTop
   pure $ JsonObj (("context", JsonArray (map jsonDef $ listValues top.defs)) :: Nil)
   where
     jsonDef : TopEntry -> Json
@@ -82,12 +82,12 @@ parseDecls fn ops toks@(first :: _) acc =
 -- New style loader, one def at a time
 processModule : FC -> String -> List String -> QName -> M String
 processModule importFC base stk qn@(QN ns nm) = do
-  top <- get
+  top <- getTop
   -- TODO make top.loaded a List QName
   let modns = (snoc ns nm)
   let name = joinBy "." modns
   let (Nothing) = lookupMap modns top.modules | _ => pure ""
-  modify (\ top => MkTop (updateMap modns emptyModCtx top.modules) top.imported top.ns top.defs top.metaCtx top.verbose top.errors top.ops)
+  modifyTop (\ top => MkTop (updateMap modns emptyModCtx top.modules) top.imported top.ns top.defs top.metaCtx top.verbose top.errors top.ops)
   let fn = (joinBy "/" (base :: ns)) ++ "/" ++ nm ++ ".newt"
   (Right src) <- liftIO {M} $ readFile fn
     | Left err => exitFailure "ERROR at \{show importFC}: error reading \{fn}: \{show err}"
@@ -121,18 +121,18 @@ processModule importFC base stk qn@(QN ns nm) = do
 
   putStrLn "module \{modName}"
   log 1 $ \ _ => "MODNS " ++ show modns
-  top <- get
+  top <- getTop
   (decls, ops) <- parseDecls fn top.ops toks Lin
 
-  top <- get
+  top <- getTop
   freshMC <- newIORef (MC EmptyMap 0 CheckAll)
   -- set imported, mod, freshMC, ops  before processing
-  modify (\ top => MkTop top.modules imported modns EmptyMap freshMC top.verbose top.errors ops)
+  modifyTop (\ top => MkTop top.modules imported modns EmptyMap freshMC top.verbose top.errors ops)
   log 1 $ \ _ => "process Decls"
   traverse (tryProcessDecl ns) (collectDecl decls)
 
   -- update modules with result, leave the rest of context in case this is top file
-  top <- get
+  top <- getTop
   mc <- readIORef top.metaCtx
 
   let mod = MkModCtx top.defs mc top.ops
@@ -140,7 +140,7 @@ processModule importFC base stk qn@(QN ns nm) = do
 
   let modules = updateMap modns mod top.modules
   freshMC <- newIORef (MC EmptyMap 0 CheckAll)
-  modify (\ top => MkTop modules top.imported top.ns top.defs top.metaCtx top.verbose top.errors top.ops)
+  modifyTop (\ top => MkTop modules top.imported top.ns top.defs top.metaCtx top.verbose top.errors top.ops)
 
   (Nil) <- liftIO {M} $ readIORef top.errors
     | errors => do
@@ -165,7 +165,7 @@ baseDir Lin _ = Left "module path doesn't match directory"
 
 showErrors : String -> String -> M Unit
 showErrors fn src = do
-  top <- get
+  top <- getTop
   (Nil) <- liftIO {M} $ readIORef top.errors
     | errors => do
         for_ errors $ \err =>
@@ -201,12 +201,12 @@ processFile fn = do
   processDecl primNS (PType emptyFC "String" Nothing)
   processDecl primNS (PType emptyFC "Char" Nothing)
 
-  top <- get
+  top <- getTop
   let modules = updateMap primNS (MkModCtx top.defs (MC EmptyMap 0 CheckAll) top.ops) top.modules
-  modify (\ top => MkTop modules (primNS :: Nil) Nil EmptyMap top.metaCtx top.verbose top.errors top.ops)
+  modifyTop (\ top => MkTop modules (primNS :: Nil) Nil EmptyMap top.metaCtx top.verbose top.errors top.ops)
 
   src <- processModule emptyFC base Nil qn
-  top <- get
+  top <- getTop
 
   showErrors fn src
   pure MkUnit
@@ -216,7 +216,7 @@ cmdLine : List String -> M (Maybe String × List String)
 cmdLine Nil = pure (Nothing, Nil)
 cmdLine ("--top" :: args) = cmdLine args -- handled later
 cmdLine ("-v" :: args) = do
-  modify (\ top => MkTop top.modules top.imported top.ns top.defs top.metaCtx (top.verbose + 1) top.errors top.ops)
+  modifyTop (\ top => MkTop top.modules top.imported top.ns top.defs top.metaCtx (top.verbose + 1) top.errors top.ops)
   cmdLine args
 cmdLine ("-o" :: fn :: args) = do
   (out, files) <- cmdLine args

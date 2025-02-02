@@ -16,7 +16,7 @@ EEnv = List (String × Quant × Maybe Tm)
 
 getType : Tm -> M (Maybe Tm)
 getType (Ref fc nm) = do
-  top <- get
+  top <- getTop
   case lookup nm top of
     Nothing => error fc "\{show nm} not in scope"
     (Just (MkEntry _ name type def)) => pure $ Just type
@@ -45,7 +45,7 @@ doAlt : EEnv -> CaseAlt -> M CaseAlt
 -- REVIEW do we extend env?
 doAlt env (CaseDefault t) = CaseDefault <$> erase env t Nil
 doAlt env (CaseCons name args t) = do
-  top <- get
+  top <- getTop
   let (Just (MkEntry _ str type def)) = lookup name top
     | _ => error emptyFC "\{show name} dcon missing from context"
   let env' = piEnv env type args
@@ -64,7 +64,7 @@ doAlt env (CaseLit lit t) = CaseLit lit <$> erase env t Nil
 erase env t sp = case t of
   (App fc u v) => erase env u ((fc,v) :: sp)
   (Ref fc nm) => do
-    top <- get
+    top <- getTop
     case lookup nm top of
       Nothing => error fc "\{show nm} not in scope"
       (Just (MkEntry _ name type def)) => eraseSpine env t sp (Just type)

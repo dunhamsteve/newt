@@ -64,7 +64,7 @@ logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
           ty <- eval ctx.env CBN x
           debug $ \ _ => "AUTO ---> \{show ty}"
           -- we want the context here too.
-          top <- get
+          top <- getTop
           -- matches <- case !(contextMatches ctx ty) of
           --   Nil => findMatches ctx ty $ toList top.defs
           --   xs => pure xs
@@ -105,7 +105,7 @@ processDecl ns  (PMixFix _ _ _ _)  = pure MkUnit
 processDecl ns  (TypeSig fc names tm) = do
   log 1 $ \ _ => "-----"
 
-  top <- get
+  top <- getTop
   mc <- readIORef top.metaCtx
   -- let mstart = length' mc.metas
   for names $ \nm => do
@@ -118,13 +118,13 @@ processDecl ns  (TypeSig fc names tm) = do
   ignore $ for names $ \nm => setDef (QN ns nm) fc ty Axiom
 
 processDecl ns (PType fc nm ty) = do
-  top <- get
+  top <- getTop
   ty' <- check (mkCtx fc) (maybe (RU fc) id ty) (VU fc)
   let arity = cast $ piArity ty'
   setDef (QN ns nm) fc ty' (PrimTCon arity)
 
 processDecl ns  (PFunc fc nm used ty src) = do
-  top <- get
+  top <- getTop
   ty <- check (mkCtx fc) ty (VU fc)
   ty' <- nf Nil ty
   log 1 $ \ _ => "pfunc \{nm} : \{render 90 $ pprint Nil ty'} = \{show src}"
@@ -137,7 +137,7 @@ processDecl ns  (PFunc fc nm used ty src) = do
 processDecl ns (Def fc nm clauses) = do
   log 1 $ \ _ => "-----"
   log 1 $ \ _ => "Def \{show nm}"
-  top <- get
+  top <- getTop
   mc <- readIORef top.metaCtx
   let (Just entry) = lookupRaw nm top
     | Nothing => throwError $ E fc "No declaration for \{nm}"
@@ -173,7 +173,7 @@ processDecl ns (Def fc nm clauses) = do
 
 processDecl ns (DCheck fc tm ty) = do
   log 1 $ \ _ => "----- DCheck"
-  top <- get
+  top <- getTop
 
   info fc "check \{show tm} at \{show ty}"
   ty' <- check (mkCtx fc) ty (VU fc)
@@ -237,7 +237,7 @@ processDecl ns (Instance instfc ty decls) = do
 
   log 1 $ \ _ => "-----"
   log 1 $ \ _ => "Instance \{render 90 $ pretty ty}"
-  top <- get
+  top <- getTop
   let tyFC = getFC ty
 
   vty <- check (mkCtx instfc) ty (VU instfc)
@@ -374,7 +374,7 @@ processDecl ns (ShortData fc lhs sigs) = do
 processDecl ns (Data fc nm ty cons) = do
   log 1 $ \ _ => "-----"
   log 1 $ \ _ => "Data \{nm}"
-  top <- get
+  top <- getTop
   mc <- readIORef top.metaCtx
   tyty <- check (mkCtx fc) ty (VU fc)
   case lookupRaw nm top of

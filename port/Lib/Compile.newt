@@ -311,7 +311,7 @@ getNames _ acc = acc
 -- This will be what we work on for optimization passes
 getEntries : SortedMap QName Def → QName → M (SortedMap QName Def)
 getEntries acc name = do
-  top <- get
+  top <- getTop
   case lookup name top of
     Nothing => do
       putStrLn "bad name \{show name}"
@@ -355,7 +355,7 @@ process name = do
 
 compile : M (List Doc)
 compile = do
-  top <- get
+  top <- getTop
   case lookupRaw "main" top of
     Just (MkEntry fc name type def) => do
       tmp <- process name

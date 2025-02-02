@@ -54,7 +54,7 @@ lamArity _ = Z
 -- TODO - figure out how this will work with erasure
 arityForName : FC -> QName -> M Nat
 arityForName fc nm = do
-  top <- get
+  top <- getTop
   case lookup nm top of
   -- let the magic hole through for now (will generate bad JS)
     Nothing => error fc "Name \{show nm} not in scope"
@@ -90,7 +90,7 @@ apply t ts acc Z ty = go (CApp t (acc <>> Nil) 0) ts
 compileTerm (Bnd _ k) = pure $ CBnd k
 -- need to eta expand to arity
 compileTerm t@(Ref fc nm) = do
-  top <- get
+  top <- getTop
   let (Just (MkEntry _ _ type _)) = lookup nm top
           | Nothing => error fc "Undefined name \{show nm}"
   arity <- arityForName fc nm
@@ -108,7 +108,7 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
   (t@(Ref fc nm), args) => do
         args' <- traverse compileTerm args
         arity <- arityForName fc nm
-        top <- get
+        top <- getTop
         let (Just (MkEntry _ _ type _)) = lookup nm top
           | Nothing => error fc "Undefined name \{show nm}"
         apply (CRef (show nm)) args' Lin arity type

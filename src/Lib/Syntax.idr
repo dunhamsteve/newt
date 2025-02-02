@@ -2,7 +2,6 @@ module Lib.Syntax
 
 import Data.String
 import Data.Maybe
-import Lib.Parser.Impl
 import Lib.Prettier
 import Lib.Types
 
