@@ -11,7 +11,7 @@ pfunc _%_ : Int → Int → Int := `(x,y) => x % y`
 -- should have a few more foreign functions and do this in newt
 pfunc divide uses (_,_) : String → String × String := `(s) => {
   let l = s.length/2|0
-  return _$2C_(undefined, undefined, s.slice(0,l), s.slice(l))
+  return Prelude__$2C_(undefined, undefined, s.slice(0,l), s.slice(l))
 }`
 
 step : List (Int × Int) → List (Int × Int)
