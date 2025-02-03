@@ -36,7 +36,9 @@ eraseSpine env t ((fc, arg) :: args) (Just (Pi fc1 str icit Many a b)) = do
   -- TODO this seems wrong, we need to subst u into b to get the type
   eraseSpine env (App fc t u) args (Just b)
 -- eraseSpine env t ((fc, arg) :: args) (Just ty) = do
---   error fc "ceci n'est pas une ∏ \{showTm ty}" -- e.g. Bnd 1
+--   -- Prelude Either and IO instance of <*> have Bnd here, possibly pattern matching
+--   -- unifying in the wrong direction? we should have something like a -> b
+--   error fc "ceci n'est pas une ∏ \{showTm ty} arg \{show arg}" -- e.g. Bnd 1
 eraseSpine env t ((fc, arg) :: args) _ = do
   u <- erase env arg Nil
   eraseSpine env (App fc t u) args Nothing

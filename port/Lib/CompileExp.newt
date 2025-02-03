@@ -73,11 +73,12 @@ compileTerm : Tm -> M CExp
 apply : CExp -> List CExp -> SnocList CExp -> Nat -> Tm -> M CExp
 -- out of args, make one up (fix that last arg)
 apply t Nil acc (S k) ty = pure $ CApp t (acc <>> Nil) (1 + cast k)
--- FIXME - this should be handled by Erasure.newt (wdiff of esbuild output says this is still used)
+-- FIXME - this should be handled by Erasure.newt
+-- We somehow hit the error below, with a Pi?
 apply t (x :: xs) acc (S k) (Pi y str icit Zero a b) =  apply t xs (acc :< CErased) k b
 apply t (x :: xs) acc (S k) (Pi y str icit Many a b) =  apply t xs (acc :< x) k b
 -- see if there is anything we have to handle here
-apply t (x :: xs) acc (S k) ty = error (getFC ty) "Expected pi \{showTm ty}. Overapplied function that escaped type checking?"
+apply t (x :: xs) acc (S k) ty = error (getFC ty) "Expected pi, got \{showTm ty}. Overapplied function that escaped type checking?"
 -- once we hit zero, we fold the rest
 apply t ts acc Z ty = go (CApp t (acc <>> Nil) 0) ts
   where
@@ -95,7 +96,7 @@ compileTerm t@(Ref fc nm) = do
           | Nothing => error fc "Undefined name \{show nm}"
   arity <- arityForName fc nm
   case arity of
-    -- we don't need tu curry functions that take one argument
+    -- we don't need to curry functions that take one argument
     (S Z) => pure $ CRef (show nm)
     _ => apply (CRef (show nm)) Nil Lin arity type
 
@@ -103,8 +104,9 @@ compileTerm (Meta _ k) = pure $ CRef "meta$\{show k}" -- FIXME
 compileTerm (Lam _ nm _ _ t) = CLam nm <$> compileTerm t
 compileTerm tm@(App _ _ _) = case funArgs tm of
   (Meta _ k, args) => do
-        info (getFC tm) "Compiling an unsolved meta \{show tm}"
-        pure $ CApp (CRef "Meta\{show k}") Nil 0
+        error (getFC tm) "Compiling an unsolved meta \{show tm}"
+        -- info (getFC tm) "Compiling an unsolved meta \{show tm}"
+        -- pure $ CApp (CRef "Meta\{show k}") Nil 0
   (t@(Ref fc nm), args) => do
         args' <- traverse compileTerm args
         arity <- arityForName fc nm

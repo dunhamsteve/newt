@@ -18,7 +18,6 @@ import Lib.Tokenizer
 import Lib.TopContext
 import Lib.Types
 import Lib.Syntax
-import Lib.Syntax
 import Node
 import Serialize
 

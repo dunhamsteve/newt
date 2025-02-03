@@ -84,7 +84,7 @@ data Tm : U where
   -- need type?
   Let : FC -> Name -> Tm -> Tm -> Tm
   -- for desugaring where
-  LetRec : FC -> Name -> Tm -> Tm -> Tm -> Tm
+  LetRec : FC -> Name -> (ty : Tm) -> (t : Tm) -> (u : Tm) -> Tm
   Lit : FC -> Literal -> Tm
   Erased : FC -> Tm
 

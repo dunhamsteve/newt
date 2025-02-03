@@ -162,12 +162,9 @@ processDecl ns (Def fc nm clauses) = do
   -- tm' <- nf Nil tm
   tm' <- zonk top 0 Nil tm
   debug $ \ _ => "NF\n\{render 80 $ pprint Nil tm'}"
-  -- TODO we want to keep both versions, but this is checking in addition to erasing
-  -- currently CompileExp is also doing erasure.
-  -- TODO we need erasure info on the lambdas or to fake up an appropriate environment
-  -- and erase inside. Currently the checking is imprecise
-  tm'' <- erase Nil tm' Nil
-  debug $ \ _ => "ERASED\n\{render 80 $ pprint Nil tm'}"
+  -- This is done in Compile.newt now, we can't store the result because we need the real thing at compile time
+  -- tm'' <- erase Nil tm' Nil
+  -- debug $ \ _ => "ERASED\n\{render 80 $ pprint Nil tm''}"
   debug $ \ _ => "Add def \{nm} \{render 90 $ pprint Nil tm'} : \{render 90 $ pprint Nil ty}"
   updateDef (QN ns nm) fc ty (Fn tm')
 

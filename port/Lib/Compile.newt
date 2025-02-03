@@ -7,6 +7,7 @@ import Lib.Types
 import Lib.Prettier
 import Lib.CompileExp
 import Lib.TopContext
+import Lib.Erasure
 import Data.String
 import Data.Int
 import Data.SortedMap
@@ -282,7 +283,8 @@ maybeWrap stmt = Apply (JLam Nil stmt) Nil
 defToDoc : QName → Def → M Doc
 defToDoc name (Fn tm) = do
   debug $ \ _ => "compileFun \{render 90 $ pprint Nil tm}"
-  ct <- compileFun tm
+  tm' <- erase Nil tm Nil
+  ct <- compileFun tm'
   let exp = maybeWrap $ termToJS emptyJSEnv ct JReturn
   pure $ text "const" <+> jsIdent (show name) <+> text "=" <+/> expToDoc exp ++ text ";"
 defToDoc name Axiom = pure $ text ""
