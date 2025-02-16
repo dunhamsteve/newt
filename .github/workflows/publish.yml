@@ -18,11 +18,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-      - name: build
+      - name: setup
         run: |
           apt update
           apt-get install -y zip
           pack install contrib
+      - name: use bun
+        uses: oven-sh/setup-bun@v2
+      - name: build
+        run: |
           make
           cd playground
           npm install -g esbuild vite
