@@ -12,23 +12,27 @@ The web playground can be at https://dunhamsteve.github.io/newt. The top left co
 has a dropdown with some samples. Currently the web playground is using the Idris-built
 version of newt because most browsers lack tail call optimization.
 
-The directory `port` contains a port of newt to itself. Currently it needs to be run by `bun` rather than `node` because `bun` does tail call optimization.
+The directory `orig` contains the original version of newt written in Idris. It is used by the playground until TCO is added to newt.
 
 ## Sample code
 
-- `port` contains a copy of newt written in newt
-- `newt` contains miscellaneous files
+- `src` contains a copy of newt written in newt
+- `newt` contains miscellaneous samples
 - `aoc2024` contains solutions for 2024 Advent of Code in newt
-- `tests` contains some test cases.
+- `tests` contains test cases
 
 ## Building
 
-There is a `Makefile` that builds both chez and javascript versions.  They end up in
-`build/exec` as usual.  I've also added a `pack.toml`, so `pack build` also works.
+The `Makefile` will build both the original Idris version of `newt`, which will end up in `build/exec` and the current version of newt, which will be `./newt.js`. There is a `pack.toml` file to allow building the original version of newt with `pack build`.
+
+Newt can also be built by running `bun run bootstrap/newt.js src/Main.newt -o newt.js`.
 
 There is a vscode extension in `newt-vscode`. Running `make vscode` will build and install it. The extension expects `build/exec/newt` to exist in the workspace. And `make test` will run a few black box tests. Currently it simply checks return codes, since the output format is in flux.
 
-The web playground is in playground.
+## Playground
+
+The web playground is found in the `playground` directory. It uses the original version of newt, which takes advantage of Idris' tail call optimization.
+
 - `npm install` will pull down dependencies.
 - `./build` will build the web workers and install sample files (`make` must be run in root first).
 - `npx vite` will run the dev server.

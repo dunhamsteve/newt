@@ -36,7 +36,7 @@ main = Main
 -- name of executable
 executable = "newt"
 -- opts =
-sourcedir = "src"
+sourcedir = "orig"
 -- builddir =
 -- outputdir =
 

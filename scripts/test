@@ -1,12 +1,18 @@
 #!/bin/sh
 SAMPLES=$(find playground/samples -name "*.newt")
+NCC="bun run newt.js"
 total=0
 failed=0
 for fn in tests/*.newt ; do
   total=$((total + 1))
   echo Test $fn
   bn=$(basename $fn)
-  ./build/exec/newt $fn -o out.js > tmp/${bn}.compile
+  if [ -f ${fn}.golden ]; then
+    $NCC $fn -o out.js > tmp/${bn}.compile
+  else
+    # we've dropped support for compiling things without main for now.
+    $NCC $fn > tmp/${bn}.compile
+  fi
   if [ $? != "0" ]; then
     echo Compile failed for $fn
     failed=$((failed + 1))

@@ -1,14 +1,13 @@
 #!/bin/sh
 mkdir -p tmp
 echo "Test AoC 2024 solutions"
-NCC="bun run newt.js"
 total=0
 failed=0
 for fn in  aoc2024/Day*.newt; do
   total=$((total + 1))
   echo Test $fn
   bn=$(basename $fn)
-  $NCC $fn -o out.js > tmp/${bn}.compile
+  ./build/exec/newt $fn -o out.js > tmp/${bn}.compile
   if [ $? != "0" ]; then
     echo Compile failed for $fn
     failed=$((failed + 1))

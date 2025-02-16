@@ -1,5 +1,5 @@
 // Experimental serializer / deserializer for modules
-// not completely wired in yet, serialization is running.
+// not completely wired in yet, serialization is running, deserialization is not
 
 const END = 0;
 const LIST = 1;
