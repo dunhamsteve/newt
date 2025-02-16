@@ -132,7 +132,8 @@ processDecl ns  (PFunc fc nm used ty src) = do
   used' <- for used $ \ name => case lookupRaw name top of
     Nothing => error fc "\{name} not in scope"
     Just entry => pure entry.name
-  setDef (QN ns nm) fc ty' (PrimFn src used')
+  let arity = piArity ty'
+  setDef (QN ns nm) fc ty' (PrimFn src arity used')
 
 processDecl ns (Def fc nm clauses) = do
   log 1 $ \ _ => "-----"

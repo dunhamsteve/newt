@@ -308,7 +308,7 @@ record MetaContext where
   mcmode : MetaMode
 
 data Def = Axiom | TCon Int (List QName) | DCon Int QName | Fn Tm | PrimTCon Int
-         | PrimFn String (List QName)
+         | PrimFn String Nat (List QName)
 
 instance Show Def where
   show Axiom = "axiom"
@@ -316,7 +316,7 @@ instance Show Def where
   show (DCon k tyname) = "DCon \{show k} \{show tyname}"
   show (Fn t) = "Fn \{show t}"
   show (PrimTCon _) = "PrimTCon"
-  show (PrimFn src used) = "PrimFn \{show src} \{show used}"
+  show (PrimFn src arity used) = "PrimFn \{show src} \{show arity} \{show used}"
 
 -- entry in the top level context
 

@@ -13,6 +13,8 @@ import Lib.Types -- Name / Tm
 import Lib.TopContext
 import Lib.Prettier
 import Lib.Util
+import Lib.Ref2
+import Data.SortedMap
 
 CExp : U
 
@@ -27,11 +29,7 @@ data CExp : U where
   CBnd : Int -> CExp
   CLam : Name -> CExp -> CExp
   CFun : List Name -> CExp -> CExp
-  -- REVIEW This feels like a hack, but if we put CLam here, the
-  -- deBruijn gets messed up in code gen
   CApp : CExp -> List CExp -> Int -> CExp
-  -- TODO make DCon/TCon app separate so we can specialize
-  -- U / Pi are compiled to type constructors
   CCase : CExp -> List CAlt -> CExp
   CRef : Name -> CExp
   CMeta : Int -> CExp
@@ -52,35 +50,28 @@ lamArity _ = Z
 -- This is how much we want to curry at top level
 -- leading lambda Arity is used for function defs and metas
 -- TODO - figure out how this will work with erasure
-arityForName : FC -> QName -> M Nat
+arityForName : {{Ref2 Defs St}} → FC -> QName -> M Nat
 arityForName fc nm = do
-  top <- getTop
-  case lookup nm top of
-  -- let the magic hole through for now (will generate bad JS)
+  defs <- getRef Defs
+  case lookupMap' nm defs of
     Nothing => error fc "Name \{show nm} not in scope"
-    (Just (MkEntry _ name type Axiom)) => pure Z
-    (Just (MkEntry _ name type (TCon arity strs))) => pure $ cast arity
-    (Just (MkEntry _ name type (DCon k str))) => pure $ cast k
-    (Just (MkEntry _ name type (Fn t))) => pure $ lamArity t
-    (Just (MkEntry _ name type (PrimTCon arity))) => pure $ cast arity
-    -- Assuming a primitive can't return a function
-    (Just (MkEntry _ name type (PrimFn t used))) => pure $ piArity type
+    (Just Axiom) => pure Z
+    (Just (TCon arity strs)) => pure $ cast arity
+    (Just (DCon k str)) => pure $ cast k
+    (Just (Fn t)) => pure $ lamArity t
+    (Just (PrimTCon arity)) => pure $ cast arity
+    (Just (PrimFn t arity used)) => pure arity
 
 
-compileTerm : Tm -> M CExp
+compileTerm : {{Ref2 Defs St}} → Tm -> M CExp
 
 -- need to eta out extra args, fill in the rest of the apps
-apply : CExp -> List CExp -> SnocList CExp -> Nat -> Tm -> M CExp
+apply : CExp -> List CExp -> SnocList CExp -> Nat -> M CExp
 -- out of args, make one up (fix that last arg)
-apply t Nil acc (S k) ty = pure $ CApp t (acc <>> Nil) (1 + cast k)
--- FIXME - this should be handled by Erasure.newt
--- We somehow hit the error below, with a Pi?
-apply t (x :: xs) acc (S k) (Pi y str icit Zero a b) =  apply t xs (acc :< CErased) k b
-apply t (x :: xs) acc (S k) (Pi y str icit Many a b) =  apply t xs (acc :< x) k b
--- see if there is anything we have to handle here
-apply t (x :: xs) acc (S k) ty = error (getFC ty) "Expected pi, got \{showTm ty}. Overapplied function that escaped type checking?"
+apply t Nil acc (S k) = pure $ CApp t (acc <>> Nil) (1 + cast k)
+apply t (x :: xs) acc (S k)  =  apply t xs (acc :< x) k
 -- once we hit zero, we fold the rest
-apply t ts acc Z ty = go (CApp t (acc <>> Nil) 0) ts
+apply t ts acc Z = go (CApp t (acc <>> Nil) 0) ts
   where
     go : CExp -> List CExp -> M CExp
     -- drop zero arg call
@@ -91,14 +82,11 @@ apply t ts acc Z ty = go (CApp t (acc <>> Nil) 0) ts
 compileTerm (Bnd _ k) = pure $ CBnd k
 -- need to eta expand to arity
 compileTerm t@(Ref fc nm) = do
-  top <- getTop
-  let (Just (MkEntry _ _ type _)) = lookup nm top
-          | Nothing => error fc "Undefined name \{show nm}"
   arity <- arityForName fc nm
   case arity of
     -- we don't need to curry functions that take one argument
     (S Z) => pure $ CRef (show nm)
-    _ => apply (CRef (show nm)) Nil Lin arity type
+    _ => apply (CRef (show nm)) Nil Lin arity
 
 compileTerm (Meta _ k) = pure $ CRef "meta$\{show k}" -- FIXME
 compileTerm (Lam _ nm _ _ t) = CLam nm <$> compileTerm t
@@ -111,14 +99,14 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
         args' <- traverse compileTerm args
         arity <- arityForName fc nm
         top <- getTop
-        let (Just (MkEntry _ _ type _)) = lookup nm top
-          | Nothing => error fc "Undefined name \{show nm}"
-        apply (CRef (show nm)) args' Lin arity type
+        -- let (Just (MkEntry _ _ type _)) = lookup nm top
+        --   | Nothing => error fc "Undefined name \{show nm}"
+        apply (CRef (show nm)) args' Lin arity
   (t, args) => do
         debug $ \ _ => "apply other \{render 90 $ pprint Nil t}"
         t' <- compileTerm t
         args' <- traverse compileTerm args
-        apply t' args' Lin Z (UU emptyFC)
+        apply t' args' Lin Z
         -- error (getFC t) "Don't know how to apply \{showTm t}"
 compileTerm (UU _) = pure $ CRef "U"
 compileTerm (Pi _ nm icit rig t u) = do
@@ -144,7 +132,7 @@ compileTerm (LetRec _ nm _ t u) = do
   pure $ CLetRec nm t' u'
 compileTerm (Erased _) = pure CErased
 
-compileFun : Tm -> M CExp
+compileFun : {{Ref2 Defs St}} → Tm -> M CExp
 compileFun tm = go tm Lin
   where
     go : Tm -> SnocList String -> M CExp

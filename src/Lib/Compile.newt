@@ -7,10 +7,13 @@ import Lib.Types
 import Lib.Prettier
 import Lib.CompileExp
 import Lib.TopContext
+import Lib.LiftWhere
+import Lib.Ref2
 import Lib.Erasure
 import Data.String
 import Data.Int
 import Data.SortedMap
+import Data.IORef
 
 data StKind = Plain | Return | Assign String
 
@@ -280,18 +283,18 @@ maybeWrap (JReturn exp) = exp
 maybeWrap stmt = Apply (JLam Nil stmt) Nil
 
 -- convert a Def to a Doc (compile to javascript)
-defToDoc : QName → Def → M Doc
+defToDoc : {{Ref2 Defs St}} → QName → Def → M Doc
 defToDoc name (Fn tm) = do
   debug $ \ _ => "compileFun \{render 90 $ pprint Nil tm}"
-  tm' <- erase Nil tm Nil
-  ct <- compileFun tm'
+  -- tm' <- erase Nil tm Nil
+  ct <- compileFun tm
   let exp = maybeWrap $ termToJS emptyJSEnv ct JReturn
   pure $ text "const" <+> jsIdent (show name) <+> text "=" <+/> expToDoc exp ++ text ";"
 defToDoc name Axiom = pure $ text ""
 defToDoc name (DCon arity str) = pure $ dcon name (cast arity)
 defToDoc name (TCon arity strs) = pure $ dcon name (cast arity)
 defToDoc name (PrimTCon arity) = pure $ dcon name (cast arity)
-defToDoc name (PrimFn src _) = pure $ text "const" <+> jsIdent (show name) <+> text "=" <+> text src
+defToDoc name (PrimFn src _ _) = pure $ text "const" <+> jsIdent (show name) <+> text "=" <+> text src
 
 -- Collect the QNames used in a term
 getNames : Tm -> List QName -> List QName
@@ -323,7 +326,7 @@ getEntries acc name = do
       Nothing =>
         let acc = updateMap name def acc in
         foldlM getEntries acc $ getNames exp Nil
-    Just (MkEntry _ name type def@(PrimFn _ used)) =>
+    Just (MkEntry _ name type def@(PrimFn _ _ used)) =>
       let acc = updateMap name def acc in
       foldlM getEntries acc used
     Just entry => pure $ updateMap name entry.def acc
@@ -341,14 +344,32 @@ sortedNames defs qn = go Nil Nil qn
       case lookupMap' qn defs of
         Nothing => acc
         Just (Fn tm) => qn :: foldl (go $ qn :: loop) acc (getNames tm Nil)
-        Just (PrimFn src used) => qn :: foldl (go $ qn :: loop) acc used
+        Just (PrimFn src _ used) => qn :: foldl (go $ qn :: loop) acc used
         Just def => qn :: acc
+
+eraseEntries : {{Ref2 Defs St}} → M Unit
+eraseEntries = do
+  defs <- getRef Defs
+  ignore $ traverse go $ toList defs
+  where
+    go : {{Ref2 Defs St}} → (QName × Def) → M Unit
+    go (qn, Fn tm) = do
+      tm' <- erase Nil tm Nil
+      modifyRef Defs $ updateMap qn (Fn tm')
+    go _ = pure MkUnit
 
 -- given a initial function, return a dependency-ordered list of javascript source
 process : QName → M (List Doc)
 process name = do
   let wat = QN ("Prelude" :: Nil) "arrayToList"
   entries <- getEntries EmptyMap name
+
+  -- Maybe move this dance into liftWhere
+  ref <- newIORef entries
+  let foo = MkRef ref -- for the autos below
+  eraseEntries
+  liftWhere
+  entries <- readIORef ref
   let names = sortedNames entries name
   for names $ \ nm => case lookupMap nm entries of
       Nothing => error emptyFC "MISS \{show nm}"

@@ -1,0 +1,93 @@
+module Lib.LiftWhere
+
+import Prelude
+import Lib.Common
+import Lib.Types
+import Lib.TopContext
+import Lib.Ref2
+import Data.SortedMap
+import Monad.State
+import Data.IORef
+
+-- track depth and whether we need to replace Bnd with a top level call
+LiftEnv : U
+LiftEnv = List (Maybe (QName × Nat))
+
+liftWhereTm : {{Ref2 Defs St}} → QName → LiftEnv → Tm → M Tm
+liftWhereTm name env (Lam fc nm icit quant t) =
+  Lam fc nm icit quant <$> liftWhereTm name (Nothing :: env) t
+liftWhereTm name env (App fc t u) =
+  App fc <$> liftWhereTm name env t <*> liftWhereTm name env u
+liftWhereTm name env (Pi fc nm icit quant t u) = do
+  t <- liftWhereTm name env t
+  u <- liftWhereTm name (Nothing :: env) u
+  pure $ Pi fc nm icit quant t u
+liftWhereTm name env (Let fc nm v sc) = do
+  v <- liftWhereTm name env v
+  sc <- liftWhereTm name (Nothing :: env) sc
+  pure $ Let fc nm v sc
+liftWhereTm name env tm@(Case fc t alts) = do
+  t <- liftWhereTm name env t
+  alts' <- traverse liftWhereAlt alts
+  pure $ Case fc t alts'
+  where
+    -- This is where I wish I had put indexes on things
+    liftWhereAlt : CaseAlt → M CaseAlt
+    liftWhereAlt (CaseDefault tm) = CaseDefault <$> liftWhereTm name env tm
+    liftWhereAlt (CaseLit l tm) = CaseLit l <$> liftWhereTm name env tm
+    liftWhereAlt (CaseCons qn args tm) =
+      CaseCons qn args <$> liftWhereTm name (map (const Nothing) args ++ env) tm
+-- This is where the magic happens
+liftWhereTm name env (LetRec fc nm ty t u) = do
+  let l = length env
+  -- FIXME we need a namespace and a name, these collide everywhere.
+  qn <- getName name nm
+  let env' = (Just (qn, S l) :: env)
+  -- environment should subst this function (see next case)
+  t' <- liftWhereTm qn env' t
+  -- TODO we could have subst in this var and dropped the extra argument
+  modifyRef Defs (updateMap qn (Fn $ wrapLam (S l) t'))
+
+  -- The rest
+  u' <- liftWhereTm qn env' u
+  pure $ LetRec fc nm (Erased fc) (Erased fc) u'
+  where
+    getName : QName → String → M QName
+    getName qn@(QN ns nm) ext = do
+      let qn' = QN ns (nm ++ "." ++ ext)
+      top <- getRef Defs
+      let (Just _) = lookupMap qn' top | _ => pure qn'
+      getName qn (ext ++ "'")
+
+    -- Hacky - CompileExp expects a pi type that matches arity
+    wrapPi : Nat → Tm → Tm
+    wrapPi Z tm = tm
+    wrapPi (S k) tm = Pi fc "_" Explicit Many (Erased fc) $ wrapPi k tm
+
+    wrapLam : Nat → Tm → Tm
+    wrapLam Z tm = tm
+    -- REVIEW We've already erased, hopefully we don't need quantity
+    wrapLam (S k) tm = Lam fc "_" Explicit Many $ wrapLam k tm
+
+-- And where it lands
+liftWhereTm name env tm@(Bnd fc k) = case getAt (cast k) env of
+  Just (Just (qn, v)) => pure $ apply (length' env) (cast v) (Ref fc qn)
+  _ => pure tm
+  where
+    apply : Int → Int → Tm → Tm
+    apply l 0 tm = tm
+    -- (l - k) is like lvl2ix, but witih k one bigger
+    apply l k tm = App fc (apply l (k - 1) tm) (Bnd fc (l - k))
+liftWhereTm name env tm = pure tm
+
+liftWhereFn : {{Ref2 Defs St}} → QName × Def → M Unit
+liftWhereFn (name, Fn tm) = do
+  tm' <- liftWhereTm name Nil tm
+  modifyRef Defs $ updateMap name (Fn tm')
+  -- updateDef name fc type (Fn tm')
+liftWhereFn _ = pure MkUnit
+
+liftWhere :  {{Ref2 Defs St}} → M Unit
+liftWhere = do
+  defs <- getRef Defs
+  ignore $ traverse liftWhereFn $ toList defs

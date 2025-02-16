@@ -1,0 +1,27 @@
+module Lib.Ref2
+
+import Prelude
+import Lib.Common
+import Lib.Types
+import Data.IORef
+import Data.SortedMap
+
+data Defs : U where
+
+-- St holds our code while we're optimizing
+St : U
+St = SortedMap QName Def
+
+-- This is inspired by Idris.
+-- Mainly to get an extra state variable into M
+-- I tried parameterizing M, but inference was having trouble
+-- in the existing code.
+data Ref2 : (l : U) → U → U where
+  MkRef : ∀ a . {0 x : U} → IORef a → Ref2 x a
+
+getRef : ∀ io a. {{HasIO io}} → (l : U) → {{Ref2 l a}} → io a
+getRef l {{MkRef a}} = readIORef a
+
+modifyRef : ∀ io a. {{HasIO io}} → (l : U) → {{Ref2 l a}} → (a → a) → io Unit
+-- TODO inference needs liftIO here
+modifyRef l {{MkRef a}} f = liftIO $ modifyIORef a f
