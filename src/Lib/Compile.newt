@@ -286,7 +286,6 @@ maybeWrap stmt = Apply (JLam Nil stmt) Nil
 defToDoc : {{Ref2 Defs St}} → QName → Def → M Doc
 defToDoc name (Fn tm) = do
   debug $ \ _ => "compileFun \{render 90 $ pprint Nil tm}"
-  -- tm' <- erase Nil tm Nil
   ct <- compileFun tm
   let exp = maybeWrap $ termToJS emptyJSEnv ct JReturn
   pure $ text "const" <+> jsIdent (show name) <+> text "=" <+/> expToDoc exp ++ text ";"

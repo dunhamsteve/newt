@@ -1127,10 +1127,10 @@ buildLitCase ctx prob fc scnm scty lit = do
       cons <- rewriteConstraint cons Nil
       pure $ MkClause fc cons pats expr
 
-buildDefault : Context → Problem → FC → String → M CaseAlt
-buildDefault ctx prob fc scnm = do
+buildDefault : Context → Problem → FC → String → List QName → M CaseAlt
+buildDefault ctx prob fc scnm missing = do
   let defclauses = filter isDefault prob.clauses
-  when (length' defclauses == 0) $ \ _ => error fc "no default for literal slot on \{show scnm}"
+  when (length' defclauses == 0) $ \ _ => error fc "missing cases \{show missing} on \{show scnm}"
   CaseDefault <$> buildTree ctx (MkProb defclauses prob.ty)
   where
     isDefault : Clause -> Bool
@@ -1253,9 +1253,9 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
       -- build a default case for missed constructors
       case miss' of
         Nil => pure $ Case fc sctm (mapMaybe id alts)
-        _ => do
+        missed => do
         -- ctx prob fc scnm
-          default <- buildDefault ctx prob fc scnm
+          default <- buildDefault ctx prob fc scnm (map fst missed)
           pure $ Case fc sctm (snoc alts' default)
 
     PatLit fc v => do

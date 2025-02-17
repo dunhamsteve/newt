@@ -87,7 +87,7 @@ liftWhereFn (name, Fn tm) = do
   -- updateDef name fc type (Fn tm')
 liftWhereFn _ = pure MkUnit
 
-liftWhere :  {{Ref2 Defs St}} → M Unit
+liftWhere : {{Ref2 Defs St}} → M Unit
 liftWhere = do
   defs <- getRef Defs
   ignore $ traverse liftWhereFn $ toList defs
