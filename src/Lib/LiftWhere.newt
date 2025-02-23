@@ -6,7 +6,6 @@ import Lib.Types
 import Lib.TopContext
 import Lib.Ref2
 import Data.SortedMap
-import Monad.State
 import Data.IORef
 
 -- track depth and whether we need to replace Bnd with a top level call
