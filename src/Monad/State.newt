@@ -1,0 +1,33 @@
+module Monad.State
+
+import Prelude
+
+record State s a where
+  constructor MkState
+  runState : s -> (a × s)
+
+get : ∀ s. State s s
+get = MkState (\s => (s, s))
+
+put : ∀ s. s -> State s Unit
+put s = MkState (\_ => (MkUnit, s))
+
+modify : ∀ s. (s → s) → State s Unit
+modify f = do
+  v <- get
+  put $ f v
+
+instance ∀ s. Functor (State s) where
+  map f (MkState run) = MkState (\s => let (a, s') = run s in (f a, s'))
+
+instance ∀ s. Applicative (State s) where
+  return x = MkState (\s => (x, s))
+  (MkState f) <*> (MkState x) = MkState (\s => let (g, s') = f s in
+                                               let (a, s'') = x s'
+                                               in (g a, s''))
+
+instance ∀ s. Monad (State s) where
+  pure x = MkState (\s => (x, s))
+  bind (MkState x) f = MkState (\s => let (a, s') = x s in
+                                     let (MkState y) = f a in
+                                     y s')

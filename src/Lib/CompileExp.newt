@@ -27,6 +27,7 @@ data CAlt : U where
 
 data CExp : U where
   CBnd : Int -> CExp
+  -- How is CLam different from CFun with one arg?
   CLam : Name -> CExp -> CExp
   CFun : List Name -> CExp -> CExp
   CApp : CExp -> List CExp -> Int -> CExp
@@ -37,6 +38,10 @@ data CExp : U where
   CLet : Name -> CExp -> CExp -> CExp
   CLetRec : Name -> CExp -> CExp -> CExp
   CErased : CExp
+  -- Data / type constructor
+  CConstr : Name -> List CExp -> CExp
+  -- Raw javascript for `pfunc`
+  CRaw : String -> CExp
 
 -- I'm counting Lam in the term for arity.  This matches what I need in
 -- code gen.
@@ -66,9 +71,14 @@ arityForName fc nm = do
 compileTerm : {{Ref2 Defs St}} → Tm -> M CExp
 
 -- need to eta out extra args, fill in the rest of the apps
+-- NOW - maybe eta here instead of Compile.newt, drop number on CApp
+-- The problem would be deBruijn. We have to put the app under CLam
+-- which would mess up all of the deBruijn (unless we push it out)
+
 apply : CExp -> List CExp -> SnocList CExp -> Nat -> M CExp
 -- out of args, make one up (fix that last arg)
-apply t Nil acc (S k) = pure $ CApp t (acc <>> Nil) (1 + cast k)
+apply t Nil acc (S k) =
+  pure $ CApp t (acc <>> Nil) (1 + cast k)
 apply t (x :: xs) acc (S k)  =  apply t xs (acc :< x) k
 -- once we hit zero, we fold the rest
 apply t ts acc Z = go (CApp t (acc <>> Nil) 0) ts
@@ -137,4 +147,9 @@ compileFun tm = go tm Lin
     go tm Lin = compileTerm tm
     go tm args = CFun (args <>> Nil) <$> compileTerm tm
 
-
+-- What are the Defs used for above? (Arity for name)
+compileDCon : QName → Int → CExp
+compileDCon (QN _ nm) 0 = CConstr nm Nil
+compileDCon (QN _ nm) arity =
+  let args = map (\k => "h\{show k}") (range 0 arity) in
+  CFun args $ CConstr nm $ map (\k => CBnd $ arity - k - 1) (range 0 arity)

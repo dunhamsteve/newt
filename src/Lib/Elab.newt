@@ -1144,9 +1144,6 @@ buildLitCases : Context -> Problem -> FC -> String -> Val -> M (List CaseAlt)
 buildLitCases ctx prob fc scnm scty = do
   let lits = nub $ getLits scnm prob.clauses
   alts <- traverse (buildLitCase ctx prob fc scnm scty) lits
-  -- TODO build default case
-  -- run getLits
-  -- buildLitCase for each
 
   let defclauses = filter isDefault prob.clauses
   when (length' defclauses == 0) $ \ _ => error fc "no default for literal slot on \{show scnm}"

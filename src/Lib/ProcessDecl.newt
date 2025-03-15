@@ -45,7 +45,7 @@ logMetas (Unsolved fc k ctx ty User cons :: rest) = do
       ty' <- quote ctx.lvl ty
       let names = map fst ctx.types
       env <- dumpEnv ctx
-      let msg = "\{env}  -----------\n  \{render 90 $ pprint names ty'}"
+      let msg = "\{env}\n  -----------\n  \{render 90 $ pprint names ty'}"
       info fc "User Hole\n\{msg}"
       logMetas rest
 logMetas (Unsolved fc k ctx ty kind cons :: rest) = do

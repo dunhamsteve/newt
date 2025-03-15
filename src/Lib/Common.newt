@@ -7,6 +7,9 @@ import Data.SortedMap
 
 -- l is environment size, this works for both lvl2ix and ix2lvl
 
+range : Int → Int → List Int
+range n m = if n < m then n :: range (n + 1) m else Nil
+
 lvl2ix : Int -> Int -> Int
 lvl2ix l k = l - k - 1
 

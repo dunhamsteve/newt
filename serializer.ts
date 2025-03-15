@@ -10,7 +10,6 @@ const NUMBER = 5;
 const NULL = 6;
 const te = new TextEncoder();
 
-// TODO - next two functions are machine generated and need to be fixed
 class DeserializationStream {
   pos = 0;
   buf: Uint8Array;

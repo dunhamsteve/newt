@@ -1,0 +1,87 @@
+module Data.Graph
+
+import Prelude
+import Data.SortedMap
+import Data.SnocList
+
+-- https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm#The_algorithm_in_pseudocode
+
+-- Based on the wikipedia article, probably could use cleanup. Maybe switch to state monad.
+
+record TVertex k where
+  constructor MkTV
+  name : k
+  out : List k
+  index : Int
+  lowLink : Int
+  onStack : Bool
+
+record TState k where
+  constructor MkTState
+  lastIndex : Int
+  stack : List k
+  result : List (List k)
+  graph : SortedMap k (TVertex k)
+
+strongConnect : ∀ k. {{Ord k}} → TState k → TVertex k → TState k
+strongConnect {k} st vtx =
+  let index' = st.lastIndex + 1
+      vtx' = MkTV vtx.name vtx.out index' index' True
+      stack' = vtx.name :: st.stack
+      graph' = updateMap vtx'.name vtx' st.graph
+      st' = MkTState index' stack' st.result graph'
+  in checkRoot $ foldl doEdge st' vtx.out
+  where
+    -- There is a lot in here because everything is public at the moment
+    -- Although we do reach for `k` and `vtx.name` a few times
+    min : Int → Int → Int
+    min a b = if a < b then a else b
+
+    splitComp : List k → List k → (List k × List k)
+    splitComp acc Nil = (acc, Nil)
+    splitComp acc (x :: xs) = if compare x vtx.name == EQ
+      then (x :: acc, xs)
+      else splitComp (x :: acc) xs
+
+    updateNode : TState k → k → (TVertex k → TVertex k) → TState k
+    updateNode st@(MkTState lastIndex stack result graph) name f =
+      case lookupMap' name graph of
+        Just v => MkTState lastIndex stack result (updateMap name (f v) graph)
+        Nothing => st
+
+    updateLowLink : TState k → k → Int → TState k
+    updateLowLink st nm v = updateNode st nm $ \ vt => MkTV vt.name vt.out vt.index (min vt.lowLink v) vt.onStack
+
+    offStack : TState k → k → TState k
+    offStack st name = updateNode st name $ \ vt => MkTV vt.name vt.out vt.index vt.lowLink False
+
+    doEdge : TState k → k → TState k
+    doEdge st k =
+      let (Just w) = lookupMap' k st.graph | _ => st in
+      if w.onStack then updateLowLink st vtx.name w.index
+      else if w.index == 0 then
+        let st' = strongConnect st w in
+        let (Just w) = lookupMap' k st'.graph | _ => st' in
+        updateLowLink st' vtx.name w.lowLink
+      else st
+
+    checkRoot : TState k → TState k
+    checkRoot st =
+      let (Just v) = lookupMap' vtx.name st.graph | _ => st in
+      if v.lowLink == v.index
+      then let (comp,stack) = splitComp Nil st.stack in
+           let st = foldl offStack st comp in
+           MkTState st.lastIndex stack (comp :: st.result) st.graph
+      else st -- leave on stack
+
+tarjan : ∀ k. {{Ord k}} → List (k × List k) → List (List k)
+tarjan {k} nodes =
+  let g = foldMap const EmptyMap $ map mkVertex nodes in
+  .result $ foldl checkVertex (MkTState 0 Nil Nil g) $ map fst nodes
+  where
+    mkVertex : k × List k → k × TVertex k
+    mkVertex (n,out) = (n, MkTV n out 0 0 False)
+
+    checkVertex : TState k → k → TState k
+    checkVertex st k = let (Just vtx) = lookupMap' k st.graph | _ => st in
+      if vtx.index > 0 then st else strongConnect st vtx

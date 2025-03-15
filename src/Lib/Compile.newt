@@ -8,6 +8,7 @@ import Lib.Prettier
 import Lib.CompileExp
 import Lib.TopContext
 import Lib.LiftWhere
+import Lib.TCO
 import Lib.Ref2
 import Lib.Erasure
 import Data.String
@@ -36,6 +37,7 @@ data JSExp : U where
   JUndefined : JSExp
   Index : JSExp -> JSExp -> JSExp
   Dot : JSExp -> String -> JSExp
+  Raw : String -> JSExp
 
 data JSStmt : StKind -> U where
   -- Maybe make this a snoc...
@@ -108,6 +110,9 @@ freshNames nms env = go nms env Lin
       let (n', env') = freshName' n env
       in go ns env' (acc :< n')
 
+
+
+
 -- This is inspired by A-normalization, look into the continuation monad
 -- There is an index on JSStmt, adopted from Stefan Hoeck's code.
 --
@@ -119,6 +124,7 @@ termToJS env (CBnd k) f = case getAt (cast k) env.jsenv of
   (Just e) => f e
   Nothing => fatalError "Bad bounds"
 termToJS env CErased f = f JUndefined
+termToJS env (CRaw str) f = f (Raw str)
 termToJS env (CLam nm t) f =
   let (nm',env') = freshName' nm env -- "\{nm}$\{show $ length env}"
   in f $ JLam (nm' :: Nil) (termToJS env' t JReturn)
@@ -146,7 +152,11 @@ termToJS env (CLetRec nm t u) f =
   in case termToJS env' t (JAssign nm') of
     (JAssign _ exp) => JSnoc (JConst nm' exp) (termToJS env' u f)
     t' => JSnoc (JLet nm' t') (termToJS env' u f)
-
+termToJS env (CConstr nm args) f = go args 0 (\ args => f $ LitObject (("tag", LitString nm) :: args))
+  where
+    go : ∀ e. List CExp -> Int -> (List (String × JSExp) -> JSStmt e) -> JSStmt e
+    go Nil ix k = k Nil
+    go (t :: ts) ix k = termToJS env t $ \ t' => go ts (ix + 1) $ \ args => k $ ("h\{show ix}", t') :: args
 termToJS env (CApp t args etas) f = termToJS env t (\ t' => (argsToJS t' args Lin f)) --  (f (Apply t' args'))))
   where
     etaExpand : JSEnv -> Nat -> SnocList JSExp -> JSExp -> JSExp
@@ -234,6 +244,7 @@ expToDoc (LitObject xs) = text "{" <+> folddoc (\ a e => a ++ text ", " <+/> e) 
 
 expToDoc (LitString str) = text $ quoteString str
 expToDoc (LitInt i) = text $ show i
+expToDoc (Raw str) = text str
 -- TODO add precedence
 expToDoc (Apply x@(JLam _ _) xs) = text "(" ++ expToDoc x ++ text ")" ++ text "(" ++ nest 2 (commaSep (map expToDoc xs)) ++ text ")"
 expToDoc (Apply x xs) = expToDoc x ++ text "(" ++ nest 2 (commaSep (map expToDoc xs)) ++ text ")"
@@ -270,17 +281,16 @@ mkArgs : Nat -> List String -> List String
 mkArgs Z acc = acc
 mkArgs (S k) acc = mkArgs k ("h\{show k}" :: acc)
 
-dcon : QName -> Nat -> Doc
-dcon qn@(QN ns nm) Z = stmtToDoc $ JConst (show qn) $ LitObject (("tag", LitString nm) :: Nil)
-dcon qn@(QN ns nm) arity =
-  let args = mkArgs arity Nil
-      obj = ("tag", LitString nm) :: map (\x => (x, Var x)) args
-  in stmtToDoc $ JConst (show qn) (JLam args (JReturn (LitObject obj)))
-
 -- use iife to turn stmts into expr
 maybeWrap : JSStmt Return -> JSExp
 maybeWrap (JReturn exp) = exp
 maybeWrap stmt = Apply (JLam Nil stmt) Nil
+
+dcon : QName -> Int -> Doc
+dcon qn arity =
+  let ct = compileDCon qn arity
+      exp = maybeWrap $ termToJS emptyJSEnv ct JReturn
+  in stmtToDoc $ JConst (show qn) exp
 
 -- convert a Def to a Doc (compile to javascript)
 defToDoc : {{Ref2 Defs St}} → QName → Def → M Doc
@@ -290,10 +300,10 @@ defToDoc name (Fn tm) = do
   let exp = maybeWrap $ termToJS emptyJSEnv ct JReturn
   pure $ text "const" <+> jsIdent (show name) <+> text "=" <+/> expToDoc exp ++ text ";"
 defToDoc name Axiom = pure $ text ""
-defToDoc name (DCon arity str) = pure $ dcon name (cast arity)
-defToDoc name (TCon arity strs) = pure $ dcon name (cast arity)
-defToDoc name (PrimTCon arity) = pure $ dcon name (cast arity)
-defToDoc name (PrimFn src _ _) = pure $ text "const" <+> jsIdent (show name) <+> text "=" <+> text src
+defToDoc name (DCon arity _) = pure $ dcon name arity
+defToDoc name (TCon arity strs) = pure $ dcon name arity
+defToDoc name (PrimTCon arity) = pure $ dcon name arity
+defToDoc name (PrimFn src _ _) = pure $ stmtToDoc $ JConst (show name) $ Raw src
 
 -- Collect the QNames used in a term
 getNames : Tm -> List QName -> List QName
@@ -368,6 +378,7 @@ process name = do
   let foo = MkRef ref -- for the autos below
   eraseEntries
   liftWhere
+  tailCallOpt
   entries <- readIORef ref
   let names = sortedNames entries name
   for names $ \ nm => case lookupMap nm entries of

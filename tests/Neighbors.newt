@@ -1,0 +1,51 @@
+-- https://www.youtube.com/watch?v=pNBPCnZEdSs
+module Neighbors
+
+-- Prf ?
+import Prelude
+
+data Void : U where
+
+data Prf : U → U where
+  Pf : ∀ a. {{_ : a}} → Prf a
+
+tryThis : ∀ A B. Prf A → Prf B → Prf A
+-- this needs help in newt
+tryThis (Pf {{x}}) b = Pf {_} {{x}}
+
+P : U
+
+data Bnd : U where
+  bot : Bnd
+  val : P → Bnd
+  top : Bnd
+
+Rel : U → U
+Rel a = a × a → U
+
+L : P × P → U
+
+-- FIXME Rel Bnd needs to be expanded
+-- LH LB : Rel Bnd → U
+LH LB : Bnd × Bnd → U
+LH (bot, _) = Unit
+LH (val x, val y) = L (x, y)
+LH _ = Void
+LB xy = Prf (LH xy)
+data Set : U where
+  SR SP : Set -- recursive / param
+  S0 S1 : Set -- empty, unit
+  _:+_ _:*_ : (S T : Set) → Set
+
+infixl 5 _:+_ _:*_
+SetF : Set → U → U
+SetF sr r = r
+SetF sr p = p
+SetF (s :+ t) r = SetF s r + SetF t r
+SetF (s :* t) r = SetF s r * SetF t r
+
+infixl 5 <_>
+data MuSet : Set → U where
+  <_> : ∀ t. SetF t (MuSet t) → MuSet t
+
+-- 9:30
