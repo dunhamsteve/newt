@@ -145,7 +145,9 @@ termToJS env (CLet nm t u) f =
   in case termToJS env t (JAssign nm') of
     (JAssign _ exp) => JSnoc (JConst nm' exp) (termToJS env' u f)
     t' => JSnoc (JLet nm' t') (termToJS env' u f)
+termToJS env (CLetRec nm CErased u) f = termToJS (push env JUndefined) u f
 termToJS env (CLetRec nm t u) f =
+  -- this shouldn't happen if where is lifted
   let nm' = freshName nm env
       env' = push env (Var nm')
   -- If it's a simple term, use const
@@ -286,24 +288,11 @@ maybeWrap : JSStmt Return -> JSExp
 maybeWrap (JReturn exp) = exp
 maybeWrap stmt = Apply (JLam Nil stmt) Nil
 
-dcon : QName -> Int -> Doc
-dcon qn arity =
-  let ct = compileDCon qn arity
-      exp = maybeWrap $ termToJS emptyJSEnv ct JReturn
-  in stmtToDoc $ JConst (show qn) exp
-
--- convert a Def to a Doc (compile to javascript)
-defToDoc : {{Ref2 Defs St}} → QName → Def → M Doc
-defToDoc name (Fn tm) = do
-  debug $ \ _ => "compileFun \{render 90 $ pprint Nil tm}"
-  ct <- compileFun tm
+cexpToDoc : (QName × CExp) -> Doc
+cexpToDoc (qn, ct) =
+  -- If we leak extra statements/assignments, we need an IIFE
   let exp = maybeWrap $ termToJS emptyJSEnv ct JReturn
-  pure $ text "const" <+> jsIdent (show name) <+> text "=" <+/> expToDoc exp ++ text ";"
-defToDoc name Axiom = pure $ text ""
-defToDoc name (DCon arity _) = pure $ dcon name arity
-defToDoc name (TCon arity strs) = pure $ dcon name arity
-defToDoc name (PrimTCon arity) = pure $ dcon name arity
-defToDoc name (PrimFn src _ _) = pure $ stmtToDoc $ JConst (show name) $ Raw src
+  in stmtToDoc $ JConst (show qn) exp
 
 -- Collect the QNames used in a term
 getNames : Tm -> List QName -> List QName
@@ -376,15 +365,21 @@ process name = do
   -- Maybe move this dance into liftWhere
   ref <- newIORef entries
   let foo = MkRef ref -- for the autos below
+  -- TODO, erasure needs to happen on Tm, but can be part of Tm -> CExp
+  -- if we move the liftWhere down.
   eraseEntries
   liftWhere
-  tailCallOpt
   entries <- readIORef ref
   let names = sortedNames entries name
+  -- I think this was just debugging
   for names $ \ nm => case lookupMap nm entries of
       Nothing => error emptyFC "MISS \{show nm}"
       Just _ => pure MkUnit
-  mapM (uncurry defToDoc) $ mapMaybe (\x => lookupMap x entries) names
+
+  exprs <- mapM defToCExp $ toList entries
+  let cexpMap = foldMap const EmptyMap exprs
+  -- TCO here on cexpMap
+  pure $ map cexpToDoc $ mapMaybe (\x => lookupMap x cexpMap) names
 
 compile : M (List Doc)
 compile = do

@@ -153,3 +153,12 @@ compileDCon (QN _ nm) 0 = CConstr nm Nil
 compileDCon (QN _ nm) arity =
   let args = map (\k => "h\{show k}") (range 0 arity) in
   CFun args $ CConstr nm $ map (\k => CBnd $ arity - k - 1) (range 0 arity)
+
+-- probably want to drop the Ref2 when we can
+defToCExp : {{Ref2 Defs St}} → (QName × Def) -> M (QName × CExp)
+defToCExp (qn, Axiom)          = pure $ (qn, CErased)
+defToCExp (qn, DCon arity _)   = pure $ (qn, compileDCon qn arity)
+defToCExp (qn, TCon arity _)   = pure $ (qn, compileDCon qn arity)
+defToCExp (qn, PrimTCon arity) = pure $ (qn, compileDCon qn arity)
+defToCExp (qn, PrimFn src _ _) = pure $ (qn, CRaw src)
+defToCExp (qn, Fn tm)          = (_,_ qn) <$> compileFun tm
