@@ -23,7 +23,7 @@ record TState k where
   result : List (List k)
   graph : SortedMap k (TVertex k)
 
-strongConnect : ∀ k. {{Ord k}} → TState k → TVertex k → TState k
+strongConnect : ∀ k. {{Eq k}} {{Ord k}} → TState k → TVertex k → TState k
 strongConnect {k} st vtx =
   let index' = st.lastIndex + 1
       vtx' = MkTV vtx.name vtx.out index' index' True
@@ -71,10 +71,16 @@ strongConnect {k} st vtx =
       if v.lowLink == v.index
       then let (comp,stack) = splitComp Nil st.stack in
            let st = foldl offStack st comp in
-           MkTState st.lastIndex stack (comp :: st.result) st.graph
+           -- as a variation on tarjan, we only return singletons that point to themselves
+           if length' comp > 1 || elem v.name v.out
+           then MkTState st.lastIndex stack (comp :: st.result) st.graph
+           else MkTState st.lastIndex stack st.result st.graph
       else st -- leave on stack
 
-tarjan : ∀ k. {{Ord k}} → List (k × List k) → List (List k)
+-- A variant of tarjan that only returns singletons that call themselves
+-- I'd like to have {{Ord k}} => {{Eq k}} but need to tweak the solver a little
+-- to ignore ambiguity from indirect solutions
+tarjan : ∀ k. {{Eq k}} {{Ord k}} → List (k × List k) → List (List k)
 tarjan {k} nodes =
   let g = foldMap const EmptyMap $ map mkVertex nodes in
   .result $ foldl checkVertex (MkTState 0 Nil Nil g) $ map fst nodes

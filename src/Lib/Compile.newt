@@ -1,4 +1,6 @@
--- TODO Audit how much "outside" stuff could pile up in the continuation.
+-- TODO Audit how much "outside" stuff could pile up in the continuation. (How much might be repeated in case branches.)
+-- TODO consider inlining constructors here (a future inline process might do this anyway).
+-- TODO consider not emitting null in `LitObject` (after inlining constructors)
 module Lib.Compile
 
 import Prelude
@@ -131,7 +133,7 @@ termToJS env (CLam nm t) f =
 termToJS env (CFun nms t) f =
   let (nms', env') = freshNames nms env
   in f $ JLam nms' (termToJS env' t JReturn)
-termToJS env (CRef nm) f = f $ Var nm
+termToJS env (CRef nm) f = f $ Var (show nm)
 termToJS env (CMeta k) f = f $ LitString "META \{show k}"
 termToJS env (CLit lit) f = f (litToJS lit)
 -- if it's a var, just use the original
@@ -371,14 +373,10 @@ process name = do
   liftWhere
   entries <- readIORef ref
   let names = sortedNames entries name
-  -- I think this was just debugging
-  for names $ \ nm => case lookupMap nm entries of
-      Nothing => error emptyFC "MISS \{show nm}"
-      Just _ => pure MkUnit
-
   exprs <- mapM defToCExp $ toList entries
   let cexpMap = foldMap const EmptyMap exprs
   -- TCO here on cexpMap
+  tailCallOpt cexpMap
   pure $ map cexpToDoc $ mapMaybe (\x => lookupMap x cexpMap) names
 
 compile : M (List Doc)

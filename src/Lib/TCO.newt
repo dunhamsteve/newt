@@ -6,6 +6,7 @@ import Lib.Ref2
 import Lib.Common
 import Lib.Types
 import Lib.CompileExp
+import Data.SortedMap
 
 -- We need CompileExp here, so we know if it's
 -- fully applied, needs eta, etc.
@@ -15,22 +16,23 @@ import Lib.CompileExp
 -- at the next stage, we'd need to fake up constructor
 -- records
 
-tailNames : CExp → List Name
+tailNames : CExp → List QName
 -- This is tricky, we need to skip the first CLam, but
 -- a deeper one is a return value
 tailNames (CApp (CRef name) args 0) = name :: Nil
 tailNames (CCase _ alts) = join $ map altTailNames alts
   where
-    altTailNames : CAlt → List Name
+    altTailNames : CAlt → List QName
     altTailNames (CConAlt _ _ exp) = tailNames exp
     altTailNames (CDefAlt exp) = tailNames exp
     altTailNames (CLitAlt _ exp) = tailNames exp
 tailNames (CLet _ _ t) = tailNames t
 tailNames (CLetRec _ _ t) = tailNames t
-tailNames (CConstr _ args) = join $ map tailNames args
+tailNames (CConstr _ args) = Nil -- join $ map tailNames args
 tailNames (CBnd _) = Nil
-tailNames (CFun _ _) = Nil
+tailNames (CFun _ tm) = tailNames tm
 tailNames (CLam _ _) = Nil
+tailNames (CApp (CRef nm) args n) = nm :: Nil
 tailNames (CApp t args n) = Nil
 tailNames (CRef _) = Nil
 tailNames CErased = Nil
@@ -38,7 +40,33 @@ tailNames (CLit _) = Nil
 tailNames (CMeta _) = Nil
 tailNames (CRaw _) = Nil
 
-tailCallOpt : {{Ref2 Defs St}} → M Unit
-tailCallOpt = do
-  defs <- getRef Defs
+/-
+(CFun ["_", "_", "_$2", "_$3"]
+  (CCase (CBnd 0) [
+     (CConAlt "_::_" ["a$4", "_$5", "_$6"]
+       (CApp (CRef "Prelude.reverse.go")
+          [(CBnd 6), (CBnd 5), (CApp (CRef "Prelude._::_") [(CErased), (CBnd 1), (CBnd 4)] 0), (CBnd 0)] 0)), (CConAlt "Nil" ["a$4"] (CBnd 2))]))
+
+-/
+
+
+ExpMap : U
+ExpMap = SortedMap QName CExp
+
+-- Need to switch everything to QName
+tailCallOpt : ExpMap → M ExpMap
+tailCallOpt expMap = do
   putStrLn "TODO TCO"
+  let blah = map (bimap id tailNames) (toList expMap)
+  let out = tarjan blah
+  for (toList expMap) $ \ foo => case foo of
+    (qn, cexp) => do
+      liftIO $ putStrLn "--- \{show qn}"
+      liftIO $ debugLog cexp
+      liftIO $ debugLog $ tailNames cexp
+  -- everything is pointing to itself, I don't want that unless it actually does..
+  for out $ \ names => liftIO $ debugLog names
+
+  -- liftIO $ debugLog out
+  pure expMap
+

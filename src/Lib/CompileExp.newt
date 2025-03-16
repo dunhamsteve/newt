@@ -32,7 +32,7 @@ data CExp : U where
   CFun : List Name -> CExp -> CExp
   CApp : CExp -> List CExp -> Int -> CExp
   CCase : CExp -> List CAlt -> CExp
-  CRef : Name -> CExp
+  CRef : QName -> CExp
   CMeta : Int -> CExp
   CLit : Literal -> CExp
   CLet : Name -> CExp -> CExp -> CExp
@@ -95,10 +95,10 @@ compileTerm t@(Ref fc nm) = do
   arity <- arityForName fc nm
   case arity of
     -- we don't need to curry functions that take one argument
-    (S Z) => pure $ CRef (show nm)
-    _ => apply (CRef (show nm)) Nil Lin arity
+    (S Z) => pure $ CRef nm
+    _ => apply (CRef nm) Nil Lin arity
 
-compileTerm (Meta _ k) = pure $ CRef "meta$\{show k}" -- FIXME
+compileTerm (Meta _ k) = pure $ CRef (QN Nil "meta$\{show k}") -- FIXME should be exception
 compileTerm (Lam _ nm _ _ t) = CLam nm <$> compileTerm t
 compileTerm tm@(App _ _ _) = case funArgs tm of
   (Meta _ k, args) => do
@@ -108,18 +108,18 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
   (t@(Ref fc nm), args) => do
         args' <- traverse compileTerm args
         arity <- arityForName fc nm
-        apply (CRef (show nm)) args' Lin arity
+        apply (CRef nm) args' Lin arity
   (t, args) => do
         debug $ \ _ => "apply other \{render 90 $ pprint Nil t}"
         t' <- compileTerm t
         args' <- traverse compileTerm args
         apply t' args' Lin Z
         -- error (getFC t) "Don't know how to apply \{showTm t}"
-compileTerm (UU _) = pure $ CRef "U"
+compileTerm (UU _) = pure $ CRef (QN Nil "U")
 compileTerm (Pi _ nm icit rig t u) = do
   t' <- compileTerm t
   u' <- compileTerm u
-  pure $ CApp (CRef "PiType") (t' :: CLam nm u' :: Nil) 0
+  pure $ CApp (CRef (QN Nil "PiType")) (t' :: CLam nm u' :: Nil) 0
 compileTerm (Case _ t alts) = do
   t' <- compileTerm t
   alts' <- for alts $ \case
