@@ -41,7 +41,7 @@ data CExp : U where
   -- Data / type constructor
   CConstr : Name -> List CExp -> CExp
   -- Raw javascript for `pfunc`
-  CRaw : String -> CExp
+  CRaw : String -> List QName -> CExp
 
 -- I'm counting Lam in the term for arity.  This matches what I need in
 -- code gen.
@@ -160,5 +160,5 @@ defToCExp (qn, Axiom)          = pure $ (qn, CErased)
 defToCExp (qn, DCon arity _)   = pure $ (qn, compileDCon qn arity)
 defToCExp (qn, TCon arity _)   = pure $ (qn, compileDCon qn arity)
 defToCExp (qn, PrimTCon arity) = pure $ (qn, compileDCon qn arity)
-defToCExp (qn, PrimFn src _ _) = pure $ (qn, CRaw src)
+defToCExp (qn, PrimFn src _ deps) = pure $ (qn, CRaw src deps)
 defToCExp (qn, Fn tm)          = (_,_ qn) <$> compileFun tm

@@ -6,6 +6,6 @@ echo build newt worker
 esbuild src/worker.ts --bundle --format=esm > public/worker.js
 esbuild src/frame.ts --bundle --format=esm > public/frame.js
 echo copy newt
-cp ../build/exec/newt.js public
+cp ../newt.js public
 cp -r static/* public
 (cd samples && zip -r ../public/files.zip .)

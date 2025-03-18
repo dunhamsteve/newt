@@ -2,8 +2,7 @@ module Node
 
 import Prelude
 
--- REVIEW - should this be IO (List String)
-pfunc getArgs uses (arrayToList) : List String := `Prelude_arrayToList(null, process.argv.slice(1))`
+pfunc getArgs uses (arrayToList MkIORes) :  IO (List String) := `(w) => Prelude_MkIORes(null, Prelude_arrayToList(null, process.argv.slice(1)), w)`
 pfunc readFile uses (MkIORes Left Right) : (fn : String) -> IO (Either String String) := `(fn) => (w) => {
   let fs = require('fs')
   let result

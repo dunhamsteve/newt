@@ -126,7 +126,7 @@ termToJS env (CBnd k) f = case getAt (cast k) env.jsenv of
   (Just e) => f e
   Nothing => fatalError "Bad bounds"
 termToJS env CErased f = f JUndefined
-termToJS env (CRaw str) f = f (Raw str)
+termToJS env (CRaw str _) f = f (Raw str)
 termToJS env (CLam nm t) f =
   let (nm',env') = freshName' nm env -- "\{nm}$\{show $ length env}"
   in f $ JLam (nm' :: Nil) (termToJS env' t JReturn)
@@ -334,18 +334,37 @@ getEntries acc name = do
 -- sort names by dependencies
 -- In JS this is only really needed for references that don't fall
 -- under a lambda.
-sortedNames : SortedMap QName Def → QName → List QName
+sortedNames : SortedMap QName CExp → QName → List QName
 sortedNames defs qn = go Nil Nil qn
   where
+    getBody : CAlt → CExp
+    getBody (CConAlt _ _ t) = t
+    getBody (CLitAlt _ t) = t
+    getBody (CDefAlt t) = t
+
+    getNames : List QName → CExp →  List QName
+    getNames acc (CLam _ t) = getNames acc t
+    getNames acc (CFun _ t) = getNames acc t
+    getNames acc (CApp t ts _) = foldl getNames acc (t :: ts)
+    getNames acc (CCase t alts) = foldl getNames acc $ t :: map getBody alts
+    getNames acc (CRef qn) = qn :: acc
+    getNames acc (CLet _ t u) = getNames (getNames acc t) u
+    getNames acc (CLetRec _ t u) = getNames (getNames acc t) u
+    getNames acc (CConstr _ ts) = foldl getNames acc ts
+    getNames acc (CRaw _ deps) = deps ++ acc
+    -- wrote these out so I get an error when I add a new constructor
+    getNames acc (CLit _) = acc
+    getNames acc (CMeta _) = acc
+    getNames acc (CBnd _) = acc
+    getNames acc CErased = acc
+
     go : List QName → List QName → QName → List QName
     go loop acc qn =
       -- O(n^2) it would be more efficient to drop qn from the map
       if elem qn loop || elem qn acc then acc else
       case lookupMap' qn defs of
         Nothing => acc
-        Just (Fn tm) => qn :: foldl (go $ qn :: loop) acc (getNames tm Nil)
-        Just (PrimFn src _ used) => qn :: foldl (go $ qn :: loop) acc used
-        Just def => qn :: acc
+        Just exp => qn :: foldl (go $ qn :: loop) acc (getNames Nil exp)
 
 eraseEntries : {{Ref2 Defs St}} → M Unit
 eraseEntries = do
@@ -372,11 +391,10 @@ process name = do
   eraseEntries
   liftWhere
   entries <- readIORef ref
-  let names = sortedNames entries name
   exprs <- mapM defToCExp $ toList entries
   let cexpMap = foldMap const EmptyMap exprs
-  -- TCO here on cexpMap
-  tailCallOpt cexpMap
+  cexpMap <- tailCallOpt cexpMap
+  let names = sortedNames cexpMap name
   pure $ map cexpToDoc $ mapMaybe (\x => lookupMap x cexpMap) names
 
 compile : M (List Doc)

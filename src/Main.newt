@@ -52,7 +52,8 @@ writeSource fn = do
   docs <- compile
   let src = unlines $
         ( "\"use strict\";"
-        ::  "const PiType = (h0, h1) => ({ tag: \"PiType\", h0, h1 })"
+        :: "const PiType = (h0, h1) => ({ tag: \"PiType\", h0, h1 });"
+        :: "const bouncer = (f,ini) => { let obj = ini; while (obj.tag !== 'return') obj = f(obj); return obj.h0 };"
         :: Nil)
         ++ map (render 90 ∘ noAlt) docs
   (Right _) <- liftIO {M} $ writeFile fn src
@@ -229,7 +230,7 @@ cmdLine (fn :: args) = do
 
 main' : M Unit
 main' = do
-  let (arg0 :: args) = getArgs
+  (arg0 :: args) <- liftIO {M} $ getArgs
     | _ => error emptyFC "error reading args"
   (out, files) <- cmdLine args
   traverse processFile files

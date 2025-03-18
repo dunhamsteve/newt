@@ -6,5 +6,5 @@ declare global {
 
   // let files: Record<string, string>;
   // let process: Process;
-  let newtMain: () => unknown;
+  let Main_main: () => unknown;
 }

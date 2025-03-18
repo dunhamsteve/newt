@@ -8,8 +8,6 @@ export let preload = (async function () {
       let data = await res.arrayBuffer();
       archive = new ZipFile(new Uint8Array(data));
       let entries = archive.entries;
-      let count = Object.keys(entries).length;
-      console.log(`preloaded ${count} files`);
     } else {
       console.error(
         `fetch of files.zip got status ${res.status}: ${res.statusText}`

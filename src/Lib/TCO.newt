@@ -8,17 +8,17 @@ import Lib.Types
 import Lib.CompileExp
 import Data.SortedMap
 
--- We need CompileExp here, so we know if it's
--- fully applied, needs eta, etc.
--- Maybe we should move Ref2 Defs over to CExp?
--- But we'll need CExp for constructors, etc.
--- I _could_ collect a stack and look up arity, but
--- at the next stage, we'd need to fake up constructor
--- records
+/-
+  This is modeled after Idris' tail call optimization written by Stefan Hoeck.
 
+  We collect strongly connected components of the tail call graph,
+  defunctionalize it (make a data type modelling function calls and "return"),
+  and wrap it in a trampoline.
+
+-/
+
+-- Find names of applications in tail position
 tailNames : CExp → List QName
--- This is tricky, we need to skip the first CLam, but
--- a deeper one is a return value
 tailNames (CApp (CRef name) args 0) = name :: Nil
 tailNames (CCase _ alts) = join $ map altTailNames alts
   where
@@ -28,7 +28,7 @@ tailNames (CCase _ alts) = join $ map altTailNames alts
     altTailNames (CLitAlt _ exp) = tailNames exp
 tailNames (CLet _ _ t) = tailNames t
 tailNames (CLetRec _ _ t) = tailNames t
-tailNames (CConstr _ args) = Nil -- join $ map tailNames args
+tailNames (CConstr _ args) = Nil
 tailNames (CBnd _) = Nil
 tailNames (CFun _ tm) = tailNames tm
 tailNames (CLam _ _) = Nil
@@ -38,35 +38,72 @@ tailNames (CRef _) = Nil
 tailNames CErased = Nil
 tailNames (CLit _) = Nil
 tailNames (CMeta _) = Nil
-tailNames (CRaw _) = Nil
+tailNames (CRaw _ _) = Nil
 
-/-
-(CFun ["_", "_", "_$2", "_$3"]
-  (CCase (CBnd 0) [
-     (CConAlt "_::_" ["a$4", "_$5", "_$6"]
-       (CApp (CRef "Prelude.reverse.go")
-          [(CBnd 6), (CBnd 5), (CApp (CRef "Prelude._::_") [(CErased), (CBnd 1), (CBnd 4)] 0), (CBnd 0)] 0)), (CConAlt "Nil" ["a$4"] (CBnd 2))]))
+-- rewrite tail calls to return an object
+rewriteTailCalls : List QName → CExp → CExp
+rewriteTailCalls nms tm = case tm of
+  CApp (CRef nm) args 0 =>
+      if elem nm nms
+        then CConstr (show nm) args
+        else CConstr "return" (tm :: Nil)
+  CLetRec nm t u => CLetRec nm t $ rewriteTailCalls nms u
+  CLet nm t u => CLet nm t $ rewriteTailCalls nms u
+  CCase sc alts => CCase sc $ map rewriteAlt alts
+  tm => CConstr "return" (tm :: Nil)
+  where
+      rewriteAlt : CAlt -> CAlt
+      rewriteAlt (CConAlt nm args t) = CConAlt nm args $ rewriteTailCalls nms t
+      rewriteAlt (CDefAlt t) = CDefAlt $ rewriteTailCalls nms t
+      rewriteAlt (CLitAlt lit t) = CLitAlt lit $ rewriteTailCalls nms t
 
--/
+-- the name of our trampoline
+bouncer : QName
+bouncer = QN Nil "bouncer"
 
+doOptimize : List (QName × CExp) → M (List (QName × CExp))
+doOptimize fns = do
+  splitFuns <- traverse splitFun fns
+  let nms = map fst fns
+  let alts = CConAlt "return" ("rval" :: Nil) (CBnd 0) :: map (mkAlt nms) splitFuns
+  recName <- mkRecName nms
+  let recfun = CFun ("arg" :: Nil) $ CCase (CBnd 0) alts
+  wrapped <- traverse (mkWrap recName) fns
+  pure $ (recName, recfun) :: wrapped
+  where
+    mkWrap : QName → QName × CExp → M (QName × CExp)
+    mkWrap recName (qn, CFun args _) = do
+      let arglen = length' args
+      let arg = CConstr (show qn) $ map (\k => CBnd (arglen - k - 1)) (range 0 arglen)
+      let body = CApp (CRef bouncer) (CRef recName :: arg :: Nil) 0
+      pure $ (qn, CFun args body)
+    mkWrap _ (qn, _) = error emptyFC "error in mkWrap: \{show qn} not a CFun"
+
+    mkRecName : List QName → M QName
+    mkRecName Nil = error emptyFC "INTERNAL ERROR: Empty List in doOptimize"
+    mkRecName (QN ns nm :: _) = pure $ QN ns "REC_\{nm}"
+
+    mkAlt : List QName → (QName × List Name × CExp) -> CAlt
+    mkAlt nms (qn, args, tm) = CConAlt (show qn) args (rewriteTailCalls nms tm)
+
+    splitFun : (QName × CExp) → M (QName × List Name × CExp)
+    splitFun (qn, CFun args body) = pure (qn, args, body)
+    splitFun (qn, _) = error emptyFC "TCO error: \{show qn} not a function"
 
 ExpMap : U
 ExpMap = SortedMap QName CExp
 
--- Need to switch everything to QName
 tailCallOpt : ExpMap → M ExpMap
 tailCallOpt expMap = do
-  putStrLn "TODO TCO"
-  let blah = map (bimap id tailNames) (toList expMap)
-  let out = tarjan blah
-  for (toList expMap) $ \ foo => case foo of
-    (qn, cexp) => do
-      liftIO $ putStrLn "--- \{show qn}"
-      liftIO $ debugLog cexp
-      liftIO $ debugLog $ tailNames cexp
-  -- everything is pointing to itself, I don't want that unless it actually does..
-  for out $ \ names => liftIO $ debugLog names
+  let graph = map (bimap id tailNames) (toList expMap)
+  let groups = tarjan graph
+  foldlM processGroup expMap groups
+  where
+    doUpdate : ExpMap → QName × CExp → ExpMap
+    doUpdate acc (k,v) = updateMap k v acc
 
-  -- liftIO $ debugLog out
-  pure expMap
-
+    processGroup : ExpMap → List QName → M ExpMap
+    processGroup expMap names = do
+      let pairs = mapMaybe (flip lookupMap expMap) names
+      updates <- doOptimize pairs
+      pure $ foldl doUpdate expMap updates

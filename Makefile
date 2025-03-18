@@ -1,6 +1,10 @@
 OSRCS=$(shell find orig -name "*.idr")
 SRCS=$(shell find src -name "*.newt")
 
+# Node shaves off 40% of the time.
+# RUNJS=bun run
+RUNJS=node
+
 .PHONY:
 
 all: build/exec/newt build/exec/newt.js build/exec/newt.min.js newt.js
@@ -25,13 +29,13 @@ orig_test: build/exec/newt
 # New version
 
 newt.js: ${SRCS}
-	bun run bootstrap/newt.js src/Main.newt -o newt.js
+	$(RUNJS) bootstrap/newt.js src/Main.newt -o newt.js
 
 newt2.js: newt.js
-	bun run newt.js src/Main.newt -o newt2.js
+	$(RUNJS) newt.js src/Main.newt -o newt2.js
 
 newt3.js: newt2.js
-	bun run newt2.js src/Main.newt -o newt3.js
+	$(RUNJS) newt2.js src/Main.newt -o newt3.js
 	cmp newt2.js newt3.js
 
 test: newt.js

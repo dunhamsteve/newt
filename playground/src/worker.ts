@@ -2,20 +2,23 @@ import { shim } from "./emul";
 import { archive, preload } from "./preload";
 import { CompileReq, CompileRes } from "./types";
 
+console.log = (m) => {
+  shim.stdout += '\n' + m
+}
+
 const handleMessage = async function (ev: { data: CompileReq }) {
   console.log("message", ev.data);
   await preload;
   shim.archive = archive;
   let { src, fileName } = ev.data;
   const outfile = "out.js";
-  shim.process.argv = ["", "", fileName, "-o", outfile, "--top"];
-  console.log("Using args", shim.process.argv);
+  shim.process.argv = ["browser", "newt", fileName, "-o", outfile, "--top"];
   shim.files[fileName] = new TextEncoder().encode(src);
   shim.files[outfile] = new TextEncoder().encode("No JS output");
   shim.stdout = "";
   const start = +new Date();
   try {
-    newtMain();
+    Main_main();
   } catch (e) {
     // make it clickable in console
     console.error(e);
