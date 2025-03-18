@@ -1,6 +1,7 @@
 #!/bin/sh
 SAMPLES=$(find playground/samples -name "*.newt")
-NCC="bun run newt.js"
+# NCC="bun run newt.js"
+NCC="node newt.js"
 total=0
 failed=0
 for fn in tests/*.newt ; do

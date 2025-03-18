@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: ghcr.io/stefan-hoeck/idris2-pack:latest
+    # container: ghcr.io/stefan-hoeck/idris2-pack:latest
     steps:
       - name: checkout
         uses: actions/checkout@v2
@@ -20,11 +20,11 @@ jobs:
           node-version: 18
       - name: setup
         run: |
-          apt update
-          apt-get install -y zip
-          pack install contrib
-      - name: use bun
-        uses: oven-sh/setup-bun@v2
+          sudo apt-get update
+          sudo apt-get install -y zip
+      #     pack install contrib
+      # - name: use bun
+      #   uses: oven-sh/setup-bun@v2
       - name: build
         run: |
           make

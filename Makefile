@@ -7,7 +7,8 @@ RUNJS=node
 
 .PHONY:
 
-all: build/exec/newt build/exec/newt.js build/exec/newt.min.js newt.js
+# all: build/exec/newt build/exec/newt.js build/exec/newt.min.js newt.js
+all: newt.js
 
 # Original idris version
 
