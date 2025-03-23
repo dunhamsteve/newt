@@ -334,6 +334,7 @@ instance Show TopEntry where
 
 record ModContext where
   constructor MkModCtx
+  csum : String
   modDefs : SortedMap QName TopEntry
   -- Do we need this if everything solved is zonked?
   modMetaCtx : MetaContext
@@ -348,8 +349,8 @@ record ModContext where
 -- expand these during normalization?
 
 -- A placeholder while walking through dependencies of a module
-emptyModCtx : ModContext
-emptyModCtx = MkModCtx EmptyMap (MC EmptyMap 0 NoCheck) EmptyMap
+emptyModCtx : String → ModContext
+emptyModCtx csum = MkModCtx csum EmptyMap (MC EmptyMap 0 NoCheck) EmptyMap
 
 record TopContext where
   constructor MkTop

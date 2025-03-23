@@ -79,6 +79,15 @@ parseDecls fn ops toks@(first :: _) acc =
       then (tok :: toks)
       else recover toks
 
+moduleHash : String → List (List String) → M String
+moduleHash src imports = do
+  srcHash <- liftIO $ checksum src
+  top <- getTop
+  let mods = mapMaybe (\x => lookupMap' x top.modules) imports
+  let modHashes = map (\x => x.csum) mods
+  liftIO $ checksum $ fastConcat $ srcHash :: modHashes
+
+
 -- New style loader, one def at a time
 processModule : FC -> String -> List String -> QName -> M String
 processModule importFC base stk qn@(QN ns nm) = do
@@ -87,7 +96,8 @@ processModule importFC base stk qn@(QN ns nm) = do
   let modns = (snoc ns nm)
   let name = joinBy "." modns
   let (Nothing) = lookupMap modns top.modules | _ => pure ""
-  modifyTop (\ top => MkTop (updateMap modns emptyModCtx top.modules) top.imported top.ns top.defs top.metaCtx top.verbose top.errors top.ops)
+  -- dummy entry for processing
+  modifyTop (\ top => MkTop (updateMap modns (emptyModCtx "") top.modules) top.imported top.ns top.defs top.metaCtx top.verbose top.errors top.ops)
   let fn = (joinBy "/" (base :: ns)) ++ "/" ++ nm ++ ".newt"
   (Right src) <- liftIO {M} $ readFile fn
     | Left err => exitFailure "ERROR at \{show importFC}: error reading \{fn}: \{show err}"
@@ -118,8 +128,22 @@ processModule importFC base stk qn@(QN ns nm) = do
       pure $ split name' "."
 
   let imported = snoc imported primNS
+  srcSum <- liftIO $ checksum src
+  csum <- moduleHash srcSum imported
 
   putStrLn "module \{modName}"
+  top <- getTop
+  (Nothing) <- loadModule qn csum
+    | Just mod => do
+      let modules = updateMap modns mod top.modules
+
+      modifyTop (\ top =>
+        -- FIXME - we don't want stray operators in a module.
+        -- inject module ops into top
+        let ops = foldMap const top.ops $ toList mod.ctxOps
+        in MkTop modules top.imported top.ns top.defs top.metaCtx top.verbose top.errors ops)
+      pure src  -- why am I returning this?
+
   log 1 $ \ _ => "MODNS " ++ show modns
   top <- getTop
   (decls, ops) <- parseDecls fn top.ops toks Lin
@@ -135,11 +159,10 @@ processModule importFC base stk qn@(QN ns nm) = do
   top <- getTop
   mc <- readIORef top.metaCtx
 
-  let mod = MkModCtx top.defs mc top.ops
-  dumpModule qn src mod
+  let mod = MkModCtx csum top.defs mc top.ops
+  if stk == Nil then pure MkUnit else dumpModule qn src mod
 
   let modules = updateMap modns mod top.modules
-  freshMC <- newIORef (MC EmptyMap 0 CheckAll)
   modifyTop (\ top => MkTop modules top.imported top.ns top.defs top.metaCtx top.verbose top.errors top.ops)
 
   (Nil) <- liftIO {M} $ readIORef top.errors
@@ -202,7 +225,7 @@ processFile fn = do
   processDecl primNS (PType emptyFC "Char" Nothing)
 
   top <- getTop
-  let modules = updateMap primNS (MkModCtx top.defs (MC EmptyMap 0 CheckAll) top.ops) top.modules
+  let modules = updateMap primNS (MkModCtx "" top.defs (MC EmptyMap 0 CheckAll) top.ops) top.modules
   modifyTop (\ top => MkTop modules (primNS :: Nil) Nil EmptyMap top.metaCtx top.verbose top.errors top.ops)
 
   src <- processModule emptyFC base Nil qn

@@ -381,6 +381,7 @@ eraseEntries = do
 process : QName → M (List Doc)
 process name = do
   let wat = QN ("Prelude" :: Nil) "arrayToList"
+  top <- getTop
   entries <- getEntries EmptyMap name
 
   -- Maybe move this dance into liftWhere

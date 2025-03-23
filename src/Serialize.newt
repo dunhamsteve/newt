@@ -6,10 +6,21 @@ import Lib.Common
 import Lib.Types
 import Data.SortedMap
 
+ModFile : U
+ModFile = (String × List TopEntry × List (String × OpDef) × List (QName × MetaEntry))
+
+pfunc checksum uses (MkIORes) : String → IO String := `(a) => (w) => {
+  const arr = new TextEncoder().encode(a);
+  // djb2 hash
+  let val = 5381
+  for (let i = 0; i < arr.length; i++) {
+    val = ((val * 33) + arr[i]) | 0
+  }
+  return Prelude_MkIORes(null, ""+val, w);
+}`
+
 -- this was an experiment, prepping for dumping module information
--- it ends up with out of memory dumping defs of some of the files.
--- Prelude is 114MB pretty-printed... gzip to 1M
-pfunc dumpObject uses (MkIORes MkUnit): ∀ a. String → a → IO Unit := `(_,fn,a) => (w) => {
+pfunc dumpModFile uses (MkIORes MkUnit): String → ModFile → IO Unit := `(fn,a) => (w) => {
   let fs = require('fs')
   try {
     let {EncFile} = require('./serializer')
@@ -19,11 +30,39 @@ pfunc dumpObject uses (MkIORes MkUnit): ∀ a. String → a → IO Unit := `(_,f
   return Prelude_MkIORes(null, Prelude_MkUnit, w)
 }`
 
+
 -- for now, include src and use that to see if something changed
 dumpModule : QName → String → ModContext → M Unit
 dumpModule qn src mod = do
   let fn = "build/\{show qn}.newtmod"
+  let csum = mod.csum
   let defs = listValues mod.modDefs
   let ops = toList mod.ctxOps
   let mctx = toList mod.modMetaCtx.metas
-  liftIO $ dumpObject fn (src,defs,ops,mctx)
+  liftIO $ dumpModFile fn (csum,defs,ops,mctx)
+
+pfunc readModFile uses (MkIORes Just Nothing): String → IO (Maybe ModFile) := `(fn) => (w) => {
+  let fs = require('fs')
+  try {
+    let {DecFile} = require('./serializer')
+    let data = fs.readFileSync(fn)
+    let dec = DecFile.decode(data)
+    return Prelude_MkIORes(null, Prelude_Just(null, dec), w)
+  } catch (e) {
+    return Prelude_MkIORes(null, Prelude_Nothing, w)
+  }
+}`
+
+loadModule : QName → String → M (Maybe ModContext)
+loadModule qn src = do
+  let fn = "build/\{show qn}.newtmod"
+  (Just (csum, defs, ops, mctx)) <- liftIO {M} $ readModFile fn
+     | _ => pure Nothing
+
+  let ops = mapFromList ops
+  let defs = mapFromList $ map (\ entry => (entry.name, entry)) defs
+      -- REVIEW can we ignore those last two inside a module
+  let mctx = MC (mapFromList mctx) 0 NoCheck
+  if csum == src
+    then pure $ Just $ MkModCtx csum defs mctx ops
+    else pure Nothing

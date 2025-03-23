@@ -195,6 +195,13 @@ toList {k} {v} (MapOf smap) = reverse $ go smap Nil
     go (Node3 t1 k1 t2 k2 t3) acc = go t3 $ go t2 $ go t1 acc
 toList _ = Nil
 
+mapFromList : ∀ k v. {{Ord k}} {{Eq k}} → List (k × v) → SortedMap k v
+mapFromList {k} {v} stuff = foldl go EmptyMap stuff
+  where
+    go : SortedMap k v → k × v → SortedMap k v
+    go map (k, v) = updateMap k v map
+
+
 foldMap : ∀ a b. {{Ord a}} → (b → b → b) → SortedMap a b → List (a × b) → SortedMap a b
 foldMap f m Nil = m
 foldMap f m ((a,b) :: xs) = case lookupMap a m of

@@ -64,7 +64,6 @@ export class DecFile {
       if (!str.length) break
       this.pool.push(str);
     }
-    console.log('read pool', this.buf.pos)
   }
 
   read(): any {
@@ -160,8 +159,11 @@ export class EncFile {
   poollen = 1;
   pool = new SerializationStream();
   buf = new SerializationStream();
-  pmap: Record<string, number> = { "": 0 };
+  pmap: Map<string, number> = new Map();
 
+  constructor() {
+    this.pmap.set("",0);
+  }
   static encode(data: any) {
     let f = new EncFile()
     f.write(data)
@@ -170,11 +172,11 @@ export class EncFile {
   }
 
   writeString(s: string) {
-    let n = this.pmap[s];
+    let n = this.pmap.get(s);
     if (n === undefined) {
       n = this.poollen++;
       this.pool.writeString(s);
-      this.pmap[s] = n;
+      this.pmap.set(s,n);
     }
     this.buf.writeVarint(n);
   }
