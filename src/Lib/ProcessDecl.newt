@@ -99,10 +99,8 @@ impTele tele = map foo tele
 
 processDecl : List String -> Decl -> M Unit
 
--- REVIEW I supposed I could have updated top here instead of the dance with the parser...
-processDecl ns  (PMixFix _ _ _ _)  = pure MkUnit
-
-processDecl ns  (TypeSig fc names tm) = do
+processTypeSig : List String → FC → List Name → Raw → M Unit
+processTypeSig ns fc names tm = do
   log 1 $ \ _ => "-----"
 
   top <- getTop
@@ -117,13 +115,17 @@ processDecl ns  (TypeSig fc names tm) = do
   log 1 $ \ _ => "TypeSig \{unwords names} : \{render 90 $ pprint Nil ty}"
   ignore $ for names $ \nm => setDef (QN ns nm) fc ty Axiom
 
-processDecl ns (PType fc nm ty) = do
+
+processPrimType : List Name → FC → Name → Maybe Raw → M Unit
+processPrimType ns fc nm ty = do
   top <- getTop
   ty' <- check (mkCtx fc) (maybe (RU fc) id ty) (VU fc)
   let arity = cast $ piArity ty'
   setDef (QN ns nm) fc ty' (PrimTCon arity)
 
-processDecl ns  (PFunc fc nm used ty src) = do
+
+processPrimFn : List String → FC → String → List String → Raw → String → M Unit
+processPrimFn ns fc nm used ty src = do
   top <- getTop
   ty <- check (mkCtx fc) ty (VU fc)
   ty' <- nf Nil ty
@@ -135,7 +137,9 @@ processDecl ns  (PFunc fc nm used ty src) = do
   let arity = piArity ty'
   setDef (QN ns nm) fc ty' (PrimFn src arity used')
 
-processDecl ns (Def fc nm clauses) = do
+
+processDef : List String → FC → String → List (Raw × Raw) → M Unit
+processDef ns fc nm clauses = do
   log 1 $ \ _ => "-----"
   log 1 $ \ _ => "Def \{show nm}"
   top <- getTop
@@ -169,7 +173,8 @@ processDecl ns (Def fc nm clauses) = do
   debug $ \ _ => "Add def \{nm} \{render 90 $ pprint Nil tm'} : \{render 90 $ pprint Nil ty}"
   updateDef (QN ns nm) fc ty (Fn tm')
 
-processDecl ns (DCheck fc tm ty) = do
+processCheck : List String → FC → Raw → Raw → M Unit
+processCheck ns fc tm ty = do
   log 1 $ \ _ => "----- DCheck"
   top <- getTop
 
@@ -184,7 +189,9 @@ processDecl ns (DCheck fc tm ty) = do
   norm <- nfv Nil res
   putStrLn "  NFV \{render 90 $ pprint Nil norm}"
 
-processDecl ns (Class classFC nm tele decls) = do
+
+processClass : List String → FC → String → Telescope → List Decl → M Unit
+processClass ns classFC nm tele decls = do
   -- REVIEW maybe we can leverage Record for this
   -- a couple of catches, we don't want the dotted accessors and
   -- the self argument should be an auto-implicit
@@ -230,9 +237,8 @@ processDecl ns (Class classFC nm tele decls) = do
     mkApp : Raw → BindInfo × Raw → Raw
     mkApp acc (BI fc nm icit _, _) = RApp fc acc (RVar fc nm) icit
 
--- TODO - these are big, break them out into individual functions
-processDecl ns (Instance instfc ty decls) = do
-
+processInstance : List String → FC → Raw → Maybe (List Decl) → M Unit
+processInstance ns instfc ty decls = do
   log 1 $ \ _ => "-----"
   log 1 $ \ _ => "Instance \{render 90 $ pretty ty}"
   top <- getTop
@@ -340,7 +346,9 @@ processDecl ns (Instance instfc ty decls) = do
       apply bx xs
     apply x (y :: xs) = error instfc "expected pi type \{show x}"
 
-processDecl ns (ShortData fc lhs sigs) = do
+-- desugars to Data and processes it
+processShortData : List String → FC → Raw → List Raw → M Unit
+processShortData ns fc lhs sigs = do
   (nm,args) <- getArgs lhs Nil
   let ty = foldr mkPi (RU fc) args
   cons <- traverse (mkDecl args Nil) sigs
@@ -369,7 +377,9 @@ processDecl ns (ShortData fc lhs sigs) = do
     mkDecl args acc (RApp fc' t u icit) = mkDecl args (u :: acc) t
     mkDecl args acc tm = error (getFC tm) "Expected contructor application, got: \{show tm}"
 
-processDecl ns (Data fc nm ty cons) = do
+
+processData : List String → FC → String → Raw → List Decl → M Unit
+processData ns fc nm ty cons = do
   log 1 $ \ _ => "-----"
   log 1 $ \ _ => "Data \{nm}"
   top <- getTop
@@ -414,7 +424,9 @@ processDecl ns (Data fc nm ty cons) = do
     checkDeclType (Pi _ str icit rig t u) = checkDeclType u
     checkDeclType _ = error fc "data type doesn't return U"
 
-processDecl ns (Record recordFC nm tele cname decls) = do
+
+processRecord : List String → FC → String → Telescope → Maybe Name → List Decl → M Unit
+processRecord ns recordFC nm tele cname decls = do
   log 1 $ \ _ => "-----"
   log 1 $ \ _ => "Record"
   let fields = getSigs decls
@@ -438,15 +450,6 @@ processDecl ns (Record recordFC nm tele cname decls) = do
       let funType = teleToPi (impTele tele) $ RPi fc (BI fc "_" Explicit Many) tail ty
       let autoPat = foldl (\acc x => case the (FC × String × Raw) x of (fc,nm,ty) => RApp fc acc (RVar fc nm) Explicit) (RVar recordFC dcName) fields
 
-      -- `fieldName` - consider dropping to keep namespace clean
-      -- let lhs = foldl (\acc, (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc name) tele
-      -- let lhs = RApp recordFC lhs autoPat Explicit
-      -- let decl = Def fc name [(lhs, (RVar fc name))]
-      -- log 1 $ \ _ => "\{name} : \{render 90 $ pretty funType}"
-      -- log 1 $ \ _ => "\{render 90 $ pretty decl}"
-      -- processDecl ns $ TypeSig fc (name :: Nil) funType
-      -- processDecl ns decl
-
       -- `.fieldName`
       let pname = "." ++ name
       let lhs = foldl (\acc x => case the (BindInfo × Raw) x of (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc pname) tele
@@ -456,3 +459,17 @@ processDecl ns (Record recordFC nm tele cname decls) = do
       log 1 $ \ _ => "\{render 90 $ pretty pdecl}"
       processDecl ns $ TypeSig fc (pname :: Nil) funType
       processDecl ns pdecl
+
+-- currently mixfix registration is handled in the parser
+-- since we now run a decl at a time we could do it here.
+processDecl ns (PMixFix _ _ _ _)  = pure MkUnit
+processDecl ns (TypeSig fc names tm) = processTypeSig ns fc names tm
+processDecl ns (PType fc nm ty) = processPrimType ns fc nm ty
+processDecl ns (PFunc fc nm used ty src) = processPrimFn ns fc nm used ty src
+processDecl ns (Def fc nm clauses) = processDef ns fc nm clauses
+processDecl ns (DCheck fc tm ty) = processCheck ns fc tm ty
+processDecl ns (Class classFC nm tele decls) = processClass ns classFC nm tele decls
+processDecl ns (Instance instfc ty decls) = processInstance ns instfc ty decls
+processDecl ns (ShortData fc lhs sigs) = processShortData ns fc lhs sigs
+processDecl ns (Data fc nm ty cons) = processData ns fc nm ty cons
+processDecl ns (Record recordFC nm tele cname decls) = processRecord ns recordFC nm tele cname decls
