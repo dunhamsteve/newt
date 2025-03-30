@@ -65,7 +65,7 @@ doOptimize : List (QName × CExp) → M (List (QName × CExp))
 doOptimize fns = do
   splitFuns <- traverse splitFun fns
   let nms = map fst fns
-  let alts = CConAlt "return" ("rval" :: Nil) (CBnd 0) :: map (mkAlt nms) splitFuns
+  let alts = map (mkAlt nms) splitFuns
   recName <- mkRecName nms
   let recfun = CFun ("arg" :: Nil) $ CCase (CBnd 0) alts
   wrapped <- traverse (mkWrap recName) fns

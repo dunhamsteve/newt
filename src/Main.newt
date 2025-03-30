@@ -133,6 +133,7 @@ processModule importFC base stk qn@(QN ns nm) = do
 
   putStrLn "module \{modName}"
   top <- getTop
+  -- TODO we need a flag on this so `make newt3.js` properly tests self-compile
   (Nothing) <- loadModule qn csum
     | Just mod => do
       let modules = updateMap modns mod top.modules
