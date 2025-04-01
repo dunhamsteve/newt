@@ -25,12 +25,15 @@
       "patterns": [{ "include": "source.js" }]
     },
     {
-      "name": "string.single.newt",
-      "match": "'(.|\\\\.)'"
-    },
-    {
       "name": "string.double.newt",
-      "match": "\"(.|\\\\.)\""
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.newt",
+          "match": "\\\\[^{]"
+        }
+      ]
     }
   ]
 }

@@ -62,7 +62,7 @@ arityForName fc nm = do
     Nothing => error fc "Name \{show nm} not in scope"
     (Just Axiom) => pure Z
     (Just (TCon arity strs)) => pure $ cast arity
-    (Just (DCon k str)) => pure $ cast k
+    (Just (DCon _ k str)) => pure $ cast k
     (Just (Fn t)) => pure $ lamArity t
     (Just (PrimTCon arity)) => pure $ cast arity
     (Just (PrimFn t arity used)) => pure arity
@@ -148,17 +148,17 @@ compileFun tm = go tm Lin
     go tm args = CFun (args <>> Nil) <$> compileTerm tm
 
 -- What are the Defs used for above? (Arity for name)
-compileDCon : QName → Int → CExp
-compileDCon (QN _ nm) 0 = CConstr nm Nil
-compileDCon (QN _ nm) arity =
+compileDCon : QName → ConInfo → Int → CExp
+compileDCon (QN _ nm) info 0 = CConstr nm Nil
+compileDCon (QN _ nm) info arity =
   let args = map (\k => "h\{show k}") (range 0 arity) in
   CFun args $ CConstr nm $ map (\k => CBnd $ arity - k - 1) (range 0 arity)
 
 -- probably want to drop the Ref2 when we can
 defToCExp : {{Ref2 Defs St}} → (QName × Def) -> M (QName × CExp)
 defToCExp (qn, Axiom)          = pure $ (qn, CErased)
-defToCExp (qn, DCon arity _)   = pure $ (qn, compileDCon qn arity)
-defToCExp (qn, TCon arity _)   = pure $ (qn, compileDCon qn arity)
-defToCExp (qn, PrimTCon arity) = pure $ (qn, compileDCon qn arity)
+defToCExp (qn, DCon info arity _)   = pure $ (qn, compileDCon qn info arity)
+defToCExp (qn, TCon arity _)   = pure $ (qn, compileDCon qn NormalCon arity)
+defToCExp (qn, PrimTCon arity) = pure $ (qn, compileDCon qn NormalCon arity)
 defToCExp (qn, PrimFn src _ deps) = pure $ (qn, CRaw src deps)
 defToCExp (qn, Fn tm)          = (_,_ qn) <$> compileFun tm

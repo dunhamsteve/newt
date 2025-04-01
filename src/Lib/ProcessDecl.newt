@@ -274,7 +274,7 @@ processInstance ns instfc ty decls = do
     | _ => error tyFC "\{show tconName} is not a type constructor"
   let (con :: Nil) = cons
     | _ => error tyFC "\{show tconName} has multiple constructors \{show cons}"
-  let (Just (MkEntry _ _ dcty (DCon _ _))) = lookup con top
+  let (Just (MkEntry _ _ dcty (DCon _ _ _))) = lookup con top
     | _ => error tyFC "can't find constructor \{show con}"
   vdcty@(VPi _ nm icit rig a b) <- eval Nil CBN dcty
     | x => error (getFC x) "dcty not Pi"
@@ -377,6 +377,32 @@ processShortData ns fc lhs sigs = do
     mkDecl args acc (RApp fc' t u icit) = mkDecl args (u :: acc) t
     mkDecl args acc tm = error (getFC tm) "Expected contructor application, got: \{show tm}"
 
+-- Identify Nat-like, enum-like, etc
+populateConInfo : List TopEntry → List TopEntry
+populateConInfo entries =
+  let (Nothing) = traverse checkEnum entries
+    | Just entries => entries in
+  let (a :: b :: Nil) = entries | _ => entries in
+  let (Just succ) = find isSucc entries | _ => entries in
+  let (Just zero) = find isZero entries | _ => entries in
+  setInfo zero ZeroCon :: setInfo succ SuccCon :: Nil
+  where
+    setInfo : TopEntry → ConInfo → TopEntry
+    setInfo (MkEntry fc nm dty (DCon _ arity hn)) info = MkEntry fc nm dty (DCon info arity hn)
+    setInfo x _ = x
+
+    checkEnum : TopEntry → Maybe TopEntry
+    checkEnum (MkEntry fc nm dty (DCon _ 0 hn)) = Just $ MkEntry fc nm dty (DCon EnumCon 0 hn)
+    checkEnum _ = Nothing
+
+    isZero : TopEntry → Bool
+    isZero (MkEntry fc nm dty (DCon _ 0 hn)) = True
+    isZero _ = False
+
+    -- TODO - handle indexes, etc
+    isSucc : TopEntry → Bool
+    isSucc (MkEntry fc nm dty@(Pi _ _ _ _ (Ref _ a) (Ref _ b)) (DCon _ 1 hn)) = a == b
+    isSucc _ = False
 
 processData : List String → FC → String → Raw → List Decl → M Unit
 processData ns fc nm ty cons = do
@@ -392,7 +418,7 @@ processData ns fc nm ty cons = do
       unifyCatch fc (mkCtx fc) tyty' type'
     Just (MkEntry _ name type _) => error fc "\{show nm} already declared"
     Nothing => setDef (QN ns nm) fc tyty Axiom
-  cnames <- for cons $ \x => case x of
+  entries <- join <$> (for cons $ \x => case x of
       (TypeSig fc names tm) => do
           debug $ \ _ => "check dcon \{show names} \{show tm}"
           dty <- check (mkCtx fc) tm (VU fc)
@@ -407,15 +433,17 @@ processData ns fc nm ty cons = do
             | (tm, _) => error (getFC tm) "expected \{nm} got \{render 90 $ pprint tnames tm}"
           when (hn /= QN ns nm) $ \ _ =>
             error (getFC codomain) "Constructor codomain is \{render 90 $ pprint tnames codomain} rather than \{nm}"
+          pure $ map (\ nm' => (MkEntry fc (QN ns nm') dty (DCon NormalCon (getArity dty) hn))) names
+      decl => throwError $ E (getFC decl) "expected constructor declaration")
+  for entries $ \case (MkEntry name fc dty def) => setDef fc name dty def
+  let entries = populateConInfo entries
+  let cnames = map (\x => x.name) entries
 
-          for names $ \ nm' => do
-            setDef (QN ns nm') fc dty (DCon (getArity dty) hn)
-          pure $ map (QN ns) names
-      decl => throwError $ E (getFC decl) "expected constructor declaration"
-  log 1 $ \ _ => "setDef \{nm}  TCon \{show $ join cnames}"
+  log 1 $ \ _ => "setDef \{nm}  TCon \{show cnames}"
   let arity = cast $ piArity tyty
-  updateDef (QN ns nm) fc tyty (TCon arity (join cnames))
+  updateDef (QN ns nm) fc tyty (TCon arity cnames)
   where
+
     binderName : Binder → Name
     binderName (MkBinder _ nm _ _ _) = nm
 

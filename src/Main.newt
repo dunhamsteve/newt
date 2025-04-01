@@ -161,7 +161,8 @@ processModule importFC base stk qn@(QN ns nm) = do
   mc <- readIORef top.metaCtx
 
   let mod = MkModCtx csum top.defs mc top.ops
-  if stk == Nil then pure MkUnit else dumpModule qn src mod
+  errors <- liftIO {M} $ readIORef top.errors
+  if stk == Nil || length' errors == 0 then pure MkUnit else dumpModule qn src mod
 
   let modules = updateMap modns mod top.modules
   modifyTop (\ top => MkTop modules top.imported top.ns top.defs top.metaCtx top.verbose top.errors top.ops)

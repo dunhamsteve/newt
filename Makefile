@@ -16,6 +16,7 @@ build/exec/newt: ${OSRCS}
 	idris2 --build newt.ipkg
 
 build/exec/newt.js: ${OSRCS}
+	rm build/*
 	idris2 --cg node -o newt.js -p contrib -c orig/Main.idr
 
 build/exec/newt.min.js: ${OSRCS}
@@ -33,9 +34,11 @@ newt.js: ${SRCS}
 	$(RUNJS) bootstrap/newt.js src/Main.newt -o newt.js
 
 newt2.js: newt.js
+	rm build/*
 	$(RUNJS) newt.js src/Main.newt -o newt2.js
 
 newt3.js: newt2.js
+	rm -f build/*
 	$(RUNJS) newt2.js src/Main.newt -o newt3.js
 	cmp newt2.js newt3.js
 

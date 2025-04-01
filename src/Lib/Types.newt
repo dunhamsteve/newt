@@ -307,13 +307,21 @@ record MetaContext where
   next : Int
   mcmode : MetaMode
 
-data Def = Axiom | TCon Int (List QName) | DCon Int QName | Fn Tm | PrimTCon Int
+data ConInfo = NormalCon | SuccCon | ZeroCon | EnumCon
+
+instance Show ConInfo where
+  show NormalCon = ""
+  show SuccCon = "[S]"
+  show ZeroCon = "[Z]"
+  show EnumCon = "[E]"
+
+data Def = Axiom | TCon Int (List QName) | DCon ConInfo Int QName | Fn Tm | PrimTCon Int
          | PrimFn String Nat (List QName)
 
 instance Show Def where
   show Axiom = "axiom"
   show (TCon _ strs) = "TCon \{show strs}"
-  show (DCon k tyname) = "DCon \{show k} \{show tyname}"
+  show (DCon ci k tyname) = "DCon \{show k} \{show tyname} \{show ci}"
   show (Fn t) = "Fn \{show t}"
   show (PrimTCon _) = "PrimTCon"
   show (PrimFn src arity used) = "PrimFn \{show src} \{show arity} \{show used}"

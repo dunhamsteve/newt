@@ -3,29 +3,44 @@
 
 Syntax -> Parser.Impl ?
 
-- [ ] implement tail call optimization
+- [x] fix string highlighting
+- [x] implement tail call optimization
+- [ ] implement magic nat (need primitive `+`, '-', and `==` in `CompileExp`)
+- [ ] drop erased args on types and top level functions
+- [ ] can I do some inlining without blowing up code size?
+- [ ] implement string enum (or number, but I'm using strings for tags at the moment)
+- [ ] use monaco input method instead of lean's
 - [ ] `Def` is shadowed between Types and Syntax (TCon vs DCon), detect this
 - [ ] review pattern matching. goal is to have a sane context on the other end. secondary goal - bring it closer to the paper.
+  - Two issues
+    - I'm rewriting stuff in the context, leaving it in a bad state (forward references). I think I can avoid this.
+    - The variables at the end of pattern matching have types with references in the wrong order. I think we can reorder them on dependencies.
+- Improve `auto`
+  - [ ] Improve cases where the auto isn't solved because of a type error
+  - [ ] Handle `Foo Blah`, `Foo a => Bar a` vs `Bar Blah`
+- [ ] Add some optimizations
+  - [ ] see if we can make the typeclass stuff a little leaner, e.g. inline a projection of a static record.
+  - It would be nice if IO looked like imperative JS, but that might be a bit of a stretch.
 
-- [ ] rename for top level functions (and maybe stuff in scope, probably need LSP first)
+- [ ] LSP and/or more editor support
+  - [ ] Probably need ranges for FC
+  - [ ] leave an interactive process running
+  - [ ] collect metadata or run through the serialization data
+  - [ ] rename in editor for top level functions (and maybe stuff in scope, probably need LSP first)
 - [ ] warn on unused imports?
 - [x] redo code to determine base path
 - [x] emit only one branch for default case when splitting inductives
-- [ ] save/load results of processing a module
+- [x] save/load results of processing a module
   - [x] keep each module separate in context
   - [x] search would include imported modules, collect ops into and from modules
   - [x] serialize modules
-  - [ ] deserialize modules if up to date
-    - should I allow the idris cross module assignment hack?
-    - >>> sort out metas (maybe push them up to the main list)
+  - [x] deserialize modules if up to date
+    - We use a hash of the source and all of its import hashes to check
     - eventually we may want to support resuming halfway through a file
 
 - [x] get port to run
   - [x] something goes terribly wrong with traverse_ and for_ (related to erasure, I think)
-- [ ] sort through issues that came up during port
 - [x] ~~don't use `take` - it's not stack safe~~ The newt version is stack safe
-- [ ] move idris version into a bootstrap directory
-  - (Need Idris/chez or newt-in-newt to bootstrap!)
 
 More comments in code! This is getting big enough that I need to re-find my bearings when fixing stuff.
 

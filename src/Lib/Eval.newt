@@ -112,7 +112,7 @@ evalCase env mode sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
       debug $ \ _ =>  "ECase \{show nm} \{show sp} \{show nms} \{showTm t}"
       go env (sp <>> Nil) nms
     else case lookup nm top of
-      (Just (MkEntry _ str type (DCon k str1))) => evalCase env mode sc xs
+      (Just (MkEntry _ str type (DCon _ k str1))) => evalCase env mode sc xs
       -- bail for a stuck function
       _ => pure Nothing
   where
