@@ -91,11 +91,16 @@ apply t ts acc Z = go (CApp t (acc <>> Nil) 0) ts
 
 compileTerm (Bnd _ k) = pure $ CBnd k
 -- need to eta expand to arity
-compileTerm t@(Ref fc nm) = do
+compileTerm t@(Ref fc nm@(QN _ tag)) = do
   arity <- arityForName fc nm
+  defs <- getRef Defs
   case arity of
     -- we don't need to curry functions that take one argument
     (S Z) => pure $ CRef nm
+    Z =>
+      case the (Maybe Def) $ lookupMap' nm defs of
+        (Just (DCon EnumCon _ _)) => pure $ CLit $ LString tag
+        _ => pure $ CRef nm
     _ => apply (CRef nm) Nil Lin arity
 
 compileTerm (Meta _ k) = pure $ CRef (QN Nil "meta$\{show k}") -- FIXME should be exception
@@ -125,7 +130,11 @@ compileTerm (Case _ t alts) = do
   alts' <- for alts $ \case
     CaseDefault tm => CDefAlt <$> compileTerm tm
     -- we use the base name for the tag, some primitives assume this
-    CaseCons (QN ns nm) args tm => CConAlt nm args <$> compileTerm tm
+    CaseCons qn@(QN ns nm) args tm => do
+      defs <- getRef Defs
+      case the (Maybe Def) $ lookupMap' qn defs of
+        Just (DCon EnumCon _ _) => CLitAlt (LString nm) <$> compileTerm tm
+        _ => CConAlt nm args <$> compileTerm tm
     CaseLit lit tm => CLitAlt lit <$> compileTerm tm
   pure $ CCase t' alts'
 compileTerm (Lit _ lit) = pure $ CLit lit
@@ -149,6 +158,7 @@ compileFun tm = go tm Lin
 
 -- What are the Defs used for above? (Arity for name)
 compileDCon : QName → ConInfo → Int → CExp
+compileDCon (QN _ nm) EnumCon 0 = CLit $ LString nm
 compileDCon (QN _ nm) info 0 = CConstr nm Nil
 compileDCon (QN _ nm) info arity =
   let args = map (\k => "h\{show k}") (range 0 arity) in

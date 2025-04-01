@@ -435,8 +435,8 @@ processData ns fc nm ty cons = do
             error (getFC codomain) "Constructor codomain is \{render 90 $ pprint tnames codomain} rather than \{nm}"
           pure $ map (\ nm' => (MkEntry fc (QN ns nm') dty (DCon NormalCon (getArity dty) hn))) names
       decl => throwError $ E (getFC decl) "expected constructor declaration")
-  for entries $ \case (MkEntry name fc dty def) => setDef fc name dty def
   let entries = populateConInfo entries
+  for entries $ \case (MkEntry name fc dty def) => setDef fc name dty def
   let cnames = map (\x => x.name) entries
 
   log 1 $ \ _ => "setDef \{nm}  TCon \{show cnames}"
