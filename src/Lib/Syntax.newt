@@ -107,7 +107,7 @@ Telescope = List (BindInfo × Raw)
 
 data Decl
   = TypeSig FC (List Name) Raw
-  | Def FC Name (List (Raw × Raw)) -- (List Clause)
+  | FunDef FC Name (List (Raw × Raw))
   | DCheck FC Raw Raw
   | Data FC Name Raw (List Decl)
   | ShortData FC Raw (List Raw)
@@ -121,7 +121,7 @@ data Decl
 
 instance HasFC Decl where
   getFC (TypeSig x strs tm) = x
-  getFC (Def x str xs) = x
+  getFC (FunDef x str xs) = x
   getFC (DCheck x tm tm1) = x
   getFC (Data x str tm xs) = x
   getFC (ShortData x _ _) = x
@@ -158,7 +158,7 @@ instance Show BindInfo where
 
 instance Show Decl where
   show (TypeSig _ str x) = foo ("TypeSig" :: show str :: show x :: Nil)
-  show (Def _ str clauses) = foo ("Def" :: show str :: show clauses :: Nil)
+  show (FunDef _ str clauses) = foo ("FunDef" :: show str :: show clauses :: Nil)
   show (Data _ str xs ys) = foo ("Data" :: show str :: show xs :: show ys :: Nil)
   show (DCheck _ x y) = foo ("DCheck" :: show x :: show y :: Nil)
   show (PType _ name ty) = foo ("PType" :: name :: show ty :: Nil)
@@ -267,7 +267,7 @@ pipeSep = folddoc (\a b => a <+/> text "|" <+> b)
 
 instance Pretty Decl where
   pretty (TypeSig _ nm ty) = spread (map text nm) <+> text ":" <+> nest 2 (pretty ty)
-  pretty (Def _ nm clauses) = stack $ map prettyPair clauses
+  pretty (FunDef _ nm clauses) = stack $ map prettyPair clauses
     where
       prettyPair : Raw × Raw → Doc
       prettyPair (a, b) = pretty a <+> text "=" <+> pretty b

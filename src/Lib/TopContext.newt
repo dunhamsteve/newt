@@ -47,25 +47,35 @@ emptyTop = do
   pure $ MkTop EmptyMap Nil Nil EmptyMap mcctx 0 errs EmptyMap
 
 
-setDef : QName -> FC -> Tm -> Def -> M Unit
-setDef name fc ty def = do
+setFlag : QName → FC → EFlag → M Unit
+setFlag name fc flag = do
   top <- getTop
-  let (Nothing) = lookupMap' name top.defs
-    | Just (MkEntry fc' nm' ty' def') => error fc "\{show name} is already defined at \{show fc'}"
+  let (Just (MkEntry fc nm ty def flags)) = lookupMap' name top.defs
+    | Nothing => error fc "\{show name} not declared"
   modifyTop $ \case
     MkTop mods imp ns defs metaCtx verbose errors ops =>
-      let defs = (updateMap name (MkEntry fc name ty def) top.defs) in
+      let defs = (updateMap name (MkEntry fc name ty def (flag :: flags)) defs) in
+      MkTop mods imp ns defs metaCtx verbose errors ops
+
+setDef : QName -> FC -> Tm -> Def → List EFlag -> M Unit
+setDef name fc ty def flags = do
+  top <- getTop
+  let (Nothing) = lookupMap' name top.defs
+    | Just (MkEntry fc' nm' ty' def' _) => error fc "\{show name} is already defined at \{show fc'}"
+  modifyTop $ \case
+    MkTop mods imp ns defs metaCtx verbose errors ops =>
+      let defs = (updateMap name (MkEntry fc name ty def flags) top.defs) in
       MkTop mods imp ns defs metaCtx verbose errors ops
 
 
 updateDef : QName -> FC -> Tm -> Def -> M Unit
 updateDef name fc ty def = do
   top <- getTop
-  let (Just (MkEntry fc' nm' ty' def')) = lookupMap' name top.defs
+  let (Just (MkEntry fc' nm' ty' def' flags)) = lookupMap' name top.defs
     | Nothing => error fc "\{show name} not declared"
   modifyTop $ \case
     MkTop mods imp ns defs metaCtx verbose errors ops =>
-      let defs = (updateMap name (MkEntry fc' name ty def) defs) in
+      let defs = (updateMap name (MkEntry fc' name ty def flags) defs) in
       MkTop mods imp ns defs metaCtx verbose errors ops
 
 addError : Error -> M Unit

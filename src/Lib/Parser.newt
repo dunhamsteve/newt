@@ -528,7 +528,7 @@ parseDef = do
     startBlock $ manySame $ (parseSig <|> parseDef)
   let body = maybe body (\ decls => RWhere wfc decls body) w
   -- these get collected later
-  pure $ Def fc nm ((t, body) :: Nil) -- (MkClause fc Nil t body :: Nil)
+  pure $ FunDef fc nm ((t, body) :: Nil) -- (MkClause fc Nil t body :: Nil)
 
 
 parsePType : Parser Decl

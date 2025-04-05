@@ -23,9 +23,9 @@ vprint ctx v = do
 -- collectDecl collects multiple Def for one function into one
 collectDecl : List Decl -> List Decl
 collectDecl Nil = Nil
-collectDecl ((Def fc nm cl) :: rest@(Def _ nm' cl' :: xs)) =
-  if nm == nm' then collectDecl (Def fc nm (cl ++ cl') :: xs)
-  else (Def fc nm cl :: collectDecl rest)
+collectDecl ((FunDef fc nm cl) :: rest@(FunDef _ nm' cl' :: xs)) =
+  if nm == nm' then collectDecl (FunDef fc nm (cl ++ cl') :: xs)
+  else (FunDef fc nm cl :: collectDecl rest)
 collectDecl (x :: xs) = x :: collectDecl xs
 
 rpprint : List String → Tm → String
@@ -116,8 +116,11 @@ isCandidate _ _ = False
 
 findMatches : Context -> Val -> List TopEntry -> M (List String)
 findMatches ctx ty Nil = pure Nil
-findMatches ctx ty ((MkEntry _ name type def) :: xs) = do
-  let (True) = isCandidate ty type | False => findMatches ctx ty xs
+findMatches ctx ty ((MkEntry _ name type def flags) :: xs) = do
+  let (True) = elem Hint flags | False => findMatches ctx ty xs
+  let (True) = isCandidate ty type
+    | False => findMatches ctx ty xs
+
   top <- getTop
   mc <- readIORef top.metaCtx
   catchError (do
@@ -473,7 +476,7 @@ unify env mode t u = do
       debug $ \ _ => "expand \{show t} =?= %ref \{show k'}"
       top <- getTop
       case lookup k' top of
-        Just (MkEntry _ name ty (Fn tm)) => do
+        Just (MkEntry _ name ty (Fn tm) _) => do
           vtm <- eval Nil CBN tm
           appvtm <- vappSpine vtm sp'
           unify env mode t appvtm
@@ -483,7 +486,7 @@ unify env mode t u = do
       debug $ \ _ => "expand %ref \{show k} \{show sp} =?= \{show u}"
       top <- getTop
       case lookup k top of
-        Just (MkEntry _ name ty (Fn tm)) => do
+        Just (MkEntry _ name ty (Fn tm) _) => do
           vtm <- eval Nil CBN tm
           tmsp <- vappSpine vtm sp
           unify env mode tmsp u
@@ -620,7 +623,7 @@ primType : FC -> QName -> M Val
 primType fc nm = do
   top <- getTop
   case lookup nm top of
-      Just (MkEntry _ name ty (PrimTCon _)) => pure $ VRef fc name Lin
+      Just (MkEntry _ name ty (PrimTCon _) _) => pure $ VRef fc name Lin
       _ => error fc "Primitive type \{show nm} not in scope"
 
 infer : Context -> Raw  -> M (Tm × Val)
@@ -688,13 +691,13 @@ getConstructors ctx scfc (VRef fc nm _) = do
     lookupTCon str = do
       top <- getTop
       case lookup nm top of
-        (Just (MkEntry _ name type (TCon _ names))) => pure names
+        (Just (MkEntry _ name type (TCon _ names) _)) => pure names
         _ => error scfc "Not a type constructor \{show nm}"
     lookupDCon : QName -> M (QName × Int × Tm)
     lookupDCon nm = do
       top <- getTop
       case lookup nm top of
-        (Just (MkEntry _ name type (DCon _ k str))) => pure (name, k, type)
+        (Just (MkEntry _ name type (DCon _ k str) _)) => pure (name, k, type)
         Just _ => error fc "Internal Error: \{show nm} is not a DCon"
         Nothing => error fc "Internal Error: DCon \{show nm} not found"
 getConstructors ctx scfc tm = do
@@ -946,7 +949,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
               -- TODO can we check this when we make the PatCon?
               top <- getTop
               case lookup nm top of
-                  (Just (MkEntry _ name type (DCon _ k tcname))) =>
+                  (Just (MkEntry _ name type (DCon _ k tcname) _)) =>
                     if (tcname /= sctynm)
                       then error fc "Constructor is \{show tcname} expected \{show sctynm}"
                       else pure Nothing
@@ -974,7 +977,7 @@ mkPat (tm, icit) = do
   top <- getTop
   case splitArgs tm Nil of
     ((RVar fc nm), b) => case lookupRaw nm top of
-                (Just (MkEntry _ name type (DCon _ k str))) => do
+                (Just (MkEntry _ name type (DCon _ k str) _)) => do
                   -- TODO check arity, also figure out why we need reverse
                   bpat <- traverse (mkPat) b
                   pure $ PatCon fc icit name bpat Nothing
@@ -1006,7 +1009,7 @@ checkWhere ctx decls body ty = do
     | _ => check ctx body ty
   funTy <- check ctx rawtype (VU sigFC)
   debug $ \ _ => "where clause \{name} : \{rpprint (names ctx) funTy}"
-  let (Def defFC name' clauses :: decls') = decls
+  let (FunDef defFC name' clauses :: decls') = decls
     | x :: _ => error (getFC x) "expected function definition"
     | _ => error sigFC "expected function definition after this signature"
   unless (name == name') $ \ _ => error defFC "Expected def for \{name}"
@@ -1407,7 +1410,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
     go i Nil = do
       top <- getTop
       case lookupRaw nm top of
-        Just (MkEntry _ name ty def) => do
+        Just (MkEntry _ name ty def _) => do
           debug $ \ _ => "lookup \{show name} as \{show def}"
           vty <- eval Nil CBN ty
           pure (Ref fc name, vty)

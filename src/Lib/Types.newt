@@ -328,17 +328,29 @@ instance Show Def where
 
 -- entry in the top level context
 
+data EFlag = Hint | Inline
+
+instance Show EFlag where
+  show Hint = "hint"
+  show Inline = "inline"
+
+instance Eq EFlag where
+  Hint == Hint = True
+  Inline == Inline = True
+  _ == _ = False
+
 record TopEntry where
   constructor MkEntry
   fc : FC
   name : QName
   type : Tm
   def : Def
+  eflags : List EFlag
 
 -- FIXME snoc
 
 instance Show TopEntry where
-  show (MkEntry fc name type def) = "\{show name} : \{show type} := \{show def}"
+  show (MkEntry fc name type def flags) = "\{show name} : \{show type} := \{show def} \{show flags}"
 
 record ModContext where
   constructor MkModCtx

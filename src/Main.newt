@@ -32,7 +32,7 @@ jsonTopContext = do
   where
     jsonDef : TopEntry -> Json
     -- There is no FC here...
-    jsonDef (MkEntry fc (QN ns name) type def) = JsonObj
+    jsonDef (MkEntry fc (QN ns name) type def _) = JsonObj
       (  ("fc", toJson fc)
       :: ("name", toJson name)
       :: ("type", toJson (render 80 $ pprint Nil type) )

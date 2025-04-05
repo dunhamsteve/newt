@@ -85,6 +85,7 @@ export function activate(context: vscode.ExtensionContext) {
         // extract errors and messages from stdout
         const lines = stdout.split("\n");
         const diagnostics: vscode.Diagnostic[] = [];
+        const others: Record<string, vscode.Diagnostic[]> = {};
 
         if (err) {
           let start = new vscode.Position(0, 0);
@@ -117,7 +118,26 @@ export function activate(context: vscode.ExtensionContext) {
             let [_full, kind, file, line, column, message] = match;
             let lnum = Number(line);
             let cnum = Number(column);
-            if (file !== fileName) lnum = cnum = 0;
+
+            let severity;
+            if (kind === "ERROR") severity = vscode.DiagnosticSeverity.Error;
+            else if (kind === "WARN") severity = vscode.DiagnosticSeverity.Warning;
+            else severity = vscode.DiagnosticSeverity.Information;
+
+            // anything indented after the ERROR/INFO line are part of
+            // the message
+            while (lines[i + 1]?.match(/^(  )/)) message += "\n" + lines[++i];
+
+            if (file !== fileName) {
+              console.log('MM', file, fileName, lnum, cnum);
+              let start = new vscode.Position(lnum, cnum);
+              let end = new vscode.Position(lnum, cnum + 1);
+              let range = new vscode.Range(start, end);
+              const diag = new vscode.Diagnostic(range, message, severity);
+              if (!others[file]) others[file] = [];
+              others[file].push(diag);
+              lnum = cnum = 0;
+            }
 
             let start = new vscode.Position(lnum, cnum);
             // we don't have the full range, so grab the surrounding word
@@ -125,18 +145,12 @@ export function activate(context: vscode.ExtensionContext) {
             let range =
               document.getWordRangeAtPosition(start) ??
               new vscode.Range(start, end);
-            // anything indented after the ERROR/INFO line are part of
-            // the message
-            while (lines[i + 1]?.match(/^(  )/)) message += "\n" + lines[++i];
-
-            let severity;
-
-            if (kind === "ERROR") severity = vscode.DiagnosticSeverity.Error;
-            else if (kind === "WARN") severity = vscode.DiagnosticSeverity.Warning;
-            else severity = vscode.DiagnosticSeverity.Information;
             const diag = new vscode.Diagnostic(range, message, severity);
             if (kind === "ERROR" || lnum > 0) diagnostics.push(diag);
           }
+        }
+        for (let file in others) {
+          diagnosticCollection.set(vscode.Uri.file(file), others[file])
         }
         diagnosticCollection.set(vscode.Uri.file(fileName), diagnostics);
       }

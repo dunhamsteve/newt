@@ -68,7 +68,6 @@ arityForName fc nm = do
     (Just (PrimFn t arity used)) => pure arity
 
 
-compileTerm : {{Ref2 Defs St}} → Tm -> M CExp
 
 -- need to eta out extra args, fill in the rest of the apps
 -- NOW - maybe eta here instead of Compile.newt, drop number on CApp
@@ -89,6 +88,14 @@ apply t ts acc Z = go (CApp t (acc <>> Nil) 0) ts
     go t Nil = pure t
     go t (arg :: args) = go (CApp t (arg :: Nil) 0) args
 
+lookupDef : {{Ref2 Defs St}} → FC → QName → M Def
+lookupDef fc nm = do
+  defs <- getRef Defs
+  case lookupMap' nm defs of
+    Nothing => error fc "\{show nm} not in scope"
+    Just def => pure def
+
+compileTerm : {{Ref2 Defs St}} → Tm -> M CExp
 compileTerm (Bnd _ k) = pure $ CBnd k
 -- need to eta expand to arity
 compileTerm t@(Ref fc nm@(QN _ tag)) = do
@@ -119,7 +126,6 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
         t' <- compileTerm t
         args' <- traverse compileTerm args
         apply t' args' Lin Z
-        -- error (getFC t) "Don't know how to apply \{showTm t}"
 compileTerm (UU _) = pure $ CRef (QN Nil "U")
 compileTerm (Pi _ nm icit rig t u) = do
   t' <- compileTerm t
@@ -132,8 +138,9 @@ compileTerm (Case _ t alts) = do
     -- we use the base name for the tag, some primitives assume this
     CaseCons qn@(QN ns nm) args tm => do
       defs <- getRef Defs
-      case the (Maybe Def) $ lookupMap' qn defs of
-        Just (DCon EnumCon _ _) => CLitAlt (LString nm) <$> compileTerm tm
+      def <- lookupDef emptyFC qn
+      case def of
+        DCon EnumCon _ _ => CLitAlt (LString nm) <$> compileTerm tm
         _ => CConAlt nm args <$> compileTerm tm
     CaseLit lit tm => CLitAlt lit <$> compileTerm tm
   pure $ CCase t' alts'

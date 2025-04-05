@@ -19,7 +19,7 @@ getType (Ref fc nm) = do
   top <- getTop
   case lookup nm top of
     Nothing => error fc "\{show nm} not in scope"
-    (Just (MkEntry _ name type def)) => pure $ Just type
+    (Just (MkEntry _ name type def _)) => pure $ Just type
 getType tm = pure Nothing
 
 
@@ -48,7 +48,7 @@ doAlt : EEnv -> CaseAlt -> M CaseAlt
 doAlt env (CaseDefault t) = CaseDefault <$> erase env t Nil
 doAlt env (CaseCons name args t) = do
   top <- getTop
-  let (Just (MkEntry _ str type def)) = lookup name top
+  let (Just (MkEntry _ str type def _)) = lookup name top
     | _ => error emptyFC "\{show name} dcon missing from context"
   let env' = piEnv env type args
   CaseCons name args <$> erase env' t Nil
@@ -69,7 +69,7 @@ erase env t sp = case t of
     top <- getTop
     case lookup nm top of
       Nothing => error fc "\{show nm} not in scope"
-      (Just (MkEntry _ name type def)) => eraseSpine env t sp (Just type)
+      (Just (MkEntry _ name type def _)) => eraseSpine env t sp (Just type)
   (Lam fc nm icit rig u) => Lam fc nm icit rig <$> erase ((nm, rig, Nothing) :: env) u Nil
   -- If we get here, we're looking at a runtime pi type
   (Pi fc nm icit rig u v) => do

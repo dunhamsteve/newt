@@ -8,9 +8,10 @@ Syntax -> Parser.Impl ?
 - [ ] implement magic nat (need primitive `+`, '-', and `==` in `CompileExp`)
 - [ ] drop erased args on types and top level functions
 - [ ] can I do some inlining without blowing up code size?
-- [ ] implement string enum (or number, but I'm using strings for tags at the moment)
-- [ ] use monaco input method instead of lean's
-- [ ] `Def` is shadowed between Types and Syntax (TCon vs DCon), detect this
+- [ ] use hint table for auto solving. (I think walking the `toList` is a big chunk of performance in `Elab.newt`.)
+- [x] implement string enum (or number, but I'm using strings for tags at the moment)
+- [x] use monaco input method instead of lean's
+- [x] `Def` is shadowed between Types and Syntax (TCon vs DCon), detect this
 - [ ] review pattern matching. goal is to have a sane context on the other end. secondary goal - bring it closer to the paper.
   - Two issues
     - I'm rewriting stuff in the context, leaving it in a bad state (forward references). I think I can avoid this.
@@ -88,15 +89,15 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [ ] add default failing case for constructor matching to catch errors
 - [x] Add icit to Lam
 - [ ] add jump to definition magic to vscode extension
-  - [x] Cheap dump to def - dump context
-- [ ] TCO? Probably needed in browser, since v8 doesn't do it. bun and JavaScriptCore do support it.
+  - [x] Working for top level, we may want a proper REPL or LSP (and FC ranges?) before we do others
+- [x] TCO? Probably needed in browser, since v8 doesn't do it. bun and JavaScriptCore do support it.
 - [x] deconstructing `let` (and do arrows)
 - [x] Fix string printing to be js instead of weird Idris strings
 - [x] make $ special
   - Makes inference easier, cleaner output, and allows `foo $ \ x => ...`
   - [ ] `$` no longer works inside ≡⟨ ⟩ sort out how to support both that and `$ \ x => ...` (or don't bother)
     - We'd either need to blacklist all non-initial mixfix bits at the appropriate spots or always pass around a terminating token.
-- [ ] **Translate newt to newt**
+- [x] **Translate newt to newt**
   - [x] Support @ on the LHS
   - [x] if / then / else sugar
   - [x] `data Foo = A | B` sugar
@@ -152,7 +153,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
 - [ ] copattern matching
 - [ ] Get `Combinatory.newt` to work
 - [x] Remember operators from imports
-- [ ] Default cases for non-primitives (currently gets expanded to all constructors)
+- [x] Default cases for non-primitives (currently gets expanded to all constructors)
   - This may need a little care. But I think I could collect all constructors that only match wildcards into a single case. This would lose any information from breaking out the individual, unnamed cases though.
   - There are cases where we have  `_` and then `Foo` on the next line, but they should all get collected into the `Foo` case. I think I sorted all of this out for primitives.
 - [x] Case for primitives

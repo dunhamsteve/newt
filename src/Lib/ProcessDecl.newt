@@ -96,6 +96,13 @@ impTele tele = map foo tele
     foo (BI fc nm _ _ , ty) = (BI fc nm Implicit Zero, ty)
 
 
+checkAlreadyDef : FC → Name → M Unit
+checkAlreadyDef fc nm = do
+  top <- getTop
+  case lookupRaw nm top of
+    Nothing => pure MkUnit
+    Just entry => error fc "\{show nm} is already defined at \{show entry.fc}"
+
 
 processDecl : List String -> Decl -> M Unit
 
@@ -106,14 +113,12 @@ processTypeSig ns fc names tm = do
   top <- getTop
   mc <- readIORef top.metaCtx
   -- let mstart = length' mc.metas
-  for names $ \nm => do
-    let (Nothing) = lookupRaw nm top
-      | Just entry => error fc "\{show nm} is already defined at \{show entry.fc}"
-    pure MkUnit
+  traverse (checkAlreadyDef fc) names
   ty <- check (mkCtx fc) tm (VU fc)
   ty <- zonk top 0 Nil ty
   log 1 $ \ _ => "TypeSig \{unwords names} : \{render 90 $ pprint Nil ty}"
-  ignore $ for names $ \nm => setDef (QN ns nm) fc ty Axiom
+  ignore $ for names $ \nm => setDef (QN ns nm) fc ty Axiom Nil
+
 
 
 processPrimType : List Name → FC → Name → Maybe Raw → M Unit
@@ -121,7 +126,7 @@ processPrimType ns fc nm ty = do
   top <- getTop
   ty' <- check (mkCtx fc) (maybe (RU fc) id ty) (VU fc)
   let arity = cast $ piArity ty'
-  setDef (QN ns nm) fc ty' (PrimTCon arity)
+  setDef (QN ns nm) fc ty' (PrimTCon arity) Nil
 
 
 processPrimFn : List String → FC → String → List String → Raw → String → M Unit
@@ -135,7 +140,7 @@ processPrimFn ns fc nm used ty src = do
     Nothing => error fc "\{name} not in scope"
     Just entry => pure entry.name
   let arity = piArity ty'
-  setDef (QN ns nm) fc ty' (PrimFn src arity used')
+  setDef (QN ns nm) fc ty' (PrimFn src arity used') Nil
 
 
 processDef : List String → FC → String → List (Raw × Raw) → M Unit
@@ -146,7 +151,7 @@ processDef ns fc nm clauses = do
   mc <- readIORef top.metaCtx
   let (Just entry) = lookupRaw nm top
     | Nothing => throwError $ E fc "No declaration for \{nm}"
-  let (MkEntry fc name ty Axiom) = entry
+  let (MkEntry fc name ty Axiom _) = entry
     | _ => throwError $ E fc "\{nm} already defined at \{show entry.fc}"
 
   log 1 $ \ _ => "check \{nm} at \{render 90 $ pprint Nil ty}"
@@ -216,7 +221,7 @@ processClass ns classFC nm tele decls = do
       let autoPat = foldl mkAutoApp (RVar classFC dcName) fields
       let lhs = makeLHS (RVar fc name) tele
       let lhs = RApp classFC lhs autoPat Auto
-      let decl = Def fc name ((lhs, (RVar fc name)) :: Nil)
+      let decl = FunDef fc name ((lhs, (RVar fc name)) :: Nil)
 
       log 1 $ \ _ => "\{name} : \{render 90 $ pretty funType}"
       log 1 $ \ _ => "\{render 90 $ pretty decl}"
@@ -264,17 +269,20 @@ processInstance ns instfc ty decls = do
     Just _ => pure MkUnit -- TODO check that the types match
     Nothing => processDecl ns sigDecl
 
+  setFlag (QN ns instname) instfc Hint
+  -- TODO add to hint dictionary
+
   let (Just decls) = collectDecl <$> decls
     | _ => do
       debug $ \ _ => "Forward declaration \{show sigDecl}"
 
   let (Ref _ tconName, args) = funArgs codomain
     | (tm, _) => error tyFC "\{render 90 $ pprint Nil codomain} doesn't appear to be a TCon application"
-  let (Just (MkEntry _ name type (TCon _ cons))) = lookup tconName top
+  let (Just (MkEntry _ name type (TCon _ cons) _)) = lookup tconName top
     | _ => error tyFC "\{show tconName} is not a type constructor"
   let (con :: Nil) = cons
     | _ => error tyFC "\{show tconName} has multiple constructors \{show cons}"
-  let (Just (MkEntry _ _ dcty (DCon _ _ _))) = lookup con top
+  let (Just (MkEntry _ _ dcty (DCon _ _ _) _)) = lookup con top
     | _ => error tyFC "can't find constructor \{show con}"
   vdcty@(VPi _ nm icit rig a b) <- eval Nil CBN dcty
     | x => error (getFC x) "dcty not Pi"
@@ -294,13 +302,14 @@ processInstance ns instfc ty decls = do
        let ty' = foldr (\ x acc => case the Binder x of (MkBinder fc nm' icit rig ty') => Pi fc nm' icit rig ty' acc) ty tele
        let nm' = "\{instname},\{nm}"
        -- we're working with a Tm, so we define directly instead of processDecl
-       let (Just (Def fc name xs)) = find (\x => case the Decl x of
-        (Def y name xs) => name == nm
+       let (Just (FunDef fc name xs)) = find (\x => case the Decl x of
+        (FunDef y name xs) => name == nm
         _ => False) decls
           | _ => error instfc "no definition for \{nm}"
 
-       setDef (QN ns nm') fc ty' Axiom
-       let decl = (Def fc nm' xs)
+       -- REVIEW if we want to Hint this
+       setDef (QN ns nm') fc ty' Axiom Nil
+       let decl = (FunDef fc nm' xs)
        log 1 $ \ _ => "***"
        log 1 $ \ _ => "«\{nm'}» : \{render 90 $ pprint Nil ty'}"
        log 1 $ \ _ => render 80 $ pretty decl
@@ -312,7 +321,7 @@ processInstance ns instfc ty decls = do
     debug $ \ _ => render 80 $ pretty decl
     processDecl ns decl
   let (QN _ con') = con
-  let decl = Def instfc instname ((RVar instfc instname, mkRHS instname conTele (RVar instfc con')) :: Nil)
+  let decl = FunDef instfc instname ((RVar instfc instname, mkRHS instname conTele (RVar instfc con')) :: Nil)
   log 1 $ \ _ => "SIGDECL"
   log 1 $ \ _ => "\{render 90 $ pretty sigDecl}"
   log 1 $ \ _ => render 80 $ pretty decl
@@ -388,20 +397,20 @@ populateConInfo entries =
   setInfo zero ZeroCon :: setInfo succ SuccCon :: Nil
   where
     setInfo : TopEntry → ConInfo → TopEntry
-    setInfo (MkEntry fc nm dty (DCon _ arity hn)) info = MkEntry fc nm dty (DCon info arity hn)
+    setInfo (MkEntry fc nm dty (DCon _ arity hn) flags) info = MkEntry fc nm dty (DCon info arity hn) flags
     setInfo x _ = x
 
     checkEnum : TopEntry → Maybe TopEntry
-    checkEnum (MkEntry fc nm dty (DCon _ 0 hn)) = Just $ MkEntry fc nm dty (DCon EnumCon 0 hn)
+    checkEnum (MkEntry fc nm dty (DCon _ 0 hn) flags) = Just $ MkEntry fc nm dty (DCon EnumCon 0 hn) flags
     checkEnum _ = Nothing
 
     isZero : TopEntry → Bool
-    isZero (MkEntry fc nm dty (DCon _ 0 hn)) = True
+    isZero (MkEntry fc nm dty (DCon _ 0 hn) flags) = True
     isZero _ = False
 
     -- TODO - handle indexes, etc
     isSucc : TopEntry → Bool
-    isSucc (MkEntry fc nm dty@(Pi _ _ _ _ (Ref _ a) (Ref _ b)) (DCon _ 1 hn)) = a == b
+    isSucc (MkEntry fc nm dty@(Pi _ _ _ _ (Ref _ a) (Ref _ b)) (DCon _ 1 hn) _) = a == b
     isSucc _ = False
 
 processData : List String → FC → String → Raw → List Decl → M Unit
@@ -412,14 +421,15 @@ processData ns fc nm ty cons = do
   mc <- readIORef top.metaCtx
   tyty <- check (mkCtx fc) ty (VU fc)
   case lookupRaw nm top of
-    Just (MkEntry _ name type Axiom) => do
+    Just (MkEntry _ name type Axiom _) => do
       tyty' <- eval Nil CBN tyty
       type' <- eval Nil CBN type
       unifyCatch fc (mkCtx fc) tyty' type'
-    Just (MkEntry _ name type _) => error fc "\{show nm} already declared"
-    Nothing => setDef (QN ns nm) fc tyty Axiom
+    Just _ => error fc "\{show nm} already declared"
+    Nothing => setDef (QN ns nm) fc tyty Axiom Nil
   entries <- join <$> (for cons $ \x => case x of
       (TypeSig fc names tm) => do
+          traverse (checkAlreadyDef fc) names
           debug $ \ _ => "check dcon \{show names} \{show tm}"
           dty <- check (mkCtx fc) tm (VU fc)
           debug $ \ _ => "dty \{show names} is \{render 90 $ pprint Nil dty}"
@@ -433,10 +443,10 @@ processData ns fc nm ty cons = do
             | (tm, _) => error (getFC tm) "expected \{nm} got \{render 90 $ pprint tnames tm}"
           when (hn /= QN ns nm) $ \ _ =>
             error (getFC codomain) "Constructor codomain is \{render 90 $ pprint tnames codomain} rather than \{nm}"
-          pure $ map (\ nm' => (MkEntry fc (QN ns nm') dty (DCon NormalCon (getArity dty) hn))) names
+          pure $ map (\ nm' => (MkEntry fc (QN ns nm') dty (DCon NormalCon (getArity dty) hn) Nil)) names
       decl => throwError $ E (getFC decl) "expected constructor declaration")
   let entries = populateConInfo entries
-  for entries $ \case (MkEntry name fc dty def) => setDef fc name dty def
+  for entries $ \case (MkEntry name fc dty def flags) => setDef fc name dty def flags
   let cnames = map (\x => x.name) entries
 
   log 1 $ \ _ => "setDef \{nm}  TCon \{show cnames}"
@@ -482,7 +492,7 @@ processRecord ns recordFC nm tele cname decls = do
       let pname = "." ++ name
       let lhs = foldl (\acc x => case the (BindInfo × Raw) x of (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc pname) tele
       let lhs = RApp recordFC lhs autoPat Explicit
-      let pdecl = Def fc pname ((lhs, (RVar fc name)) :: Nil)
+      let pdecl = FunDef fc pname ((lhs, (RVar fc name)) :: Nil)
       log 1 $ \ _ => "\{pname} : \{render 90 $ pretty funType}"
       log 1 $ \ _ => "\{render 90 $ pretty pdecl}"
       processDecl ns $ TypeSig fc (pname :: Nil) funType
@@ -494,7 +504,7 @@ processDecl ns (PMixFix _ _ _ _)  = pure MkUnit
 processDecl ns (TypeSig fc names tm) = processTypeSig ns fc names tm
 processDecl ns (PType fc nm ty) = processPrimType ns fc nm ty
 processDecl ns (PFunc fc nm used ty src) = processPrimFn ns fc nm used ty src
-processDecl ns (Def fc nm clauses) = processDef ns fc nm clauses
+processDecl ns (FunDef fc nm clauses) = processDef ns fc nm clauses
 processDecl ns (DCheck fc tm ty) = processCheck ns fc tm ty
 processDecl ns (Class classFC nm tele decls) = processClass ns classFC nm tele decls
 processDecl ns (Instance instfc ty decls) = processInstance ns instfc ty decls

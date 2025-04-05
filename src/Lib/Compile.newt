@@ -308,7 +308,7 @@ getNames (Case x t alts) acc = foldl getAltNames acc alts
   where
     getAltNames : List QName -> CaseAlt -> List QName
     getAltNames acc (CaseDefault t) = getNames t acc
-    getAltNames acc (CaseCons name args t) = getNames t acc
+    getAltNames acc (CaseCons name args t) = name :: getNames t acc
     getAltNames acc (CaseLit lit t) = getNames t acc
 getNames _ acc = acc
 
@@ -321,12 +321,12 @@ getEntries acc name = do
     Nothing => do
       putStrLn "bad name \{show name}"
       pure acc
-    Just (MkEntry _ name type def@(Fn exp)) => case lookupMap' name acc of
+    Just (MkEntry _ name type def@(Fn exp) _) => case lookupMap' name acc of
       Just _ => pure acc
       Nothing =>
         let acc = updateMap name def acc in
         foldlM getEntries acc $ getNames exp Nil
-    Just (MkEntry _ name type def@(PrimFn _ _ used)) =>
+    Just (MkEntry _ name type def@(PrimFn _ _ used) _) =>
       let acc = updateMap name def acc in
       foldlM getEntries acc used
     Just entry => pure $ updateMap name entry.def acc
@@ -402,7 +402,7 @@ compile : M (List Doc)
 compile = do
   top <- getTop
   case lookupRaw "main" top of
-    Just (MkEntry fc name type def) => do
+    Just (MkEntry fc name type def _) => do
       tmp <- process name
       -- tack on call to main function
       let exec = stmtToDoc $ JPlain $ Apply (Var $ show name) Nil
