@@ -128,7 +128,12 @@ export function activate(context: vscode.ExtensionContext) {
             console.log(`entry ${name} not found`);
             return null;
           }
-          let uri = vscode.Uri.file(entry.fc.file);
+          const root = vscode.workspace.getWorkspaceFolder(document.uri);
+          if (!root) {
+            console.error("Workspace folder not found");
+            return null;
+          }
+          let uri = vscode.Uri.file(path.join(root.uri.fsPath, entry.fc.file));
           let start = new vscode.Position(entry.fc.line, entry.fc.col);
           let range = new vscode.Range(start, start);
           return new vscode.Location(uri, range);

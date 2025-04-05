@@ -27,7 +27,8 @@ primNS = ("Prim" :: Nil)
 jsonTopContext : M Json
 jsonTopContext = do
   top <- getTop
-  pure $ JsonObj (("context", JsonArray (map jsonDef $ listValues top.defs)) :: Nil)
+  let defs = join $ map (\mod => listValues mod.modDefs) $ listValues top.modules
+  pure $ JsonObj (("context", JsonArray (map jsonDef $ defs)) :: Nil)
   where
     jsonDef : TopEntry -> Json
     -- There is no FC here...
