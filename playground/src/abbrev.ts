@@ -1,0 +1,1 @@
+../../newt-vscode/src/abbrev.ts

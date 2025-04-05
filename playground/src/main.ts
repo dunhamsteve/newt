@@ -6,6 +6,7 @@ import { h, render } from "preact";
 import { ChangeEvent } from "preact/compat";
 import { archive, preload } from "./preload.ts";
 import { CompileReq, CompileRes, Message } from "./types.ts";
+import { ABBREV } from "./abbrev.ts";
 
 // editor.(createModel / setModel / getModels) to switch files
 
@@ -220,17 +221,6 @@ effect(() => {
 interface EditorProps {
   initialValue: string;
 }
-
-const ABBREV: Record<string, string> = {
-    '\\x': '×',
-    '\\r': '→',
-    '\\all': '∀',
-    '\\\\': '\\',
-    '\\==': '≡',
-    '\\circ': '∘',
-    '\\1': '₁',
-    '\\2': '₂',
-  }
 
 function Editor({ initialValue }: EditorProps) {
   const ref = useRef<HTMLDivElement>(null);

@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { exec } from "child_process";
 import path from "path";
+import { ABBREV } from "./abbrev";
 
 interface FC {
   file: string;
@@ -21,6 +22,45 @@ export function activate(context: vscode.ExtensionContext) {
   let topData: undefined | TopData;
   const diagnosticCollection =
     vscode.languages.createDiagnosticCollection("newt");
+
+  vscode.workspace.onDidChangeTextDocument((event) => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || event.document !== editor.document) return;
+
+    const changes = event.contentChanges;
+    if (changes.length === 0) return;
+
+    const lastChange = changes[changes.length - 1];
+    const text = lastChange.text;
+
+    // Check if the last change is a potential shortcut trigger
+    if (!text || !" ')\\".includes(text)) return;
+
+    const document = editor.document;
+    const position = lastChange.range.end;
+    const lineText = document.lineAt(position.line).text;
+    const start = Math.max(0, position.character - 10);
+    const snippet = lineText.slice(start, position.character);
+    console.log(`change '${text}' snippet ${snippet}`)
+    const m = snippet.match(/(\\[^ ]+)$/);
+    if (m) {
+      const cand = m[0];
+      console.log('cand', cand);
+      const replacement = ABBREV[cand];
+      console.log('repl', replacement);
+      if (replacement) {
+        const range = new vscode.Range(
+          position.line,
+          position.character - cand.length,
+          position.line,
+          position.character
+        );
+        editor.edit((editBuilder) => {
+          editBuilder.replace(range, replacement);
+        });
+      }
+    }
+  });
 
   function checkDocument(document: vscode.TextDocument) {
     const fileName = document.fileName;
