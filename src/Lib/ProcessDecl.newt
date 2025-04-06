@@ -51,9 +51,7 @@ logMetas (Unsolved fc k ctx ty User cons :: rest) = do
 logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
       ty' <- forceMeta ty
       tm <- quote ctx.lvl ty'
-      -- Now that we're collecting errors, maybe we simply check at the end
-      -- TODO - log constraints?
-      -- FIXME in Combinatory, the val doesn't match environment?
+      -- FIXME in Combinatory.newt, the val doesn't match environment?
       let msg = "Unsolved meta \{show k} \{show kind} type \{render 90 $ pprint (names ctx) tm} \{show $ length' cons} constraints"
       msgs <- for cons $ \case
         (MkMc fc env sp val) => do
@@ -65,13 +63,10 @@ logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
           debug $ \ _ => "AUTO ---> \{show ty}"
           -- we want the context here too.
           top <- getTop
-          -- matches <- case !(contextMatches ctx ty) of
-          --   Nil => findMatches ctx ty $ toList top.defs
-          --   xs => pure xs
-          matches <- findMatches ctx ty $ map snd $ toList top.defs
-          -- TODO try putting mc into TopContext for to see if it gives better terms
+          let (VRef _ tyname _) = ty | _ => pure Nil
+          let cands = fromMaybe Nil $ lookupMap' tyname top.hints
+          matches <- findMatches ctx ty cands
           pure $ ("  \{show $ length' matches} Solutions: \{show matches}" :: Nil)
-          -- pure $ "  \{show $ length' matches} Solutions:" :: map (("  " ++) ∘ render 90 ∘ pprint (names ctx) ∘ fst) matches
 
         _ => pure Nil
       info fc $ unlines ((msg :: Nil) ++ msgs ++ sols)
@@ -162,9 +157,7 @@ processDef ns fc nm clauses = do
   -- I can take LHS apart syntactically or elaborate it with an infer
   clauses' <- traverse makeClause clauses
   tm <- buildTree (mkCtx fc) (MkProb clauses' vty)
-  -- log 1 $ \ _ => "Ok \{render 90 $ pprint Nil tm}"
 
-  mc <- readIORef top.metaCtx
   solveAutos
   -- TODO - make nf that expands all metas and drop zonk
   -- Idris2 doesn't expand metas for performance - a lot of these are dropped during erasure.
@@ -267,10 +260,11 @@ processInstance ns instfc ty decls = do
   -- member
   case lookupRaw instname top of
     Just _ => pure MkUnit -- TODO check that the types match
-    Nothing => processDecl ns sigDecl
-
-  setFlag (QN ns instname) instfc Hint
-  -- TODO add to hint dictionary
+    Nothing => do
+      -- only add once
+      processDecl ns sigDecl
+      setFlag (QN ns instname) instfc Hint
+      addHint (QN ns instname)
 
   let (Just decls) = collectDecl <$> decls
     | _ => do

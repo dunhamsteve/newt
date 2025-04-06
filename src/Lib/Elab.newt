@@ -114,10 +114,9 @@ isCandidate (VRef _ nm _) (Ref fc nm') = nm == nm'
 isCandidate ty (App fc t u) = isCandidate ty t
 isCandidate _ _ = False
 
-findMatches : Context -> Val -> List TopEntry -> M (List String)
+findMatches : Context -> Val -> List (QName × Tm) -> M (List String)
 findMatches ctx ty Nil = pure Nil
-findMatches ctx ty ((MkEntry _ name type def flags) :: xs) = do
-  let (True) = elem Hint flags | False => findMatches ctx ty xs
+findMatches ctx ty ((name, type) :: xs) = do
   let (True) = isCandidate ty type
     | False => findMatches ctx ty xs
 
@@ -130,7 +129,7 @@ findMatches ctx ty ((MkEntry _ name type def flags) :: xs) = do
       -- This check is solving metas, so we save mc below in case we want this solution
       let (QN ns nm) = name
       let (cod, tele) = splitTele type
-      modifyIORef top.metaCtx $ \ mc => MC mc.metas mc.next CheckFirst
+      modifyIORef top.metaCtx $ \ mc => MC mc.metas mc.autos mc.next CheckFirst
       tm <- check ctx (RVar fc nm) ty
       debug $ \ _ => "Found \{rpprint Nil tm} for \{show ty}"
       writeIORef top.metaCtx mc
@@ -195,11 +194,10 @@ trySolveAuto (Unsolved fc k ctx ty AutoSolve _) = do
           | res => do
               debug $ \ _ => "FAILED to solve \{show ty}, matches: \{render 90 $ commaSep $ map (pprint Nil ∘ fst) res}"
               pure False
-      let te = listValues top.defs
-      let rest = map {List} (\ x => listValues x.modDefs) $
-            mapMaybe (flip lookupMap' top.modules) top.imported
 
-      (nm :: Nil) <- findMatches ctx ty $ join (te :: rest)
+      let (VRef _ tyname _) = ty | _ => pure False
+      let cands = fromMaybe Nil $ lookupMap' tyname top.hints
+      (nm :: Nil) <- findMatches ctx ty cands
         | res => do
           debug $ \ _ => "FAILED to solve \{show ty}, matches: \{show res}"
           pure False
@@ -215,7 +213,8 @@ solveAutos : M Unit
 solveAutos = do
   top <- getTop
   mc <- readIORef top.metaCtx
-  res <- run $ filter isAuto (listValues mc.metas)
+  let autos = filter isAuto $ mapMaybe (flip lookupMap' mc.metas) mc.autos
+  res <- run autos
   if res then solveAutos else pure MkUnit
   where
     isAuto : MetaEntry -> Bool
@@ -236,7 +235,10 @@ updateMeta ix f = do
   mc <- readIORef {M} top.metaCtx
   let (Just me) = lookupMap' ix mc.metas | Nothing => pure MkUnit
   me <- f me
-  writeIORef top.metaCtx $ MC (updateMap ix me mc.metas) mc.next mc.mcmode
+  let autos = case me of
+    Solved _ _ _ => filter (_/=_ ix) mc.autos
+    _ => mc.autos
+  writeIORef top.metaCtx $ MC (updateMap ix me mc.metas) autos mc.next mc.mcmode
 
 checkAutos : QName -> List MetaEntry -> M Unit
 checkAutos ix Nil = pure MkUnit
@@ -263,8 +265,7 @@ addConstraint env ix sp tm = do
     (Solved _ k tm) => error' "Meta \{show k} already solved [addConstraint]"
     (OutOfScope) => error' "Meta \{show ix} out of scope"
   mc <- readIORef top.metaCtx
-  checkAutos ix (listValues mc.metas)
-  pure MkUnit
+  checkAutos ix $ mapMaybe (flip lookupMap' mc.metas) mc.autos
 
 -- return renaming, the position is the new VVar
 invert : Int -> SnocList Val -> M (List Int)
@@ -353,9 +354,9 @@ maybeCheck action = do
   case mc.mcmode of
     CheckAll => action
     CheckFirst => do
-      modifyIORef top.metaCtx $ \ mc => MC mc.metas mc.next NoCheck
+      modifyIORef top.metaCtx $ \ mc => MC mc.metas mc.autos mc.next NoCheck
       action
-      modifyIORef top.metaCtx $ \ mc => MC mc.metas mc.next CheckFirst
+      modifyIORef top.metaCtx $ \ mc => MC mc.metas mc.autos mc.next CheckFirst
     NoCheck => pure MkUnit
 
 solve env m sp t = do
@@ -393,8 +394,6 @@ solve env m sp t = do
         debug $ \ _ => "discharge l=\{show $ length' env} \{(show val)} =?= \{(show rhs)}"
         unify env UNormal val rhs
     mc <- readIORef top.metaCtx
-    -- stack ...
-    -- checkAutos ix mc.metas
     pure MkUnit
     )
 
@@ -587,7 +586,10 @@ freshMeta ctx fc ty kind = do
   -- we were fudging this for v1
   let qn = QN top.ns "$m\{show mc.next}"
   let newmeta = Unsolved fc qn ctx ty kind Nil
-  writeIORef top.metaCtx $ MC (updateMap qn newmeta mc.metas) (1 + mc.next) mc.mcmode
+  let autos = case kind of
+      AutoSolve => qn :: mc.autos
+      _ => mc.autos
+  writeIORef top.metaCtx $ MC (updateMap qn newmeta mc.metas) autos (1 + mc.next) mc.mcmode
   -- infinite loop - keeps trying Ord a => Ord (a \x a)
   -- when (kind == AutoSolve) $ \ _ => ignore $ trySolveAuto newmeta
   pure $ applyBDs 0 (Meta fc qn) ctx.bds

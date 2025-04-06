@@ -110,7 +110,7 @@ compileTerm t@(Ref fc nm@(QN _ tag)) = do
         _ => pure $ CRef nm
     _ => apply (CRef nm) Nil Lin arity
 
-compileTerm (Meta _ k) = pure $ CRef (QN Nil "meta$\{show k}") -- FIXME should be exception
+compileTerm (Meta fc k) = error fc "Compiling meta \{show k}"
 compileTerm (Lam _ nm _ _ t) = CLam nm <$> compileTerm t
 compileTerm tm@(App _ _ _) = case funArgs tm of
   (Meta _ k, args) => do

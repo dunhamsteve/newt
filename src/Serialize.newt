@@ -62,7 +62,7 @@ loadModule qn src = do
   let ops = mapFromList ops
   let defs = mapFromList $ map (\ entry => (entry.name, entry)) defs
       -- REVIEW can we ignore those last two inside a module
-  let mctx = MC (mapFromList mctx) 0 NoCheck
+  let mctx = MC (mapFromList mctx) Nil 0 NoCheck
   if csum == src
     then pure $ Just $ MkModCtx csum defs mctx ops
     else pure Nothing
