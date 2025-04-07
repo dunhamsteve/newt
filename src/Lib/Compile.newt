@@ -36,6 +36,7 @@ data JSExp : U where
   Apply : JSExp -> List JSExp -> JSExp
   Var : String -> JSExp
   JLam : List String -> JSStmt Return -> JSExp
+  JPrimOp : String → JSExp → JSExp → JSExp
   JUndefined : JSExp
   Index : JSExp -> JSExp -> JSExp
   Dot : JSExp -> String -> JSExp
@@ -134,6 +135,7 @@ termToJS env (CFun nms t) f =
   let (nms', env') = freshNames nms env
   in f $ JLam nms' (termToJS env' t JReturn)
 termToJS env (CRef nm) f = f $ Var (show nm)
+termToJS env (CPrimOp op t u) f = termToJS env t $ \ t => termToJS env u $ \ u => f $ JPrimOp op t u
 termToJS env (CMeta k) f = f $ LitString "META \{show k}"
 termToJS env (CLit lit) f = f (litToJS lit)
 -- if it's a var, just use the original
@@ -258,6 +260,7 @@ expToDoc (JLam nms body) = text "(" <+> commaSep (map jsIdent nms) <+> text ") =
 expToDoc JUndefined = text "null"
 expToDoc (Index obj ix) = expToDoc obj ++ text "(" ++ expToDoc ix ++ text " :: Nil)"
 expToDoc (Dot obj nm) = expToDoc obj ++ text "." ++ jsIdent nm
+expToDoc (JPrimOp op t u) = text "(" ++ expToDoc t <+> text op <+> expToDoc u ++ text ")"
 
 caseBody : ∀ e. JSStmt e -> Doc
 caseBody stmt@(JReturn x) = nest 2 (line ++ stmtToDoc stmt)
@@ -357,6 +360,7 @@ sortedNames defs qn = go Nil Nil qn
     getNames acc (CMeta _) = acc
     getNames acc (CBnd _) = acc
     getNames acc CErased = acc
+    getNames acc (CPrimOp op t u) = getNames (getNames acc t) u
 
     go : List QName → List QName → QName → List QName
     go loop acc qn =

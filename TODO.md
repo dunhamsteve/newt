@@ -24,6 +24,7 @@ Syntax -> Parser.Impl ?
   - It would be nice if IO looked like imperative JS, but that might be a bit of a stretch.
 
 - [ ] LSP and/or more editor support
+  - [ ] would be nice to have "add missing cases" and "case split"
   - [ ] Probably need ranges for FC
   - [ ] leave an interactive process running
   - [ ] collect metadata or run through the serialization data

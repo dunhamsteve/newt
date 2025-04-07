@@ -42,6 +42,9 @@ data CExp : U where
   CConstr : Name -> List CExp -> CExp
   -- Raw javascript for `pfunc`
   CRaw : String -> List QName -> CExp
+  -- Need this for magic Nat
+  -- TODO - use for primitives too
+  CPrimOp : String → CExp → CExp -> CExp
 
 -- I'm counting Lam in the term for arity.  This matches what I need in
 -- code gen.

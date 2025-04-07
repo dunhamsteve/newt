@@ -39,6 +39,7 @@ tailNames CErased = Nil
 tailNames (CLit _) = Nil
 tailNames (CMeta _) = Nil
 tailNames (CRaw _ _) = Nil
+tailNames (CPrimOp _ _ _) = Nil
 
 -- rewrite tail calls to return an object
 rewriteTailCalls : List QName → CExp → CExp
