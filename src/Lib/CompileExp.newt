@@ -16,10 +16,15 @@ import Lib.Util
 import Lib.Ref2
 import Data.SortedMap
 
+-- REVIEW Separate pass for constructor magic?
+-- ConCase SuccCon will be replaced by Default CLet,
+-- but we would need to fix up zero, since we collapse extra constructors into a default case.
+-- But should be ok becaon CLitAlt doesn't bind.
+
 CExp : U
 
 data CAlt : U where
-  CConAlt : String -> List String -> CExp -> CAlt
+  CConAlt : String → ConInfo → List String → CExp → CAlt
   -- REVIEW keep var name?
   CDefAlt : CExp -> CAlt
   -- literal
@@ -109,7 +114,10 @@ compileTerm t@(Ref fc nm@(QN _ tag)) = do
     (S Z) => pure $ CRef nm
     Z =>
       case the (Maybe Def) $ lookupMap' nm defs of
-        (Just (DCon EnumCon _ _)) => pure $ CLit $ LString tag
+        Just (DCon EnumCon _ _) => pure $ CLit $ LString tag
+        Just (DCon ZeroCon _ _) => pure $ CLit $ LInt 0
+        Just (DCon SuccCon _ _) =>
+          pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
         _ => pure $ CRef nm
     _ => apply (CRef nm) Nil Lin arity
 
@@ -121,20 +129,28 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
         -- info (getFC tm) "Compiling an unsolved meta \{show tm}"
         -- pure $ CApp (CRef "Meta\{show k}") Nil 0
   (t@(Ref fc nm), args) => do
+        defs <- getRef Defs
         args' <- traverse compileTerm args
         arity <- arityForName fc nm
-        apply (CRef nm) args' Lin arity
+        case the (Maybe Def) $ lookupMap' nm defs of
+          Just (DCon SuccCon _ _) => applySucc args'
+          _ => apply (CRef nm) args' Lin arity
   (t, args) => do
         debug $ \ _ => "apply other \{render 90 $ pprint Nil t}"
         t' <- compileTerm t
         args' <- traverse compileTerm args
         apply t' args' Lin Z
+  where
+    applySucc : List CExp → M CExp
+    applySucc Nil = pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
+    applySucc (t :: Nil) = pure $ CPrimOp "+" (CLit $ LInt 1) t
+    applySucc _ = error emptyFC "overapplied Succ \{show tm}"
 compileTerm (UU _) = pure $ CRef (QN Nil "U")
 compileTerm (Pi _ nm icit rig t u) = do
   t' <- compileTerm t
   u' <- compileTerm u
   pure $ CApp (CRef (QN Nil "PiType")) (t' :: CLam nm u' :: Nil) 0
-compileTerm (Case _ t alts) = do
+compileTerm (Case fc t alts) = do
   t' <- compileTerm t
   alts' <- for alts $ \case
     CaseDefault tm => CDefAlt <$> compileTerm tm
@@ -143,10 +159,58 @@ compileTerm (Case _ t alts) = do
       defs <- getRef Defs
       def <- lookupDef emptyFC qn
       case def of
-        DCon EnumCon _ _ => CLitAlt (LString nm) <$> compileTerm tm
-        _ => CConAlt nm args <$> compileTerm tm
+        DCon info _ _ => CConAlt nm info args <$> compileTerm tm
+        _ => error fc "\{show nm} is not constructor"
+
     CaseLit lit tm => CLitAlt lit <$> compileTerm tm
-  pure $ CCase t' alts'
+  pure $ CCase t' $ fancyCons t' alts'
+  where
+    numAltP : CAlt → Bool
+    numAltP (CConAlt _ SuccCon _ _) = True
+    numAltP (CConAlt _ ZeroCon _ _) = True
+    numAltP _ = False
+
+    enumAlt : CAlt → CAlt
+    enumAlt (CConAlt nm EnumCon args tm) = CLitAlt (LString nm) tm
+    enumAlt alt = alt
+
+    isInfo : ConInfo → CAlt → Bool
+    isInfo needle (CConAlt _ info _ _)  = needle == info
+    isInfo _ _ = False
+
+    isDef : CAlt → Bool
+    isDef (CDefAlt _) = True
+    isDef _ = False
+
+    getBody : CAlt → CExp
+    getBody (CConAlt _ _ _ t) = t
+    getBody (CLitAlt _ t) = t
+    getBody (CDefAlt t) = t
+
+    doNumCon : CExp → List CAlt → List CAlt
+    doNumCon sc alts =
+      let zeroAlt = case find (isInfo ZeroCon) alts of
+            Just (CConAlt _ _ _ tm) => CLitAlt (LInt 0) tm :: Nil
+            Just tm => fatalError "ERROR zeroAlt mismatch \{debugStr tm}"
+            _ => case find isDef alts of
+                  Just (CDefAlt tm) => CLitAlt (LInt 0) tm :: Nil
+                  -- This happens if the zero alt is impossible
+                  _ => Nil
+      in
+      let succAlt = case find (isInfo SuccCon) alts of
+            Just (CConAlt _ _ _ tm) => CDefAlt (CLet "x" (CPrimOp "-" sc (CLit $ LInt 1)) tm) :: Nil
+            Just tm => fatalError "ERROR succAlt mismatch \{debugStr tm}"
+            _ => case find isDef alts of
+              Just alt => alt :: Nil
+              _ => Nil
+      in zeroAlt ++ succAlt
+
+    fancyCons : CExp → List CAlt → List CAlt
+    fancyCons sc alts =
+      if any numAltP alts
+        then doNumCon sc alts
+        else map enumAlt alts
+
 compileTerm (Lit _ lit) = pure $ CLit lit
 compileTerm (Let _ nm t u) = do
   t' <- compileTerm t

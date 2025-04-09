@@ -310,6 +310,13 @@ record MetaContext where
 
 data ConInfo = NormalCon | SuccCon | ZeroCon | EnumCon
 
+instance Eq ConInfo where
+  NormalCon == NormalCon = True
+  SuccCon == SuccCon = True
+  ZeroCon == ZeroCon = True
+  EnumCon == EnumCon = True
+  _ == _ = False
+
 instance Show ConInfo where
   show NormalCon = ""
   show SuccCon = "[S]"

@@ -3,15 +3,20 @@
 
 Syntax -> Parser.Impl ?
 
+- [ ] Eq Nat is not being identified as tail recursive...
 - [x] fix string highlighting
 - [x] implement tail call optimization
-- [ ] implement magic nat (need primitive `+`, '-', and `==` in `CompileExp`)
+- [x] implement magic nat 
 - [ ] drop erased args on types and top level functions
 - [ ] can I do some inlining without blowing up code size?
 - [ ] use hint table for auto solving. (I think walking the `toList` is a big chunk of performance in `Elab.newt`.)
 - [x] implement string enum (or number, but I'm using strings for tags at the moment)
 - [x] use monaco input method instead of lean's
 - [x] `Def` is shadowed between Types and Syntax (TCon vs DCon), detect this
+- [ ] constructor magic for Bool?
+  - We'd have to make assumptions about order.
+  - we could special case some translations
+  - extra code.
 - [ ] review pattern matching. goal is to have a sane context on the other end. secondary goal - bring it closer to the paper.
   - Two issues
     - I'm rewriting stuff in the context, leaving it in a bad state (forward references). I think I can avoid this.
@@ -105,8 +110,8 @@ More comments in code! This is getting big enough that I need to re-find my bear
   - [x] records
   - [ ] record sugar? (detailed above)
   - [x] where
-  - [ ] add namespaces
-  - [ ] magic nat?
+- [x] add namespaces
+- [x] magic nat?
 - [x] rework `unify` case tree
   - Idris needs help with the case tree to keep code size down, do it in stages, one dcon at a time.
   - I'm not sure it can go a few steps deep and have a default hanging off the side, so we may need to put the default case in another function ourselves.

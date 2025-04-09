@@ -195,14 +195,14 @@ termToJS {e} env (CCase t alts) f =
 
   where
     termToJSAlt : JSEnv -> String -> CAlt -> JAlt
-    termToJSAlt env nm (CConAlt name args u) = JConAlt name (termToJS (mkEnv nm 0 env args) u f)
+    termToJSAlt env nm (CConAlt name info args u) = JConAlt name (termToJS (mkEnv nm 0 env args) u f)
     -- intentionally reusing scrutinee name here
     termToJSAlt env nm (CDefAlt u) = JDefAlt (termToJS  (env) u f)
     termToJSAlt env nm (CLitAlt lit u) = JLitAlt (litToJS lit) (termToJS env u f)
 
     maybeCaseStmt : JSEnv -> String -> List CAlt -> JSStmt e
     -- If there is a single alt, assume it matched
-    maybeCaseStmt env nm ((CConAlt _ args u) :: Nil) = (termToJS (mkEnv nm 0 env args) u f)
+    maybeCaseStmt env nm ((CConAlt _ info args u) :: Nil) = (termToJS (mkEnv nm 0 env args) u f)
     maybeCaseStmt env nm alts@(CLitAlt _ _  :: _) =
         (JCase (Var nm) (map (termToJSAlt env nm) alts))
     maybeCaseStmt env nm alts =
@@ -237,6 +237,8 @@ jsIdent id = if elem id jsKeywords then text ("$" ++ id) else text $ pack $ fix 
       else
         '$' :: (toHex (cast x)) ++ fix xs
 
+
+
 stmtToDoc : ∀ e. JSStmt e -> Doc
 
 
@@ -260,7 +262,7 @@ expToDoc (JLam nms body) = text "(" <+> commaSep (map jsIdent nms) <+> text ") =
 expToDoc JUndefined = text "null"
 expToDoc (Index obj ix) = expToDoc obj ++ text "(" ++ expToDoc ix ++ text " :: Nil)"
 expToDoc (Dot obj nm) = expToDoc obj ++ text "." ++ jsIdent nm
-expToDoc (JPrimOp op t u) = text "(" ++ expToDoc t <+> text op <+> expToDoc u ++ text ")"
+expToDoc (JPrimOp op t u) = parens 0 1 (expToDoc t) <+> text op <+> parens 0 1 (expToDoc u)
 
 caseBody : ∀ e. JSStmt e -> Doc
 caseBody stmt@(JReturn x) = nest 2 (line ++ stmtToDoc stmt)
@@ -341,7 +343,7 @@ sortedNames : SortedMap QName CExp → QName → List QName
 sortedNames defs qn = go Nil Nil qn
   where
     getBody : CAlt → CExp
-    getBody (CConAlt _ _ t) = t
+    getBody (CConAlt _ _ _ t) = t
     getBody (CLitAlt _ t) = t
     getBody (CDefAlt t) = t
 

@@ -23,7 +23,7 @@ tailNames (CApp (CRef name) args 0) = name :: Nil
 tailNames (CCase _ alts) = join $ map altTailNames alts
   where
     altTailNames : CAlt → List QName
-    altTailNames (CConAlt _ _ exp) = tailNames exp
+    altTailNames (CConAlt _ _ _ exp) = tailNames exp
     altTailNames (CDefAlt exp) = tailNames exp
     altTailNames (CLitAlt _ exp) = tailNames exp
 tailNames (CLet _ _ t) = tailNames t
@@ -54,7 +54,7 @@ rewriteTailCalls nms tm = case tm of
   tm => CConstr "return" (tm :: Nil)
   where
       rewriteAlt : CAlt -> CAlt
-      rewriteAlt (CConAlt nm args t) = CConAlt nm args $ rewriteTailCalls nms t
+      rewriteAlt (CConAlt nm info args t) = CConAlt nm info args $ rewriteTailCalls nms t
       rewriteAlt (CDefAlt t) = CDefAlt $ rewriteTailCalls nms t
       rewriteAlt (CLitAlt lit t) = CLitAlt lit $ rewriteTailCalls nms t
 
@@ -85,7 +85,7 @@ doOptimize fns = do
     mkRecName (QN ns nm :: _) = pure $ QN ns "REC_\{nm}"
 
     mkAlt : List QName → (QName × List Name × CExp) -> CAlt
-    mkAlt nms (qn, args, tm) = CConAlt (show qn) args (rewriteTailCalls nms tm)
+    mkAlt nms (qn, args, tm) = CConAlt (show qn) NormalCon args (rewriteTailCalls nms tm)
 
     splitFun : (QName × CExp) → M (QName × List Name × CExp)
     splitFun (qn, CFun args body) = pure (qn, args, body)

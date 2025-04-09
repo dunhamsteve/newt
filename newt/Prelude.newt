@@ -314,23 +314,8 @@ pfunc split uses (Nil _::_) : String -> String -> List String := `(s, by) => {
 pfunc slen : String -> Int := `s => s.length`
 pfunc sindex : String -> Int -> Char := `(s,i) => s[i]`
 
--- TODO represent Nat as number at runtime
-pfunc natToInt : Nat -> Int := `(n) => {
-  let rval = 0
-  while (n.tag === 'S') {
-    n = n.h0
-    rval++
-  }
-  return rval
-}`
-
-pfunc intToNat uses (Z S) : Int -> Nat := `(n) => {
-  let rval = Prelude_Z
-  for (;n>0;n--) rval = Prelude_S(rval);
-  return rval;
-}`
-
-
+pfunc natToInt : Nat -> Int := `(n) => n`
+pfunc intToNat : Int -> Nat := `(n) => n>0?n:0`
 
 pfunc fastConcat uses (listToArray) : List String → String := `(xs) => Prelude_listToArray(null, xs).join('')`
 pfunc replicate uses (natToInt) : Nat -> Char → String := `(n,c) => c.repeat(Prelude_natToInt(n))`
@@ -795,6 +780,10 @@ instance ∀ a. {{Eq a}} → Eq (List a) where
 find : ∀ a. (a → Bool) → List a → Maybe a
 find f Nil = Nothing
 find f (x :: xs) = if f x then Just x else find f xs
+
+any : ∀ a. (a → Bool) → List a → Bool
+any f Nil = False
+any f (x :: xs) = if f x then True else any f xs
 
 -- TODO this would be faster, but less pure as a primitive
 -- fastConcat might be a good compromise
