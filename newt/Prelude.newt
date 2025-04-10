@@ -580,10 +580,13 @@ elem v (x :: xs) = if v == x then True else elem v xs
 pfunc trace uses (debugStr) : ∀ a. String -> a -> a := `(_, msg, a) => { console.log(msg,Prelude_debugStr(_,a)); return a }`
 
 mapMaybe : ∀ a b. (a → Maybe b) → List a → List b
-mapMaybe f Nil = Nil
-mapMaybe f (x :: xs) = case f x of
-  Just y => y :: mapMaybe f xs
-  Nothing => mapMaybe f xs
+mapMaybe {a} {b} f xs = go Lin xs
+  where
+    go : SnocList b → List a → List b
+    go acc Nil = acc <>> Nil
+    go acc (x :: xs) = case f x of
+      Just y => go (acc :< y) xs
+      Nothing => go acc xs
 
 zip : ∀ a b. List a → List b → List (a × b)
 zip (x :: xs) (y :: ys) = (x,y) :: zip xs ys
@@ -780,10 +783,6 @@ instance ∀ a. {{Eq a}} → Eq (List a) where
 find : ∀ a. (a → Bool) → List a → Maybe a
 find f Nil = Nothing
 find f (x :: xs) = if f x then Just x else find f xs
-
-any : ∀ a. (a → Bool) → List a → Bool
-any f Nil = False
-any f (x :: xs) = if f x then True else any f xs
 
 -- TODO this would be faster, but less pure as a primitive
 -- fastConcat might be a good compromise

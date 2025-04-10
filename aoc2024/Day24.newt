@@ -132,7 +132,7 @@ swapPins a g (MkG i1 i2 op out) =
   else MkG i1 i2 op out
 
 fail : ∀ a. String -> a
-fail msg = let x = trace "FAIL" msg in ?
+fail msg = fatalError msg
 
 check : List Gate → List Int → String → Either (String × String) Unit
 check gates Nil carry = Right MkUnit

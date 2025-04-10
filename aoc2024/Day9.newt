@@ -21,7 +21,7 @@ part1 : List File -> Int
 part1 fs = go 0 0 fs $ reverse fs
   where
     go : Int -> Int -> List File -> List File -> Int
-    go pos csum Nil bwd = ?
+    go pos csum Nil bwd = fatalError "Shouldn't happen"
     go pos csum fwd Nil = csum
     go pos csum ((id, 0, 0) :: fwd) bwd = go pos csum fwd bwd
     go pos csum fwd ((id, 0, _) :: bwd) = go pos csum fwd bwd

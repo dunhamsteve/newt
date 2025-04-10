@@ -72,10 +72,7 @@ calcCheats start dists fuel threshold = go (toList start) 0
      -- only '.' have dist
     tryCand : Int → Point → Point → Int
     tryCand l pt cand = case lookupMap cand dists of
-      Just (_, dist) =>
-        let d = manh pt cand in
-        if fuel < d then (let x = (trace "X" (pt, cand, d)) in ?) else
-        if l + manh pt cand + dist <= threshold then 1 else 0
+      Just (_, dist) => if l + manh pt cand + dist <= threshold then 1 else 0
       Nothing => 0
 
     go : List (Point × Int) → Int → Int

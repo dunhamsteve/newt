@@ -78,7 +78,7 @@ pathCost from to kp =
   case lookupMap (from, to) kp.costs of
     Just (_, cost) => (kp, cost)
     Nothing =>
-      let (path :: paths) = getPaths kp.interdit from to | _ => ? in
+      let (path :: paths) = getPaths kp.interdit from to | _ => fatalError "empty path list" in
       case kp of
         (KP n s i c Nothing) => (kp, 1)
         (KP n s i c (Just kp')) =>

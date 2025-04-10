@@ -106,7 +106,7 @@ pathCost from to = do
   case lookupMap (from, to) (.costs kp) of
     Just (_, cost) => pure {State Keypad} cost
     Nothing =>
-      let (path :: paths) = getPaths (.interdit kp) from to | _ => ? in
+      let (path :: paths) = getPaths (.interdit kp) from to | _ => fatalError "empty paths" in
       case kp of
         (KP n s i c Nothing) => pure 1
         (KP n s i c (Just kp')) => do

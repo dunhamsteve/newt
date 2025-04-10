@@ -76,6 +76,9 @@ arityForName fc nm = do
     (Just (PrimFn t arity used)) => pure arity
 
 
+any : ∀ a. (a → Bool) → List a → Bool
+any f Nil = False
+any f (x :: xs) = if f x then True else any f xs
 
 -- need to eta out extra args, fill in the rest of the apps
 -- NOW - maybe eta here instead of Compile.newt, drop number on CApp

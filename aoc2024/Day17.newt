@@ -72,7 +72,7 @@ step mach@(M a b c mem ip out) =
     5 => let o = combo op % itobi 8 in step (M a b c mem (ip + 2) (out :< bitoi o))
     6 => let b = a >>> combo op in step (M a b c mem (ip + 2) out)
     7 => let c = a >>> combo op in step (M a b c mem (ip + 2) out)
-    _ => ?
+    _ => mach
   where
     combo : Int → BigInt
     combo 4 = a
