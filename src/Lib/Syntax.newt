@@ -55,6 +55,7 @@ record Clause where
 
 data RCaseAlt = MkAlt Raw Raw
 
+data UpdateClause = AssignField FC String Raw | ModifyField FC String Raw
 
 data DoStmt : U where
   DoExpr : (fc : FC) -> Raw -> DoStmt
@@ -64,7 +65,7 @@ data DoStmt : U where
 Decl : U
 data Raw : U where
   RVar : (fc : FC) -> (nm : Name) -> Raw
-  RLam : (fc : FC) -> BindInfo -> (ty : Raw) -> Raw
+  RLam : (fc : FC) -> BindInfo -> (sc : Raw) -> Raw
   RApp : (fc : FC) -> (t : Raw) -> (u : Raw) -> (icit : Icit) -> Raw
   RU   : (fc : FC) -> Raw
   RPi  : (fc : FC) -> BindInfo -> (ty : Raw) -> (sc : Raw) -> Raw
@@ -78,6 +79,9 @@ data Raw : U where
   RIf : (fc : FC) -> Raw -> Raw -> Raw -> Raw
   RWhere : (fc : FC) -> (List Decl) -> Raw -> Raw
   RAs : (fc : FC) -> Name -> Raw -> Raw
+  -- has to be applied or we have to know its type as Foo → Foo to elaborate.
+  -- I can bake the arg in here, or require an app in elab.
+  RUpdateRec : (fc : FC) → List UpdateClause → Maybe Raw → Raw
 
 instance HasFC Raw where
   getFC (RVar fc nm) = fc
@@ -95,6 +99,7 @@ instance HasFC Raw where
   getFC (RIf fc _ _ _) = fc
   getFC (RWhere fc _ _) = fc
   getFC (RAs fc _ _) = fc
+  getFC (RUpdateRec fc _ _) = fc
 
 
 data Import = MkImport FC Name
@@ -184,10 +189,14 @@ instance Show Pattern where
 instance Show RCaseAlt where
   show (MkAlt x y)= foo ("MkAlt" :: show x :: show y :: Nil)
 
+instance Show UpdateClause where
+  show (ModifyField _ nm tm) = foo ("ModifyField" :: nm :: show tm :: Nil)
+  show (AssignField _ nm tm) = foo ("AssignField" :: nm :: show tm :: Nil)
 
 instance Show Raw where
   show (RImplicit _) = "_"
   show (RHole _) = "?"
+  show (RUpdateRec _ clauses tm) = foo ("RUpdateRec" :: show clauses :: show tm :: Nil)
   show (RVar _ name) = foo ("RVar" :: show name :: Nil)
   show (RAnn _ t ty) = foo ( "RAnn" :: show t :: show ty :: Nil)
   show (RLit _ x) = foo ( "RLit" :: show x :: Nil)
@@ -257,6 +266,7 @@ instance Pretty Raw where
     asDoc p (RIf _ x y z) = par p 0 $ text "if" <+> asDoc 0 x <+/> text "then" <+> asDoc 0 y <+/> text "else" <+> asDoc 0 z
     asDoc p (RWhere _ dd b) = text "TODO pretty where"
     asDoc p (RAs _ nm x) = text nm ++ text "@(" ++ asDoc 0 x ++ text ")"
+    asDoc p (RUpdateRec _ clauses tm) = text "{" <+> text "TODO RUpdateRec" <+> text "}"
 
 prettyBind : (BindInfo × Raw) -> Doc
 prettyBind (BI _ nm icit quant, ty) = wrap icit (text (show quant ++ nm) <+> text ":" <+> pretty ty)

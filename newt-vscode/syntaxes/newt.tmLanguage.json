@@ -25,6 +25,10 @@
       "patterns": [{ "include": "source.js" }]
     },
     {
+      "name": "character",
+      "match": "'\\\\?.'"
+    },
+    {
       "name": "string.double.newt",
       "begin": "\"",
       "end": "\"",

@@ -14,7 +14,7 @@ import Data.String
 import Data.SnocList
 
 standalone : List Char
-standalone = unpack "()\\{}[],.@"
+standalone = unpack "()\\{}[],.@;"
 
 keywords : List String
 keywords = ("let" :: "in" :: "where" :: "case" :: "of" :: "data" :: "U" :: "do" ::
@@ -25,7 +25,8 @@ keywords = ("let" :: "in" :: "where" :: "case" :: "of" :: "data" :: "U" :: "do" 
             -- it would be nice to find a way to unkeyword "." so it could be
             -- used as an operator too
             "$" :: "λ" :: "?" :: "@" :: "." ::
-             "->" :: "→" :: ":" :: "=>" :: ":=" :: "=" :: "<-" :: "\\" :: "_" :: "|" :: Nil)
+             "->" :: "→" :: ":" :: "=>" :: ":=" :: "$="
+             :: "=" :: "<-" :: "\\" :: "_" :: "|" :: Nil)
 
 record TState where
   constructor TS

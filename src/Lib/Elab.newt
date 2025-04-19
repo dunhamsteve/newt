@@ -1313,9 +1313,60 @@ undo prev ((DoArrow fc left right alts) :: xs) = do
   pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
     (RLam fc (BI fc nm Explicit Many) rest) Explicit
 
+
+
+
+-- REVIEW do we want to let arg?
+-- collect fields and default assignment
+-- subst in real assignment
+updateRec : Context → FC → List UpdateClause → Maybe Raw → Val → M Tm
+updateRec ctx fc clauses arg ty = do
+  ((QN _ conname), args) <- getTele arg ty
+  args' <- foldlM doClause args clauses
+  let tm = foldl (\ acc tm => RApp (getFC tm) acc tm Explicit) (RVar fc conname) $ map snd args'
+  let tm = case arg of
+    Just arg => tm
+    Nothing => RLam fc (BI fc "$ru" Explicit Many) tm
+  check ctx tm ty
+  where
+    doClause : List (String × Raw) → UpdateClause → M (List (String × Raw))
+    doClause args (ModifyField fc nm tm) = go args
+      where
+        go : List (String × Raw) → M (List (String × Raw))
+        go Nil = error fc "\{nm} is not a field of \{show ty}"
+        go (x :: xs) = if fst x == nm
+        -- need arg in here and apply tm to arg
+          then pure $ (nm, RApp fc tm (snd x) Explicit) :: xs
+          else _::_ x <$> go xs
+    doClause args (AssignField fc nm tm) = go args
+      where
+        go : List (String × Raw) → M (List (String × Raw))
+        go Nil = error fc "\{nm} is not a field of \{show ty}"
+        go (x :: xs) = if fst x == nm then pure $ (nm, tm) :: xs else _::_ x <$> go xs
+
+    collect : Raw → Tm → List (String × Raw)
+    collect arg (Pi _ nm _ _ a b) = (nm, RApp fc (RVar fc $ "." ++ nm) arg Explicit) :: collect arg b
+    collect _ _ = Nil
+
+    getTele : Maybe Raw → Val → M (QName × List (String × Raw))
+    getTele (Just arg) (VRef fc nm sp) = do
+      top <- getTop
+      let (Just (MkEntry _ _ _ (TCon _ (conname :: Nil)) _)) = lookup nm top
+        | Just _ => error fc "\{show nm} is not a record"
+        | _ => error fc "\{show nm} not in scope"
+      let (Just (MkEntry _ _ ty (DCon _ _ _) _)) = lookup conname top
+        | _ => error fc "\{show conname} not a dcon"
+      pure $ (conname, collect arg ty)
+    --
+    getTele Nothing (VPi _ _ _ _ a b) = getTele (Just $ RVar fc "$ru") a
+    getTele Nothing v = error (getFC v) "Expected a pi type, got \{show v}"
+    getTele _ v = error (getFC v) "Expected a record type, got \{show v}"
+
+
 check ctx tm ty = do
   ty' <- forceType ctx.env ty
   case (tm, ty') of
+    (RUpdateRec fc clauses arg, ty) => updateRec ctx fc clauses arg ty
     (RWhere fc decls body, ty) => checkWhere ctx (collectDecl decls) body ty
     (RIf fc a b c, ty) =>
       let tm' = RCase fc a ( MkAlt (RVar (getFC b) "True") b :: MkAlt (RVar (getFC c) "False") c  :: Nil) in
@@ -1405,6 +1456,18 @@ check ctx tm ty = do
       debug $ \ _ => "INFER \{show tm} to (\{rpprint names tm'} : \{show ty'}) expect \{show ty}"
       unifyCatch (getFC tm) ctx ty' ty
       pure tm'
+
+-- We assume the types are the same here, which looses some flexibility
+-- This does not work because the meta is unsolved when `updateRecord` tries to do
+-- its thing. We would need to defer elab to get this to work - insert placeholder
+-- and solve it later.
+infer ctx tm@(RUpdateRec fc _ _) = do
+  error fc "I can't infer record updates"
+  -- mvar <- freshMeta ctx fc (VU emptyFC) Normal
+  -- a <- eval ctx.env CBN mvar
+  -- let ty = VPi fc ":ins" Explicit Many a (MkClosure ctx.env mvar)
+  -- tm <- check ctx tm ty
+  -- pure (tm, ty)
 
 infer ctx (RVar fc nm) = go 0 ctx.types
   where

@@ -103,7 +103,7 @@ processModule importFC base stk qn@(QN ns nm) = do
   let name = joinBy "." modns
   let (Nothing) = lookupMap modns top.modules | _ => pure ""
   -- dummy entry for processing
-  modifyTop (\ top => MkTop (updateMap modns (emptyModCtx "") top.modules) top.imported top.hints top.ns top.defs top.metaCtx top.verbose top.errors top.ops)
+  modifyTop [modules := updateMap modns (emptyModCtx "") top.modules]
   let fn = (joinBy "/" (base :: ns)) ++ "/" ++ nm ++ ".newt"
   (Right src) <- liftIO {M} $ readFile fn
     | Left err => exitFailure "ERROR at \{show importFC}: error reading \{fn}: \{show err}"
@@ -143,11 +143,10 @@ processModule importFC base stk qn@(QN ns nm) = do
     | Just mod => do
       let modules = updateMap modns mod top.modules
 
-      modifyTop (\ top =>
-        -- FIXME - we don't want stray operators in a module.
-        -- inject module ops into top
-        let ops = foldMap const top.ops $ toList mod.ctxOps
-        in MkTop modules top.imported top.hints top.ns top.defs top.metaCtx top.verbose top.errors ops)
+      -- FIXME - we don't want stray operators in a module.
+      -- inject module ops into top
+      let ops = foldMap const top.ops $ toList mod.ctxOps
+      modifyTop [modules := modules; ops := ops ]
       pure src  -- why am I returning this?
 
   log 1 $ \ _ => "MODNS " ++ show modns
@@ -176,7 +175,7 @@ processModule importFC base stk qn@(QN ns nm) = do
     else pure MkUnit
 
   let modules = updateMap modns mod top.modules
-  modifyTop (\ top => MkTop modules top.imported top.hints top.ns top.defs top.metaCtx top.verbose top.errors top.ops)
+  modifyTop [modules := modules]
 
   (Nil) <- liftIO {M} $ readIORef top.errors
     | errors => do
@@ -252,7 +251,7 @@ cmdLine : List String -> M (Maybe String × List String)
 cmdLine Nil = pure (Nothing, Nil)
 cmdLine ("--top" :: args) = cmdLine args -- handled later
 cmdLine ("-v" :: args) = do
-  modifyTop (\ top => MkTop top.modules top.imported top.hints top.ns top.defs top.metaCtx (top.verbose + 1) top.errors top.ops)
+  modifyTop [ verbose $= _+_ 1 ]
   cmdLine args
 cmdLine ("-o" :: fn :: args) = do
   (out, files) <- cmdLine args

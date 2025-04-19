@@ -110,6 +110,8 @@ asAtom = do
     Nothing  => pure $ RVar fc nm
 
 -- the inside of Raw
+recordUpdate : Parser Raw
+
 atom : Parser Raw
 atom = do
   pure MkUnit
@@ -122,14 +124,34 @@ atom = do
     <|> RImplicit <$> getPos <* keyword "_"
     <|> RHole <$> getPos <* keyword "?"
     <|> parenWrap typeExpr
+    <|> recordUpdate
+
+updateClause : Parser UpdateClause
+updateClause = do
+  fc <- getPos
+  nm <- ident
+  op <- True <$ symbol ":=" <|> False <$ symbol "$="
+  tm <- term
+  case op of
+    True => pure $ AssignField fc nm tm
+    _    => pure $ ModifyField fc nm tm
+
+-- ambiguity vs {a} or {a} -> ... is tough, we can do [] or put a keyword in front.
+recordUpdate = do
+  fc <- getPos
+  symbol "["
+  clauses <- sepBy (symbol ";") updateClause
+  symbol "]"
+  tm <- optional atom
+  pure $ RUpdateRec fc clauses tm
 
 -- Argument to a Spine
 pArg : Parser (Icit × FC × Raw)
 pArg = do
   fc <- getPos
-  (\x => Explicit, fc, x) <$> atom
-    <|> (\x => Implicit, fc, x) <$> braces typeExpr
+  (\x => Implicit, fc, x) <$> braces typeExpr
     <|> (\x => Auto, fc, x) <$> dbraces typeExpr
+    <|> (\x => Explicit, fc, x) <$> atom
 
 AppSpine : U
 AppSpine = List (Icit × FC × Raw)

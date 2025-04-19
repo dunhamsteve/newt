@@ -1,15 +1,18 @@
 
 ## TODO
 
-Syntax -> Parser.Impl ?
-
-- [ ] Eq Nat is not being identified as tail recursive...
+- [ ] vscode - run newt when switching editors
+- [ ] inline struct getters
 - [x] fix string highlighting
 - [x] implement tail call optimization
-- [x] implement magic nat 
+- [x] implement magic nat
+- [ ] record update can't elaborate if type is unsolved meta
+  - need to postpone elab until meta is known. Create fresh meta for the term to return and have postponed elab fill it in later.
 - [ ] drop erased args on types and top level functions
 - [ ] can I do some inlining without blowing up code size?
-- [ ] use hint table for auto solving. (I think walking the `toList` is a big chunk of performance in `Elab.newt`.)
+  - [ ] Maybe tag some functions as inline
+  - [ ] Eq Nat is not tail recursive because of the call to `==`
+- [x] use hint table for auto solving. (I think walking the `toList` is a big chunk of performance in `Elab.newt`.)
 - [x] implement string enum (or number, but I'm using strings for tags at the moment)
 - [x] use monaco input method instead of lean's
 - [x] `Def` is shadowed between Types and Syntax (TCon vs DCon), detect this
@@ -21,6 +24,7 @@ Syntax -> Parser.Impl ?
   - Two issues
     - I'm rewriting stuff in the context, leaving it in a bad state (forward references). I think I can avoid this.
     - The variables at the end of pattern matching have types with references in the wrong order. I think we can reorder them on dependencies.
+    - should w
 - Improve `auto`
   - [ ] Improve cases where the auto isn't solved because of a type error
   - [ ] Handle `Foo Blah`, `Foo a => Bar a` vs `Bar Blah`
@@ -48,9 +52,6 @@ Syntax -> Parser.Impl ?
 - [x] get port to run
   - [x] something goes terribly wrong with traverse_ and for_ (related to erasure, I think)
 - [x] ~~don't use `take` - it's not stack safe~~ The newt version is stack safe
-
-More comments in code! This is getting big enough that I need to re-find my bearings when fixing stuff.
-
 - [ ] report info in case of error
 - [x] tokenizer that can be ported to newt
 - [ ] Add default path for library, so we don't need symlinks everywhere and can write tests for the library
@@ -62,8 +63,7 @@ More comments in code! This is getting big enough that I need to re-find my bear
   - need to scan sigs and then defs, will have to make sure Compile.idr puts them all in scope before processing each.
 - [x] Move on to next decl in case of error
 - [x] for parse error, seek to col 0 token and process next decl
-- [ ] record update sugar, syntax TBD
-  - I think I'm going to hold off on this for now as it requires the type to elaborate. This ends up at the head of an app, which typically is inferred. We'd need a special case somewhere that infers its argument instead.
+- [x] record update sugar
 - [x] Change `Ord` to be more like Idris - LT / EQ / GT (and entail equality)
 - [ ] Keep a `compare` function on `SortedMap` (like lean)
 - [x] keymap for monaco
