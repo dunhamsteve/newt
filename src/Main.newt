@@ -179,8 +179,7 @@ processModule importFC base stk qn@(QN ns nm) = do
 
   (Nil) <- liftIO {M} $ readIORef top.errors
     | errors => do
-        for_ errors $ \err =>
-          putStrLn (showError src err)
+        traverse (putStrLn ∘ showError src) errors
         exitFailure "Compile failed"
   logMetas $ reverse $ listValues mc.metas
   pure src
@@ -190,7 +189,7 @@ processModule importFC base stk qn@(QN ns nm) = do
       (Left err) <- tryError $ processDecl ns decl | _ => pure MkUnit
       addError err
 
-
+-- unwind the module part of the path name
 baseDir : SnocList String -> SnocList String -> Either String String
 baseDir dirs Lin = Right $ joinBy "/" (dirs <>> Nil)
 baseDir (dirs :< d) (ns :< n) = if d == n
@@ -201,17 +200,15 @@ baseDir Lin _ = Left "module path doesn't match directory"
 showErrors : String -> String -> M Unit
 showErrors fn src = do
   top <- getTop
+  -- TODO {M} needed to sort out scrutinee
   (Nil) <- liftIO {M} $ readIORef top.errors
     | errors => do
-        for_ errors $ \err =>
-          putStrLn (showError src err)
-        -- if err.file == fn
-        -- then putStrLn (showError src err)
-        -- else putStrLn (showError "" err)
+        traverse (putStrLn ∘ showError src) errors
         exitFailure "Compile failed"
   pure MkUnit
 
-
+-- processFile called on the top level file
+-- it sets up everything and then recurses into processModule
 processFile : String -> M Unit
 processFile fn = do
   putStrLn "*** Process \{fn}"

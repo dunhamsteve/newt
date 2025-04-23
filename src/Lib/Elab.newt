@@ -11,7 +11,6 @@ import Data.SortedMap
 import Lib.Eval
 import Lib.Util
 import Lib.TopContext
--- FIXME Def is shadowing...
 import Lib.Syntax
 import Lib.Types
 
@@ -682,8 +681,6 @@ findSplit (x :: xs) = findSplit xs
 
 -- we could pass into build case and use it for   (x /? y)
 
--- TODO, we may need to filter these against the type to rule out
--- impossible cases
 getConstructors : Context -> FC -> Val -> M (List (QName × Int × Tm))
 getConstructors ctx scfc (VRef fc nm _) = do
   names <- lookupTCon nm
@@ -731,13 +728,6 @@ substVal k v tm = go tm
     go (VMeta fc ix sp) = VMeta fc ix (map go sp)
     go (VRef fc nm sp) = VRef fc nm (map go sp)
     go tm = tm
-    -- FIXME - do I need a Val closure like idris?
-    -- or env in unify...
-    -- or quote back
-    -- go (VLam fc nm sc) = VLam fc nm sc
-    -- go (VCase x sc xs) = ?rhs_2
-    -- go (VU x) = ?rhs_7
-    -- go (VLit x y) = ?rhs_8
 
 -- need to turn k into a ground value
 
@@ -936,7 +926,6 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         then case y of
           PatVar _ _ s => pure $ Just $ c :: (xs ++ acc)
           PatWild _ _ => pure $ Just $ c :: (xs ++ acc)
-          -- FIXME why don't we hit this (when user puts 'x' for Just 'x')
           PatLit fc lit => error fc "Literal \{show lit} in constructor split"
           PatCon fc icit nm ys as => if nm == dcName
             then case as of

@@ -39,7 +39,6 @@ liftWhereTm name env tm@(Case fc t alts) = do
 -- This is where the magic happens
 liftWhereTm name env (LetRec fc nm ty t u) = do
   let l = length env
-  -- FIXME we need a namespace and a name, these collide everywhere.
   qn <- getName name nm
   let env' = (Just (qn, S l) :: env)
   -- environment should subst this function (see next case)
@@ -51,6 +50,7 @@ liftWhereTm name env (LetRec fc nm ty t u) = do
   u' <- liftWhereTm qn env' u
   pure $ LetRec fc nm (Erased fc) (Erased fc) u'
   where
+    -- TODO might be nice if we could nest the names (Foo.go.go) for nested where
     getName : QName → String → M QName
     getName qn@(QN ns nm) ext = do
       let qn' = QN ns (nm ++ "." ++ ext)

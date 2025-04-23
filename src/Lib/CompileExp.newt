@@ -58,8 +58,6 @@ lamArity : Tm -> Nat
 lamArity (Lam _ _ _ _ t) = S (lamArity t)
 lamArity _ = Z
 
-
-
 -- This is how much we want to curry at top level
 -- leading lambda Arity is used for function defs and metas
 -- TODO - figure out how this will work with erasure
@@ -75,16 +73,13 @@ arityForName fc nm = do
     (Just (PrimTCon arity)) => pure $ cast arity
     (Just (PrimFn t arity used)) => pure arity
 
-
 any : ∀ a. (a → Bool) → List a → Bool
 any f Nil = False
 any f (x :: xs) = if f x then True else any f xs
 
--- need to eta out extra args, fill in the rest of the apps
--- NOW - maybe eta here instead of Compile.newt, drop number on CApp
--- The problem would be deBruijn. We have to put the app under CLam
--- which would mess up all of the deBruijn (unless we push it out)
-
+-- apply an expression at an arity to a list of args
+-- CApp will specify any missing args, for eta conversion later
+-- and any extra args get individual CApp.
 apply : CExp -> List CExp -> SnocList CExp -> Nat -> M CExp
 -- out of args, make one up (fix that last arg)
 apply t Nil acc (S k) =

@@ -189,8 +189,6 @@ instance Traversable List where
 traverse_ : ∀ t f a b. {{Traversable t}} {{Applicative f}} → (a → f b) → t a → f Unit
 traverse_ f xs = return (const MkUnit) <*> traverse f xs
 
--- FIXME - there is something subtly wrong in erasure here. t gets applied and there is no warning about it.
--- maybe we don't check the head of an application?
 for : {0 t : U → U} {0 f : U → U} → {{Traversable t}} {{appf : Applicative f}} → {0 a : U} → {0 b : U} → t a → (a → f b) → f (t b)
 for stuff fun = traverse fun stuff
 
@@ -691,10 +689,7 @@ instance Eq Ordering where
   GT == GT = True
   _ == _ = False
 
--- FIXME There is a subtle issue here with shadowing if the file defines a GT in its own namespace
--- We end up chosing that an assigning to GT, which cause a lot of trouble.
--- Prelude.GT is not in scope, because we've depended on the other one.
-pfunc jsCompare uses (LT EQ GT) : ∀ a. a → a → Ordering := `(_, a, b) => a == b ? Prelude_EQ : a < b ? Prelude_LT : Prelude_GT`
+pfunc jsCompare : ∀ a. a → a → Ordering := `(_, a, b) => a == b ? "EQ" : a < b ? "LT" : "GT"`
 
 infixl 6 _<_ _<=_ _>_
 class Ord a where

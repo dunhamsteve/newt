@@ -188,7 +188,6 @@ pprint' p names (Pi _ "_" Explicit Many t u) =
   parens 0 p $ pprint' 1 names t <+> text "->" <+> pprint' 0 ("_" :: names) u
 pprint' p names (Pi _ nm Explicit rig t u) = parens 0 p $
   text "(" ++  text (show rig) <+> text nm <+> text ":" <+> pprint' 0 names t ++ text ")" <+> text "->" <+> pprint' 0 (nm :: names) u
--- FIXME - probably way wrong on the names here.  There is implicit binding going on
 pprint' p names (Case _ sc alts) = parens 0 p $ text "case" <+> pprint' 0 names sc <+> text "of" ++ (nest 2 (line ++ stack (map (pprintAlt 0 names) alts)))
 pprint' p names (Lit _ lit) = text (show lit)
 pprint' p names (Let _ nm t u) = parens 0 p $ text "let" <+> text nm <+> text ":=" <+> pprint' 0 names t <+> text "in" </> (nest 2 $ pprint' 0 (nm :: names) u)
@@ -354,8 +353,6 @@ record TopEntry where
   type : Tm
   def : Def
   eflags : List EFlag
-
--- FIXME snoc
 
 instance Show TopEntry where
   show (MkEntry fc name type def flags) = "\{show name} : \{show type} := \{show def} \{show flags}"

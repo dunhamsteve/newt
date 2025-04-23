@@ -217,20 +217,18 @@ instance Pretty Literal where
   pretty (LInt i) = text $ show i
   pretty (LChar c) = text $ show c
 
-
-instance Pretty Pattern where
-  -- FIXME - wrap Implicit with {}
-  pretty (PatVar _ icit str) = text str
-  pretty (PatCon _ icit nm args Nothing) = text (show nm) <+> spread (map pretty args)
-  pretty (PatCon _ icit nm args (Just as)) = text as ++ text "@(" ++ text (show nm) <+> spread (map pretty args) ++ text ")"
-  pretty (PatWild _ icit) = text "_"
-  pretty (PatLit _ lit) = pretty lit
-
 wrap : Icit -> Doc -> Doc
 wrap Explicit x = text "(" ++ x ++ text ")"
 wrap Implicit x = text "{" ++ x ++ text "}"
 wrap Auto x = text "{{" ++ x ++ text "}}"
 
+instance Pretty Pattern where
+  pretty (PatVar _ Implicit str) = text str
+  pretty (PatVar _ icit str) = wrap icit $ text str
+  pretty (PatCon _ icit nm args Nothing) = text (show nm) <+> spread (map pretty args)
+  pretty (PatCon _ icit nm args (Just as)) = text as ++ text "@(" ++ text (show nm) <+> spread (map pretty args) ++ text ")"
+  pretty (PatWild _ icit) = text "_"
+  pretty (PatLit _ lit) = pretty lit
 
 instance Pretty Raw where
   pretty = asDoc 0

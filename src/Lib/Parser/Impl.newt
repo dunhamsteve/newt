@@ -206,7 +206,6 @@ token' : Kind -> Parser String
 token' k = satisfy (\t => t.val.kind == k) "Expected a \{show k} token"
 
 keyword' : String -> Parser Unit
--- FIXME make this an appropriate whitelist
 keyword' kw = ignore $ satisfy (\t => t.val.text == kw && (t.val.kind == Keyword || t.val.kind == Symbol || t.val.kind == Number)) "Expected \{kw}"
 
 -- expect indented token of given kind

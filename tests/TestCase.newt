@@ -60,8 +60,6 @@ and = \ x y => case x of
   True => y
   False => False
 
--- FIXME - a case is evaluated here, and I don't know why.
-
 nand : Bool -> Bool -> Bool
 nand = \ x y => not (case x of
     True => y

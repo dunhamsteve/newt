@@ -1,7 +1,5 @@
 module Lib.Parser
 
--- NOW Still working on this.
-
 import Prelude
 import Lib.Common
 import Data.SortedMap

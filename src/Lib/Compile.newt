@@ -51,7 +51,6 @@ data JSStmt : StKind -> U where
   JLet : (nm : String) -> JSStmt (Assign nm) -> JSStmt Plain  -- need somebody to assign
   JAssign : (nm : String) -> JSExp -> JSStmt (Assign nm)
   -- TODO - switch to Int tags
-  -- FIXME add e to JAlt (or just drop it?)
   JCase : ∀ a. JSExp -> List JAlt -> JSStmt a
   -- throw can't be used
   JError : ∀ a. String -> JSStmt a
