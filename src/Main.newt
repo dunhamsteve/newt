@@ -154,7 +154,7 @@ processModule importFC base stk qn@(QN ns nm) = do
   (decls, ops) <- parseDecls fn top.ops toks Lin
 
   top <- getTop
-  freshMC <- newIORef (MC EmptyMap Nil 0 CheckAll)
+  let freshMC = MC EmptyMap Nil 0 CheckAll
   -- set imported, mod, freshMC, ops  before processing
   modifyTop (\ top => MkTop top.modules imported EmptyMap modns EmptyMap freshMC top.verbose top.errors ops)
   for imported $ \ ns => do
@@ -166,9 +166,8 @@ processModule importFC base stk qn@(QN ns nm) = do
 
   -- update modules with result, leave the rest of context in case this is top file
   top <- getTop
-  mc <- readIORef top.metaCtx
 
-  let mod = MkModCtx csum top.defs mc top.ops
+  let mod = MkModCtx csum top.defs top.metaCtx top.ops
   errors <- liftIO {M} $ readIORef top.errors
   if stk /= Nil && length' errors == 0
     then dumpModule qn src mod
@@ -181,7 +180,7 @@ processModule importFC base stk qn@(QN ns nm) = do
     | errors => do
         traverse (putStrLn ∘ showError src) errors
         exitFailure "Compile failed"
-  logMetas $ reverse $ listValues mc.metas
+  logMetas $ reverse $ listValues top.metaCtx.metas
   pure src
   where
     tryProcessDecl : List String -> Decl -> M Unit

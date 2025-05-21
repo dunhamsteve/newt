@@ -106,7 +106,7 @@ processTypeSig ns fc names tm = do
   log 1 $ \ _ => "-----"
 
   top <- getTop
-  mc <- readIORef top.metaCtx
+  let mc = top.metaCtx
   -- let mstart = length' mc.metas
   traverse (checkAlreadyDef fc) names
   ty <- check (mkCtx fc) tm (VU fc)
@@ -143,7 +143,7 @@ processDef ns fc nm clauses = do
   log 1 $ \ _ => "-----"
   log 1 $ \ _ => "Def \{show nm}"
   top <- getTop
-  mc <- readIORef top.metaCtx
+  let mc = top.metaCtx
   let (Just entry) = lookupRaw nm top
     | Nothing => throwError $ E fc "No declaration for \{nm}"
   let (MkEntry fc name ty Axiom _) = entry
@@ -412,7 +412,7 @@ processData ns fc nm ty cons = do
   log 1 $ \ _ => "-----"
   log 1 $ \ _ => "Data \{nm}"
   top <- getTop
-  mc <- readIORef top.metaCtx
+  let mc = top.metaCtx
   tyty <- check (mkCtx fc) ty (VU fc)
   case lookupRaw nm top of
     Just (MkEntry _ name type Axiom _) => do

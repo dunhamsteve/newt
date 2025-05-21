@@ -113,6 +113,10 @@ isCandidate (VRef _ nm _) (Ref fc nm') = nm == nm'
 isCandidate ty (App fc t u) = isCandidate ty t
 isCandidate _ _ = False
 
+setMetaMode : MetaMode → M Unit
+-- ideally we could do metaCtx.mcmode := CheckFirst
+setMetaMode mcmode = modifyTop $ \top => [ metaCtx := [mcmode := mcmode] (top.metaCtx) ] top
+
 findMatches : Context -> Val -> List (QName × Tm) -> M (List String)
 findMatches ctx ty Nil = pure Nil
 findMatches ctx ty ((name, type) :: xs) = do
@@ -120,7 +124,8 @@ findMatches ctx ty ((name, type) :: xs) = do
     | False => findMatches ctx ty xs
 
   top <- getTop
-  mc <- readIORef top.metaCtx
+  -- save context
+  let mc = top.metaCtx
   catchError (do
       -- TODO sort out the FC here
       let fc = getFC ty
@@ -128,14 +133,14 @@ findMatches ctx ty ((name, type) :: xs) = do
       -- This check is solving metas, so we save mc below in case we want this solution
       let (QN ns nm) = name
       let (cod, tele) = splitTele type
-      modifyIORef top.metaCtx $ \ mc => MC mc.metas mc.autos mc.next CheckFirst
+      setMetaMode CheckFirst
       tm <- check ctx (RVar fc nm) ty
       debug $ \ _ => "Found \{rpprint Nil tm} for \{show ty}"
-      writeIORef top.metaCtx mc
+      modifyTop [ metaCtx := mc ]
       (_::_ nm) <$> findMatches ctx ty xs)
     (\ err => do
       debug $ \ _ => "No match \{show ty} \{rpprint Nil type} \{showError "" err}"
-      writeIORef top.metaCtx mc
+      modifyTop [ metaCtx := mc ]
       findMatches ctx ty xs)
 
 contextMatches : Context -> Val -> M (List (Tm × Val))
@@ -147,17 +152,17 @@ contextMatches ctx ty = go (zip ctx.env ctx.types)
       type <- quote ctx.lvl vty
       let (True) = isCandidate ty type | False => go xs
       top <- getTop
-      mc <- readIORef top.metaCtx
+      let mc = top.metaCtx
       catchError(do
           debug $ \ _ => "TRY context \{nm} : \{rpprint (names ctx) type} for \{show ty}"
           unifyCatch (getFC ty) ctx ty vty
-          mc' <- readIORef top.metaCtx
-          writeIORef top.metaCtx mc
+          let mc' = top.metaCtx
+          modifyTop [ metaCtx := mc]
           tm <- quote ctx.lvl tm
           (_::_ (tm, vty)) <$> go xs)
         (\ err => do
           debug $ \ _ => "No match \{show ty} \{rpprint (names ctx) type} \{showError "" err}"
-          writeIORef top.metaCtx mc
+          modifyTop [ metaCtx := mc]
           go xs)
 
 getArity : Tm -> Int
@@ -211,7 +216,7 @@ trySolveAuto _ = pure False
 solveAutos : M Unit
 solveAutos = do
   top <- getTop
-  mc <- readIORef top.metaCtx
+  let mc = top.metaCtx
   let autos = filter isAuto $ mapMaybe (flip lookupMap' mc.metas) mc.autos
   res <- run autos
   if res then solveAutos else pure MkUnit
@@ -231,13 +236,13 @@ solveAutos = do
 updateMeta : QName -> (MetaEntry -> M MetaEntry) -> M Unit
 updateMeta ix f = do
   top <- getTop
-  mc <- readIORef {M} top.metaCtx
+  let mc = top.metaCtx
   let (Just me) = lookupMap' ix mc.metas | Nothing => pure MkUnit
   me <- f me
   let autos = case me of
     Solved _ _ _ => filter (_/=_ ix) mc.autos
     _ => mc.autos
-  writeIORef top.metaCtx $ MC (updateMap ix me mc.metas) autos mc.next mc.mcmode
+  modifyTop [ metaCtx := MC (updateMap ix me mc.metas) autos mc.next mc.mcmode ]
 
 checkAutos : QName -> List MetaEntry -> M Unit
 checkAutos ix Nil = pure MkUnit
@@ -255,7 +260,7 @@ checkAutos ix (_ :: rest) = checkAutos ix rest
 addConstraint : Env -> QName -> SnocList Val -> Val -> M Unit
 addConstraint env ix sp tm = do
   top <- getTop
-  mc <- readIORef top.metaCtx
+  let mc = top.metaCtx
   let (CheckAll) = mc.mcmode | _ => pure MkUnit
   updateMeta ix $ \case
     (Unsolved pos k a b c cons) => do
@@ -263,8 +268,10 @@ addConstraint env ix sp tm = do
       pure (Unsolved pos k a b c (MkMc (getFC tm) env sp tm :: cons))
     (Solved _ k tm) => error' "Meta \{show k} already solved [addConstraint]"
     (OutOfScope) => error' "Meta \{show ix} out of scope"
-  mc <- readIORef top.metaCtx
-  checkAutos ix $ mapMaybe (flip lookupMap' mc.metas) mc.autos
+  -- I broke this while dropping IORef and it seemed to have no effect
+  -- top <- getTop
+  -- let mc = top.metaCtx
+  -- checkAutos ix $ mapMaybe (flip lookupMap' mc.metas) mc.autos
 
 -- return renaming, the position is the new VVar
 invert : Int -> SnocList Val -> M (List Int)
@@ -349,13 +356,13 @@ ctx.boundNames = map snd $ filter (\x => fst x == Bound) $ zip ctx.bds (map fst 
 maybeCheck : M Unit -> M Unit
 maybeCheck action = do
   top <- getTop
-  mc <- readIORef top.metaCtx
+  let mc = top.metaCtx
   case mc.mcmode of
     CheckAll => action
     CheckFirst => do
-      modifyIORef top.metaCtx $ \ mc => MC mc.metas mc.autos mc.next NoCheck
+      setMetaMode NoCheck
       action
-      modifyIORef top.metaCtx $ \ mc => MC mc.metas mc.autos mc.next CheckFirst
+      setMetaMode CheckFirst
     NoCheck => pure MkUnit
 
 solve env m sp t = do
@@ -392,7 +399,6 @@ solve env m sp t = do
         val <- vappSpine soln sp
         debug $ \ _ => "discharge l=\{show $ length' env} \{(show val)} =?= \{(show rhs)}"
         unify env UNormal val rhs
-    mc <- readIORef top.metaCtx
     pure MkUnit
     )
 
@@ -579,7 +585,7 @@ unifyCatch fc ctx ty' ty = do
 freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
 freshMeta ctx fc ty kind = do
   top <- getTop
-  mc <- readIORef top.metaCtx
+  let mc = top.metaCtx
   debug $ \ _ => "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
   -- need the ns here
   -- we were fudging this for v1
@@ -588,7 +594,7 @@ freshMeta ctx fc ty kind = do
   let autos = case kind of
       AutoSolve => qn :: mc.autos
       _ => mc.autos
-  writeIORef top.metaCtx $ MC (updateMap qn newmeta mc.metas) autos (1 + mc.next) mc.mcmode
+  modifyTop $ \top => [metaCtx := MC (updateMap qn newmeta mc.metas) autos (1 + mc.next) mc.mcmode ] top
   -- infinite loop - keeps trying Ord a => Ord (a \x a)
   -- when (kind == AutoSolve) $ \ _ => ignore $ trySolveAuto newmeta
   pure $ applyBDs 0 (Meta fc qn) ctx.bds
@@ -1213,9 +1219,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
       case meta of
         (Solved _ k t) => forceType ctx.env scty'
         (Unsolved _ k xs _ _ _) => do
-          top <- getTop
-          mc <- readIORef top.metaCtx
-          -- TODO - only hit the relevant ones
+          -- TODO - only check the relevant autos
           solveAutos
           forceType ctx.env scty'
         OutOfScope => pure scty'

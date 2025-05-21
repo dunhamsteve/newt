@@ -392,7 +392,7 @@ record TopContext where
   -- current module
   ns : List String
   defs : SortedMap QName TopEntry
-  metaCtx : IORef MetaContext
+  metaCtx : MetaContext
 
   -- Global values
   verbose : Int -- command line flag
@@ -548,8 +548,7 @@ error' msg = throwError $ E emptyFC msg
 lookupMeta : QName -> M MetaEntry
 lookupMeta ix@(QN ns nm) = do
   top <- getTop
-  mc <- readIORef {M} top.metaCtx
-  case lookupMap' ix mc.metas of
+  case lookupMap' ix top.metaCtx.metas of
     Just meta => pure meta
     Nothing => case lookupMap' ns top.modules of
       Nothing =>
