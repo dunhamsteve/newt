@@ -2,7 +2,18 @@
 ## TODO
 
 - [ ] vscode - run newt when switching editors
-- [ ] inline struct getters
+- [ ] case split
+  - We could fake this up:
+    - given a name and a point in the editor
+    - walk through the function looking for the binder
+    - get its type
+    - enumerate valid constructors (and their arity)
+    - Repeat the line with each, applied to args
+    - For `<-` or `let` we'd want to fudge some `|` lines
+- [ ] inline struct getters during code generation (We'd like  `x.h1.h2`)
+- [ ] Better FC for parse errors (both EOF and the ones that show up just after the error)
+- [ ] Support "Add missing cases"
+- [ ] Code gen for PiType (rather than static JS)
 - [x] fix string highlighting
 - [x] implement tail call optimization
 - [x] implement magic nat
