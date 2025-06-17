@@ -1,4 +1,7 @@
-
+body {
+  overflow: hidden;
+  font-size: 12px;
+}
 svg.icon path {
   stroke: black;
   fill: none;
@@ -85,5 +88,8 @@ svg.icon path {
   font-family: 'Comic Code', monospace;
   font-size: 12px;
   white-space: pre;
+  padding: 5px;
+}
+.tooltip {
   padding: 5px;
 }

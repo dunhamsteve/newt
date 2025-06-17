@@ -1,91 +1,25 @@
 import { effect, signal } from "@preact/signals";
-import { newtConfig, newtTokens } from "./monarch.ts";
-import * as monaco from "monaco-editor";
+import { Diagnostic } from "@codemirror/lint";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { h, render } from "preact";
 import { ChangeEvent } from "preact/compat";
 import { archive, preload } from "./preload.ts";
-import { CompileReq, CompileRes, Message } from "./types.ts";
-import { ABBREV } from "./abbrev.ts";
-
-// editor.(createModel / setModel / getModels) to switch files
-
-// TODO - remember files and allow switching?
-
-// static zip filesystem with user changes overlaid via localStorage
-// download individual files (we could use the cheap compression from the pdflib or no compression to make zip download)
-// would need way to reset/delete
-
-interface FC {
-  file: string;
-  line: number;
-  col: number;
-}
-
-interface TopEntry {
-  fc: FC;
-  name: String;
-  type: String;
-}
-interface TopData {
-  context: TopEntry[];
-}
+import {
+  AbstractEditor,
+  EditorDelegate,
+  CompileReq,
+  CompileRes,
+  Message,
+  TopData,
+  Marker,
+} from "./types.ts";
+import { CMEditor } from "./cmeditor.ts";
 
 let topData: undefined | TopData;
 
-// we need to fix the definition of word
-monaco.languages.register({ id: "newt" });
-monaco.languages.setMonarchTokensProvider("newt", newtTokens);
-monaco.languages.setLanguageConfiguration("newt", newtConfig);
-monaco.languages.registerDefinitionProvider("newt", {
-  provideDefinition(model, position, token) {
-    if (!topData) return;
-    // HACK - we don't know our filename which was generated from `module` decl, so
-    // assume the last context entry is in our file.
-    let last = topData.context[topData.context.length - 1];
-    let file = last.fc.file;
-
-    const info = model.getWordAtPosition(position);
-    if (!info) return;
-    let entry = topData.context.find((entry) => entry.name === info.word);
-    // we can't switch files at the moment
-    if (!entry || entry.fc.file !== file) return;
-    let lineNumber = entry.fc.line + 1;
-    let column = entry.fc.col + 1;
-    let word = model.getWordAtPosition({ lineNumber, column });
-    let range = new monaco.Range(lineNumber, column, lineNumber, column);
-    if (word) {
-      range = new monaco.Range(
-        lineNumber,
-        word.startColumn,
-        lineNumber,
-        word.endColumn
-      );
-    }
-    return { uri: model.uri, range };
-  },
-});
-monaco.languages.registerHoverProvider("newt", {
-  provideHover(model, position, token, context) {
-    if (!topData) return;
-    const info = model.getWordAtPosition(position);
-    if (!info) return;
-    let entry = topData.context.find((entry) => entry.name === info.word);
-    if (!entry) return;
-    return {
-      range: new monaco.Range(
-        position.lineNumber,
-        info.startColumn,
-        position.lineNumber,
-        info.endColumn
-      ),
-      contents: [{ value: `${entry.name} : ${entry.type}` }],
-    };
-  },
-});
 const newtWorker = new Worker("worker.js");
+// :FIXME use because Safari
 let postMessage = (msg: CompileReq) => newtWorker.postMessage(msg);
-
 // Safari/MobileSafari have small stacks in webworkers.
 if (navigator.vendor.includes("Apple")) {
   const workerFrame = document.createElement("iframe");
@@ -104,7 +38,7 @@ document.body.appendChild(iframe);
 function run(src: string) {
   console.log("SEND TO", iframe.contentWindow);
   const fileName = state.currentFile.value;
-  postMessage({ type: "compileRequest", fileName, src });
+  // postMessage({ type: "compileRequest", fileName, src });
 }
 
 function runOutput() {
@@ -134,6 +68,9 @@ function setOutput(output: string) {
   state.output.value = output;
 }
 
+let lastID = 0;
+const nextID = () => "" + lastID++;
+
 window.onmessage = (ev: MessageEvent<Message>) => {
   console.log("window got", ev.data);
   if ("messages" in ev.data) state.messages.value = ev.data.messages;
@@ -142,28 +79,47 @@ window.onmessage = (ev: MessageEvent<Message>) => {
   }
   // safari callback
   if ("output" in ev.data) {
+    newtWorker.onmessage?.(ev)
     setOutput(ev.data.output);
     state.javascript.value = ev.data.javascript;
   }
 };
 
+// TODO wrap up IPC
+
+type Suspense<T> = {
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: any) => void;
+};
+
+const callbacks: Record<string, Suspense<string>> = {};
+
 newtWorker.onmessage = (ev: MessageEvent<CompileRes>) => {
+  let suspense = callbacks[ev.data.id];
+  if (suspense) {
+    suspense.resolve(ev.data.output);
+    delete callbacks[ev.data.id];
+  }
+  console.log('result', ev.data, 'suspense', suspense)
+  // FIXME - we want to have the callback take a response for its command
   setOutput(ev.data.output);
   state.javascript.value = ev.data.javascript;
 };
 
-self.MonacoEnvironment = {
-  getWorkerUrl(moduleId, _label) {
-    console.log("Get worker", moduleId);
-    return moduleId;
-  },
-};
+function runCommand(req: CompileReq) {
+  return new Promise<string>(
+    (resolve, reject) => {
+      callbacks[req.id] = { resolve, reject }
+      postMessage(req);
+    }
+  );
+}
 
 const state = {
   output: signal(""),
   javascript: signal(""),
   messages: signal<string[]>([]),
-  editor: signal<monaco.editor.IStandaloneCodeEditor | null>(null),
+  editor: signal<AbstractEditor | null>(null),
   dark: signal(false),
   files: signal<string[]>(["Tour.newt"]),
   currentFile: signal<string>(localStorage.currentFile ?? "Tour.newt"),
@@ -174,13 +130,15 @@ if (window.matchMedia) {
   function checkDark(ev: { matches: boolean }) {
     console.log("CHANGE", ev);
     if (ev.matches) {
-      monaco.editor.setTheme("vs-dark");
+      // monaco.editor.setTheme("vs-dark");
       document.body.className = "dark";
       state.dark.value = true;
+      state.editor.value?.setDark(true);
     } else {
-      monaco.editor.setTheme("vs");
+      // monaco.editor.setTheme("vs");
       document.body.className = "light";
       state.dark.value = false;
+      state.editor.value?.setDark(false);
     }
   }
   let query = window.matchMedia("(prefers-color-scheme: dark)");
@@ -215,69 +173,76 @@ let initialVertical = localStorage.vertical == "true";
 effect(() => {
   let text = state.output.value;
   let editor = state.editor.value;
-  if (editor) processOutput(editor, text);
+  // TODO - abstract this for both editors
+  // if (editor) processOutput(editor, text);
 });
 
 interface EditorProps {
   initialValue: string;
 }
+const language: EditorDelegate = {
+  getEntry(word, _row, _col) {
+    return topData?.context.find((entry) => entry.name === word);
+  },
+  onChange(value) {
+    // clearTimeout(timeout);
+    //   timeout = setTimeout(() => {
+    //     run(value);
+    //     localStorage.code = value;
+    //   }, 1000);
+  },
+  getFileName() {
+    if (!topData) return "";
+    let last = topData.context[topData.context.length - 1];
+    return last.fc.file;
+  },
+  async lint(view) {
+    console.log("LINT");
+    let src = view.state.doc.toString();
+    const fileName = state.currentFile.value;
+    console.log("FN", fileName);
+    // console.log("SRC", src);
+    try {
+      let out = await runCommand({
+        id: nextID(),
+        type: "compileRequest",
+        fileName,
+        src,
+      });
+      console.log("OUT", out);
+      let markers = processOutput(out);
+      let diags: Diagnostic[] = []
+      for (let marker of markers) {
+        let col = marker.startColumn
+
+        let line = view.state.doc.line(marker.startLineNumber)
+        const pos = line.from + col - 1;
+        let word = view.state.wordAt(pos)
+        diags.push({
+          from: word?.from ?? pos,
+          to: word?.to ?? pos+1,
+          severity: marker.severity,
+          message: marker.message,
+        })
+      }
+      return diags
+    } catch (e) {
+      console.log("ERR", e);
+    }
+
+    return [];
+  },
+};
 
 function Editor({ initialValue }: EditorProps) {
   const ref = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const container = ref.current!;
-    const editor = monaco.editor.create(container, {
-      value,
-      language: "newt",
-      fontFamily: "Comic Code, Menlo, Monaco, Courier New, sans",
-      automaticLayout: true,
-      acceptSuggestionOnEnter: "off",
-      unicodeHighlight: { ambiguousCharacters: false },
-      minimap: { enabled: false },
-    });
+    const editor = new CMEditor(container, value, language);
+    // const editor = new MonacoEditor(container, value, language)
     state.editor.value = editor;
-
-    editor.onDidChangeModelContent((ev) => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        let value = editor.getValue();
-        run(value);
-        localStorage.code = value;
-      }, 1000);
-      let last = ev.changes[ev.changes.length - 1];
-      const model = editor.getModel();
-      // figure out heuristics here, what chars do we want to trigger?
-      // the lean one will only be active if it sees you type \
-      // and bail if it decides you've gone elsewhere
-      // it maintains an underline annotation, too.
-      if (model && last.text && " ')\\".includes(last.text)) {
-        console.log('LAST', last)
-        let { startLineNumber, startColumn } = last.range;
-        const text = model.getValueInRange(
-          new monaco.Range(
-            startLineNumber,
-            Math.max(1, startColumn - 10),
-            startLineNumber,
-            startColumn
-          )
-        );
-        const m = text.match(/(\\[^ ]+)$/);
-        if (m) {
-          let cand = m[0];
-          console.log("GOT", cand);
-          let text = ABBREV[cand];
-          if (text) {
-            const range = new monaco.Range(
-              startLineNumber,
-              startColumn - cand.length,
-              startLineNumber,
-              startColumn
-            );
-            editor.executeEdits("replaceSequence", [{ range, text: text }]);
-          }
-        }
-      }
-    });
+    editor.setDark(state.dark.value);
     if (initialValue === LOADING) loadFile("Tour.newt");
     else run(initialValue);
   }, []);
@@ -431,11 +396,12 @@ let timeout: number | undefined;
 // Adapted from the vscode extension, but types are slightly different
 // and positions are 1-based.
 const processOutput = (
-  editor: monaco.editor.IStandaloneCodeEditor,
+  // editor: AbstractEditor,
   output: string
 ) => {
-  let model = editor.getModel()!;
-  let markers: monaco.editor.IMarkerData[] = [];
+  // let model = editor.getModel()!;
+  console.log('process output', output)
+  let markers: Marker[] = [];
   let lines = output.split("\n");
   let m = lines[0].match(/.*Process (.*)/);
   let fn = "";
@@ -451,11 +417,8 @@ const processOutput = (
       if (fn && fn !== file) {
         lineNumber = column = 0;
       }
-      let start = { column, lineNumber };
       // we don't have the full range, so grab the surrounding word
       let endColumn = column + 1;
-      let word = model.getWordAtPosition(start);
-      if (word) endColumn = word.endColumn;
 
       // heuristics to grab the entire message:
       // anything indented
@@ -464,13 +427,9 @@ const processOutput = (
       while (lines[i + 1]?.match(/^(  )/)) {
         message += "\n" + lines[++i];
       }
-      const severity =
-        kind === "ERROR"
-          ? monaco.MarkerSeverity.Error
-          : monaco.MarkerSeverity.Info;
       if (kind === "ERROR" || lineNumber)
         markers.push({
-          severity,
+          severity: kind === 'ERROR' ? 'error' : 'info',
           message,
           startLineNumber: lineNumber,
           endLineNumber: lineNumber,
@@ -479,5 +438,7 @@ const processOutput = (
         });
     }
   }
-  monaco.editor.setModelMarkers(model, "newt", markers);
+  console.log('markers', markers)
+  // editor.setMarkers(markers)
+  return markers;
 };

@@ -10,7 +10,7 @@ const handleMessage = async function (ev: { data: CompileReq }) {
   console.log("message", ev.data);
   await preload;
   shim.archive = archive;
-  let { src, fileName } = ev.data;
+  let { id, src, fileName } = ev.data;
   const outfile = "out.js";
   shim.process.argv = ["browser", "newt", fileName, "-o", outfile, "--top"];
   shim.files[fileName] = new TextEncoder().encode(src);
@@ -29,7 +29,7 @@ const handleMessage = async function (ev: { data: CompileReq }) {
   console.log(`process ${fileName} in ${duration} ms`);
   let javascript = new TextDecoder().decode(shim.files[outfile]);
   let output = shim.stdout;
-  sendResponse({ type: 'compileResult', javascript, output, duration });
+  sendResponse({ id, type: 'compileResult', javascript, output, duration });
 };
 
 // hooks for worker.html to override
