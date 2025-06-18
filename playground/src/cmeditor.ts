@@ -12,6 +12,7 @@ import {
   StreamLanguage,
   StringStream,
 } from "@codemirror/language";
+import { ABBREV } from "./abbrev.js";
 
 let parserWithMetadata = parser.configure({
   props: [
@@ -32,7 +33,7 @@ const newtLanguage = LRLanguage.define({
     },
   },
 });
-// prettier did this...
+// prettier flattened this...
 const keywords = [
   "let",
   "in",
@@ -113,7 +114,6 @@ function commentTokenizer(stream: StringStream, state: State): string | null {
     }
     dash = ch === "-";
   }
-  console.log("XX", stream.current());
   return "comment";
 }
 
@@ -143,6 +143,27 @@ export class CMEditor implements AbstractEditor {
         basicSetup,
         linter((view) => this.delegate.lint(view)),
         this.theme.of(EditorView.baseTheme({})),
+        EditorView.updateListener.of((update) => {
+          let doc = update.state.doc
+
+          update.changes.iterChanges((fromA, toA, fromB, toB, inserted)=> {
+            if (" ')\\".includes(inserted.toString())) {
+              console.log('changes', update.changes, update.changes.desc)
+              let line = doc.lineAt(fromA)
+              let e = fromA - line.from
+              const m = line.text.slice(0, e).match(/(\\[^ ]+)$/);
+              if (m) {
+                let s = e - m[0].length
+                let key = line.text.slice(s, e)
+                if (ABBREV[key]) {
+                  this.view.dispatch({
+                    changes: { from: line.from + s, to: fromA, insert: ABBREV[key] },
+                  });
+                }
+              }
+            }
+          })
+        }),
         hoverTooltip((view, pos) => {
           let cursor = this.view.state.doc.lineAt(pos);
           let line = cursor.number;
