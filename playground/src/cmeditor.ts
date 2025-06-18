@@ -2,37 +2,15 @@ import { AbstractEditor, EditorDelegate, Marker } from "./types";
 import { basicSetup } from "codemirror";
 import { EditorView, hoverTooltip, Tooltip } from "@codemirror/view";
 import { Compartment } from "@codemirror/state";
-import { parser } from "./parser.js";
-import { oneDark, oneDark as themeOneDark } from "@codemirror/theme-one-dark";
-import { styleTags, tags as t } from "@lezer/highlight";
-import { linter, Diagnostic } from "@codemirror/lint";
+import { oneDark } from "@codemirror/theme-one-dark";
+import { linter } from "@codemirror/lint";
 import {
   LanguageSupport,
-  LRLanguage,
   StreamLanguage,
   StringStream,
 } from "@codemirror/language";
 import { ABBREV } from "./abbrev.js";
 
-let parserWithMetadata = parser.configure({
-  props: [
-    styleTags({
-      Identifier: t.variableName,
-      LineComment: t.lineComment,
-      "if then else data where": t.keyword,
-    }),
-    // indentNodeProp, foldNodeProp
-  ],
-});
-
-const newtLanguage = LRLanguage.define({
-  parser: parserWithMetadata,
-  languageData: {
-    commentTokens: {
-      line: "--",
-    },
-  },
-});
 // prettier flattened this...
 const keywords = [
   "let",
@@ -144,25 +122,29 @@ export class CMEditor implements AbstractEditor {
         linter((view) => this.delegate.lint(view)),
         this.theme.of(EditorView.baseTheme({})),
         EditorView.updateListener.of((update) => {
-          let doc = update.state.doc
+          let doc = update.state.doc;
 
-          update.changes.iterChanges((fromA, toA, fromB, toB, inserted)=> {
+          update.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
             if (" ')\\".includes(inserted.toString())) {
-              console.log('changes', update.changes, update.changes.desc)
-              let line = doc.lineAt(fromA)
-              let e = fromA - line.from
+              console.log("changes", update.changes, update.changes.desc);
+              let line = doc.lineAt(fromA);
+              let e = fromA - line.from;
               const m = line.text.slice(0, e).match(/(\\[^ ]+)$/);
               if (m) {
-                let s = e - m[0].length
-                let key = line.text.slice(s, e)
+                let s = e - m[0].length;
+                let key = line.text.slice(s, e);
                 if (ABBREV[key]) {
                   this.view.dispatch({
-                    changes: { from: line.from + s, to: fromA, insert: ABBREV[key] },
+                    changes: {
+                      from: line.from + s,
+                      to: fromA,
+                      insert: ABBREV[key],
+                    },
                   });
                 }
               }
             }
-          })
+          });
         }),
         hoverTooltip((view, pos) => {
           let cursor = this.view.state.doc.lineAt(pos);
