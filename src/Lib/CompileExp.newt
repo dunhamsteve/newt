@@ -1,10 +1,3 @@
--- First pass of compilation
--- - work out arities and fully apply functions / constructors (currying)
---     currying is problemmatic because we need to insert lambdas (η-expand) and
---     it breaks all of the de Bruijn indices
--- - expand metas (this is happening earlier)
--- - erase stuff (there is another copy that essentially does the same thing)
--- I could make names unique (e.q. on lambdas), but I might want that to vary per backend?
 module Lib.CompileExp
 
 import Prelude
@@ -35,7 +28,8 @@ data CExp : U where
   -- How is CLam different from CFun with one arg?
   CLam : Name -> CExp -> CExp
   CFun : List Name -> CExp -> CExp
-  CApp : CExp -> List CExp -> Int -> CExp
+  CAppRef : QName -> List CExp -> Int -> CExp
+  CApp : CExp -> CExp -> CExp
   CCase : CExp -> List CAlt -> CExp
   CRef : QName -> CExp
   CMeta : Int -> CExp
@@ -78,21 +72,22 @@ any f Nil = False
 any f (x :: xs) = if f x then True else any f xs
 
 -- apply an expression at an arity to a list of args
--- CApp will specify any missing args, for eta conversion later
+-- CAppRef will specify any missing args, for eta conversion later
 -- and any extra args get individual CApp.
-apply : CExp -> List CExp -> SnocList CExp -> Nat -> M CExp
+apply : QName -> List CExp -> SnocList CExp -> Nat -> M CExp
 -- out of args, make one up (fix that last arg)
 apply t Nil acc (S k) =
-  pure $ CApp t (acc <>> Nil) (1 + cast k)
+  pure $ CAppRef t (acc <>> Nil) (1 + cast k)
 apply t (x :: xs) acc (S k)  =  apply t xs (acc :< x) k
 -- once we hit zero, we fold the rest
-apply t ts acc Z = go (CApp t (acc <>> Nil) 0) ts
+apply t ts acc Z = case acc of
+  -- drop zero arg call
+  Lin => go (CRef t) ts
+  _ => go (CAppRef t (acc <>> Nil) 0) ts
   where
     go : CExp -> List CExp -> M CExp
-    -- drop zero arg call
-    go (CApp t Nil 0) args = go t args
     go t Nil = pure t
-    go t (arg :: args) = go (CApp t (arg :: Nil) 0) args
+    go t (arg :: args) = go (CApp t arg) args
 
 lookupDef : {{Ref2 Defs St}} → FC → QName → M Def
 lookupDef fc nm = do
@@ -117,7 +112,7 @@ compileTerm t@(Ref fc nm@(QN _ tag)) = do
         Just (DCon SuccCon _ _) =>
           pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
         _ => pure $ CRef nm
-    _ => apply (CRef nm) Nil Lin arity
+    _ => apply nm Nil Lin arity
 
 compileTerm (Meta fc k) = error fc "Compiling meta \{show k}"
 compileTerm (Lam _ nm _ _ t) = CLam nm <$> compileTerm t
@@ -125,19 +120,20 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
   (Meta _ k, args) => do
         error (getFC tm) "Compiling an unsolved meta \{show tm}"
         -- info (getFC tm) "Compiling an unsolved meta \{show tm}"
-        -- pure $ CApp (CRef "Meta\{show k}") Nil 0
+        -- pure $ CAppRef  "Meta\{show k}" Nil 0
   (t@(Ref fc nm), args) => do
         defs <- getRef Defs
         args' <- traverse compileTerm args
         arity <- arityForName fc nm
         case the (Maybe Def) $ lookupMap' nm defs of
           Just (DCon SuccCon _ _) => applySucc args'
-          _ => apply (CRef nm) args' Lin arity
+          _ => apply nm args' Lin arity
+  -- REVIEW maybe we want a different constructor for non-Ref applications?
   (t, args) => do
         debug $ \ _ => "apply other \{render 90 $ pprint Nil t}"
         t' <- compileTerm t
         args' <- traverse compileTerm args
-        apply t' args' Lin Z
+        pure $ foldl CApp t' args'
   where
     applySucc : List CExp → M CExp
     applySucc Nil = pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
@@ -147,7 +143,7 @@ compileTerm (UU _) = pure $ CRef (QN Nil "U")
 compileTerm (Pi _ nm icit rig t u) = do
   t' <- compileTerm t
   u' <- compileTerm u
-  pure $ CApp (CRef (QN Nil "PiType")) (t' :: CLam nm u' :: Nil) 0
+  pure $ CAppRef (QN Nil "PiType") (t' :: CLam nm u' :: Nil) 0
 compileTerm (Case fc t alts) = do
   t' <- compileTerm t
   alts' <- for alts $ \case

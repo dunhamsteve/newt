@@ -38,7 +38,7 @@ newt2.js: newt.js
 	$(RUNJS) newt.js src/Main.newt -o newt2.js
 
 newt3.js: newt2.js
-	rm -f build/*
+	-rm build/*
 	time $(RUNJS) newt2.js src/Main.newt -o newt3.js
 	cmp newt2.js newt3.js
 

@@ -19,7 +19,7 @@ import Data.SortedMap
 
 -- Find names of applications in tail position
 tailNames : CExp → List QName
-tailNames (CApp (CRef name) args 0) = name :: Nil
+tailNames (CAppRef nm args n) = nm :: Nil
 tailNames (CCase _ alts) = join $ map altTailNames alts
   where
     altTailNames : CAlt → List QName
@@ -32,8 +32,9 @@ tailNames (CConstr _ args) = Nil
 tailNames (CBnd _) = Nil
 tailNames (CFun _ tm) = tailNames tm
 tailNames (CLam _ _) = Nil
-tailNames (CApp (CRef nm) args n) = nm :: Nil
-tailNames (CApp t args n) = Nil
+-- should not happen, FIXME
+tailNames (CAppRef t args n) = Nil
+tailNames (CApp t u) = Nil
 tailNames (CRef _) = Nil
 tailNames CErased = Nil
 tailNames (CLit _) = Nil
@@ -44,7 +45,7 @@ tailNames (CPrimOp _ _ _) = Nil
 -- rewrite tail calls to return an object
 rewriteTailCalls : List QName → CExp → CExp
 rewriteTailCalls nms tm = case tm of
-  CApp (CRef nm) args 0 =>
+  CAppRef nm args 0 =>
       if elem nm nms
         then CConstr (show nm) args
         else CConstr "return" (tm :: Nil)
@@ -76,7 +77,7 @@ doOptimize fns = do
     mkWrap recName (qn, CFun args _) = do
       let arglen = length' args
       let arg = CConstr (show qn) $ map (\k => CBnd (arglen - k - 1)) (range 0 arglen)
-      let body = CApp (CRef bouncer) (CRef recName :: arg :: Nil) 0
+      let body = CAppRef bouncer (CRef recName :: arg :: Nil) 0
       pure $ (qn, CFun args body)
     mkWrap _ (qn, _) = error emptyFC "error in mkWrap: \{show qn} not a CFun"
 

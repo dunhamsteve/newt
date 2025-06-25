@@ -162,7 +162,7 @@ termToJS env (CConstr nm args) f = go args 0 (\ args => f $ LitObject (("tag", L
     go : ∀ e. List CExp -> Int -> (List (String × JSExp) -> JSStmt e) -> JSStmt e
     go Nil ix k = k Nil
     go (t :: ts) ix k = termToJS env t $ \ t' => go ts (ix + 1) $ \ args => k $ ("h\{show ix}", t') :: args
-termToJS env (CApp t args etas) f = termToJS env t (\ t' => (argsToJS t' args Lin f)) --  (f (Apply t' args'))))
+termToJS env (CAppRef nm args etas) f = termToJS env (CRef nm) (\ t' => (argsToJS t' args Lin f))
   where
     etaExpand : JSEnv -> Nat -> SnocList JSExp -> JSExp -> JSExp
     etaExpand env Z args tm = Apply tm (args <>> Nil)
@@ -176,6 +176,7 @@ termToJS env (CApp t args etas) f = termToJS env t (\ t' => (argsToJS t' args Li
     -- k (acc <>> Nil)
     argsToJS tm (x :: xs) acc k = termToJS env x (\ x' => argsToJS tm xs (acc :< x') k)
 
+termToJS env (CApp t arg) f = termToJS env t (\ t' => termToJS env arg (\arg' => f (Apply t' (arg' :: Nil))))
 
 termToJS {e} env (CCase t alts) f =
   -- need to assign the scrutinee to a variable (unless it is a var already?)
@@ -349,7 +350,8 @@ sortedNames defs qn = go Nil Nil qn
     getNames : List QName → CExp →  List QName
     getNames acc (CLam _ t) = getNames acc t
     getNames acc (CFun _ t) = getNames acc t
-    getNames acc (CApp t ts _) = foldl getNames acc (t :: ts)
+    getNames acc (CAppRef nm ts _) = foldl getNames (nm :: acc) ts --  (CRef nm :: ts)
+    getNames acc (CApp t u) = getNames (getNames acc t) u
     getNames acc (CCase t alts) = foldl getNames acc $ t :: map getBody alts
     getNames acc (CRef qn) = qn :: acc
     getNames acc (CLet _ t u) = getNames (getNames acc t) u
