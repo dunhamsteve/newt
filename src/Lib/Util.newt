@@ -23,7 +23,7 @@ data Binder : U where
 -- I don't have a show for terms without a name list
 
 instance Show Binder where
-  show (MkBinder _ nm icit quant t) = "(\{show quant}\{nm} \{show icit} : ... :: Nil)"
+  show (MkBinder _ nm icit quant t) = "[\{show quant}\{nm} \{show icit} : ...]"
 
 splitTele : Tm -> (Tm × List Binder)
 splitTele = go Nil

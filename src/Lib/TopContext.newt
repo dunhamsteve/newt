@@ -37,7 +37,7 @@ lookupRaw raw top =
 
 
 instance Show TopContext where
-  show (MkTop _ _ _ _ defs metas _ _ _) = "\nContext:\n (\{ joinBy "\n" $ map (show ∘ snd) $ toList defs} :: Nil)"
+  show (MkTop _ _ _ _ defs metas _ _ _) = "\nContext:\n [\{ joinBy "\n" $ map (show ∘ snd) $ toList defs}]"
 
 -- TODO need to get class dependencies working
 emptyTop : ∀ io. {{Monad io}} {{HasIO io}} -> io TopContext

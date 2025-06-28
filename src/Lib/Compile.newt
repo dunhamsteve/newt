@@ -260,7 +260,7 @@ expToDoc (Var nm) = jsIdent nm
 expToDoc (JLam nms (JReturn exp)) = text "(" <+> commaSep (map jsIdent nms) <+> text ") =>" <+> text "(" ++ expToDoc exp ++ text ")"
 expToDoc (JLam nms body) = text "(" <+> commaSep (map jsIdent nms) <+> text ") =>" <+> bracket "{" (stmtToDoc body) "}"
 expToDoc JUndefined = text "null"
-expToDoc (Index obj ix) = expToDoc obj ++ text "(" ++ expToDoc ix ++ text " :: Nil)"
+expToDoc (Index obj ix) = expToDoc obj ++ text "[" ++ expToDoc ix ++ text "]"
 expToDoc (Dot obj nm) = expToDoc obj ++ text "." ++ jsIdent nm
 expToDoc (JPrimOp op t u) = parens 0 1 (expToDoc t) <+> text op <+> parens 0 1 (expToDoc u)
 
