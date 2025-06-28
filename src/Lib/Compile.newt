@@ -286,10 +286,6 @@ stmtToDoc (JError str) = text "throw new Error(" ++ text (quoteString str) ++ te
 stmtToDoc (JCase sc alts) =
   text "switch (" ++ expToDoc sc ++ text ")" <+> bracket "{" (stack $ map altToDoc alts) "}"
 
-mkArgs : Nat -> List String -> List String
-mkArgs Z acc = acc
-mkArgs (S k) acc = mkArgs k ("h\{show k}" :: acc)
-
 -- use iife to turn stmts into expr
 maybeWrap : JSStmt Return -> JSExp
 maybeWrap (JReturn exp) = exp
@@ -399,6 +395,7 @@ process name = do
   eraseEntries
   liftWhere
   entries <- readIORef ref
+  -- Now working with defs
   exprs <- mapM defToCExp $ toList entries
   let cexpMap = foldMap const EmptyMap exprs
   cexpMap <- tailCallOpt cexpMap

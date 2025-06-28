@@ -185,6 +185,7 @@ const language: EditorDelegate = {
     return topData?.context.find((entry) => entry.name === word);
   },
   onChange(value) {
+    // run via the linter now
     // clearTimeout(timeout);
     //   timeout = setTimeout(() => {
     //     run(value);
@@ -199,15 +200,17 @@ const language: EditorDelegate = {
   async lint(view) {
     console.log("LINT");
     let src = view.state.doc.toString();
+    localStorage.code = src
+    // we'll want to pull it from the file.
     const fileName = state.currentFile.value;
     console.log("FN", fileName);
-    // console.log("SRC", src);
     try {
       let out = await runCommand({
         id: nextID(),
         type: "compileRequest",
         fileName,
         src,
+        compile: false,
       });
       console.log("OUT", out);
       let markers = processOutput(out);

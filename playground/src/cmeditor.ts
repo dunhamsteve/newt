@@ -1,10 +1,12 @@
 import { AbstractEditor, EditorDelegate, Marker } from "./types";
 import { basicSetup } from "codemirror";
-import { EditorView, hoverTooltip, Tooltip } from "@codemirror/view";
-import { Compartment } from "@codemirror/state";
+import { defaultKeymap, indentMore, indentLess, toggleLineComment } from "@codemirror/commands";
+import { EditorView, hoverTooltip, keymap, Tooltip } from "@codemirror/view";
+import { Compartment, Prec } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { linter } from "@codemirror/lint";
 import {
+  indentService,
   LanguageSupport,
   StreamLanguage,
   StringStream,
@@ -61,7 +63,7 @@ interface State {
 }
 
 function tokenizer(stream: StringStream, state: State): string | null {
-  stream.eatSpace();
+  if (stream.eatSpace()) return null
   if (stream.match("--")) {
     stream.skipToEnd();
     return "comment";
@@ -70,17 +72,19 @@ function tokenizer(stream: StringStream, state: State): string | null {
     state.tokenizer = commentTokenizer;
     return state.tokenizer(stream, state);
   }
-  if (stream.match(/^[\w_][\w\d_']*/)) {
+
+  // TODO match tokenizer better..
+  if (stream.match(/[^\\(){}[\],.@;\s][^()\\{}\[\],.@;\s]*/)) {
     let word = stream.current();
     if (keywords.includes(word)) return "keyword";
     if (word[0] >= "A" && word[0] <= "Z") return "typename";
+    console.log('IDENT', )
     return "identifier";
   }
   // unhandled
-  stream.next();
+  stream.next()
   return null;
 }
-
 function commentTokenizer(stream: StringStream, state: State): string | null {
   console.log("ctok");
   let dash = false;
@@ -100,6 +104,12 @@ const newtLanguage2 = StreamLanguage.define({
   token(stream, st) {
     return st.tokenizer(stream, st);
   },
+  languageData: {
+    commentTokens: {
+      line: "--"
+    },
+    wordChars: "!#$%^&*_+-=<>|",
+  }
 });
 
 function newt() {
@@ -120,12 +130,46 @@ export class CMEditor implements AbstractEditor {
       extensions: [
         basicSetup,
         linter((view) => this.delegate.lint(view)),
-        this.theme.of(EditorView.baseTheme({})),
+        // For indent on return
+        indentService.of((ctx, pos) => {
+          let line = ctx.lineAt(pos)
+          if (!line) return null
+            let prevLine = ctx.lineAt(line.from - 1);
+            if (prevLine.text.trimEnd().match(/\b(of|where|do)\s*$/)) {
+              let pindent = prevLine.text.match(/^\s*/)?.[0].length ?? 0
+              return pindent + 2
+            }
+          return null
+        }),
+        Prec.highest(keymap.of([
+          {
+            key: "Tab",
+            preventDefault: true,
+            run: indentMore,
+          },
+          {
+            key: "Cmd-/",
+            run: toggleLineComment,
+          },
+          // ok, we can do multiple keys (we'll want this for Idris)
+          {
+            key: "c-c c-s",
+            run: () => {
+              console.log("C-c C-s")
+              return false
+            }
+          },
+          {
+            key: "Shift-Tab",
+            preventDefault: true,
+            run: indentLess,
+          },
+        ])),
         EditorView.updateListener.of((update) => {
           let doc = update.state.doc;
 
           update.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
-            if (" ')\\".includes(inserted.toString())) {
+            if (" ')\\_".includes(inserted.toString())) {
               console.log("changes", update.changes, update.changes.desc);
               let line = doc.lineAt(fromA);
               let e = fromA - line.from;
@@ -146,6 +190,7 @@ export class CMEditor implements AbstractEditor {
             }
           });
         }),
+        this.theme.of(EditorView.baseTheme({})),
         hoverTooltip((view, pos) => {
           let cursor = this.view.state.doc.lineAt(pos);
           let line = cursor.number;
@@ -155,7 +200,8 @@ export class CMEditor implements AbstractEditor {
             let col = range.from - cursor.from;
             let word = this.view.state.doc.sliceString(range.from, range.to);
             let entry = this.delegate.getEntry(word, line, col);
-            console.log("entry", entry);
+            if (!entry) entry = this.delegate.getEntry('_'+word+'_', line, col);
+            console.log("entry for", word, "is", entry);
             if (entry) {
               let rval: Tooltip = {
                 pos: range.head,

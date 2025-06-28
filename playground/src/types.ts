@@ -6,6 +6,7 @@ export interface CompileReq {
   type: "compileRequest";
   fileName: string;
   src: string;
+  compile: boolean;
 }
 
 export interface CompileRes {
