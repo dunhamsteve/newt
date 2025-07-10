@@ -54,7 +54,7 @@ dumpCtx : Context -> M String
 dumpCtx ctx = do
   let names = (map fst ctx.types)
   -- I want to know which ones are defines. I should skip the `=` bit if they match, I'll need indices in here too.
-  env <- for (zip ctx.env ctx.types) $ \case
+  env <- for (reverse $ zip ctx.env ctx.types) $ \case
     (v, n, ty) => do
       sty <- vprint ctx ty
       sv <- vprint ctx v
@@ -697,7 +697,7 @@ getConstructors ctx scfc (VRef fc nm _) = do
       top <- getTop
       case lookup nm top of
         (Just (MkEntry _ name type (TCon _ names) _)) => pure names
-        _ => error scfc "Not a type constructor \{show nm}"
+        _ => error scfc "Not a type constructor: \{show nm}"
     lookupDCon : QName -> M (QName × Int × Tm)
     lookupDCon nm = do
       top <- getTop

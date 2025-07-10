@@ -162,7 +162,7 @@ processModule importFC base stk qn@(QN ns nm) = do
     importHints (listValues mod.modDefs)
 
   log 1 $ \ _ => "process Decls"
-  traverse (tryProcessDecl ns) (collectDecl decls)
+  traverse (tryProcessDecl src ns) (collectDecl decls)
 
   -- update modules with result, leave the rest of context in case this is top file
   top <- getTop
@@ -178,14 +178,16 @@ processModule importFC base stk qn@(QN ns nm) = do
 
   (Nil) <- liftIO {M} $ readIORef top.errors
     | errors => do
-        traverse (putStrLn ∘ showError src) errors
+        -- we're now showing errors when they occur, so they're next to debug messages
+        -- traverse (putStrLn ∘ showError src) errors
         exitFailure "Compile failed"
   logMetas $ reverse $ listValues top.metaCtx.metas
   pure src
   where
-    tryProcessDecl : List String -> Decl -> M Unit
-    tryProcessDecl ns decl = do
+    tryProcessDecl : String -> List String → Decl -> M Unit
+    tryProcessDecl src ns decl = do
       (Left err) <- tryError $ processDecl ns decl | _ => pure MkUnit
+      putStrLn $ showError src err
       addError err
 
 -- unwind the module part of the path name

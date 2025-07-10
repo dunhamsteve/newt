@@ -74,7 +74,7 @@ tryEval env (VRef fc k sp) = do
         catchError (
             do
             debug $ \ _ =>  "app \{show name} to \{show sp}"
-            vtm <- eval Nil CBN tm
+            vtm <- eval env CBN tm
             debug $ \ _ =>  "tm is \{render 90 $ pprint Nil tm}"
             val <- vappSpine vtm sp
             case val of
@@ -86,7 +86,9 @@ tryEval env (VRef fc k sp) = do
               VLetRec _ _ _ _ _ => pure Nothing
               v => pure $ Just v)
             (\ _ => pure Nothing)
-      _ => pure Nothing
+      _ => do
+        debug $ \ _ => "tryEval blocked on undefined \{show k}"
+        pure Nothing
 tryEval _ _ = pure Nothing
 
 
