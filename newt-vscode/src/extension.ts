@@ -41,13 +41,13 @@ export function activate(context: vscode.ExtensionContext) {
     const lineText = document.lineAt(position.line).text;
     const start = Math.max(0, position.character - 10);
     const snippet = lineText.slice(start, position.character);
-    console.log(`change '${text}' snippet ${snippet}`)
+    console.log(`change '${text}' snippet ${snippet}`);
     const m = snippet.match(/(\\[^ ]+)$/);
     if (m) {
       const cand = m[0];
-      console.log('cand', cand);
+      console.log("cand", cand);
       const replacement = ABBREV[cand];
-      console.log('repl', replacement);
+      console.log("repl", replacement);
       if (replacement) {
         const range = new vscode.Range(
           position.line,
@@ -70,6 +70,7 @@ export function activate(context: vscode.ExtensionContext) {
       ? workspaceFolder.uri.fsPath
       : path.dirname(fileName);
     const config = vscode.workspace.getConfiguration("newt");
+    // FIXME wrong newt now.
     const cmd = config.get<string>("path", "build/exec/newt");
     const command = `${cmd} --top ${fileName}`;
     let st = +new Date();
@@ -85,7 +86,6 @@ export function activate(context: vscode.ExtensionContext) {
         // extract errors and messages from stdout
         const lines = stdout.split("\n");
         const diagnostics: vscode.Diagnostic[] = [];
-        const others: Record<string, vscode.Diagnostic[]> = {};
 
         if (err) {
           let start = new vscode.Position(0, 0);
@@ -118,26 +118,7 @@ export function activate(context: vscode.ExtensionContext) {
             let [_full, kind, file, line, column, message] = match;
             let lnum = Number(line);
             let cnum = Number(column);
-
-            let severity;
-            if (kind === "ERROR") severity = vscode.DiagnosticSeverity.Error;
-            else if (kind === "WARN") severity = vscode.DiagnosticSeverity.Warning;
-            else severity = vscode.DiagnosticSeverity.Information;
-
-            // anything indented after the ERROR/INFO line are part of
-            // the message
-            while (lines[i + 1]?.match(/^(  )/)) message += "\n" + lines[++i];
-
-            if (file !== fileName) {
-              console.log('MM', file, fileName, lnum, cnum);
-              let start = new vscode.Position(lnum, cnum);
-              let end = new vscode.Position(lnum, cnum + 1);
-              let range = new vscode.Range(start, end);
-              const diag = new vscode.Diagnostic(range, message, severity);
-              if (!others[file]) others[file] = [];
-              others[file].push(diag);
-              lnum = cnum = 0;
-            }
+            if (file !== fileName) lnum = cnum = 0;
 
             let start = new vscode.Position(lnum, cnum);
             // we don't have the full range, so grab the surrounding word
@@ -145,28 +126,32 @@ export function activate(context: vscode.ExtensionContext) {
             let range =
               document.getWordRangeAtPosition(start) ??
               new vscode.Range(start, end);
+            // anything indented after the ERROR/INFO line are part of
+            // the message
+            while (lines[i + 1]?.match(/^(  )/)) message += "\n" + lines[++i];
+
+            let severity;
+
+            if (kind === "ERROR") severity = vscode.DiagnosticSeverity.Error;
+            else if (kind === "WARN")
+              severity = vscode.DiagnosticSeverity.Warning;
+            else severity = vscode.DiagnosticSeverity.Information;
             const diag = new vscode.Diagnostic(range, message, severity);
             if (kind === "ERROR" || lnum > 0) diagnostics.push(diag);
           }
-        }
-        for (let file in others) {
-          diagnosticCollection.set(vscode.Uri.file(file), others[file])
         }
         diagnosticCollection.set(vscode.Uri.file(fileName), diagnostics);
       }
     );
   }
 
-  const runPiForall = vscode.commands.registerCommand(
-    "newt-vscode.check",
-    () => {
-      const editor = vscode.window.activeTextEditor;
-      if (editor) {
-        const document = editor.document;
-        if (document.fileName.endsWith(".newt")) checkDocument(document);
-      }
+  const runNewt = vscode.commands.registerCommand("newt-vscode.check", () => {
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      const document = editor.document;
+      if (document.fileName.endsWith(".newt")) checkDocument(document);
     }
-  );
+  });
 
   context.subscriptions.push(
     vscode.languages.registerDefinitionProvider(
@@ -187,7 +172,11 @@ export function activate(context: vscode.ExtensionContext) {
             console.error("Workspace folder not found");
             return null;
           }
-          let uri = vscode.Uri.file(path.resolve(root.uri.fsPath, entry.fc.file));
+          // let uri = vscode.Uri.file(path.join(root.uri.fsPath, entry.fc.file));
+          let fileName = entry.fc.file;
+          if (!fileName.startsWith('/')) fileName = path.join(root.uri.fsPath, fileName);
+          let uri = vscode.Uri.file(fileName);
+          console.log('root', root.uri.fsPath, 'file', entry.fc.file, 'uri', uri);
           let start = new vscode.Position(entry.fc.line, entry.fc.col);
           let range = new vscode.Range(start, start);
           return new vscode.Location(uri, range);
@@ -216,7 +205,51 @@ export function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  context.subscriptions.push(runPiForall);
+  context.subscriptions.push(
+    vscode.languages.registerDocumentSymbolProvider(
+      { language: "newt" },
+      {
+        provideDocumentSymbols(document, token) {
+          console.log("DSP!!");
+          const symbols: vscode.DocumentSymbol[] = [];
+          // we should ask the compiler
+          const RE_FUNC = /^(|data|record|class|instance)\s*([\d\w']+)\s*:/;
+
+          for (let i = 0; i < document.lineCount; i++) {
+            const line = document.lineAt(i);
+            const match = line.text.match(RE_FUNC);
+            if (match) {
+              const prefix = match[1];
+              const functionName = match[2];
+              const range = new vscode.Range(
+                new vscode.Position(i, 0),
+                new vscode.Position(i, line.text.length)
+              );
+              let type = vscode.SymbolKind.Function;
+              let details = "Function";
+              if (prefix === "class") type = vscode.SymbolKind.Interface;
+              if (prefix === "instance") type = vscode.SymbolKind.Class;
+              if (prefix === "record") type = vscode.SymbolKind.Struct;
+              if (prefix === "data") type = vscode.SymbolKind.Struct;
+
+              const symbol = new vscode.DocumentSymbol(
+                functionName,
+                details,
+                type,
+                range, // full range
+                range  // selection
+              );
+              symbols.push(symbol);
+            }
+          }
+          console.log("SYMBOLS", symbols);
+          return symbols;
+        },
+      }
+    )
+  );
+
+  context.subscriptions.push(runNewt);
 
   vscode.workspace.onDidSaveTextDocument((document) => {
     if (document.fileName.endsWith(".newt"))

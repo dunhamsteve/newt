@@ -169,14 +169,6 @@ const LOADING = "module Loading\n";
 let value = localStorage.code || LOADING;
 let initialVertical = localStorage.vertical == "true";
 
-// the editor might handle this itself with the right prodding.
-effect(() => {
-  let text = state.output.value;
-  let editor = state.editor.value;
-  // TODO - abstract this for both editors
-  // if (editor) processOutput(editor, text);
-});
-
 interface EditorProps {
   initialValue: string;
 }
@@ -201,8 +193,12 @@ const language: EditorDelegate = {
     console.log("LINT");
     let src = view.state.doc.toString();
     localStorage.code = src
-    // we'll want to pull it from the file.
-    const fileName = state.currentFile.value;
+    let module = src.match(/module\s+([^\s]+)/)?.[1]
+    if (module) {
+      // This causes problems with stuff like aoc/... that reference files in the same directory
+      // state.currentFile.value = module.replace('.','/')+'.newt'
+    }
+    let fileName = state.currentFile.value;
     console.log("FN", fileName);
     try {
       let out = await runCommand({
@@ -411,7 +407,7 @@ const processOutput = (
   if (m) fn = m[1];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const match = line.match(/(INFO|ERROR) at (.*):\((\d+), (\d+)\):\s*(.*)/);
+    const match = line.match(/(INFO|ERROR) at ([^:]+):\((\d+), (\d+)\):\s*(.*)/);
     if (match) {
       let [_full, kind, file, line, col, message] = match;
       let lineNumber = +line + 1;

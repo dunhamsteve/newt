@@ -13,6 +13,9 @@ import {
 } from "@codemirror/language";
 import { ABBREV } from "./abbrev.js";
 
+// maybe use https://github.com/codemirror/legacy-modes/blob/main/mode/simple-mode.js instead.
+// @codemirror/legacy-modes/mode/simple-mode.js
+
 // prettier flattened this...
 const keywords = [
   "let",
