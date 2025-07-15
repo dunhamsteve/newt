@@ -62,7 +62,7 @@ window.addEventListener("message", (ev: MessageEvent<Message>) => {
     let { src } = ev.data;
     try {
       sendMessage({ type: "setConsole", messages: [] });
-      eval(src);
+      (new Function(src))();
     } catch (e) {
       console.log(e);
     }

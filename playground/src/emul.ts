@@ -9,7 +9,14 @@ export interface Handle {
 
 interface Process {
   argv: string[];
+  platform: string;
   exit(_: number): void;
+  stdout: {
+    write(s: string): unknown
+  };
+  cwd(): string;
+  env: Record<string,string>
+  __lasterr: {errno: number}
 }
 export interface NodeShim {
   stdout: string;

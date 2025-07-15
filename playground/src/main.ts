@@ -1,32 +1,59 @@
 import { effect, signal } from "@preact/signals";
 import { Diagnostic } from "@codemirror/lint";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { h, render } from "preact";
+import { h, render, VNode } from "preact";
 import { ChangeEvent } from "preact/compat";
 import { archive, preload } from "./preload.ts";
+import { b64decode, b64encode } from "./base64";
 import {
   AbstractEditor,
   EditorDelegate,
-  CompileReq,
-  CompileRes,
-  Message,
   TopData,
   Marker,
 } from "./types.ts";
 import { CMEditor } from "./cmeditor.ts";
+import { deflate } from "./deflate.ts";
+import { inflate } from "./inflate.ts";
+import { IPC } from "./ipc.ts";
 
 let topData: undefined | TopData;
 
-const newtWorker = new Worker("worker.js");
-// :FIXME use because Safari
-let postMessage = (msg: CompileReq) => newtWorker.postMessage(msg);
-// Safari/MobileSafari have small stacks in webworkers.
-if (navigator.vendor.includes("Apple")) {
-  const workerFrame = document.createElement("iframe");
-  workerFrame.src = "worker.html";
-  workerFrame.style.display = "none";
-  document.body.appendChild(workerFrame);
-  postMessage = (msg: any) => workerFrame.contentWindow?.postMessage(msg, "*");
+const ipc = new IPC();
+
+function mdline2nodes(s: string) {
+  let cs: (VNode|string)[] = []
+  let toks = s.matchAll(/(\*\*.*?\*\*)|(\*.*?\*)|(_.*?_)|[^*]+|\*/g)
+  for (let tok of toks) {
+    if (tok[1]) cs.push(h('b',{},tok[0].slice(2,-2)))
+    else if (tok[2]) cs.push(h('em',{},tok[0].slice(1,-1)))
+    else if (tok[3]) cs.push(h('em',{},tok[0].slice(1,-1)))
+    else cs.push(tok[0])
+  }
+  return cs
+}
+
+function md2nodes(md: string)  {
+  let rval: VNode[] = []
+  let list: VNode[] | undefined
+  for (let line of md.split("\n")) {
+    if (line.startsWith('- ')) {
+      list = list ?? []
+      list.push(h('li', {}, mdline2nodes(line.slice(2))))
+      continue
+    }
+    if (list) {
+      rval.push(h('ul', {}, list))
+      list = undefined
+    }
+    if (line.startsWith('# ')) {
+      rval.push(h('h2', {}, mdline2nodes(line.slice(2))))
+    } else if (line.startsWith('## ')) {
+      rval.push(h('h3', {}, mdline2nodes(line.slice(3))))
+    } else {
+      rval.push(h('div', {}, mdline2nodes(line)))
+    }
+  }
+  return rval
 }
 
 // iframe for running newt output
@@ -35,13 +62,20 @@ iframe.src = "frame.html";
 iframe.style.display = "none";
 document.body.appendChild(iframe);
 
-function run(src: string) {
-  console.log("SEND TO", iframe.contentWindow);
-  const fileName = state.currentFile.value;
-  // postMessage({ type: "compileRequest", fileName, src });
+async function refreshJS() {
+if (!state.javascript.value) {
+    let src = state.editor.value!.getValue();
+    console.log("SEND TO", iframe.contentWindow);
+    const fileName = state.currentFile.value;
+    // maybe send fileName, src?
+    await ipc.sendMessage("save", [fileName, src]);
+    let js = await ipc.sendMessage("compile", [fileName]);
+    state.javascript.value = js;
+  }
 }
 
-function runOutput() {
+async function runOutput() {
+  await refreshJS()
   const src = state.javascript.value;
   console.log("RUN", iframe.contentWindow);
   try {
@@ -68,55 +102,47 @@ function setOutput(output: string) {
   state.output.value = output;
 }
 
-let lastID = 0;
-const nextID = () => "" + lastID++;
-
-window.onmessage = (ev: MessageEvent<Message>) => {
+window.addEventListener("message", (ev) => {
+  if (ev.data.id) return;
   console.log("window got", ev.data);
   if ("messages" in ev.data) state.messages.value = ev.data.messages;
   if ("message" in ev.data) {
     state.messages.value = [...state.messages.value, ev.data.message];
   }
-  // safari callback
-  if ("output" in ev.data) {
-    newtWorker.onmessage?.(ev)
-    setOutput(ev.data.output);
-    state.javascript.value = ev.data.javascript;
-  }
-};
+});
 
-// TODO wrap up IPC
+async function copyToClipboard(ev: Event) {
+ev.preventDefault();
+    let src = state.editor.value!.getValue();
+    let hash = `#code/${b64encode(deflate(new TextEncoder().encode(src)))}`;
+    window.location.hash = hash;
+    await navigator.clipboard.writeText(window.location.href);
+    state.toast.value = "URL copied to clipboard";
+    setTimeout(() => (state.toast.value = ""), 2_000);
+}
 
-type Suspense<T> = {
-  resolve: (value: T | PromiseLike<T>) => void;
-  reject: (reason?: any) => void;
-};
+// We could push this into the editor
+document.addEventListener("keydown", (ev) => {
+  if ((ev.metaKey || ev.ctrlKey) && ev.code == "KeyS")
+    copyToClipboard(ev);
+});
 
-const callbacks: Record<string, Suspense<string>> = {};
-
-newtWorker.onmessage = (ev: MessageEvent<CompileRes>) => {
-  let suspense = callbacks[ev.data.id];
-  if (suspense) {
-    suspense.resolve(ev.data.output);
-    delete callbacks[ev.data.id];
-  }
-  console.log('result', ev.data, 'suspense', suspense)
-  // FIXME - we want to have the callback take a response for its command
-  setOutput(ev.data.output);
-  state.javascript.value = ev.data.javascript;
-};
-
-function runCommand(req: CompileReq) {
-  return new Promise<string>(
-    (resolve, reject) => {
-      callbacks[req.id] = { resolve, reject }
-      postMessage(req);
+function getSavedCode() {
+  let value: string = localStorage.idrisCode || LOADING;
+  let hash = window.location.hash;
+  if (hash.startsWith("#code/")) {
+    try {
+      value = new TextDecoder().decode(inflate(b64decode(hash.slice(6))));
+    } catch (e) {
+      console.error(e);
     }
-  );
+  }
+  return value;
 }
 
 const state = {
   output: signal(""),
+  toast: signal(""),
   javascript: signal(""),
   messages: signal<string[]>([]),
   editor: signal<AbstractEditor | null>(null),
@@ -166,7 +192,7 @@ document.addEventListener("keydown", (ev) => {
 
 const LOADING = "module Loading\n";
 
-let value = localStorage.code || LOADING;
+let value = getSavedCode() || LOADING;
 let initialVertical = localStorage.vertical == "true";
 
 interface EditorProps {
@@ -176,13 +202,8 @@ const language: EditorDelegate = {
   getEntry(word, _row, _col) {
     return topData?.context.find((entry) => entry.name === word);
   },
-  onChange(value) {
-    // run via the linter now
-    // clearTimeout(timeout);
-    //   timeout = setTimeout(() => {
-    //     run(value);
-    //     localStorage.code = value;
-    //   }, 1000);
+  onChange(_value) {
+    // we're using lint() now
   },
   getFileName() {
     if (!topData) return "";
@@ -192,39 +213,35 @@ const language: EditorDelegate = {
   async lint(view) {
     console.log("LINT");
     let src = view.state.doc.toString();
-    localStorage.code = src
-    let module = src.match(/module\s+([^\s]+)/)?.[1]
+    localStorage.code = src;
+    let module = src.match(/module\s+([^\s]+)/)?.[1];
     if (module) {
-      // This causes problems with stuff like aoc/... that reference files in the same directory
-      // state.currentFile.value = module.replace('.','/')+'.newt'
+      // This causes problems with stuff like aoc/...
+      state.currentFile.value = module.replace(".", "/") + ".newt";
     }
+    state.javascript.value = ''
     let fileName = state.currentFile.value;
     console.log("FN", fileName);
     try {
-      let out = await runCommand({
-        id: nextID(),
-        type: "compileRequest",
-        fileName,
-        src,
-        compile: false,
-      });
-      console.log("OUT", out);
+      await ipc.sendMessage("save", [fileName, src]);
+      let out = await ipc.sendMessage("typeCheck", [fileName]);
+      setOutput(out);
       let markers = processOutput(out);
-      let diags: Diagnostic[] = []
+      let diags: Diagnostic[] = [];
       for (let marker of markers) {
-        let col = marker.startColumn
+        let col = marker.startColumn;
 
-        let line = view.state.doc.line(marker.startLineNumber)
+        let line = view.state.doc.line(marker.startLineNumber);
         const pos = line.from + col - 1;
-        let word = view.state.wordAt(pos)
+        let word = view.state.wordAt(pos);
         diags.push({
           from: word?.from ?? pos,
-          to: word?.to ?? pos+1,
+          to: word?.to ?? pos + 1,
           severity: marker.severity,
           message: marker.message,
-        })
+        });
       }
-      return diags
+      return diags;
     } catch (e) {
       console.log("ERR", e);
     }
@@ -243,7 +260,6 @@ function Editor({ initialValue }: EditorProps) {
     state.editor.value = editor;
     editor.setDark(state.dark.value);
     if (initialValue === LOADING) loadFile("Tour.newt");
-    else run(initialValue);
   }, []);
 
   return h("div", { id: "editor", ref });
@@ -260,6 +276,38 @@ function Result() {
   return h("div", { id: "result" }, text);
 }
 
+function Help() {
+  return h("div", { id: "help" },
+    md2nodes(`
+# Newt Playground
+
+The editor will typecheck the file with newt and render errors as the file is changed. The current file is saved to localStorage and will be restored if there is no data in the URL. Cmd-s / Ctrl-s will create a url embedding the file contents. There is a layout toggle for phone use.
+
+## Tabs
+
+**Output** - Displays the compiler output, which is also used to render errors and info annotations in the editor.
+
+**JS** - Displays the javascript translation of the file
+
+**Console** - Displays the console output from running the javascript
+
+**Help** - Displays this help file
+
+## Buttons
+
+▶ Compile and run the current file in an iframe, console output is collected to the console tab.
+
+📋 Embed the current file in the URL and copy to clipboard
+
+↕ or ↔ Toggle vertical or horziontal layout (for mobile)
+
+## Keyboard
+
+*C-s or M-s* - Embed the current file in the URL and copy to clipboard
+`)
+  )
+}
+
 function Console() {
   const messages = state.messages.value ?? [];
   return h(
@@ -272,6 +320,7 @@ function Console() {
 const RESULTS = "Output";
 const JAVASCRIPT = "JS";
 const CONSOLE = "Console";
+const HELP = "Help";
 
 function Tabs() {
   const [selected, setSelected] = useState(localStorage.tab ?? RESULTS);
@@ -289,6 +338,10 @@ function Tabs() {
     if (state.messages.value.length) setSelected(CONSOLE);
   }, [state.messages.value]);
 
+  useEffect(() => {
+    if (selected === JAVASCRIPT && !state.javascript.value) refreshJS();
+  }, [selected, state.javascript.value]);
+
   let body;
   switch (selected) {
     case RESULTS:
@@ -299,6 +352,9 @@ function Tabs() {
       break;
     case CONSOLE:
       body = h(Console, {});
+      break;
+    case HELP:
+      body = h(Help, {});
       break;
     default:
       body = h("div", {});
@@ -312,7 +368,8 @@ function Tabs() {
       { className: "tabBar" },
       Tab(RESULTS),
       Tab(JAVASCRIPT),
-      Tab(CONSOLE)
+      Tab(CONSOLE),
+      Tab(HELP),
     ),
     h("div", { className: "tabBody" }, body)
   );
@@ -348,12 +405,15 @@ function EditWrap({
       loadFile(fn);
     }
   };
-  let d = vertical
-    ? "M0 0 h20 v20 h-20 z M0 10 h20"
-    : "M0 0 h20 v20 h-20 z M10 0 v20";
-  let play = "M0 0 L20 10 L0 20 z";
-  let svg = (d: string) =>
-    h("svg", { width: 20, height: 20, className: "icon" }, h("path", { d }));
+
+  const char = vertical ? "↕" : "↔"
+
+  // let d = vertical
+  //   ? "M0 0 h20 v20 h-20 z M0 10 h20"
+  //   : "M0 0 h20 v20 h-20 z M10 0 v20";
+  // let play = "M0 0 L20 10 L0 20 z";
+  // let svg = (d: string) =>
+  //   h("svg", { width: 20, height: 20, className: "icon" }, h("path", { d }));
   return h(
     "div",
     { className: "tabPanel left" },
@@ -366,8 +426,10 @@ function EditWrap({
         options
       ),
       h("div", { style: { flex: "1 1" } }),
-      h("button", { onClick: runOutput }, svg(play)),
-      h("button", { onClick: toggle }, svg(d))
+      h("button", { onClick: copyToClipboard, title: "copy url" }, "📋"),
+      h("button", { onClick: runOutput, title: "run program" }, "▶"),
+      h("button", { onClick: toggle, title: "change layout" }, char),
+      // h("button", { onClick: toggle }, svg(d))
     ),
     h("div", { className: "tabBody" }, h(Editor, { initialValue: value }))
   );
@@ -379,10 +441,15 @@ function App() {
     setVertical(!vertical);
     localStorage.vertical = !vertical;
   };
+  let toast;
+  if (state.toast.value) {
+    toast = h("p", { className: "toast" }, h("div", {}, state.toast.value));
+  }
   let className = `wrapper ${vertical ? "vertical" : "horizontal"}`;
   return h(
     "div",
     { className },
+    toast,
     h(EditWrap, { vertical, toggle }),
     h(Tabs, {})
   );
@@ -390,16 +457,10 @@ function App() {
 
 render(h(App, {}), document.getElementById("app")!);
 
-let timeout: number | undefined;
-
-// Adapted from the vscode extension, but types are slightly different
-// and positions are 1-based.
 const processOutput = (
-  // editor: AbstractEditor,
   output: string
 ) => {
-  // let model = editor.getModel()!;
-  console.log('process output', output)
+  console.log("process output", output);
   let markers: Marker[] = [];
   let lines = output.split("\n");
   let m = lines[0].match(/.*Process (.*)/);
@@ -407,7 +468,9 @@ const processOutput = (
   if (m) fn = m[1];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const match = line.match(/(INFO|ERROR) at ([^:]+):\((\d+), (\d+)\):\s*(.*)/);
+    const match = line.match(
+      /(INFO|ERROR) at ([^:]+):\((\d+), (\d+)\):\s*(.*)/
+    );
     if (match) {
       let [_full, kind, file, line, col, message] = match;
       let lineNumber = +line + 1;
@@ -428,7 +491,7 @@ const processOutput = (
       }
       if (kind === "ERROR" || lineNumber)
         markers.push({
-          severity: kind === 'ERROR' ? 'error' : 'info',
+          severity: kind === "ERROR" ? "error" : "info",
           message,
           startLineNumber: lineNumber,
           endLineNumber: lineNumber,
@@ -437,7 +500,7 @@ const processOutput = (
         });
     }
   }
-  console.log('markers', markers)
+  console.log("markers", markers);
   // editor.setMarkers(markers)
   return markers;
 };

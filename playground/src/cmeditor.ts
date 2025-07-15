@@ -81,7 +81,6 @@ function tokenizer(stream: StringStream, state: State): string | null {
     let word = stream.current();
     if (keywords.includes(word)) return "keyword";
     if (word[0] >= "A" && word[0] <= "Z") return "typename";
-    console.log('IDENT', )
     return "identifier";
   }
   // unhandled
@@ -136,7 +135,7 @@ export class CMEditor implements AbstractEditor {
         // For indent on return
         indentService.of((ctx, pos) => {
           let line = ctx.lineAt(pos)
-          if (!line) return null
+          if (!line || !line.from) return null
             let prevLine = ctx.lineAt(line.from - 1);
             if (prevLine.text.trimEnd().match(/\b(of|where|do)\s*$/)) {
               let pindent = prevLine.text.match(/^\s*/)?.[0].length ?? 0

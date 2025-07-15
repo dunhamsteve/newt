@@ -7,6 +7,31 @@ svg.icon path {
   fill: none;
 }
 
+#help {
+  padding: 5px;
+  font-family: 'Comic Code', monospace;
+}
+
+#help>div {
+  margin: 5px 0;
+}
+
+.toast {
+  position: absolute;
+  left: 50%;
+  top: 50px;
+  width: auto;
+  z-index: 100;
+  background: white;
+}
+.toast div {
+  margin-left: -50%;
+  border: solid 2px darkgrey;
+  padding: 10px;
+  border-radius: 10px;
+  background: white;
+  text-align: center;
+}
 @media (prefers-color-scheme: dark) {
 	body {
     color: white;
@@ -60,6 +85,7 @@ svg.icon path {
 .tabPanel {
   display: flex;
   flex-direction: column;
+  font-family: 'Comic Code', monospace;
 }
 .tabBar {
   display:flex;
@@ -92,4 +118,7 @@ svg.icon path {
 }
 .tooltip {
   padding: 5px;
+}
+.cm-editor .cm-content {
+  font-family: 'Comic Code', monospace;
 }
