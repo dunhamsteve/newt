@@ -21,9 +21,6 @@ import Lib.Syntax
 import Node
 import Serialize
 
-primNS : List String
-primNS = ("Prim" :: Nil)
-
 jsonTopContext : M Json
 jsonTopContext = do
   top <- getTop

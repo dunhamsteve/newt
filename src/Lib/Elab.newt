@@ -1162,9 +1162,9 @@ buildLitCases ctx prob fc scnm scty = do
 -- If we lookupRaw "String", we could get different answers in different contexts.
 -- maybe Hardwire this one
 stringType intType charType : QName
-stringType = QN ("Prim" :: Nil) "String"
-intType = QN ("Prim" :: Nil) "Int"
-charType = QN ("Prim" :: Nil) "Char"
+stringType = QN primNS "String"
+intType = QN primNS "Int"
+charType = QN primNS "Char"
 
 litTyName : Literal -> QName
 litTyName (LString str) = stringType
@@ -1213,6 +1213,8 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
   -- If we try on creation, we're looping at the moment, because of the possibility
   -- of Ord a -> Ord b -> Ord (a \x b). Need to cut earlier when solving or switch to
   -- Idris method...
+  -- This is necessary for tests/InferenceIssue.newt
+  -- solveAutos below is the important part
   scty' <- case scty' of
     (VMeta fc1 ix sp) => do
       meta <- lookupMeta ix

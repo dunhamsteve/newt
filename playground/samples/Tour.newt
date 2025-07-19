@@ -1,22 +1,14 @@
 
 
 /-
-  Ok, so this is newt, a dependent typed programming language that
-  I am implementing to learn how they work.  It targets javascript
-  and borrows a lot of syntax from Idris and Agda.
+  This is newt, a self-hosted, dependent typed programming language that
+  compiles to javascript and borrows a lot of syntax from Idris and Agda.
 
-  This page is a very simple web playground based on the monaco editor.
-  It runs newt, compiled by Idris2, in a web worker.
+  This page is a very simple web playground based on the codemirror editor.
+  It runs newt in a web worker.
 
   Block comments follow Lean because they're easier to type on a
   US keyboard.
-
-  The output, to the right, is somewhat noisy and obtuse. You'll see
-  INFO and sometimes ERROR messages that show up in the editor view
-  on hover.  I'm emitting INFO for solved metas.
-
-  The Day1.newt and Day2.newt are last year's advent of code, translated
-  from Lean.
 
 -/
 
@@ -27,10 +19,11 @@
 module Tour
 
 -- We can import other modules, with a flat namespace and no cycles,
--- diamonds are ok
+-- diamonds are ok, Prelude is not imported by default, only explicitly
+-- imported modules are in scope
 
--- commented out until we preload other files into the worker
--- import Lib
+-- commented out because we redefine parts of Prelude in this file.
+-- import Prelude
 
 -- We're calling the universe U and are doing type in type for now
 
@@ -39,9 +32,13 @@ data Nat : U where
   Z : Nat
   S : Nat -> Nat
 
+-- Nat-shaped data is turned into numbers in codegen.
+
 -- Multiple names are allowed on the left:
 data Bool : U where
   True False : Bool
+
+-- Enum shaped data becomes a bare string (the constructor name) in codegen.
 
 -- function definitions are equations using dependent pattern matching
 plus : Nat -> Nat -> Nat
@@ -58,7 +55,7 @@ plus' = \ n m => case n of
 
 -- We can define operators. Mixfix is supported, but we don't
 -- allow ambiguity (so you can't have both [_] and [_,_]). See
--- the Reasoning.newt sample for a mixfix example.
+-- the Reasoning.newt sample file for a mixfix example.
 infixl 2 _≡_
 
 -- Here is an equality, like Idris, everything goes to the right of the colon
@@ -84,8 +81,6 @@ instance Add Nat where
   Z + m = m
   (S n) + m = S (n + m)
 
--- and it now finds the implicits, you'll see the solutions to the
--- implicits if you hover over the `+`.
 two : Nat
 two = S Z + S Z
 
@@ -96,14 +91,13 @@ foo a b = ?
 
 -- Newt compiles to javascript, there is a tab to the right that shows the
 -- javascript output. There is some erasure, but inlining is not being done
--- yet.  Dead code elimination will be done if there is a `main` function.
--- That is not the case in this file.
+-- yet.
 
 -- We can define native types, if the type is left off, it defaults to U
 
 ptype SomePrimType : U
 
--- The names of these three types are special, primitive numbers, strings,
+-- The types Int, String, Char are special. Primitive numbers, strings,
 -- and characters inhabit them, respectively. We can match on primitives, but
 -- must provide a default case:
 
@@ -208,3 +202,25 @@ prod xs ys = do
   y <- ys
   pure (x, y)
 
+
+data Unit = MkUnit
+
+ptype World
+
+data IORes a = MkIORes a World
+
+IO : U -> U
+IO a = World -> IORes a
+
+instance Monad IO where
+  bind ma mab = \ w => case ma w of
+    MkIORes a w => mab a w
+  pure = MkIORes
+
+pfunc putStrLn uses (MkIORes MkUnit) : String -> IO Unit := `(s) => (w) => {
+  console.log(s)
+  return Prelude_MkIORes(null,Prelude_MkUnit,w)
+}`
+
+main : IO Unit
+main = putStrLn "Hello, World!"

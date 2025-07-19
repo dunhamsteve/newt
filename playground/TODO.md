@@ -7,6 +7,7 @@
   - workaround is to visit the file first
   - we can put them in the zip file and pull them over the IPC
 - [ ] make phone layout automatic
+- [ ] case split &c
 - [x] move newt to a worker (shim + newt + listener)
 - [x] tabs for source, compiler output
 - [x] Show errors in editor
@@ -19,4 +20,6 @@
 - [x] save to url (copy from idris2-playground)
 - [ ] click on url
 - [ ] settings
+  - compilation is now optional, what else do we need for newt?
+
 

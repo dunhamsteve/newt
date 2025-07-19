@@ -1,4 +1,4 @@
-import { effect, signal } from "@preact/signals";
+import { signal } from "@preact/signals";
 import { Diagnostic } from "@codemirror/lint";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { h, render, VNode } from "preact";
@@ -15,6 +15,7 @@ import { CMEditor } from "./cmeditor.ts";
 import { deflate } from "./deflate.ts";
 import { inflate } from "./inflate.ts";
 import { IPC } from "./ipc.ts";
+import helpText from "./help.md?raw";
 
 let topData: undefined | TopData;
 
@@ -37,14 +38,14 @@ function md2nodes(md: string)  {
   let list: VNode[] | undefined
   for (let line of md.split("\n")) {
     if (line.startsWith('- ')) {
-      list = list ?? []
+      if (!list) {
+        list = []
+        rval.push(h('ul', {}, list))
+      }
       list.push(h('li', {}, mdline2nodes(line.slice(2))))
       continue
     }
-    if (list) {
-      rval.push(h('ul', {}, list))
-      list = undefined
-    }
+    list = undefined
     if (line.startsWith('# ')) {
       rval.push(h('h2', {}, mdline2nodes(line.slice(2))))
     } else if (line.startsWith('## ')) {
@@ -277,35 +278,7 @@ function Result() {
 }
 
 function Help() {
-  return h("div", { id: "help" },
-    md2nodes(`
-# Newt Playground
-
-The editor will typecheck the file with newt and render errors as the file is changed. The current file is saved to localStorage and will be restored if there is no data in the URL. Cmd-s / Ctrl-s will create a url embedding the file contents. There is a layout toggle for phone use.
-
-## Tabs
-
-**Output** - Displays the compiler output, which is also used to render errors and info annotations in the editor.
-
-**JS** - Displays the javascript translation of the file
-
-**Console** - Displays the console output from running the javascript
-
-**Help** - Displays this help file
-
-## Buttons
-
-▶ Compile and run the current file in an iframe, console output is collected to the console tab.
-
-📋 Embed the current file in the URL and copy to clipboard
-
-↕ or ↔ Toggle vertical or horziontal layout (for mobile)
-
-## Keyboard
-
-*C-s or M-s* - Embed the current file in the URL and copy to clipboard
-`)
-  )
+  return h("div", { id: "help" }, md2nodes(helpText))
 }
 
 function Console() {

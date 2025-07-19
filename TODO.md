@@ -1,6 +1,7 @@
 
 ## TODO
 
+- [ ] Raw is duplicated between Lib.Syntax and Lib.Compile, but not detected
 - [ ] vscode - run newt when switching editors
 - [ ] case split
   - We could fake this up:

@@ -92,8 +92,8 @@ fcCol (MkFC file (l, c)) = c
 class HasFC a where
   getFC : a -> FC
 
-
-
+primNS : List String
+primNS = ("Prim" :: Nil)
 
 emptyFC : FC
 emptyFC = MkFC "" (0,0)
