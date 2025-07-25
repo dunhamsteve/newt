@@ -129,7 +129,7 @@ document.addEventListener("keydown", (ev) => {
 });
 
 function getSavedCode() {
-  let value: string = localStorage.idrisCode || LOADING;
+  let value: string = localStorage.code || LOADING;
   let hash = window.location.hash;
   if (hash.startsWith("#code/")) {
     try {
@@ -157,12 +157,10 @@ if (window.matchMedia) {
   function checkDark(ev: { matches: boolean }) {
     console.log("CHANGE", ev);
     if (ev.matches) {
-      // monaco.editor.setTheme("vs-dark");
       document.body.className = "dark";
       state.dark.value = true;
       state.editor.value?.setDark(true);
     } else {
-      // monaco.editor.setTheme("vs");
       document.body.className = "light";
       state.dark.value = false;
       state.editor.value?.setDark(false);
@@ -366,7 +364,6 @@ function EditWrap({
   vertical: boolean;
   toggle: () => void;
 }) {
-  // const [file, setFile] = useState("Tour.newt");
   const options = state.files.value.map((value) =>
     h("option", { value }, value)
   );
@@ -395,7 +392,8 @@ function EditWrap({
       { className: "tabBar" },
       h(
         "select",
-        { onChange: selectFile, value: state.currentFile.value },
+        { onChange: selectFile, value: "" },
+        h("option", { value: "" }, "-- load sample --"),
         options
       ),
       h("div", { style: { flex: "1 1" } }),
