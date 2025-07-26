@@ -32,9 +32,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     const lastChange = changes[changes.length - 1];
     const text = lastChange.text;
-
+    console.log("lastChange", lastChange)
     // Check if the last change is a potential shortcut trigger
-    if (!text || !" ')\\".includes(text)) return;
+    if (!text || !( " ')\\".includes(text) || text.startsWith('\n'))) return;
 
     const document = editor.document;
     const position = lastChange.range.end;

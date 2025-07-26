@@ -169,9 +169,10 @@ export class CMEditor implements AbstractEditor {
         ])),
         EditorView.updateListener.of((update) => {
           let doc = update.state.doc;
-
+          console.log('update', update)
           update.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
-            if (" ')\\_".includes(inserted.toString())) {
+            console.log('inserted', inserted)
+            if (" ')\\_".includes(inserted.toString()) || inserted.lines > 1) {
               console.log("changes", update.changes, update.changes.desc);
               let line = doc.lineAt(fromA);
               let e = fromA - line.from;
