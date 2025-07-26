@@ -83,7 +83,7 @@ xs <>< (y :: ys) = (xs :< y) <>< ys
 
 -- This is now handled by the parser, and LHS becomes `f a`.
 -- infixr 0 _$_
--- _$_ : ∀ a b. (a -> b) -> a -> b
+-- _$_ : ∀ a b. (a → b) → a → b
 -- f $ a = f a
 
 infixr 8 _×_
@@ -98,14 +98,14 @@ snd (a,b) = b
 -- Monad
 
 class Monad (m : U → U) where
-  bind : {0 a b} → m a → (a → m b) → m b
-  pure : {0 a} → a → m a
+  bind : ∀ a b. m a → (a → m b) → m b
+  pure : ∀ a. a → m a
 
 infixl 1 _>>=_ _>>_
-_>>=_ : ∀ m a b. {{Monad m}} -> (m a) -> (a -> m b) -> m b
+_>>=_ : ∀ m a b. {{Monad m}} → (m a) → (a → m b) → m b
 ma >>= amb = bind ma amb
 
-_>>_ :  ∀ m a b. {{Monad m}} -> m a -> m b -> m b
+_>>_ :  ∀ m a b. {{Monad m}} → m a → m b → m b
 ma >> mb = bind ma (\ _ => mb)
 
 join : ∀ m a. {{Monad m}} → m (m a) → m a
@@ -114,16 +114,16 @@ join mma = mma >>= id
 -- Equality
 
 infixl 1 _≡_
-data _≡_ : {0 A : U} -> A -> A -> U where
-  Refl :  {0 A : U} -> {a : A} -> a ≡ a
+data _≡_ : ∀ A. A → A → U where
+  Refl :  ∀ A. {0 a : A} → a ≡ a
 
-replace : {0 A : U} {0 a b : A} -> (P : A -> U) -> a ≡ b -> P a -> P b
+replace : ∀ A. {0 a b : A} → (P : A → U) → a ≡ b → P a → P b
 replace p Refl x = x
 
-cong : {0 A B : U} {0 a b : A} -> (f : A -> B) -> a ≡ b -> f a ≡ f b
+cong : ∀ A B. {0 a b : A} → (f : A → B) → a ≡ b → f a ≡ f b
 cong f Refl = Refl
 
-sym : {0 A : U} -> {0 a b : A} -> a ≡ b -> b ≡ a
+sym : ∀ A. {0 a b : A} → a ≡ b → b ≡ a
 sym Refl = Refl
 
 
@@ -269,7 +269,7 @@ instance Eq Char where
 
 
 ptype Array : U → U
-pfunc listToArray : {a : U} -> List a -> Array a := `
+pfunc listToArray : ∀ a. List a → Array a := `
 (a, l) => {
   let rval = []
   while (l.tag !== 'Nil') {
@@ -280,11 +280,11 @@ pfunc listToArray : {a : U} -> List a -> Array a := `
 }
 `
 
-pfunc alen : {0 a : U} -> Array a -> Int := `(a,arr) => arr.length`
-pfunc aget : {0 a : U} -> Array a -> Int -> a := `(a, arr, ix) => arr[ix]`
-pfunc aempty : {0 a : U} -> Unit -> Array a := `() => []`
+pfunc alen : ∀ a. Array a → Int := `(a,arr) => arr.length`
+pfunc aget : ∀ a. Array a → Int → a := `(a, arr, ix) => arr[ix]`
+pfunc aempty : ∀ a. Unit → Array a := `() => []`
 
-pfunc arrayToList uses (Nil _::_) : {0 a} → Array a → List a := `(a,arr) => {
+pfunc arrayToList uses (Nil _::_) : ∀ a. Array a → List a := `(a,arr) => {
   let rval = Prelude_Nil(null)
   for (let i = arr.length - 1;i >= 0; i--) {
     rval = Prelude__$3A$3A_(a, arr[i], rval)
@@ -297,11 +297,11 @@ pfunc arrayToList uses (Nil _::_) : {0 a} → Array a → List a := `(a,arr) => 
 -- for now I'll run this in JS
 pfunc lines uses (arrayToList) : String → List String := `(s) => Prelude_arrayToList(null,s.split('\n'))`
 
-pfunc p_strHead : (s : String) -> Char := `(s) => s[0]`
-pfunc p_strTail : (s : String) -> String := `(s) => s[0]`
+pfunc p_strHead : (s : String) → Char := `(s) => s[0]`
+pfunc p_strTail : (s : String) → String := `(s) => s[0]`
 
-pfunc trim : String -> String := `s => s.trim()`
-pfunc split uses (Nil _::_) : String -> String -> List String := `(s, by) => {
+pfunc trim : String → String := `s => s.trim()`
+pfunc split uses (Nil _::_) : String → String → List String := `(s, by) => {
   let parts = s.split(by)
   let rval = Prelude_Nil(null)
   parts.reverse()
@@ -309,22 +309,22 @@ pfunc split uses (Nil _::_) : String -> String -> List String := `(s, by) => {
   return rval
 }`
 
-pfunc slen : String -> Int := `s => s.length`
-pfunc sindex : String -> Int -> Char := `(s,i) => s[i]`
+pfunc slen : String → Int := `s => s.length`
+pfunc sindex : String → Int → Char := `(s,i) => s[i]`
 
-pfunc natToInt : Nat -> Int := `(n) => n`
-pfunc intToNat : Int -> Nat := `(n) => n>0?n:0`
+pfunc natToInt : Nat → Int := `(n) => n`
+pfunc intToNat : Int → Nat := `(n) => n>0?n:0`
 
 pfunc fastConcat uses (listToArray) : List String → String := `(xs) => Prelude_listToArray(null, xs).join('')`
-pfunc replicate uses (natToInt) : Nat -> Char → String := `(n,c) => c.repeat(Prelude_natToInt(n))`
+pfunc replicate uses (natToInt) : Nat → Char → String := `(n,c) => c.repeat(Prelude_natToInt(n))`
 
 -- I don't want to use an empty type because it would be a proof of void
 ptype World
 
 data IORes a = MkIORes a World
 
-IO : U -> U
-IO a = World -> IORes a
+IO : U → U
+IO a = World → IORes a
 
 instance Monad IO where
   bind ma mab = \ w => case ma w of
@@ -357,21 +357,21 @@ mapM f (x :: xs) = do
   bs <- mapM f xs
   pure (b :: bs)
 
-class HasIO (m : U -> U) where
+class HasIO (m : U → U) where
   liftIO : ∀ a. IO a → m a
 
 instance HasIO IO where
   liftIO a = a
 
-pfunc primPutStrLn uses (MkIORes MkUnit) : String -> IO Unit := `(s) => (w) => {
+pfunc primPutStrLn uses (MkIORes MkUnit) : String → IO Unit := `(s) => (w) => {
   console.log(s)
   return Prelude_MkIORes(null,Prelude_MkUnit,w)
 }`
 
-putStrLn : ∀ io. {{HasIO io}} -> String -> io Unit
+putStrLn : ∀ io. {{HasIO io}} → String → io Unit
 putStrLn s = liftIO (primPutStrLn s)
 
-pfunc showInt : Int -> String := `(i) => String(i)`
+pfunc showInt : Int → String := `(i) => String(i)`
 
 class Show a where
   show : a → String
@@ -382,10 +382,10 @@ instance Show String where
 instance Show Int where
   show = showInt
 
-pfunc ord : Char -> Int := `(c) => c.charCodeAt(0)`
+pfunc ord : Char → Int := `(c) => c.charCodeAt(0)`
 pfunc chr : Int → Char := `(c) => String.fromCharCode(c)`
 
-pfunc unpack uses (Nil _::_) : String -> List Char
+pfunc unpack uses (Nil _::_) : String → List Char
   := `(s) => {
     let acc = Prelude_Nil(null)
     for (let i = s.length - 1; 0 <= i; i--) acc = Prelude__$3A$3A_(null, s[i], acc)
@@ -449,7 +449,7 @@ pfunc stringToInt : String → Int := `(s) => {
 
 -- TODO - add Foldable
 
-foldl : ∀ A B. (B -> A -> B) -> B -> List A -> B
+foldl : ∀ A B. (B → A → B) → B → List A → B
 foldl f acc Nil = acc
 foldl f acc (x :: xs) = foldl f (f acc x) xs
 
@@ -458,7 +458,7 @@ foldr f b Nil = b
 foldr f b (x :: xs) = f x (foldr f b xs)
 
 infixl 9 _∘_
-_∘_ : ∀ A B C. (B -> C) -> (A -> B) -> A -> C
+_∘_ : ∀ A B C. (B → C) → (A → B) → A → C
 (f ∘ g) x = f (g x)
 
 
@@ -480,7 +480,7 @@ instance Sub Int where
 instance Div Int where
   x / y = divInt x y
 
-printLn : {m} {{HasIO m}} {a} {{Show a}} → a → m Unit
+printLn : ∀ m. {{HasIO m}} {0 a : U} {{Show a}} → a → m Unit
 printLn a = putStrLn (show a)
 
 -- opaque JSObject
@@ -488,10 +488,10 @@ ptype JSObject
 
 
 -- Like Idris1, but not idris2, we need {a} to put a in scope.
-span : ∀ a. (a -> Bool) -> List a -> List a × List a
+span : ∀ a. (a → Bool) → List a → List a × List a
 span {a} f xs = go xs Nil
   where
-    go : List a -> List a -> List a × List a
+    go : List a → List a → List a × List a
     go Nil left = (reverse left, Nil)
     go (x :: xs) left = if f x
       then go xs (x :: left)
@@ -511,12 +511,12 @@ filter : ∀ a. (a → Bool) → List a → List a
 filter pred Nil = Nil
 filter pred (x :: xs) = if pred x then x :: filter pred xs else filter pred xs
 
-drop : ∀ a. Nat -> List a -> List a
+drop : ∀ a. Nat → List a → List a
 drop _ Nil = Nil
 drop Z xs = xs
 drop (S k) (x :: xs) = drop k xs
 
-take : ∀ a. Nat -> List a -> List a
+take : ∀ a. Nat → List a → List a
 take {a} n xs = go n xs Lin
   where
     go : Nat → List a → SnocList a → List a
@@ -575,7 +575,7 @@ elem v (x :: xs) = if v == x then True else elem v xs
 -- TODO no empty value on my `Add`, I need a group..
 -- sum : ∀ a. {{Add a}} → List a → a
 -- sum xs = foldl _+_
-pfunc trace uses (debugStr) : ∀ a. String -> a -> a := `(_, msg, a) => { console.log(msg,Prelude_debugStr(_,a)); return a }`
+pfunc trace uses (debugStr) : ∀ a. String → a → a := `(_, msg, a) => { console.log(msg,Prelude_debugStr(_,a)); return a }`
 
 mapMaybe : ∀ a b. (a → Maybe b) → List a → List b
 mapMaybe {a} {b} f xs = go Lin xs
@@ -617,7 +617,7 @@ pfunc arraySet uses (MkIORes MkUnit) : ∀ a. IOArray a → Int → a → IO Uni
 }`
 pfunc arraySize uses (MkIORes) : ∀ a. IOArray a → IO Int := `(_, arr) => w => Prelude_MkIORes(null, arr.length, w)`
 
-pfunc ioArrayToList uses (Nil _::_ MkIORes) : {0 a} → IOArray a → IO (List a) := `(a,arr) => w => {
+pfunc ioArrayToList uses (Nil _::_ MkIORes) : ∀ a. IOArray a → IO (List a) := `(a,arr) => w => {
   let rval = Prelude_Nil(null)
   for (let i = arr.length - 1;i >= 0; i--) {
     rval = Prelude__$3A$3A_(a, arr[i], rval)
@@ -625,7 +625,7 @@ pfunc ioArrayToList uses (Nil _::_ MkIORes) : {0 a} → IOArray a → IO (List a
   return Prelude_MkIORes(null, rval, w)
 }`
 
-pfunc listToIOArray uses (MkIORes) : {0 a} → List a → IO (Array a) := `(a,list) => w => {
+pfunc listToIOArray uses (MkIORes) : ∀ a. List a → IO (Array a) := `(a,list) => w => {
   let rval = []
   while (list.tag === '_::_') {
     rval.push(list.h1)
@@ -669,7 +669,7 @@ instance Bifunctor _×_ where
 instance Functor IO where
   map f a = bind a $ \ a => pure (f a)
 
-uncurry : ∀ a b c. (a -> b -> c) -> (a × b) -> c
+uncurry : ∀ a b c. (a → b → c) → (a × b) → c
 uncurry f (a,b) = f a b
 
 -- TODO Idris has a tail recursive version of this
@@ -695,7 +695,7 @@ infixl 6 _<_ _<=_ _>_
 class Ord a where
   compare : a → a → Ordering
 
-_<_ : ∀ a. {{Ord a}} -> a → a → Bool
+_<_ : ∀ a. {{Ord a}} → a → a → Bool
 a < b = compare a b == LT
 
 _<=_ : ∀ a. {{Ord a}} → a → a → Bool
@@ -704,7 +704,7 @@ a <= b = compare a b /= GT
 _>_ : ∀ a. {{Ord a}} → a → a → Bool
 a > b = compare a b == GT
 
-search : ∀ cl. {{cl}} -> cl
+search : ∀ cl. {{cl}} → cl
 search {{x}} = x
 
 instance Ord Nat where
@@ -736,7 +736,7 @@ qsort : ∀ a. (a → a → Bool) → List a → List a
 qsort lt Nil = Nil
 qsort lt (x :: xs) = qsort lt (filter (λ y => not $ lt x y) xs) ++ x :: qsort lt (filter (lt x) xs)
 
-ordNub : ∀ a. {{Eq a}} {{Ord a}} -> List a -> List a
+ordNub : ∀ a. {{Eq a}} {{Ord a}} → List a → List a
 ordNub {a} {{ordA}} xs = go $ qsort _<_ xs
   where
     go : List a → List a
@@ -818,12 +818,12 @@ instance ∀ a. {{Ord a}} → Ord (List a) where
     EQ => compare xs ys
     c => c
 
-isSpace : Char -> Bool
+isSpace : Char → Bool
 isSpace ' '    = True
 isSpace '\n'   = True
 isSpace _      = False
 
-isDigit : Char -> Bool
+isDigit : Char → Bool
 isDigit '0' = True
 isDigit '1' = True
 isDigit '2' = True
