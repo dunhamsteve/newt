@@ -757,14 +757,7 @@ updateContext ctx ((k, val) :: cs) =
       info (getFC val) "need to unify \{show val} and \{show val'} or something"
       updateContext ctx cs
     Nothing => error (getFC val) "INTERNAL ERROR: bad index in updateContext"
-
-  --
-  -- updateContext ({env $= replace ix val, bds $= replaceV ix Defined } ctx) cs
   where
-    replace : Nat -> Val -> List Val -> List Val
-    replace k x Nil = Nil
-    replace Z x (y :: xs) = x :: xs
-    replace (S k) x (y :: xs) = y :: replace k x xs
 
     replaceV : ∀ a. Nat -> a -> List a -> List a
     replaceV k x Nil = Nil
