@@ -115,7 +115,6 @@ processTypeSig ns fc names tm = do
   ignore $ for names $ \nm => setDef (QN ns nm) fc ty Axiom Nil
 
 
-
 processPrimType : List Name → FC → Name → Maybe Raw → M Unit
 processPrimType ns fc nm ty = do
   top <- getTop
@@ -439,6 +438,8 @@ processData ns fc nm ty cons = do
             error (getFC codomain) "Constructor codomain is \{render 90 $ pprint tnames codomain} rather than \{nm}"
           pure $ map (\ nm' => (MkEntry fc (QN ns nm') dty (DCon NormalCon (getArity dty) hn) Nil)) names
       decl => throwError $ E (getFC decl) "expected constructor declaration")
+  -- type level autos like _++_
+  solveAutos
   let entries = populateConInfo entries
   for entries $ \case (MkEntry name fc dty def flags) => setDef fc name dty def flags
   let cnames = map (\x => x.name) entries

@@ -1,0 +1,14 @@
+module AutoInData
+
+import Prelude
+
+rep : ∀ a. Nat → a → List a
+rep Z x = Nil
+rep (S k) x = x :: rep k x
+
+data RunLength : ∀ ty. List ty → U where
+  Empty : ∀ ty. RunLength {ty} Nil
+  Run : ∀ ty more. (n : Nat) →
+        (x : ty) →
+        RunLength more →
+        RunLength (rep n x ++ more)
