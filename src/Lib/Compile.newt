@@ -302,7 +302,7 @@ getNames : Tm -> List QName -> List QName
 getNames (Ref x nm) acc = nm :: acc
 getNames (Lam x str _ _ t) acc = getNames t acc
 getNames (App x t u) acc = getNames u $ getNames t acc
-getNames (Pi x str icit y t u) acc = getNames u $ getNames t acc
+getNames (Pi x str icit y t u) acc = getNames u $ getNames t $ QN primNS "PiType" :: acc
 getNames (Let x str t u) acc = getNames u $ getNames t acc
 getNames (LetRec x str _ t u) acc = getNames u $  getNames t acc
 getNames (Case x t alts) acc = foldl getAltNames acc alts

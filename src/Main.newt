@@ -21,6 +21,7 @@ import Lib.Syntax
 import Node
 import Serialize
 
+-- For editors, dump some information about the context (fc, name, type)
 jsonTopContext : M Json
 jsonTopContext = do
   top <- getTop
@@ -50,7 +51,6 @@ writeSource fn = do
   docs <- compile
   let src = unlines $
         ( "\"use strict\";"
-        :: "const PiType = (h0, h1) => ({ tag: \"PiType\", h0, h1 });"
         :: "const bouncer = (f,ini) => { let obj = ini; while (obj.tag !== 'return') obj = f(obj); return obj.h0 };"
         :: Nil)
         ++ map (render 90 ∘ noAlt) docs
@@ -230,6 +230,7 @@ processFile fn = do
   processDecl primNS (PType emptyFC "Int" Nothing)
   processDecl primNS (PType emptyFC "String" Nothing)
   processDecl primNS (PType emptyFC "Char" Nothing)
+  setDef (QN primNS "PiType") emptyFC (Erased emptyFC) (PrimFn "(h0, h1) => ({ tag: \"PiType\", h0, h1 });" (S (S Z)) Nil) Nil
 
   top <- getTop
   let modules = updateMap primNS (MkModCtx "" top.defs (MC EmptyMap Nil 0 CheckAll) top.ops) top.modules
@@ -240,7 +241,6 @@ processFile fn = do
 
   showErrors fn src
   pure MkUnit
-
 
 cmdLine : List String -> M (Maybe String × List String)
 cmdLine Nil = pure (Nothing, Nil)

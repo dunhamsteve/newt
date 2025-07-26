@@ -143,7 +143,7 @@ compileTerm (UU _) = pure $ CRef (QN Nil "U")
 compileTerm (Pi _ nm icit rig t u) = do
   t' <- compileTerm t
   u' <- compileTerm u
-  pure $ CAppRef (QN Nil "PiType") (t' :: CLam nm u' :: Nil) 0
+  pure $ CAppRef (QN primNS "PiType") (t' :: CLam nm u' :: Nil) 0
 compileTerm (Case fc t alts) = do
   t' <- compileTerm t
   alts' <- for alts $ \case
