@@ -455,6 +455,12 @@ unify env mode t u = do
       xb' <- b' $$ fresh
       _<+>_ <$> unify env mode a a' <*> unify (fresh :: env) mode xb xb'
 
+    -- TODO adds about 2kb, maybe add one more func for unifyPi?
+    -- or rearrange to split on first arg and then case on second (might be a good experiment)
+    unifyRest (VLit fc l) (VLit _ k) = if l == k
+      then pure neutral
+      else error fc "unify failed \{show l} =?= \{show k}"
+
     unifyRest (VU _) (VU _) = pure neutral
     -- REVIEW I'd like to quote this back, but we have l that aren't in the environment.
     unifyRest t' u' = error (getFC t') "unify failed \{show t'} =?= \{show u'} \n  env is \{show env}"

@@ -1,0 +1,12 @@
+module UnifyLit
+
+import Prelude
+
+test : 'x' ≡ 'x'
+test = Refl
+
+test2 : "foo" ≡ "foo"
+test2 = Refl
+
+test3 : 1 ≡ 1
+test3 = Refl

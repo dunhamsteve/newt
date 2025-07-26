@@ -54,9 +54,9 @@ Tm : U
 data Literal = LString String | LInt Int | LChar Char
 
 instance Show Literal where
-  show (LString str) = show str
+  show (LString str) = quoteString str
   show (LInt i) = show i
-  show (LChar c) = show c
+  show (LChar c) = "'\{show c}'" -- FIXME single quote
 
 data CaseAlt : U where
   CaseDefault : Tm -> CaseAlt
