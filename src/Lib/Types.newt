@@ -259,7 +259,7 @@ instance Show Val where
   show (VVar _ k sp) = "(%var\{show k} \{unwords $ map show (sp <>> Nil)})"
   show (VRef _ nm Lin) = show nm
   show (VRef _ nm sp) = "(\{show nm} \{unwords $ map show (sp <>> Nil)})"
-  show (VMeta _ ix sp) = "(%meta \{show ix} (\{show $ snoclen sp} sp :: Nil))"
+  show (VMeta _ ix sp) = "(%meta \{show ix} [\{show $ snoclen sp} sp])"
   show (VLam _ str icit quant x) = "(%lam \{show quant}\{str} \{showClosure x})"
   show (VPi fc str Implicit rig x y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{showClosure  y})"
   show (VPi fc str Explicit rig x y) = "(%pi (\{show rig} \{str} : \{show  x}). \{showClosure  y})"
@@ -272,7 +272,7 @@ instance Show Val where
   show (VErased _) = "ERASED"
 
 
-showClosure (MkClosure xs t) = "(%cl (\{show $ length xs} env :: Nil) \{show t})"
+showClosure (MkClosure xs t) = "(%cl [\{show $ length xs} env] \{show t})"
 
 -- instance Show Closure where
 --   show = showClosure

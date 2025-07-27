@@ -490,7 +490,7 @@ unify env mode t u = do
           vtm <- eval Nil CBN tm
           appvtm <- vappSpine vtm sp'
           unify env mode t appvtm
-        _ => error fc' "unify failed \{show t} =?= \{show u} (no Fn :: Nil)\n  env is \{show env}"
+        _ => error fc' "unify failed \{show t} =?= \{show u} [no Fn]\n  env is \{show env}"
 
     unifyRef t@(VRef fc k sp) u = do
       debug $ \ _ => "expand %ref \{show k} \{show sp} =?= \{show u}"
@@ -500,7 +500,7 @@ unify env mode t u = do
           vtm <- eval Nil CBN tm
           tmsp <- vappSpine vtm sp
           unify env mode tmsp u
-        _ => error fc "unify failed \{show t} (no Fn :: Nil) =?= \{show u}\n  env is \{show env}"
+        _ => error fc "unify failed \{show t} [no Fn] =?= \{show u}\n  env is \{show env}"
     unifyRef t u = unifyRest t u
 
     unifyVar : Val -> Val -> M UnifyResult
