@@ -367,6 +367,7 @@ doArrow = do
   (Just _) <- optional $ keyword "<-"
     | _ => pure $ DoExpr fc left
   right <- term
+  -- FIXME bad error for `| pure MkUnit`, we need to commit if indentation is correct.
   alts <- startBlock $ manySame $ symbol "|" *> caseAlt
   pure $ DoArrow fc left right alts
 

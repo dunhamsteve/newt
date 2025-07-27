@@ -79,6 +79,7 @@ tryEval env (VRef fc k sp) = do
             val <- vappSpine vtm sp
             case val of
               VCase _ _ _ => pure Nothing
+              VLam _ _ _ _ _ => pure Nothing
               -- For now? There is a spot in Compile.newt that has
               -- two applications of fresh that is getting unfolded even
               -- though it has the same head and spine.  Possibly because it's

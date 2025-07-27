@@ -1,0 +1,64 @@
+-- This showed a couple of issues related to having ++ in types.
+
+module RunLength
+
+-- https://youtu.be/N4Z45Xg6_oc?t=1246
+
+import Prelude
+
+-- TODO this belongs in a library
+
+data Void : U where
+
+Not : U → U
+Not x = x → Void
+
+data Dec : U → U where
+  Yes : ∀ prop. (prf : prop) → Dec prop
+  No : ∀ prop. (contra : Not prop) → Dec prop
+
+class DecEq t where
+  decEq : (x₁ : t) → (x₂ : t) → Dec (x₁ ≡ x₂)
+
+-- end lib
+
+rep : ∀ a. Nat → a → List a
+rep Z x = Nil
+rep (S k) x = x :: rep k x
+
+data RunLength : ∀ ty. List ty → U where
+  Empty : ∀ ty. RunLength {ty} Nil
+  Run : ∀ ty more. (n : Nat) →
+        (x : ty) →
+        RunLength more →
+        RunLength (rep n x ++ more)
+
+-- Idris has `?` here, but we're allowing metas on signatures to be solved later
+testComp : RunLength {Char} _
+testComp = Run (S (S (S Z))) 'x' $ Run (S (S (S (S Z)))) 'y' $ Empty
+
+-- 24:20
+uncompress : ∀ ty xs. RunLength {ty} xs → List ty
+
+data Singleton : ∀ a. a → U where
+  Val : ∀ a. (x : a) → Singleton x
+
+-- Idris generates this
+-- uncompress' : ∀ ty xs. RunLength {ty} xs → Singleton xs
+-- uncompress' Empty = Val Nil
+-- uncompress' (Run n x y) = let (Val ys) = uncompress' y in Val (rep n x ++ _)
+
+solve : ∀ a. {{a}} -> a
+solve {{a}} = a
+
+-- adding ys back in, we still get a unification failure.
+-- I think because the meta for ++ is not yet solved.
+uncompress' : ∀ ty xs. RunLength {ty} xs → Singleton {List ty} xs
+uncompress' Empty = Val Nil
+uncompress' {ty} (Run n x y) = let (Val ys) = uncompress' y in Val (rep n x ++ ys)
+
+rle : ∀ a. {{DecEq a}} → (xs : List a) → RunLength xs
+
+
+
+

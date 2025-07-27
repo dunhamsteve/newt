@@ -382,6 +382,10 @@ instance Show String where
 instance Show Int where
   show = showInt
 
+instance Show Bool where
+  show True = "true"
+  show False = "false"
+
 pfunc ord : Char → Int := `(c) => c.charCodeAt(0)`
 pfunc chr : Int → Char := `(c) => String.fromCharCode(c)`
 

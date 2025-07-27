@@ -286,9 +286,18 @@ instance Show MetaKind where
   show User = "User"
   show AutoSolve = "Auto"
 
+instance Eq MetaKind where
+  Normal == Normal = True
+  User == User = True
+  AutoSolve == AutoSolve = True
+  _ == _ = False
+
 -- constrain meta applied to val to be a val
 
 data MConstraint = MkMc FC Env (SnocList Val) Val
+
+instance Show MConstraint where
+  show (MkMc fc env (args) ty) = "MkMC \{show fc} env \{show args} \{show ty}"
 
 data MetaEntry
   = Unsolved FC QName Context Val MetaKind (List MConstraint)
@@ -307,6 +316,12 @@ record MetaContext where
   autos : List QName
   next : Int
   mcmode : MetaMode
+
+instance Eq MetaMode where
+  CheckAll == CheckAll = True
+  CheckFirst == CheckFirst = True
+  NoCheck == NoCheck = True
+  _ == _ = False
 
 data ConInfo = NormalCon | SuccCon | ZeroCon | EnumCon
 

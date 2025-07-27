@@ -117,7 +117,7 @@ setMetaMode : MetaMode → M Unit
 -- ideally we could do metaCtx.mcmode := CheckFirst
 setMetaMode mcmode = modifyTop $ \top => [ metaCtx := [mcmode := mcmode] (top.metaCtx) ] top
 
-findMatches : Context -> Val -> List (QName × Tm) -> M (List String)
+findMatches : Context -> Val -> List (QName × Tm) -> M (List QName)
 findMatches ctx ty Nil = pure Nil
 findMatches ctx ty ((name, type) :: xs) = do
   let (True) = isCandidate ty type
@@ -137,7 +137,7 @@ findMatches ctx ty ((name, type) :: xs) = do
       tm <- check ctx (RVar fc nm) ty
       debug $ \ _ => "Found \{rpprint Nil tm} for \{show ty}"
       modifyTop [ metaCtx := mc ]
-      (_::_ nm) <$> findMatches ctx ty xs)
+      (_::_ name) <$> findMatches ctx ty xs)
     (\ err => do
       debug $ \ _ => "No match \{show ty} \{rpprint Nil type} \{showError "" err}"
       modifyTop [ metaCtx := mc ]
@@ -189,27 +189,35 @@ trySolveAuto (Unsolved fc k ctx ty AutoSolve _) = do
       top <- getTop
       Nil <- contextMatches ctx ty
           | ((tm, vty) :: Nil) => do
-              unifyCatch (getFC ty) ctx ty vty
               val <- eval ctx.env CBN tm
-              debug $ \ _ => "SOLUTION \{rpprint Nil tm} evaled to \{show val}"
+              debug $ \ _ => "LOCAL SOLUTION \{rpprint Nil tm} evaled to \{show val}"
               let sp = makeSpine ctx.lvl ctx.bds
               solve ctx.env k sp val
+              debug $ \ _ => "<-- AUTO LOCAL"
+              debug $ \ _ => ">UNIFY \{show k}"
+              -- Causes infinite loop if we do this before the solve
+              -- may be nice to push it into solve, but vty is not there..
+              unifyCatch (getFC ty) ctx ty vty
+              debug $ \ _ => "<UNIFY \{show k}"
               pure True
           | res => do
-              debug $ \ _ => "FAILED to solve \{show ty}, matches: \{render 90 $ commaSep $ map (pprint Nil ∘ fst) res}"
+              debug $ \ _ => "LOCAL FAILED to solve \{show ty}, matches: \{render 90 $ commaSep $ map (pprint Nil ∘ fst) res}"
               pure False
 
       let (VRef _ tyname _) = ty | _ => pure False
       let cands = fromMaybe Nil $ lookupMap' tyname top.hints
       (nm :: Nil) <- findMatches ctx ty cands
         | res => do
-          debug $ \ _ => "FAILED to solve \{show ty}, matches: \{show res}"
+          debug $ \ _ => "GLOBAL FAILED to solve \{show ty}, matches: \{show res}"
           pure False
-      tm <- check ctx (RVar fc nm) ty
-      val <- eval ctx.env CBN tm
-      debug $ \ _ => "SOLUTION \{rpprint Nil tm} evaled to \{show val}"
+      let val = VRef fc nm Lin
+      debug $ \ _ => "GLOBAL SOLUTION \{show val}"
       let sp = makeSpine ctx.lvl ctx.bds
       solve ctx.env k sp val
+      debug $ \ _ => ">CHECK \{show k}"
+      let (QN ns nm) = nm
+      ignore $ check ctx (RVar fc nm) ty
+      debug $ \ _ => "<CHECK \{show k}"
       pure True
 trySolveAuto _ = pure False
 
@@ -244,17 +252,23 @@ updateMeta ix f = do
     _ => mc.autos
   modifyTop [ metaCtx := MC (updateMap ix me mc.metas) autos mc.next mc.mcmode ]
 
-checkAutos : QName -> List MetaEntry -> M Unit
+-- Try to solve autos that reference the meta ix
+checkAutos : QName -> List QName -> M Unit
 checkAutos ix Nil = pure MkUnit
-checkAutos ix (entry@(Unsolved fc k ctx ty AutoSolve _) :: rest) = do
-  ty' <- quote ctx.lvl ty
-  when (usesMeta ty') $ \ _ => ignore $ trySolveAuto entry
+checkAutos ix (cand :: rest) = do
+  entry@(Unsolved fc k ctx ty AutoSolve _) <- lookupMeta cand | _ => checkAutos ix rest
+  case ty of
+    VRef _ nm sp => if checkMeta sp
+        then trySolveAuto entry >> checkAutos ix rest
+        else pure MkUnit
+    _ => pure MkUnit
   checkAutos ix rest
   where
-    usesMeta : Tm -> Bool
-    usesMeta (App _ (Meta _ k) u) = if k == ix then True else usesMeta u
-    usesMeta (App _ _ u) = usesMeta u
-    usesMeta _ = False
+    checkMeta : SnocList Val → Bool
+    checkMeta Lin = False
+    checkMeta (sp :< VMeta _ nm _) = if nm == ix then True else checkMeta sp
+    checkMeta (sp :< _) = checkMeta sp
+
 checkAutos ix (_ :: rest) = checkAutos ix rest
 
 addConstraint : Env -> QName -> SnocList Val -> Val -> M Unit
@@ -266,12 +280,8 @@ addConstraint env ix sp tm = do
     (Unsolved pos k a b c cons) => do
       debug $ \ _ => "Add constraint m\{show ix} \{show sp} =?= \{show tm}"
       pure (Unsolved pos k a b c (MkMc (getFC tm) env sp tm :: cons))
-    (Solved _ k tm) => error' "Meta \{show k} already solved [addConstraint]"
+    (Solved fc k tm) => error fc "Meta \{show k} already solved [addConstraint]"
     (OutOfScope) => error' "Meta \{show ix} out of scope"
-  -- I broke this while dropping IORef and it seemed to have no effect
-  -- top <- getTop
-  -- let mc = top.metaCtx
-  -- checkAutos ix $ mapMaybe (flip lookupMap' mc.metas) mc.autos
 
 -- return renaming, the position is the new VVar
 invert : Int -> SnocList Val -> M (List Int)
@@ -353,6 +363,7 @@ unify : Env -> UnifyMode -> Val -> Val  -> M UnifyResult
 .boundNames : Context -> List String
 ctx.boundNames = map snd $ filter (\x => fst x == Bound) $ zip ctx.bds (map fst ctx.types)
 
+-- run action if mcmode allows it, ratcheting as necessary
 maybeCheck : M Unit -> M Unit
 maybeCheck action = do
   top <- getTop
@@ -392,13 +403,19 @@ solve env m sp t = do
 
     updateMeta m $ \case
       (Unsolved pos k _ _ _ cons) => pure $ Solved pos k soln
-      (Solved _ k x) => error' "Meta \{show ix} already solved! [solve2]"
+      (Solved fc k x) => error fc "Meta \{show ix} already solved! [solve2]"
       OutOfScope => error' "Meta \{show ix} out of scope"
-    maybeCheck $ for_ cons $ \case
-      MkMc fc env sp rhs => do
-        val <- vappSpine soln sp
-        debug $ \ _ => "discharge l=\{show $ length' env} \{(show val)} =?= \{(show rhs)}"
-        unify env UNormal val rhs
+    maybeCheck $ do
+      for_ cons $ \case
+        MkMc fc env sp rhs => do
+          val <- vappSpine soln sp
+          debug $ \ _ => "discharge l=\{show $ length' env} \{(show val)} =?= \{(show rhs)}"
+          unify env UNormal val rhs
+      -- check any autos
+      top <- getTop
+      let mc = top.metaCtx
+      debug $ \ _ => "check autos depending on \{show ix} \{debugStr mc.mcmode}"
+      checkAutos ix mc.autos
     pure MkUnit
     )
 
@@ -478,7 +495,7 @@ unify env mode t u = do
               | Just v => unify env mode t' v
             if k == k'
               then unifySpine env mode (k == k') sp sp'
-              else error fc "vref mismatch \{show t'} \{show u'}"
+              else error fc "vref mismatch \{show t'} =?= \{show u'}"
 
     -- Lennart.newt cursed type references itself
     -- We _could_ look up the ref, eval against Nil and vappSpine...
@@ -601,8 +618,7 @@ freshMeta ctx fc ty kind = do
       AutoSolve => qn :: mc.autos
       _ => mc.autos
   modifyTop $ \top => [metaCtx := MC (updateMap qn newmeta mc.metas) autos (1 + mc.next) mc.mcmode ] top
-  -- infinite loop - keeps trying Ord a => Ord (a \x a)
-  -- when (kind == AutoSolve) $ \ _ => ignore $ trySolveAuto newmeta
+  -- I tried checking Auto immediately if CheckAll, but there isn't enough information yet.
   pure $ applyBDs 0 (Meta fc qn) ctx.bds
   where
     -- hope I got the right order here :)
@@ -1306,8 +1322,6 @@ undo prev ((DoArrow fc left right alts) :: xs) = do
   rest <- pure $ RCase fc (RVar fc nm) (MkAlt left xs' :: alts)
   pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
     (RLam fc (BI fc nm Explicit Many) rest) Explicit
-
-
 
 
 -- REVIEW do we want to let arg?
