@@ -1,1 +1,908 @@
-../newt/Prelude.newt
+module Prelude
+
+id : ∀ a. a → a
+id x = x
+
+the : (a : U) → a → a
+the _ a = a
+
+const : ∀ a b. a → b → a
+const a b = a
+
+data Unit = MkUnit
+data Bool = True | False
+
+not : Bool → Bool
+not True = False
+not False = True
+
+-- In Idris, this is lazy in the second arg, we're not doing
+-- magic laziness for now, it's messy
+infixr 4 _||_
+_||_ : Bool → Bool → Bool
+True || _ = True
+False || b = b
+
+infixr 5 _&&_
+_&&_ : Bool → Bool → Bool
+False && b = False
+True && b = b
+
+infixl 6 _==_
+class Eq a where
+  _==_ : a → a → Bool
+
+infixl 6 _/=_
+_/=_ : ∀ a. {{Eq a}} → a → a → Bool
+a /= b = not (a == b)
+
+data Nat = Z | S Nat
+
+pred : Nat → Nat
+pred Z = Z
+pred (S k) = k
+
+instance Eq Nat where
+  Z == Z = True
+  S n == S m = n == m
+  x == y = False
+
+
+data Maybe a = Just a | Nothing
+
+fromMaybe : ∀ a. a → Maybe a → a
+fromMaybe a Nothing = a
+fromMaybe _ (Just a) = a
+
+maybe : ∀ a b. b → (a → b) → Maybe a → b
+maybe def f (Just a) = f a
+maybe def f Nothing = def
+
+data Either a b = Left a | Right b
+
+infixr 7 _::_
+data List a = Nil | a :: List a
+
+length : ∀ a. List a → Nat
+length Nil = Z
+length (x :: xs) = S (length xs)
+
+
+infixl 7 _:<_
+data SnocList a = Lin | SnocList a :< a
+
+-- 'chips'
+infixr 6 _<>>_ _<><_
+_<>>_ : ∀ a. SnocList a → List a → List a
+Lin <>> ys = ys
+(xs :< x) <>> ys = xs <>> x :: ys
+
+_<><_ : ∀ a. SnocList a → List a → SnocList a
+xs <>< Nil = xs
+xs <>< (y :: ys) = (xs :< y) <>< ys
+
+-- This is now handled by the parser, and LHS becomes `f a`.
+-- infixr 0 _$_
+-- _$_ : ∀ a b. (a → b) → a → b
+-- f $ a = f a
+
+infixr 8 _×_
+infixr 2 _,_
+data a × b = (a,b)
+
+fst : ∀ a b. a × b → a
+fst (a,b) = a
+
+snd : ∀ a b. a × b → b
+snd (a,b) = b
+-- Monad
+
+class Monad (m : U → U) where
+  bind : ∀ a b. m a → (a → m b) → m b
+  pure : ∀ a. a → m a
+
+infixl 1 _>>=_ _>>_
+_>>=_ : ∀ m a b. {{Monad m}} → (m a) → (a → m b) → m b
+ma >>= amb = bind ma amb
+
+_>>_ :  ∀ m a b. {{Monad m}} → m a → m b → m b
+ma >> mb = bind ma (\ _ => mb)
+
+join : ∀ m a. {{Monad m}} → m (m a) → m a
+join mma = mma >>= id
+
+-- Equality
+
+infixl 1 _≡_
+data _≡_ : ∀ A. A → A → U where
+  Refl :  ∀ A. {0 a : A} → a ≡ a
+
+replace : ∀ A. {0 a b : A} → (P : A → U) → a ≡ b → P a → P b
+replace p Refl x = x
+
+cong : ∀ A B. {0 a b : A} → (f : A → B) → a ≡ b → f a ≡ f b
+cong f Refl = Refl
+
+sym : ∀ A. {0 a b : A} → a ≡ b → b ≡ a
+sym Refl = Refl
+
+data Void : U where
+
+¬ : U → U
+¬ x = x → Void
+
+data Dec : U → U where
+  Yes : ∀ prop. (prf : prop) → Dec prop
+  No : ∀ prop. (contra : ¬ prop) → Dec prop
+
+class DecEq t where
+  decEq : (x₁ : t) → (x₂ : t) → Dec (x₁ ≡ x₂)
+
+
+-- Functor
+
+class Functor (m : U → U) where
+  map : ∀ a b. (a → b) → m a → m b
+
+infixr 4 _<$>_ _<$_
+_<$>_ : ∀ f. {{Functor f}} {0 a b} → (a → b) → f a → f b
+f <$> ma = map f ma
+
+_<$_ : ∀ f a b. {{Functor f}} → b → f a → f b
+a <$ b = const a <$> b
+
+instance Functor Maybe where
+  map f Nothing = Nothing
+  map f (Just a) = Just (f a)
+
+reverse : ∀ a. List a → List a
+reverse {a} = go Nil
+  where
+    go : List a → List a → List a
+    go acc Nil = acc
+    go acc (x :: xs) = go (x :: acc) xs
+
+instance Functor List where
+  map f xs = go f xs Nil
+    where
+      go : ∀ a b. (a → b) → List a → List b → List b
+      go f Nil ys = reverse ys
+      go f (x :: xs) ys = go f xs (f x :: ys)
+  -- map f Nil = Nil
+  -- map f (x :: xs) = f x :: map f xs
+
+instance Functor SnocList where
+  map f Lin = Lin
+  map f (xs :< x) = map f xs :< f x
+
+-- TODO this probably should depend on / entail Functor
+infixl 3 _<*>_ _<*_ _*>_
+class Applicative (f : U → U) where
+  -- appIsFunctor : Functor f
+  return : ∀ a. a → f a
+  _<*>_ : ∀ a b. f (a → b) → f a → f b
+
+
+_<*_ : ∀ f a b. {{Applicative f}} → f a → f b → f a
+fa <* fb = return const <*> fa <*> fb
+
+_*>_ : ∀ f a b. {{Functor f}} {{Applicative f}} → f a → f b → f b
+a *> b = map (const id) a <*> b
+
+
+class Traversable (t : U → U) where
+  traverse : ∀ f a b. {{Applicative f}} → (a → f b) → t a → f (t b)
+
+instance Traversable List where
+  traverse f Nil = return Nil
+  traverse f (x :: xs) = return _::_ <*> f x <*> traverse f xs
+
+traverse_ : ∀ t f a b. {{Traversable t}} {{Applicative f}} → (a → f b) → t a → f Unit
+traverse_ f xs = return (const MkUnit) <*> traverse f xs
+
+for : {0 t : U → U} {0 f : U → U} → {{Traversable t}} {{appf : Applicative f}} → {0 a : U} → {0 b : U} → t a → (a → f b) → f (t b)
+for stuff fun = traverse fun stuff
+
+for_ : {0 t : U → U} {0 f : U → U} → {{Traversable t}} {{appf : Applicative f}} → {0 a : U} → {0 b : U} → t a → (a → f b) → f Unit
+for_ stuff fun = return (const MkUnit) <*> traverse fun stuff
+
+instance Applicative Maybe where
+  return a = Just a
+  Nothing <*> _ = Nothing
+  Just f <*> fa = f <$> fa
+
+infixr 2 _<|>_
+class Alternative (m : U → U) where
+  _<|>_ : {0 a} → m a → m a → m a
+
+instance Alternative Maybe where
+  Nothing <|> x = x
+  Just x <|> _ = Just x
+
+-- Semigroup
+
+infixl 8 _<+>_
+class Semigroup a where
+  _<+>_ : a → a → a
+
+infixl 7 _+_
+class Add a where
+  _+_ : a → a → a
+
+infixl 8 _*_ _/_
+class Mul a where
+  _*_ : a → a → a
+
+class Div a where
+  _/_ : a → a → a
+
+instance Add Nat where
+  Z + m = m
+  S n + m = S (n + m)
+
+instance Mul Nat where
+  Z * _ = Z
+  S n * m = m + n * m
+
+pfunc mod : Int → Int → Int := `(a,b) => a % b`
+
+infixl 7 _-_
+class Sub a where
+  _-_ : a → a → a
+
+instance Sub Nat where
+  Z - m = Z
+  n - Z = n
+  S n - S m = n - m
+
+infixr 7 _++_
+class Concat a where
+  _++_ : a → a → a
+
+pfunc sconcat : String → String → String := `(x,y) => x + y`
+instance Concat String where
+  _++_ = sconcat
+
+
+pfunc jsEq uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a == b ? Prelude_True : Prelude_False`
+pfunc jsLT uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a < b ? Prelude_True : Prelude_False`
+
+pfunc jsShow : ∀ a . a → String := `(_,a) => ''+a`
+instance Eq Int where
+  a == b = jsEq a b
+
+instance Eq String where
+  a == b = jsEq a b
+
+instance Eq Char where
+  a == b = jsEq a b
+
+
+
+ptype Array : U → U
+pfunc listToArray : ∀ a. List a → Array a := `
+(a, l) => {
+  let rval = []
+  while (l.tag !== 'Nil') {
+    rval.push(l.h1)
+    l = l.h2
+  }
+  return rval
+}
+`
+
+pfunc alen : ∀ a. Array a → Int := `(a,arr) => arr.length`
+pfunc aget : ∀ a. Array a → Int → a := `(a, arr, ix) => arr[ix]`
+pfunc aempty : ∀ a. Unit → Array a := `() => []`
+
+pfunc arrayToList uses (Nil _::_) : ∀ a. Array a → List a := `(a,arr) => {
+  let rval = Prelude_Nil(null)
+  for (let i = arr.length - 1;i >= 0; i--) {
+    rval = Prelude__$3A$3A_(a, arr[i], rval)
+  }
+  return rval
+}`
+
+
+
+-- for now I'll run this in JS
+pfunc lines uses (arrayToList) : String → List String := `(s) => Prelude_arrayToList(null,s.split('\n'))`
+
+pfunc p_strHead : (s : String) → Char := `(s) => s[0]`
+pfunc p_strTail : (s : String) → String := `(s) => s[0]`
+
+pfunc trim : String → String := `s => s.trim()`
+pfunc split uses (Nil _::_) : String → String → List String := `(s, by) => {
+  let parts = s.split(by)
+  let rval = Prelude_Nil(null)
+  parts.reverse()
+  parts.forEach(p => { rval = Prelude__$3A$3A_(null, p, rval) })
+  return rval
+}`
+
+pfunc slen : String → Int := `s => s.length`
+pfunc sindex : String → Int → Char := `(s,i) => s[i]`
+
+pfunc natToInt : Nat → Int := `(n) => n`
+pfunc intToNat : Int → Nat := `(n) => n>0?n:0`
+
+pfunc fastConcat uses (listToArray) : List String → String := `(xs) => Prelude_listToArray(null, xs).join('')`
+pfunc replicate uses (natToInt) : Nat → Char → String := `(n,c) => c.repeat(Prelude_natToInt(n))`
+
+-- I don't want to use an empty type because it would be a proof of void
+ptype World
+
+data IORes a = MkIORes a World
+
+IO : U → U
+IO a = World → IORes a
+
+instance Monad IO where
+  bind ma mab = \ w => case ma w of
+    MkIORes a w => mab a w
+  pure = MkIORes
+
+bindList : ∀ a b. List a → (a → List b) → List b
+
+instance ∀ a. Concat (List a) where
+  Nil ++ ys = ys
+  (x :: xs) ++ ys = x :: (xs ++ ys)
+
+instance Monad List where
+  pure a = a :: Nil
+  bind Nil amb = Nil
+  bind (x :: xs) amb = amb x ++ bind xs amb
+
+
+
+-- This is traverse, but we haven't defined Traversable yet
+mapA : ∀ m. {{Applicative m}} {0 a b} → (a → m b) → List a → m (List b)
+mapA f Nil = return Nil
+mapA f (x :: xs) = return _::_ <*> f x <*> mapA f xs
+
+
+mapM : ∀ m. {{Monad m}} {0 a b} → (a → m b) → List a → m (List b)
+mapM f Nil = pure Nil
+mapM f (x :: xs) = do
+  b <- f x
+  bs <- mapM f xs
+  pure (b :: bs)
+
+class HasIO (m : U → U) where
+  liftIO : ∀ a. IO a → m a
+
+instance HasIO IO where
+  liftIO a = a
+
+pfunc primPutStrLn uses (MkIORes MkUnit) : String → IO Unit := `(s) => (w) => {
+  console.log(s)
+  return Prelude_MkIORes(null,Prelude_MkUnit,w)
+}`
+
+putStrLn : ∀ io. {{HasIO io}} → String → io Unit
+putStrLn s = liftIO (primPutStrLn s)
+
+pfunc showInt : Int → String := `(i) => String(i)`
+
+class Show a where
+  show : a → String
+
+instance Show String where
+  show a = a
+
+instance Show Int where
+  show = showInt
+
+instance Show Bool where
+  show True = "true"
+  show False = "false"
+
+pfunc ord : Char → Int := `(c) => c.charCodeAt(0)`
+pfunc chr : Int → Char := `(c) => String.fromCharCode(c)`
+
+pfunc unpack uses (Nil _::_) : String → List Char
+  := `(s) => {
+    let acc = Prelude_Nil(null)
+    for (let i = s.length - 1; 0 <= i; i--) acc = Prelude__$3A$3A_(null, s[i], acc)
+    return acc
+}`
+
+pfunc pack : List Char → String := `(cs) => {
+  let rval = ''
+  while (cs.tag === '_::_') {
+    rval += cs.h1
+    cs = cs.h2
+  }
+  return rval
+}
+`
+
+pfunc debugStr uses (natToInt listToArray) : ∀ a. a → String := `(_, obj) => {
+  const go = (obj) => {
+    if (obj === null) return "_"
+    if (typeof obj == 'bigint') return ''+obj
+    if (obj.tag === '_,_') {
+      let rval = '('
+      while (obj?.tag === '_,_') {
+        rval += go(obj.h2) + ', '
+        obj = obj.h3
+      }
+      return rval + go(obj) + ')'
+    }
+    if (obj?.tag === '_::_' || obj?.tag === 'Nil') {
+      let stuff = Prelude_listToArray(null,obj)
+      return '['+(stuff.map(go).join(', '))+']'
+    }
+    if (obj instanceof Array) {
+      return 'io['+(obj.map(go).join(', '))+']'
+    }
+    if (obj?.tag === 'S' || obj?.tag === 'Z') {
+      return ''+Prelude_natToInt(obj)
+    } else if (obj?.tag) {
+      let rval = '('+obj.tag
+      for(let i=0;;i++) {
+        let key = 'h'+i
+        if (!(key in obj)) break
+        rval += ' ' + go(obj[key])
+      }
+      return rval+')'
+    } else {
+      return JSON.stringify(obj)
+    }
+  }
+  return go(obj)
+}`
+
+debugLog : ∀ a. a → IO Unit
+debugLog a = putStrLn (debugStr a)
+
+pfunc stringToInt : String → Int := `(s) => {
+  let rval = Number(s)
+  if (isNaN(rval)) throw new Error(s + " is NaN")
+  return rval
+}`
+
+-- TODO - add Foldable
+
+foldl : ∀ A B. (B → A → B) → B → List A → B
+foldl f acc Nil = acc
+foldl f acc (x :: xs) = foldl f (f acc x) xs
+
+foldr : ∀ a b. (a → b → b) → b → List a → b
+foldr f b Nil = b
+foldr f b (x :: xs) = f x (foldr f b xs)
+
+infixl 9 _∘_
+_∘_ : ∀ A B C. (B → C) → (A → B) → A → C
+(f ∘ g) x = f (g x)
+
+
+pfunc addInt : Int → Int → Int := `(x,y) => x + y`
+pfunc mulInt : Int → Int → Int := `(x,y) => x * y`
+pfunc divInt : Int → Int → Int := `(x,y) => x / y | 0`
+pfunc subInt : Int → Int → Int := `(x,y) => x - y`
+pfunc ltInt uses (True False) : Int → Int → Bool := `(x,y) => x < y ? Prelude_True : Prelude_False`
+
+instance Mul Int where
+  x * y = mulInt x y
+
+instance Add Int where
+  x + y = addInt x y
+
+instance Sub Int where
+  x - y = subInt x y
+
+instance Div Int where
+  x / y = divInt x y
+
+printLn : ∀ m. {{HasIO m}} {0 a : U} {{Show a}} → a → m Unit
+printLn a = putStrLn (show a)
+
+-- opaque JSObject
+ptype JSObject
+
+
+-- Like Idris1, but not idris2, we need {a} to put a in scope.
+span : ∀ a. (a → Bool) → List a → List a × List a
+span {a} f xs = go xs Nil
+  where
+    go : List a → List a → List a × List a
+    go Nil left = (reverse left, Nil)
+    go (x :: xs) left = if f x
+      then go xs (x :: left)
+      else (reverse left, x :: xs)
+
+instance Show Nat where
+  show n = show (natToInt n)
+
+enumerate : ∀ a. List a → List (Nat × a)
+enumerate {a} xs = go Z xs
+  where
+    go : Nat → List a → List (Nat × a)
+    go k Nil = Nil
+    go k (x :: xs) = (k,x) :: go (S k) xs
+
+filter : ∀ a. (a → Bool) → List a → List a
+filter pred Nil = Nil
+filter pred (x :: xs) = if pred x then x :: filter pred xs else filter pred xs
+
+drop : ∀ a. Nat → List a → List a
+drop _ Nil = Nil
+drop Z xs = xs
+drop (S k) (x :: xs) = drop k xs
+
+take : ∀ a. Nat → List a → List a
+take {a} n xs = go n xs Lin
+  where
+    go : Nat → List a → SnocList a → List a
+    go (S k) (x :: xs) acc = go k xs (acc :< x)
+    go _ _ acc = acc <>> Nil
+
+getAt : ∀ a. Nat → List a → Maybe a
+getAt _ Nil = Nothing
+getAt Z (x :: xs) = Just x
+getAt (S k) (x :: xs) = getAt k xs
+
+
+splitOn : ∀ a. {{Eq a}} → a → List a → List (List a)
+splitOn {a} v xs = go Nil xs
+  where
+    go : List a → List a → List (List a)
+    go acc Nil = reverse acc :: Nil
+    go acc (x :: xs) = if x == v
+      then reverse acc :: go Nil xs
+      else go (x :: acc) xs
+
+
+class Inhabited a where
+  default : a
+
+instance ∀ a. Inhabited (List a) where
+  default = Nil
+
+getAt! : ∀ a. {{Inhabited a}} → Nat → List a → a
+getAt! _ Nil = default
+getAt! Z (x :: xs) = x
+getAt! (S k) (x :: xs) = getAt! k xs
+
+
+instance ∀ a. Applicative (Either a) where
+  return b = Right b
+  Right x <*> Right y = Right (x y)
+  Left x <*> _ = Left x
+  Right x <*> Left y = Left y
+
+instance ∀ a. Monad (Either a) where
+  pure x = Right x
+  bind (Right x) mab = mab x
+  bind (Left x) mab = Left x
+
+instance Monad Maybe where
+  pure x = Just x
+  bind Nothing mab = Nothing
+  bind (Just x) mab = mab x
+
+
+elem : ∀ a. {{Eq a}} → a → List a → Bool
+elem v Nil = False
+elem v (x :: xs) = if v == x then True else elem v xs
+
+-- TODO no empty value on my `Add`, I need a group..
+-- sum : ∀ a. {{Add a}} → List a → a
+-- sum xs = foldl _+_
+pfunc trace uses (debugStr) : ∀ a. String → a → a := `(_, msg, a) => { console.log(msg,Prelude_debugStr(_,a)); return a }`
+
+mapMaybe : ∀ a b. (a → Maybe b) → List a → List b
+mapMaybe {a} {b} f xs = go Lin xs
+  where
+    go : SnocList b → List a → List b
+    go acc Nil = acc <>> Nil
+    go acc (x :: xs) = case f x of
+      Just y => go (acc :< y) xs
+      Nothing => go acc xs
+
+zip : ∀ a b. List a → List b → List (a × b)
+zip (x :: xs) (y :: ys) = (x,y) :: zip xs ys
+zip _ _ = Nil
+
+-- TODO add double literals
+ptype Double
+pfunc intToDouble : Int → Double := `(x) => x`
+pfunc doubleToInt : Double → Int := `(x) => x`
+pfunc addDouble : Double → Double → Double := `(x,y) => x + y`
+pfunc subDouble : Double → Double → Double := `(x,y) => x - y`
+pfunc mulDouble : Double → Double → Double := `(x,y) => x * y`
+pfunc divDouble : Double → Double → Double := `(x,y) => x / y`
+pfunc sqrtDouble : Double → Double := `(x) => Math.sqrt(x)`
+pfunc ceilDouble : Double → Double := `(x) => Math.ceil(x)`
+
+instance Add Double where x + y = addDouble x y
+instance Sub Double where x - y = subDouble x y
+instance Mul Double where x * y = mulDouble x y
+instance Div Double where x / y = divDouble x y
+
+ptype IOArray : U → U
+
+pfunc newArray uses (MkIORes) : ∀ a. Int → a → IO (IOArray a) :=
+  `(_, n, v) => (w) => Prelude_MkIORes(null, Prelude_Array(n).fill(v),w)`
+pfunc arrayGet : ∀ a. IOArray a → Int → IO a := `(_, arr, ix) => w => Prelude_MkIORes(null, arr[ix], w)`
+pfunc arraySet uses (MkIORes MkUnit) : ∀ a. IOArray a → Int → a → IO Unit := `(_, arr, ix, v) => w => {
+  arr[ix] = v
+  return Prelude_MkIORes(null, Prelude_MkUnit, w)
+}`
+pfunc arraySize uses (MkIORes) : ∀ a. IOArray a → IO Int := `(_, arr) => w => Prelude_MkIORes(null, arr.length, w)`
+
+pfunc ioArrayToList uses (Nil _::_ MkIORes) : ∀ a. IOArray a → IO (List a) := `(a,arr) => w => {
+  let rval = Prelude_Nil(null)
+  for (let i = arr.length - 1;i >= 0; i--) {
+    rval = Prelude__$3A$3A_(a, arr[i], rval)
+  }
+  return Prelude_MkIORes(null, rval, w)
+}`
+
+pfunc listToIOArray uses (MkIORes) : ∀ a. List a → IO (Array a) := `(a,list) => w => {
+  let rval = []
+  while (list.tag === '_::_') {
+    rval.push(list.h1)
+    list = list.h2
+  }
+  return Prelude_MkIORes(null,rval,w)
+}`
+
+class Cast a b where
+  cast : a → b
+
+instance Cast Nat Int where
+  cast = natToInt
+
+instance Cast Int Double where
+  cast = intToDouble
+
+instance Applicative IO where
+  return a = \ w => MkIORes a w
+  f <*> a = \ w =>
+    let (MkIORes f w) = f w in
+    let (MkIORes a w) = a w in
+    MkIORes (f a) w
+
+class Bifunctor (f : U → U → U) where
+  bimap : ∀ a b c d. (a → c) → (b → d) → f a b → f c d
+
+mapFst : ∀ a b c f. {{Bifunctor f}} → (a → c) → f a b → f c b
+mapFst f ab = bimap f id ab
+
+mapSnd : ∀ a b c f. {{Bifunctor f}} → (b → c) → f a b → f a c
+mapSnd f ab = bimap id f ab
+
+isNothing : ∀ a. Maybe a → Bool
+isNothing Nothing = True
+isNothing _ = False
+
+instance Bifunctor _×_ where
+  bimap f g (a,b) = (f a, g b)
+
+instance Functor IO where
+  map f a = bind a $ \ a => pure (f a)
+
+uncurry : ∀ a b c. (a → b → c) → (a × b) → c
+uncurry f (a,b) = f a b
+
+-- TODO Idris has a tail recursive version of this
+instance Applicative List where
+  return a = a :: Nil
+  Nil <*> _ = Nil
+  fs <*> ys = join $ map (\ f => map f ys) fs
+
+tail : ∀ a. List a → List a
+tail Nil = Nil
+tail (x :: xs) = xs
+
+data Ordering = LT | EQ | GT
+instance Eq Ordering where
+  LT == LT = True
+  EQ == EQ = True
+  GT == GT = True
+  _ == _ = False
+
+pfunc jsCompare : ∀ a. a → a → Ordering := `(_, a, b) => a == b ? "EQ" : a < b ? "LT" : "GT"`
+
+infixl 6 _<_ _<=_ _>_
+class Ord a where
+  compare : a → a → Ordering
+
+_<_ : ∀ a. {{Ord a}} → a → a → Bool
+a < b = compare a b == LT
+
+_<=_ : ∀ a. {{Ord a}} → a → a → Bool
+a <= b = compare a b /= GT
+
+_>_ : ∀ a. {{Ord a}} → a → a → Bool
+a > b = compare a b == GT
+
+search : ∀ cl. {{cl}} → cl
+search {{x}} = x
+
+instance Ord Nat where
+  compare Z Z = EQ
+  compare _ Z = GT
+  compare Z (S _) = LT
+  compare (S n) (S m) = compare n m
+
+instance Ord Int where
+  compare a b = jsCompare a b
+
+instance Ord Char where
+  compare a b = jsCompare a b
+
+flip : ∀ a b c. (a → b → c) → (b → a → c)
+flip f b a = f a b
+
+partition : ∀ a. (a → Bool) → List a → List a × List a
+partition {a} pred xs = go xs Nil Nil
+  where
+    go : List a → List a → List a → List a × List a
+    go Nil as bs = (as, bs)
+    go (x :: xs) as bs = if pred x
+      then go xs (x :: as) bs
+      else go xs as (x :: bs)
+
+-- probably not super efficient, but it works
+qsort : ∀ a. (a → a → Bool) → List a → List a
+qsort lt Nil = Nil
+qsort lt (x :: xs) = qsort lt (filter (λ y => not $ lt x y) xs) ++ x :: qsort lt (filter (lt x) xs)
+
+ordNub : ∀ a. {{Eq a}} {{Ord a}} → List a → List a
+ordNub {a} {{ordA}} xs = go $ qsort _<_ xs
+  where
+    go : List a → List a
+    go (a :: b :: xs) = if a == b then go (a :: xs) else a :: go (b :: xs)
+    go t = t
+
+nub : ∀ a. {{Eq a}} → List a → List a
+nub Nil = Nil
+nub (x :: xs) = if elem x xs then nub xs else x :: nub xs
+
+ite : ∀ a. Bool → a → a → a
+ite c t e = if c then t else e
+
+instance Ord String where
+  compare a b = jsCompare a b
+
+instance Cast Int Nat where
+  cast n = intToNat n
+
+instance Show Char where
+  show c = jsShow c
+
+swap : ∀ a b. a × b → b × a
+swap (a,b) = (b,a)
+
+instance ∀ a b. {{Eq a}} {{Eq b}} → Eq (a × b) where
+  (a,b) == (c,d) = a == c && b == d
+
+instance ∀ a b. {{Ord a}} {{Ord b}} → Ord (a × b) where
+  compare (a,b) (c,d) = case compare a c of
+    EQ => compare b d
+    res => res
+
+instance ∀ a. {{Eq a}} → Eq (List a) where
+  Nil == Nil = True
+  (x :: xs) == (y :: ys) = if x == y then xs == ys else False
+  _ == _ = False
+
+find : ∀ a. (a → Bool) → List a → Maybe a
+find f Nil = Nothing
+find f (x :: xs) = if f x then Just x else find f xs
+
+-- TODO this would be faster, but less pure as a primitive
+-- fastConcat might be a good compromise
+joinBy : String → List String → String
+joinBy _ Nil = ""
+joinBy _ (x :: Nil) = x
+joinBy s (x :: y :: xs) = joinBy s ((x ++ s ++ y) :: xs)
+
+snoc : ∀ a. List a → a → List a
+snoc xs x = xs ++ (x :: Nil)
+
+instance ∀ a b. {{Show a}} {{Show b}} → Show (a × b) where
+  show (a,b) = "(" ++ show a ++ ", " ++ show b ++ ")"
+
+instance ∀ a. {{Show a}} → Show (List a) where
+  show xs = joinBy ", " $ map show xs
+
+-- For now, I'm not having the compiler do this automatically
+
+Lazy : U → U
+Lazy a = Unit → a
+
+force : ∀ a. Lazy a → a
+force f = f MkUnit
+
+-- unlike Idris, user will have to write \ _ => ...
+when : ∀ f. {{Applicative f}} → Bool → Lazy (f Unit) → f Unit
+when b fa = if b then force fa else return MkUnit
+
+unless : ∀ f. {{Applicative f}} → Bool → Lazy (f Unit) → f Unit
+unless b fa = when (not b) fa
+
+instance ∀ a. {{Ord a}} → Ord (List a) where
+  compare Nil Nil = EQ
+  compare Nil ys = LT
+  compare xs Nil = GT
+  compare (x :: xs) (y :: ys) = case compare x y of
+    EQ => compare xs ys
+    c => c
+
+isSpace : Char → Bool
+isSpace ' '    = True
+isSpace '\n'   = True
+isSpace _      = False
+
+isDigit : Char → Bool
+isDigit '0' = True
+isDigit '1' = True
+isDigit '2' = True
+isDigit '3' = True
+isDigit '4' = True
+isDigit '5' = True
+isDigit '6' = True
+isDigit '7' = True
+isDigit '8' = True
+isDigit '9' = True
+isDigit _ = False
+
+isUpper : Char → Bool
+isUpper c = let o = ord c in 64 < o && o < 91
+
+isAlphaNum : Char → Bool
+isAlphaNum c = let o = ord c in
+  64 < o && o < 91 ||
+  47 < o && o < 58 ||
+  96 < o && o < 123
+
+ignore : ∀ f a. {{Functor f}} → f a → f Unit
+ignore = map (const MkUnit)
+
+instance ∀ a. {{Show a}} → Show (Maybe a) where
+  show Nothing = "Nothing"
+  show (Just a) = "Just {show a}"
+
+
+-- TODO
+
+pfunc isPrefixOf uses (True False): String → String → Bool := `(pfx, s) => s.startsWith(pfx) ? Prelude_True : Prelude_False`
+pfunc isSuffixOf uses (True False): String → String → Bool := `(pfx, s) => s.endsWith(pfx) ? Prelude_True : Prelude_False`
+pfunc strIndex : String → Int → Char := `(s, ix) => s[ix]`
+
+
+instance ∀ a. {{Show a}} → Show (SnocList a) where
+  show xs = show (xs <>> Nil)
+
+getAt' : ∀ a. Int → List a → Maybe a
+getAt' i xs = getAt (cast i) xs
+
+length' : ∀ a. List a → Int
+length' xs = go xs 0
+  where
+    go : ∀ a. List a → Int → Int
+    go Nil acc = acc
+    go (x :: xs) acc = go xs (acc + 1)
+
+unlines : List String → String
+unlines lines = joinBy "\n" lines
+
+-- TODO inherit Semigroup
+class Monoid a where
+  neutral : a
+
+findIndex' : ∀ a. (a → Bool) → List a → Maybe Int
+findIndex' {a} pred xs = go xs 0
+  where
+    go : List a → Int → Maybe Int
+    go Nil ix = Nothing
+    go (x :: xs) ix = if pred x then Just ix else go xs (ix + 1)
+
+pfunc fatalError : ∀ a. String → a := `(_, msg) => { throw new Error(msg) }`
+
+foldlM : ∀ m a e. {{Monad m}} → (a → e → m a) → a → List e → m a
+foldlM f a xs = foldl (\ ma b => ma >>= flip f b) (pure a) xs
