@@ -4,8 +4,6 @@ module Neighbors
 -- Prf ?
 import Prelude
 
-data Void : U where
-
 data Prf : U → U where
   Pf : ∀ a. {{_ : a}} → Prf a
 

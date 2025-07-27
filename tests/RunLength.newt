@@ -6,22 +6,6 @@ module RunLength
 
 import Prelude
 
--- TODO this belongs in a library
-
-data Void : U where
-
-Not : U → U
-Not x = x → Void
-
-data Dec : U → U where
-  Yes : ∀ prop. (prf : prop) → Dec prop
-  No : ∀ prop. (contra : Not prop) → Dec prop
-
-class DecEq t where
-  decEq : (x₁ : t) → (x₂ : t) → Dec (x₁ ≡ x₂)
-
--- end lib
-
 rep : ∀ a. Nat → a → List a
 rep Z x = Nil
 rep (S k) x = x :: rep k x

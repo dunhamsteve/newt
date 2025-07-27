@@ -126,6 +126,17 @@ cong f Refl = Refl
 sym : ∀ A. {0 a b : A} → a ≡ b → b ≡ a
 sym Refl = Refl
 
+data Void : U where
+
+¬ : U → U
+¬ x = x → Void
+
+data Dec : U → U where
+  Yes : ∀ prop. (prf : prop) → Dec prop
+  No : ∀ prop. (contra : ¬ prop) → Dec prop
+
+class DecEq t where
+  decEq : (x₁ : t) → (x₂ : t) → Dec (x₁ ≡ x₂)
 
 
 -- Functor
