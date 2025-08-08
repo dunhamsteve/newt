@@ -7,7 +7,7 @@ import Lib.Prettier
 import Lib.Types
 
 public export
-data Raw : Type where
+data Raw : Type
 
 public export
 data Pattern

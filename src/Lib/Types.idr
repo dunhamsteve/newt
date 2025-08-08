@@ -332,6 +332,7 @@ Show Val where
   show (VLam _ str icit quant x) = "(%lam \{show quant}\{str} \{show x})"
   show (VPi fc str Implicit rig x y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{show  y})"
   show (VPi fc str Explicit rig x y) = "(%pi (\{show rig} \{str} : \{show  x}). \{show  y})"
+  show (VPi fc str Auto rig x y) = "(%pi {{\{show rig} \{str} : \{show  x}}}. \{show  y})"
   show (VCase fc sc alts) = "(%case \{show sc} ...)"
   show (VU _) = "U"
   show (VLit _ lit) = show lit
