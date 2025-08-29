@@ -104,7 +104,8 @@ data QName : U where
   QN : List String -> String -> QName
 
 instance Eq QName where
-  QN ns n == QN ns' n' = n == n' && ns == ns'
+  -- `if` gets us short circuit behavior, idris has a lazy `&&`
+  QN ns n == QN ns' n' = if n == n' then ns == ns' else False
 
 instance Show QName where
   show (QN Nil n) = n

@@ -110,7 +110,8 @@ processTypeSig ns fc names tm = do
   -- let mstart = length' mc.metas
   traverse (checkAlreadyDef fc) names
   ty <- check (mkCtx fc) tm (VU fc)
-  ty <- zonk top 0 Nil ty
+  -- this is not needed
+  -- ty <- zonk top 0 Nil ty
   log 1 $ \ _ => "TypeSig \{unwords names} : \{render 90 $ pprint Nil ty}"
   ignore $ for names $ \nm => setDef (QN ns nm) fc ty Axiom Nil
 
@@ -161,7 +162,7 @@ processDef ns fc nm clauses = do
   -- TODO - make nf that expands all metas and drop zonk
   -- Idris2 doesn't expand metas for performance - a lot of these are dropped during erasure.
   -- Day1.newt is a test case
-  -- tm' <- nf Nil tm
+  -- NOW - might not need this if we do it at compile time
   tm' <- zonk top 0 Nil tm
   debug $ \ _ => "NF\n\{render 80 $ pprint Nil tm'}"
   -- This is done in Compile.newt now, we can't store the result because we need the real thing at compile time
