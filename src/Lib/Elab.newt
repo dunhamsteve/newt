@@ -414,6 +414,7 @@ solve env m sp t = do
       -- check any autos
       top <- getTop
       let mc = top.metaCtx
+      let (CheckAll) = mc.mcmode | _ => pure MkUnit
       debug $ \ _ => "check autos depending on \{show ix} \{debugStr mc.mcmode}"
       checkAutos ix mc.autos
     pure MkUnit
