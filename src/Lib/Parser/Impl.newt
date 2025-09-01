@@ -50,7 +50,7 @@ perror fn ((MkBounded val (MkBounds line col _ _)) :: _) msg = E (MkFC fn (line,
 
 
 parse : ∀ a. String -> Parser a -> TokenList -> Either Error a
-parse fn pa toks = case runP pa toks False EmptyMap (MkFC fn (-1,-1)) of
+parse fn pa toks = case runP pa toks False emptyMap (MkFC fn (-1,-1)) of
   Fail fatal err toks com ops => Left err
   OK a Nil _ _ => Right a
   OK a ts _ _ => Left (perror fn ts "Extra toks")

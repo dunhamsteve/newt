@@ -385,7 +385,7 @@ process : QName → M (List Doc)
 process name = do
   let wat = QN ("Prelude" :: Nil) "arrayToList"
   top <- getTop
-  entries <- getEntries EmptyMap name
+  entries <- getEntries emptyMap name
 
   -- Maybe move this dance into liftWhere
   ref <- newIORef entries
@@ -397,7 +397,7 @@ process name = do
   entries <- readIORef ref
   -- Now working with defs
   exprs <- mapM defToCExp $ toList entries
-  let cexpMap = foldMap const EmptyMap exprs
+  let cexpMap = foldMap const emptyMap exprs
   cexpMap <- tailCallOpt cexpMap
   let names = sortedNames cexpMap name
   pure $ map cexpToDoc $ mapMaybe (\x => lookupMap x cexpMap) names

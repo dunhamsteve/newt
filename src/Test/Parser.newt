@@ -17,7 +17,7 @@ main = do
     | _ => putStrLn "postpone error"
   -- debugLog toks
 
-  let (OK a toks com ops) = runP parseMod toks False EmptyMap (MkFC fn (0,0))
+  let (OK a toks com ops) = runP parseMod toks False emptyMap (MkFC fn (0,0))
     | fail => debugLog fail
   putStrLn "Module"
   debugLog $ a

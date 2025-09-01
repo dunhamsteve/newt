@@ -3,6 +3,7 @@
 
 - [ ] Raw is duplicated between Lib.Syntax and Lib.Compile, but not detected
 - [ ] vscode - run newt when switching editors
+- [ ] who calls X?  We can only do this scoped to the current context for now. Someday whole source dir
 - [ ] case split
   - We could fake this up:
     - given a name and a point in the editor

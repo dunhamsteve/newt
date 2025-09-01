@@ -391,7 +391,7 @@ record ModContext where
 
 -- A placeholder while walking through dependencies of a module
 emptyModCtx : String → ModContext
-emptyModCtx csum = MkModCtx csum EmptyMap (MC EmptyMap Nil 0 NoCheck) EmptyMap
+emptyModCtx csum = MkModCtx csum emptyMap (MC emptyMap Nil 0 NoCheck) emptyMap
 
 HintTable : U
 HintTable = SortedMap QName (List (QName × Tm))

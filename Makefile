@@ -55,3 +55,8 @@ vscode:
 
 playground: .PHONY
 	cd playground && ./build
+
+profile: .PHONY
+	rm isolate* build/*; node --prof newt.js -o newt2.js src/Main.newt
+	node --prof-process isolate* > profile.txt
+

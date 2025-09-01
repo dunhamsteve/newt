@@ -82,7 +82,7 @@ strongConnect {k} st vtx =
 -- to ignore ambiguity from indirect solutions
 tarjan : ∀ k. {{Eq k}} {{Ord k}} → List (k × List k) → List (List k)
 tarjan {k} nodes =
-  let g = foldMap const EmptyMap $ map mkVertex nodes in
+  let g = foldMap const emptyMap $ map mkVertex nodes in
   .result $ foldl checkVertex (MkTState 0 Nil Nil g) $ map fst nodes
   where
     mkVertex : k × List k → k × TVertex k

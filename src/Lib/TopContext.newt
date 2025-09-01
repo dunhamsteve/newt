@@ -42,9 +42,9 @@ instance Show TopContext where
 -- TODO need to get class dependencies working
 emptyTop : ∀ io. {{Monad io}} {{HasIO io}} -> io TopContext
 emptyTop = do
-  let mcctx = MC EmptyMap Nil 0 CheckAll
+  let mcctx = MC emptyMap Nil 0 CheckAll
   errs <- newIORef $ the (List Error) Nil
-  pure $ MkTop EmptyMap Nil EmptyMap Nil EmptyMap mcctx 0 errs EmptyMap
+  pure $ MkTop emptyMap Nil emptyMap Nil emptyMap mcctx 0 errs emptyMap
 
 
 setFlag : QName → FC → EFlag → M Unit
