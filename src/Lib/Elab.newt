@@ -206,18 +206,19 @@ trySolveAuto (Unsolved fc k ctx ty AutoSolve _) = do
 
       let (VRef _ tyname _) = ty | _ => pure False
       let cands = fromMaybe Nil $ lookupMap' tyname top.hints
-      (nm :: Nil) <- findMatches ctx ty cands
+      (QN _ nm :: Nil) <- findMatches ctx ty cands
         | res => do
           debug $ \ _ => "GLOBAL FAILED to solve \{show ty}, matches: \{show res}"
           pure False
-      let val = VRef fc nm Lin
+      -- The `check` fills in implicits
+      tm <- check ctx (RVar fc nm) ty
+      val <- eval ctx.env CBN tm
+      debug $ \ _ => "SOLUTION \{rpprint Nil tm} evaled to \{show val}"
       debug $ \ _ => "GLOBAL SOLUTION \{show val}"
       let sp = makeSpine ctx.lvl ctx.bds
+      -- Sometimes this gets solved during the `check` above
+      entry@(Unsolved _ _ _ _ _ _) <- lookupMeta k | _ => pure True
       solve ctx.env k sp val
-      debug $ \ _ => ">CHECK \{show k}"
-      let (QN ns nm) = nm
-      ignore $ check ctx (RVar fc nm) ty
-      debug $ \ _ => "<CHECK \{show k}"
       pure True
 trySolveAuto _ = pure False
 
@@ -227,6 +228,7 @@ solveAutos = do
   let mc = top.metaCtx
   let autos = filter isAuto $ mapMaybe (flip lookupMap' mc.metas) mc.autos
   res <- run autos
+  -- If anything is solved, we try again from the top
   if res then solveAutos else pure MkUnit
   where
     isAuto : MetaEntry -> Bool

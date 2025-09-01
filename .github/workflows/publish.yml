@@ -27,7 +27,7 @@ jobs:
       #   uses: oven-sh/setup-bun@v2
       - name: build
         run: |
-          make
+          make newt3.js
           cd playground
           npm install -g esbuild vite
           npm install
