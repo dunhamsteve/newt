@@ -79,9 +79,9 @@ litToJS (LInt i) = LitInt i
 
 -- Stuff nm.h1, nm.h2, ... into environment
 -- TODO consider JSExp instead of nm, so we can have $foo.h1 instead of assigning a sc.
-mkEnv : String -> Int -> JSEnv -> List String -> JSEnv
+mkEnv : JSExp -> Int -> JSEnv -> List String -> JSEnv
 mkEnv nm k env Nil = env
-mkEnv nm k env (x :: xs) = mkEnv nm (1 + k) (push env (Dot (Var nm) "h\{show k}")) xs
+mkEnv nm k env (x :: xs) = mkEnv nm (1 + k) (push env (Dot nm "h\{show k}")) xs
 
 envNames : Env -> List String
 
@@ -112,8 +112,15 @@ freshNames nms env = go nms env Lin
       let (n', env') = freshName' n env
       in go ns env' (acc :< n')
 
-
-
+-- These expressions are added to the environment rather than assigned to a name
+simpleJSExp : JSExp → Bool
+simpleJSExp (Var _) = True
+simpleJSExp (Dot a _) = simpleJSExp a
+simpleJSExp (JUndefined) = True
+simpleJSExp (Index a b) = if simpleJSExp a then simpleJSExp b else False
+simpleJSExp (LitInt _) = True
+simpleJSExp (LitString _) = True
+simpleJSExp _ = False
 
 -- This is inspired by A-normalization, look into the continuation monad
 -- There is an index on JSStmt, adopted from Stefan Hoeck's code.
@@ -141,12 +148,16 @@ termToJS env (CLit lit) f = f (litToJS lit)
 termToJS env (CLet nm (CBnd k) u) f = case getAt (cast k) env.jsenv of
   Just e  => termToJS (push env e) u f
   Nothing => fatalError "bad bounds"
+-- For a let, we run with a continuation to JAssign to a pre-declared variable
+-- if JAssign comes back out, we either push the JSExpr into the environment or JConst it,
+-- depending on complexity. Otherwise, stick the declaration in front.
 termToJS env (CLet nm t u) f =
   let nm' = freshName nm env
       env' = push env (Var nm')
-  -- If it's a simple term, use const
   in case termToJS env t (JAssign nm') of
-    (JAssign _ exp) => JSnoc (JConst nm' exp) (termToJS env' u f)
+    (JAssign _ exp) => if simpleJSExp exp
+      then termToJS (push env exp) u f
+      else JSnoc (JConst nm' exp) (termToJS env' u f)
     t' => JSnoc (JLet nm' t') (termToJS env' u f)
 termToJS env (CLetRec nm CErased u) f = termToJS (push env JUndefined) u f
 termToJS env (CLetRec nm t u) f =
@@ -184,29 +195,32 @@ termToJS {e} env (CCase t alts) f =
   -- TODO default case, let's drop the extra field.
 
   termToJS env t $ \case
-    (Var nm) => maybeCaseStmt env nm alts
+    (Var nm) => maybeCaseStmt env (Var nm) alts
     t' => do
       -- TODO refactor nm to be a JSExp with Var{} or Dot{}
       -- FIXME sc$ seemed to shadow something else, lets get this straightened out
       -- we need freshName names that are not in env (i.e. do not play in debruijn)
       let nm = "_sc$\{show env.depth}"
+      -- increment the bit that goes into the name
       let env' = MkEnv env.jsenv (1 + env.depth)
-      JSnoc (JConst nm t') (maybeCaseStmt env' nm alts)
+      if simpleJSExp t'
+        then (maybeCaseStmt env' t' alts)
+        else JSnoc (JConst nm t') (maybeCaseStmt env' (Var nm) alts)
 
   where
-    termToJSAlt : JSEnv -> String -> CAlt -> JAlt
+    termToJSAlt : JSEnv -> JSExp -> CAlt -> JAlt
     termToJSAlt env nm (CConAlt name info args u) = JConAlt name (termToJS (mkEnv nm 0 env args) u f)
     -- intentionally reusing scrutinee name here
     termToJSAlt env nm (CDefAlt u) = JDefAlt (termToJS  (env) u f)
     termToJSAlt env nm (CLitAlt lit u) = JLitAlt (litToJS lit) (termToJS env u f)
 
-    maybeCaseStmt : JSEnv -> String -> List CAlt -> JSStmt e
+    maybeCaseStmt : JSEnv -> JSExp -> List CAlt -> JSStmt e
     -- If there is a single alt, assume it matched
     maybeCaseStmt env nm ((CConAlt _ info args u) :: Nil) = (termToJS (mkEnv nm 0 env args) u f)
     maybeCaseStmt env nm alts@(CLitAlt _ _  :: _) =
-        (JCase (Var nm) (map (termToJSAlt env nm) alts))
+        (JCase nm (map (termToJSAlt env nm) alts))
     maybeCaseStmt env nm alts =
-          (JCase (Dot (Var nm) "tag") (map (termToJSAlt env nm) alts))
+          (JCase (Dot nm "tag") (map (termToJSAlt env nm) alts))
 
 jsKeywords : List String
 jsKeywords = (
