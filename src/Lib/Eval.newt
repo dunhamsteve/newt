@@ -10,22 +10,17 @@ import Data.IORef
 import Data.SnocList
 import Data.SortedMap
 
-
-eval : Env -> Mode -> Tm -> M Val
+eval : Env -> Tm -> M Val
 
 -- REVIEW everything is evalutated whether it's needed or not
 -- It would be nice if the environment were lazy.
 -- e.g. case is getting evaluated when passed to a function because
 -- of dependencies in pi-types, even if the dependency isn't used
 
-
 infixl 8 _$$_
 
-
 _$$_ : Closure -> Val -> M Val
-_$$_ (MkClosure env tm) u = eval (u :: env) CBN tm
-
-
+_$$_ (MkClosure env tm) u = eval (u :: env) tm
 
 vapp : Val -> Val -> M Val
 vapp (VLam _ _ _ _ t) u = t $$ u
@@ -34,14 +29,11 @@ vapp (VRef fc nm sp) u = pure $ VRef fc nm (sp :< u)
 vapp (VMeta fc k sp) u = pure $ VMeta fc k (sp :< u)
 vapp t u = error' "impossible in vapp \{show t} to \{show u}\n"
 
-
 vappSpine : Val -> SnocList Val -> M Val
 vappSpine t Lin = pure t
 vappSpine t (xs :< x) = do
   rest <- vappSpine t xs
   vapp rest x
-
-
 
 lookupVar : Env -> Int -> Maybe Val
 lookupVar env k = let l = cast $ length env in
@@ -74,7 +66,7 @@ tryEval env (VRef fc k sp) = do
         catchError (
             do
             debug $ \ _ =>  "app \{show name} to \{show sp}"
-            vtm <- eval env CBN tm
+            vtm <- eval env tm
             debug $ \ _ =>  "tm is \{render 90 $ pprint Nil tm}"
             val <- vappSpine vtm sp
             case val of
@@ -92,7 +84,6 @@ tryEval env (VRef fc k sp) = do
         pure Nothing
 tryEval _ _ = pure Nothing
 
-
 -- Force far enough to compare types
 
 forceType : Env -> Val -> M Val
@@ -107,41 +98,41 @@ forceType env x = do
     | _ => pure x
   forceType env x'
 
-evalCase : Env -> Mode -> Val -> List CaseAlt -> M (Maybe Val)
-evalCase env mode sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
+evalCase : Env -> Val -> List CaseAlt -> M (Maybe Val)
+evalCase env sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
   top <- getTop
   if nm == name
     then do
       debug $ \ _ =>  "ECase \{show nm} \{show sp} \{show nms} \{showTm t}"
       go env (sp <>> Nil) nms
     else case lookup nm top of
-      (Just (MkEntry _ str type (DCon _ k str1) _)) => evalCase env mode sc xs
+      (Just (MkEntry _ str type (DCon _ k str1) _)) => evalCase env sc xs
       -- bail for a stuck function
       _ => pure Nothing
   where
     go : Env -> List Val -> List String -> M (Maybe Val)
     go env (arg :: args) (nm :: nms) = go (arg :: env) args nms
     go env args Nil = do
-      t' <- eval env mode t
+      t' <- eval env t
       Just <$> vappSpine t' (Lin <>< args)
     go env Nil rest = pure Nothing
 -- REVIEW - this is handled in the caller already
-evalCase env mode sc@(VVar fc k sp) alts = case lookupVar env k of
+evalCase env sc@(VVar fc k sp) alts = case lookupVar env k of
     Just tt@(VVar fc' k' sp') => do
         debug $ \ _ =>  "lookup \{show k} is \{show tt}"
         if k' == k
           then pure Nothing
           else do
             val <- vappSpine (VVar fc' k' sp') sp
-            evalCase env mode val alts
+            evalCase env val alts
     Just t => do
       val <- vappSpine t sp
-      evalCase env mode val alts
+      evalCase env val alts
     Nothing => do
         debug $ \ _ =>  "lookup \{show k} is Nothing in env \{show env}"
         pure Nothing
-evalCase env mode sc (CaseDefault u :: xs) = Just <$> eval (sc :: env) mode u
-evalCase env mode sc cc = do
+evalCase env sc (CaseDefault u :: xs) = Just <$> eval (sc :: env) u
+evalCase env sc cc = do
   debug $ \ _ =>  "CASE BAIL sc \{show sc} vs " -- \{show cc}"
   debug $ \ _ =>  "env is \{show env}"
   pure Nothing
@@ -155,51 +146,50 @@ evalCase env mode sc cc = do
 
 -- TODO maybe add glueing
 
-eval env mode (Ref fc x) = pure $ VRef fc x Lin
-eval env mode (App _ t u) = do
-  t' <- eval env mode t
-  u' <- eval env mode u
+
+eval env (Ref fc x) = pure $ VRef fc x Lin
+eval env (App _ t u) = do
+  t' <- eval env t
+  u' <- eval env u
   vapp t' u'
-eval env mode (UU fc) = pure (VU fc)
-eval env mode (Erased fc) = pure (VErased fc)
-eval env mode (Meta fc i) = do
+eval env (UU fc) = pure (VU fc)
+eval env (Erased fc) = pure (VErased fc)
+eval env (Meta fc i) = do
   meta <- lookupMeta i
   case meta of
         (Solved _ k t) => pure $ t
         _ => pure $ VMeta fc i Lin
-eval env mode (Lam fc x icit rig t) = pure $ VLam fc x icit rig (MkClosure env t)
-eval env mode (Pi fc x icit rig a b) = do
-  a' <- eval env mode a
+eval env (Lam fc x icit rig t) = pure $ VLam fc x icit rig (MkClosure env t)
+eval env (Pi fc x icit rig a b) = do
+  a' <- eval env a
   pure $ VPi fc x icit rig a' (MkClosure env b)
-eval env mode (Let fc nm t u) = do
-  t' <- eval env mode t
-  u' <- eval (VVar fc (cast $ length env) Lin :: env) mode u
+eval env (Let fc nm t u) = do
+  t' <- eval env t
+  u' <- eval (VVar fc (cast $ length env) Lin :: env) u
   pure $ VLet fc nm t' u'
-eval env mode (LetRec fc nm ty t u) = do
-  ty' <- eval env mode ty
-  t' <- eval (VVar fc (length' env) Lin :: env) mode t
-  u' <- eval (VVar fc (length' env) Lin :: env) mode u
+eval env (LetRec fc nm ty t u) = do
+  ty' <- eval env ty
+  t' <- eval (VVar fc (length' env) Lin :: env) t
+  u' <- eval (VVar fc (length' env) Lin :: env) u
   pure $ VLetRec fc nm ty' t' u'
 -- Here, we assume env has everything. We push levels onto it during type checking.
 -- I think we could pass in an l and assume everything outside env is free and
 -- translate to a level
-eval env mode (Bnd fc i) = case getAt' i env of
+eval env (Bnd fc i) = case getAt' i env of
   Just rval => pure rval
   Nothing => error fc "Bad deBruin index \{show i}"
-eval env mode (Lit fc lit) = pure $ VLit fc lit
+eval env (Lit fc lit) = pure $ VLit fc lit
 
-eval env mode tm@(Case fc sc alts) = do
+eval env tm@(Case fc sc alts) = do
   -- TODO we need to be able to tell eval to expand aggressively here.
-  sc' <- eval env mode sc
+  sc' <- eval env sc
   sc' <- unlet env sc' -- try to expand lets from pattern matching
   sc' <- forceType env sc'
-  vsc <- eval env mode sc
-  vcase <- evalCase env mode sc' alts
+  vsc <- eval env sc
+  vcase <- evalCase env sc' alts
   pure $ fromMaybe (VCase fc vsc alts) vcase
 
-
 quote : (lvl : Int) -> Val -> M Tm
-
 
 quoteSp : (lvl : Int) -> Tm -> SnocList Val -> M Tm
 quoteSp lvl t Lin = pure t
@@ -246,12 +236,7 @@ quote l (VErased fc) = pure $ Erased fc
 -- ezoo only seems to use it at Nil, but essentially does this:
 
 nf : Env -> Tm -> M Tm
-nf env t = eval env CBN t >>= quote (length' env)
-
-
-nfv : Env -> Tm -> M Tm
-nfv env t = eval env CBV t >>= quote (length' env)
-
+nf env t = eval env t >>= quote (length' env)
 
 prvalCtx : {{ctx : Context}} -> Val -> M String
 prvalCtx {{ctx}} v = do
@@ -310,7 +295,7 @@ zonkApp top l env t@(Meta fc k) sp = do
   meta <- lookupMeta k
   case meta of
     (Solved _ j v) => do
-      sp' <- traverse (eval env CBN) sp
+      sp' <- traverse (eval env) sp
       debug $ \ _ =>  "zonk \{show k} -> \{show v} spine \{show sp'}"
       foo <- vappSpine v (Lin <>< sp')
       debug $ \ _ =>  "-> result is \{show foo}"

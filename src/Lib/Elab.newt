@@ -183,13 +183,13 @@ trySolveAuto (Unsolved fc k ctx ty AutoSolve _) = do
       debug $ \ _ => "TRYAUTO solving \{show k} : \{show ty}"
       -- fill in solved metas in type
       x <- quote ctx.lvl ty
-      ty <- eval ctx.env CBN x
+      ty <- eval ctx.env x
       debug $ \ _ => "AUTO ---> \{show ty}"
       -- we want the context here too.
       top <- getTop
       Nil <- contextMatches ctx ty
           | ((tm, vty) :: Nil) => do
-              val <- eval ctx.env CBN tm
+              val <- eval ctx.env tm
               debug $ \ _ => "LOCAL SOLUTION \{rpprint Nil tm} evaled to \{show val}"
               let sp = makeSpine ctx.lvl ctx.bds
               solve ctx.env k sp val
@@ -212,7 +212,7 @@ trySolveAuto (Unsolved fc k ctx ty AutoSolve _) = do
           pure False
       -- The `check` fills in implicits
       tm <- check ctx (RVar fc nm) ty
-      val <- eval ctx.env CBN tm
+      val <- eval ctx.env tm
       debug $ \ _ => "SOLUTION \{rpprint Nil tm} evaled to \{show val}"
       debug $ \ _ => "GLOBAL SOLUTION \{show val}"
       let sp = makeSpine ctx.lvl ctx.bds
@@ -395,13 +395,13 @@ solve env m sp t = do
   ren <- invert l sp
   -- force unlet
   hack <- quote l t
-  t <- eval env CBN hack
+  t <- eval env hack
   catchError (do
     tm <- rename m ren l t
 
     let tm = lams (snoclen sp) (reverse ctx_.boundNames) tm
     top <- getTop
-    soln <- eval Nil CBN tm
+    soln <- eval Nil tm
 
     updateMeta m $ \case
       (Unsolved pos k _ _ _ cons) => pure $ Solved pos k soln
@@ -507,7 +507,7 @@ unify env mode t u = do
       top <- getTop
       case lookup k' top of
         Just (MkEntry _ name ty (Fn tm) _) => do
-          vtm <- eval Nil CBN tm
+          vtm <- eval Nil tm
           appvtm <- vappSpine vtm sp'
           unify env mode t appvtm
         _ => error fc' "unify failed \{show t} =?= \{show u} [no Fn]\n  env is \{show env}"
@@ -517,7 +517,7 @@ unify env mode t u = do
       top <- getTop
       case lookup k top of
         Just (MkEntry _ name ty (Fn tm) _) => do
-          vtm <- eval Nil CBN tm
+          vtm <- eval Nil tm
           tmsp <- vappSpine vtm sp
           unify env mode tmsp u
         _ => error fc "unify failed \{show t} [no Fn] =?= \{show u}\n  env is \{show env}"
@@ -639,14 +639,14 @@ insert ctx tm ty = do
       m <- freshMeta ctx (getFC tm) a AutoSolve
       debug $ \ _ => "INSERT Auto \{rpprint (names ctx) m} : \{show a}"
       debug $ \ _ => "TM \{rpprint (names ctx) tm}"
-      mv <- eval ctx.env CBN m
+      mv <- eval ctx.env m
       bapp <- b $$ mv
       insert ctx (App (getFC tm) tm m) bapp
     VPi fc x Implicit rig a b => do
       m <- freshMeta ctx (getFC tm) a Normal
       debug $ \ _ => "INSERT \{rpprint (names ctx) m} : \{show a}"
       debug $ \ _ => "TM \{rpprint (names ctx) tm}"
-      mv <- eval ctx.env CBN m
+      mv <- eval ctx.env m
       bapp <- b $$ mv
       insert ctx (App (getFC tm) tm m) bapp
     va => pure (tm, va)
@@ -791,7 +791,7 @@ updateContext ctx ((k, val) :: cs) =
 
 checkCase : Context → Problem → String → Val → (QName × Int × Tm) → M Bool
 checkCase ctx prob scnm scty (dcName, arity, ty) = do
-  vty <- eval Nil CBN ty
+  vty <- eval Nil ty
   (ctx', ty', vars, sc) <- extendPi ctx (vty) Lin Lin
   (Just res) <- catchError (Just <$> unify ctx'.env UPattern ty' scty)
               (\err => do
@@ -813,7 +813,7 @@ checkCase ctx prob scnm scty (dcName, arity, ty) = do
 buildCase : Context -> Problem -> String -> Val -> (QName × Int × Tm) -> M (Maybe CaseAlt)
 buildCase ctx prob scnm scty (dcName, arity, ty) = do
   debug $ \ _ => "CASE \{scnm} match \{show dcName} ty \{rpprint (names ctx) ty}"
-  vty <- eval Nil CBN ty
+  vty <- eval Nil ty
   (ctx', ty', vars, sc) <- extendPi ctx (vty) Lin Lin
 
   -- TODO I think we need to figure out what is dotted, maybe
@@ -1031,7 +1031,7 @@ checkWhere ctx decls body ty = do
   -- REVIEW is this right, cribbed from my top level code
   top <- getTop
   clauses' <- traverse makeClause clauses
-  vty <- eval ctx.env CBN funTy
+  vty <- eval ctx.env funTy
   debug $ \ _ => "\{name} vty is \{show vty}"
   let ctx' = extend ctx name vty
 
@@ -1041,7 +1041,7 @@ checkWhere ctx decls body ty = do
   -- e.g. "go" -> (VApp ... (VApp (VRef "ns.go") ...)
   -- But I'll attempt letrec first
   tm <- buildTree (withPos ctx' defFC) (MkProb clauses' vty)
-  vtm <- eval ctx'.env CBN tm
+  vtm <- eval ctx'.env tm
   -- Should we run the rest with the definition in place?
   -- I'm wondering if switching from bind to define will mess with metas
   -- let ctx' = define ctx name vtm vty
@@ -1059,11 +1059,11 @@ checkDone ctx Nil body ty = do
   env' <- for ctx.env $ \ val => do
     ty <- quote (length' ctx.env) val
     -- This is not getting vars under lambdas
-    eval ctx.env CBV ty
+    eval ctx.env ty
   types' <- for ctx.types $ \case
     (nm,ty) =>  do
       nty <- quote (length' env') ty
-      ty' <- eval env' CBV nty
+      ty' <- eval env' nty
       pure (nm, ty')
   let ctx = MkCtx ctx.lvl env' types' ctx.bds ctx.ctxFC
   debug $ \ _ => "AFTER"
@@ -1073,7 +1073,7 @@ checkDone ctx Nil body ty = do
   -- The case eval code only works in the Tm -> Val case at the moment.
   -- we don't have anything like `vapp` for case
   ty <- quote (length' ctx.env) ty
-  ty <- eval ctx.env CBN ty
+  ty <- eval ctx.env ty
 
   debug $ \ _ => "check at \{show ty}"
   got <- check ctx body ty
@@ -1428,9 +1428,9 @@ check ctx tm ty = do
 
     (RLet fc nm ty v sc, rty) => do
       ty' <- check ctx ty (VU emptyFC)
-      vty <- eval ctx.env CBN ty'
+      vty <- eval ctx.env ty'
       v' <- check ctx v vty
-      vv <- eval ctx.env CBN v'
+      vv <- eval ctx.env v'
       let ctx' = define ctx nm vv vty
       sc' <- check ctx' sc rty
       pure $ Let fc nm v' sc'
@@ -1475,7 +1475,7 @@ check ctx tm ty = do
 infer ctx tm@(RUpdateRec fc _ _) = do
   error fc "I can't infer record updates"
   -- mvar <- freshMeta ctx fc (VU emptyFC) Normal
-  -- a <- eval ctx.env CBN mvar
+  -- a <- eval ctx.env mvar
   -- let ty = VPi fc ":ins" Explicit Many a (MkClosure ctx.env mvar)
   -- tm <- check ctx tm ty
   -- pure (tm, ty)
@@ -1488,7 +1488,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
       case lookupRaw nm top of
         Just (MkEntry _ name ty def _) => do
           debug $ \ _ => "lookup \{show name} as \{show def}"
-          vty <- eval Nil CBN ty
+          vty <- eval Nil ty
           pure (Ref fc name, vty)
         Nothing => error fc "\{show nm} not in scope"
     go i ((x, ty) :: xs) = if x == nm then pure $ (Bnd fc i, ty)
@@ -1518,40 +1518,40 @@ infer ctx (RApp fc t u icit) = do
       -- TODO test case to cover this.
       tty => do
         debug $ \ _ => "unify PI for \{show tty}"
-        a <- freshMeta ctx fc (VU emptyFC) Normal >>= eval ctx.env CBN
+        a <- freshMeta ctx fc (VU emptyFC) Normal >>= eval ctx.env
         b <- MkClosure ctx.env <$> freshMeta (extend ctx ":ins" a) fc (VU emptyFC) Normal
         -- FIXME - I had to guess Many here.  What are the side effects?
         unifyCatch fc ctx tty (VPi fc ":ins" icit Many a b)
         pure (a,b)
 
   u <- check ctx u a
-  u' <- eval ctx.env CBN u
+  u' <- eval ctx.env u
   bappu <- b $$ u'
   pure (App fc t u, bappu)
 
 infer ctx (RU fc) = pure (UU fc, VU fc) -- YOLO
 infer ctx (RPi _ (BI fc nm icit quant) ty ty2) = do
   ty' <- check ctx ty (VU fc)
-  vty' <- eval ctx.env CBN ty'
+  vty' <- eval ctx.env ty'
   ty2' <- check (extend ctx nm vty') ty2 (VU fc)
   pure (Pi fc nm icit quant ty' ty2', (VU fc))
 infer ctx (RLet fc nm ty v sc) = do
   ty' <- check ctx ty (VU emptyFC)
-  vty <- eval ctx.env CBN ty'
+  vty <- eval ctx.env ty'
   v' <- check ctx v vty
-  vv <- eval ctx.env CBN v'
+  vv <- eval ctx.env v'
   let ctx' = define ctx nm vv vty
   (sc',scty) <- infer ctx' sc
   pure $ (Let fc nm v' sc', scty)
 
 infer ctx (RAnn fc tm rty) = do
   ty <- check ctx rty (VU fc)
-  vty <- eval ctx.env CBN ty
+  vty <- eval ctx.env ty
   tm <- check ctx tm vty
   pure (tm, vty)
 
 infer ctx (RLam _ (BI fc nm icit quant) tm) = do
-  a <- freshMeta ctx fc (VU emptyFC) Normal >>= eval ctx.env CBN
+  a <- freshMeta ctx fc (VU emptyFC) Normal >>= eval ctx.env
   let ctx' = extend ctx nm a
   (tm', b) <- infer ctx' tm
   debug $ \ _ => "make lam for \{show nm} scope \{rpprint (names ctx) tm'} : \{show b}"
@@ -1560,7 +1560,7 @@ infer ctx (RLam _ (BI fc nm icit quant) tm) = do
 
 infer ctx (RImplicit fc) = do
   ty <- freshMeta ctx fc (VU emptyFC) Normal
-  vty <- eval ctx.env CBN ty
+  vty <- eval ctx.env ty
   tm <- freshMeta ctx fc vty Normal
   pure (tm, vty)
 

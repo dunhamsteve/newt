@@ -59,7 +59,7 @@ logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
       sols <- case kind of
         AutoSolve => do
           x <- quote ctx.lvl ty
-          ty <- eval ctx.env CBN x
+          ty <- eval ctx.env x
           debug $ \ _ => "AUTO ---> \{show ty}"
           -- we want the context here too.
           top <- getTop
@@ -150,11 +150,10 @@ processDef ns fc nm clauses = do
     | _ => throwError $ E fc "\{nm} already defined at \{show entry.fc}"
 
   log 1 $ \ _ => "check \{nm} at \{render 90 $ pprint Nil ty}"
-  vty <- eval Nil CBN ty
+  vty <- eval Nil ty
 
   debug $ \ _ => "\{nm} vty is \{show vty}"
 
-  -- I can take LHS apart syntactically or elaborate it with an infer
   clauses' <- traverse makeClause clauses
   tm <- buildTree (mkCtx fc) (MkProb clauses' vty)
 
@@ -165,9 +164,6 @@ processDef ns fc nm clauses = do
   -- NOW - might not need this if we do it at compile time
   tm' <- zonk top 0 Nil tm
   debug $ \ _ => "NF\n\{render 80 $ pprint Nil tm'}"
-  -- This is done in Compile.newt now, we can't store the result because we need the real thing at compile time
-  -- tm'' <- erase Nil tm' Nil
-  -- debug $ \ _ => "ERASED\n\{render 80 $ pprint Nil tm''}"
   debug $ \ _ => "Add def \{nm} \{render 90 $ pprint Nil tm'} : \{render 90 $ pprint Nil ty}"
   updateDef (QN ns nm) fc ty (Fn tm')
 
@@ -179,13 +175,11 @@ processCheck ns fc tm ty = do
   info fc "check \{show tm} at \{show ty}"
   ty' <- check (mkCtx fc) ty (VU fc)
   putStrLn "  got type \{render 90 $ pprint Nil ty'}"
-  vty <- eval Nil CBN ty'
+  vty <- eval Nil ty'
   res <- check (mkCtx fc) tm vty
   putStrLn "  got \{render 90 $ pprint Nil res}"
   norm <- nf Nil res
   putStrLn "  NF \{render 90 $ pprint Nil norm}"
-  norm <- nfv Nil res
-  putStrLn "  NFV \{render 90 $ pprint Nil norm}"
 
 
 processClass : List String → FC → String → Telescope → List Decl → M Unit
@@ -220,6 +214,7 @@ processClass ns classFC nm tele decls = do
       log 1 $ \ _ => "\{render 90 $ pretty decl}"
       processDecl ns $ TypeSig fc (name :: Nil) funType
       processDecl ns decl
+      setFlag (QN ns name) fc Inline
   where
     makeLHS : Raw → Telescope → Raw
     makeLHS acc ((BI fc' nm icit quant,  _) :: tele) = RApp fc' (makeLHS acc tele) (RVar fc' nm) Implicit
@@ -278,7 +273,7 @@ processInstance ns instfc ty decls = do
     | _ => error tyFC "\{show tconName} has multiple constructors \{show cons}"
   let (Just (MkEntry _ _ dcty (DCon _ _ _) _)) = lookup con top
     | _ => error tyFC "can't find constructor \{show con}"
-  vdcty@(VPi _ nm icit rig a b) <- eval Nil CBN dcty
+  vdcty@(VPi _ nm icit rig a b) <- eval Nil dcty
     | x => error (getFC x) "dcty not Pi"
   debug $ \ _ => "dcty \{render 90 $ pprint Nil dcty}"
   let (_,args) = funArgs codomain
@@ -286,7 +281,7 @@ processInstance ns instfc ty decls = do
   debug $ \ _ => "traverse \{show $ map showTm args}"
   -- This is a little painful because we're reverse engineering the
   -- individual types back out from the composite type
-  args' <- traverse (eval env CBN) args
+  args' <- traverse (eval env) args
   debug $ \ _ => "args' is \{show args'}"
   appty <- apply vdcty args'
   conTele <- getFields appty env Nil
@@ -416,8 +411,8 @@ processData ns fc nm ty cons = do
   tyty <- check (mkCtx fc) ty (VU fc)
   case lookupRaw nm top of
     Just (MkEntry _ name type Axiom _) => do
-      tyty' <- eval Nil CBN tyty
-      type' <- eval Nil CBN type
+      tyty' <- eval Nil tyty
+      type' <- eval Nil type
       unifyCatch fc (mkCtx fc) tyty' type'
     Just _ => error fc "\{show nm} already declared"
     Nothing => setDef (QN ns nm) fc tyty Axiom Nil
@@ -449,7 +444,6 @@ processData ns fc nm ty cons = do
   let arity = cast $ piArity tyty
   updateDef (QN ns nm) fc tyty (TCon arity cnames)
   where
-
     binderName : Binder → Name
     binderName (MkBinder _ nm _ _ _) = nm
 
@@ -493,6 +487,7 @@ processRecord ns recordFC nm tele cname decls = do
       log 1 $ \ _ => "\{render 90 $ pretty pdecl}"
       processDecl ns $ TypeSig fc (pname :: Nil) funType
       processDecl ns pdecl
+      setFlag (QN ns pname) fc Inline
 
 -- currently mixfix registration is handled in the parser
 -- since we now run a decl at a time we could do it here.
