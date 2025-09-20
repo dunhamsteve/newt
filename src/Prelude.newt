@@ -785,6 +785,11 @@ instance ∀ a b. {{Ord a}} {{Ord b}} → Ord (a × b) where
     EQ => compare b d
     res => res
 
+instance Eq Bool where
+  True == x = x
+  False == False = True
+  _ == _ = False
+
 instance ∀ a. {{Eq a}} → Eq (List a) where
   Nil == Nil = True
   (x :: xs) == (y :: ys) = if x == y then xs == ys else False

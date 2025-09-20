@@ -303,7 +303,20 @@ zonkApp top l env t@(Meta fc k) sp = do
     _ => pure $ appSpine t sp
 zonkApp top l env t sp = do
   t' <- zonk top l env t
-  pure $ appSpine t' sp
+  -- inlining
+  let (Just tm) = inlineDef t' | _ => pure $ appSpine t' sp
+  sp' <- traverse (eval env) sp
+  vtm <- eval env tm
+  catchError (do
+    foo <- vappSpine vtm (Lin <>< sp')
+    quote l foo)
+    (\_ => pure $ appSpine t' sp)
+  where
+    inlineDef : Tm → Maybe Tm
+    inlineDef (Ref _ nm) = case lookup nm top of
+      Just (MkEntry _ _ ty (Fn tm) flags) => if elem Inline flags then Just tm else Nothing
+      _ => Nothing
+    inlineDef _ = Nothing
 
 zonkAlt : TopContext -> Int -> Env -> CaseAlt -> M CaseAlt
 zonkAlt top l env (CaseDefault t) = CaseDefault <$> zonkBind top l env t

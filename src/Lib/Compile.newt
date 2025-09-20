@@ -319,7 +319,7 @@ getNames (App x t u) acc = getNames u $ getNames t acc
 getNames (Pi x str icit y t u) acc = getNames u $ getNames t $ QN primNS "PiType" :: acc
 getNames (Let x str t u) acc = getNames u $ getNames t acc
 getNames (LetRec x str _ t u) acc = getNames u $  getNames t acc
-getNames (Case x t alts) acc = foldl getAltNames acc alts
+getNames (Case x t alts) acc = getNames t $ foldl getAltNames acc alts
   where
     getAltNames : List QName -> CaseAlt -> List QName
     getAltNames acc (CaseDefault t) = getNames t acc
@@ -346,42 +346,88 @@ getEntries acc name = do
       foldlM getEntries acc used
     Just entry => pure $ updateMap name entry.def acc
 
--- sort names by dependencies
--- In JS this is only really needed for references that don't fall
--- under a lambda.
+/-
+
+## Sort names by dependencies
+
+This code is _way too subtle. The problem goes away if I wrap `() =>` around 0-ary top level functions. But I'm
+stubborn, so I'm giving it a try. Changing codegen may repeatedly break this and require switching to `() =>`.
+
+The idea here is to get a list of names to emit in order of dependencies. But top level 0-ary functions can reference
+and call names at startup. They can't reference something that hasn't been declared yet and can't call something that
+hasn't been defined.
+
+As an example, a recursive show instance:
+- References the `show` function
+- `show` function references the instance under a lambda (not inlining this yet)
+- We hit the bare function first, it depends on the instance (because of recursion), which depends on the
+  function, but loop prevention cuts.
+
+We have main at the top, it is called so we visit it deep. We do a depth-first traversal, but will distinguish whether
+we're visiting shallow or deep. We're trying to avoid hitting issues with indirect circular references.
+
+- Anything we visit deep, we ensure is visited shallow first
+- Shallow doesn't go into function bodies, but we do go into lambdas
+- Anything invoked with arguments while shallow is visited deep, anything referenced or partially applied is still shallow.
+- We keep track of both shallow and deep visits in our accumuulator
+- Shallow represents the declaration, so we filter to those at the end
+
+TODO this could be made faster by keeping a map of the done information
+-/
+
 sortedNames : SortedMap QName CExp → QName → List QName
-sortedNames defs qn = go Nil Nil qn
+sortedNames defs qn = map snd $ filter (not ∘ fst) $ go Nil Nil (True, qn)
   where
     getBody : CAlt → CExp
     getBody (CConAlt _ _ _ t) = t
     getBody (CLitAlt _ t) = t
     getBody (CDefAlt t) = t
 
-    getNames : List QName → CExp →  List QName
-    getNames acc (CLam _ t) = getNames acc t
-    getNames acc (CFun _ t) = getNames acc t
-    getNames acc (CAppRef nm ts _) = foldl getNames (nm :: acc) ts --  (CRef nm :: ts)
-    getNames acc (CApp t u) = getNames (getNames acc t) u
-    getNames acc (CCase t alts) = foldl getNames acc $ t :: map getBody alts
-    getNames acc (CRef qn) = qn :: acc
-    getNames acc (CLet _ t u) = getNames (getNames acc t) u
-    getNames acc (CLetRec _ t u) = getNames (getNames acc t) u
-    getNames acc (CConstr _ ts) = foldl getNames acc ts
-    getNames acc (CRaw _ deps) = deps ++ acc
+    -- deep if this qn is being applied to something
+    getNames : (deep : Bool) → List (Bool × QName) → CExp →  List (Bool × QName)
+    -- liftIO calls a lambda statically
+    getNames deep acc (CLam _ t) = getNames deep acc t
+    -- top level 0-ary function, doesn't happen
+    getNames deep acc (CFun _ t) = if deep then getNames deep acc t else acc
+    -- 0-ary call is not deep invocation
+    getNames deep acc (CAppRef nm Nil 0) =  (True, nm) :: acc
+    -- full call is deep ref to the head, arguments may be applied by `nm`
+    getNames deep acc (CAppRef nm ts 0) =  foldl (getNames True) ((True, nm) :: acc) ts
+    -- non-zero are closures
+    getNames deep acc (CAppRef nm ts _) =  foldl (getNames deep) ((deep, nm) :: acc) ts
+    -- True is needed for an issue in the parser. symbol -> keyword -> indented
+    -- TODO look at which cases generate CApp
+    getNames deep acc (CApp t u) = getNames True (getNames deep acc u) t
+    getNames deep acc (CCase t alts) = foldl (getNames deep) acc $ t :: map getBody alts
+    -- we're not calling it
+    getNames deep acc (CRef qn) = (deep, qn) :: acc
+    getNames deep acc (CLet _ t u) = getNames deep (getNames deep acc t) u
+    getNames deep acc (CLetRec _ t u) = getNames deep (getNames deep acc t) u
+    getNames deep acc (CConstr _ ts) = foldl (getNames deep) acc ts
+    -- if the CRaw is called, then the deps are called
+    getNames deep acc (CRaw _ deps) = map (_,_ deep) deps ++ acc
     -- wrote these out so I get an error when I add a new constructor
-    getNames acc (CLit _) = acc
-    getNames acc (CMeta _) = acc
-    getNames acc (CBnd _) = acc
-    getNames acc CErased = acc
-    getNames acc (CPrimOp op t u) = getNames (getNames acc t) u
+    getNames deep acc (CLit _) = acc
+    getNames deep acc (CMeta _) = acc
+    getNames deep acc (CBnd _) = acc
+    getNames deep acc CErased = acc
+    getNames deep acc (CPrimOp op t u) = getNames deep (getNames deep acc t) u
 
-    go : List QName → List QName → QName → List QName
-    go loop acc qn =
-      -- O(n^2) it would be more efficient to drop qn from the map
-      if elem qn loop || elem qn acc then acc else
-      case lookupMap' qn defs of
-        Nothing => acc
-        Just exp => qn :: foldl (go $ qn :: loop) acc (getNames Nil exp)
+    -- recurse on all dependencies, pushing onto acc
+    go : List (Bool × QName) → List (Bool × QName) → (Bool × QName) → List (Bool × QName)
+      -- Need to force shallow if we're doing deep and haven't done shallow.
+    go loop acc this@(deep, qn) =
+      -- there is a subtle issue here with an existing (False, qn) vs (True, qn)
+      let acc = if deep && not (elem (False, qn) acc) && not (elem (False, qn) loop)
+                  then go loop acc (False, qn)
+                  else acc
+      in if elem this loop
+        then acc
+        else if elem this acc then acc
+        else
+          case lookupMap' qn defs of
+            Nothing => acc   -- only `bouncer`
+            Just exp => this :: foldl (go $ this :: loop) acc (getNames deep Nil exp)
 
 eraseEntries : {{Ref2 Defs St}} → M Unit
 eraseEntries = do
