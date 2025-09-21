@@ -1,7 +1,9 @@
 
 ## TODO
 
+- [ ] Increment row/col in printing, so vscode can click on compiler output
 - [ ] Raw is duplicated between Lib.Syntax and Lib.Compile, but not detected
+  - Maybe add qualified names
 - [ ] vscode - run newt when switching editors
 - [ ] who calls X?  We can only do this scoped to the current context for now. Someday whole source dir
 - [ ] case split

@@ -30,7 +30,7 @@ orig_test: build/exec/newt
 # New version
 
 newt.js: ${SRCS}
-	-rm build/*
+	-rm build/* >/dev/null
 	$(RUNJS) bootstrap/newt.js src/Main.newt -o newt.js
 
 newt2.js: newt.js

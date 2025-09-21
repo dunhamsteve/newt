@@ -52,6 +52,14 @@ lamArity : Tm -> Nat
 lamArity (Lam _ _ _ _ t) = S (lamArity t)
 lamArity _ = Z
 
+compilePrimOp : String → List CExp → Maybe CExp
+compilePrimOp "Prelude.addString" (x :: y :: Nil) = Just (CPrimOp "+" x y)
+compilePrimOp "Prelude.addInt" (x :: y :: Nil) = Just (CPrimOp "+" x y)
+compilePrimOp "Prelude.mulInt" (x :: y :: Nil) = Just (CPrimOp "*" x y)
+compilePrimOp "Prelude.subInt" (x :: y :: Nil) = Just (CPrimOp "-" x y)
+compilePrimOp "Prelude.divInt" (x :: y :: Nil) = Just (CPrimOp "|" (CPrimOp "/" x y) (CLit $ LInt 0))
+compilePrimOp _ _ = Nothing
+
 -- This is how much we want to curry at top level
 -- leading lambda Arity is used for function defs and metas
 -- TODO - figure out how this will work with erasure
@@ -125,6 +133,8 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
         defs <- getRef Defs
         args' <- traverse compileTerm args
         arity <- arityForName fc nm
+        let (Nothing) = compilePrimOp (show nm) args'
+          | Just cexp => pure cexp
         case the (Maybe Def) $ lookupMap' nm defs of
           Just (DCon SuccCon _ _) => applySucc args'
           _ => apply nm args' Lin arity

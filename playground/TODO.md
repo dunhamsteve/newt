@@ -1,6 +1,7 @@
 
 ## Todo items for the playground
 
+- [ ] switch to oxlint (dependency reduction)
 - [x] sample files
 - [x] codemirror migration
 - [ ] make sample files available for import
