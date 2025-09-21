@@ -137,6 +137,13 @@ processPrimFn ns fc nm used ty src = do
   let arity = piArity ty'
   setDef (QN ns nm) fc ty' (PrimFn src arity used') Nil
 
+-- I'm trying to get ++ and + inlined as javascript +
+complexity : Tm → Int
+complexity (Ref _ _) = 1
+complexity (Lam _ _ _ _ sc) = 1 + complexity sc
+complexity (App _ t u) = complexity t + complexity u
+complexity (Bnd _ _) = 1
+complexity _ = 100
 
 processDef : List String → FC → String → List (Raw × Raw) → M Unit
 processDef ns fc nm clauses = do
@@ -166,6 +173,9 @@ processDef ns fc nm clauses = do
   debug $ \ _ => "NF\n\{render 80 $ pprint Nil tm'}"
   debug $ \ _ => "Add def \{nm} \{render 90 $ pprint Nil tm'} : \{render 90 $ pprint Nil ty}"
   updateDef (QN ns nm) fc ty (Fn tm')
+  if complexity tm' < 10
+    then setFlag (QN ns nm) fc Inline
+    else pure MkUnit
 
 processCheck : List String → FC → Raw → Raw → M Unit
 processCheck ns fc tm ty = do
@@ -213,8 +223,8 @@ processClass ns classFC nm tele decls = do
       log 1 $ \ _ => "\{name} : \{render 90 $ pretty funType}"
       log 1 $ \ _ => "\{render 90 $ pretty decl}"
       processDecl ns $ TypeSig fc (name :: Nil) funType
-      processDecl ns decl
       setFlag (QN ns name) fc Inline
+      processDecl ns decl
   where
     makeLHS : Raw → Telescope → Raw
     makeLHS acc ((BI fc' nm icit quant,  _) :: tele) = RApp fc' (makeLHS acc tele) (RVar fc' nm) Implicit

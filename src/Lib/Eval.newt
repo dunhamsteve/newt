@@ -286,7 +286,6 @@ tweakFC fc (LetRec fc1 nm ty t u) = LetRec fc nm ty t u
 tweakFC fc (Lit fc1 lit) = Lit fc lit
 tweakFC fc (Erased fc1) = Erased fc
 
--- TODO replace this with a variant on nf
 zonkApp : TopContext -> Int -> Env -> Tm -> List Tm -> M Tm
 zonkApp top l env (App fc t u) sp = do
   u' <- zonk top l env u
@@ -309,7 +308,8 @@ zonkApp top l env t sp = do
   vtm <- eval env tm
   catchError (do
     foo <- vappSpine vtm (Lin <>< sp')
-    quote l foo)
+    t' <- quote l foo
+    zonk top l env t')
     (\_ => pure $ appSpine t' sp)
   where
     inlineDef : Tm → Maybe Tm
