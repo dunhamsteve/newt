@@ -63,11 +63,15 @@ Cont e = JSExp -> JSStmt e
 record JSEnv where
   constructor MkEnv
   jsenv : List JSExp
+  -- This is not depth, it is incremented as we go down the tree to get fresh names
   depth : Int
 
 -- this was like this, are we not using depth?
 push : JSEnv -> JSExp -> JSEnv
 push (MkEnv env depth) exp = MkEnv (exp :: env) depth
+
+incr : JSEnv → JSEnv
+incr env = MkEnv env.jsenv (1 + env.depth)
 
 emptyJSEnv : JSEnv
 emptyJSEnv = MkEnv Nil 0
@@ -78,7 +82,6 @@ litToJS (LChar c) = LitString $ pack (c :: Nil)
 litToJS (LInt i) = LitInt i
 
 -- Stuff nm.h1, nm.h2, ... into environment
--- TODO consider JSExp instead of nm, so we can have $foo.h1 instead of assigning a sc.
 mkEnv : JSExp -> Int -> JSEnv -> List String -> JSEnv
 mkEnv nm k env Nil = env
 mkEnv nm k env (x :: xs) = mkEnv nm (1 + k) (push env (Dot nm "h\{show k}")) xs
@@ -173,7 +176,7 @@ termToJS env (CConstr nm args) f = go args 0 (\ args => f $ LitObject (("tag", L
     go : ∀ e. List CExp -> Int -> (List (String × JSExp) -> JSStmt e) -> JSStmt e
     go Nil ix k = k Nil
     go (t :: ts) ix k = termToJS env t $ \ t' => go ts (ix + 1) $ \ args => k $ ("h\{show ix}", t') :: args
-termToJS env (CAppRef nm args etas) f = termToJS env (CRef nm) (\ t' => (argsToJS t' args Lin f))
+termToJS env (CAppRef nm args etas) f = termToJS env (CRef nm) (\ t' => (argsToJS env t' args Lin f))
   where
     etaExpand : JSEnv -> Nat -> SnocList JSExp -> JSExp -> JSExp
     etaExpand env Z args tm = Apply tm (args <>> Nil)
@@ -182,31 +185,25 @@ termToJS env (CAppRef nm args etas) f = termToJS env (CRef nm) (\ t' => (argsToJ
           env' = push env (Var nm')
        in JLam (nm' :: Nil) $ JReturn $ etaExpand (push env (Var nm')) etas (args :< Var nm') tm
 
-    argsToJS : ∀ e. JSExp -> List CExp -> SnocList JSExp -> (JSExp -> JSStmt e) -> JSStmt e
-    argsToJS tm Nil acc k = k (etaExpand env (cast etas) acc tm)
-    -- k (acc <>> Nil)
-    argsToJS tm (x :: xs) acc k = termToJS env x (\ x' => argsToJS tm xs (acc :< x') k)
+    argsToJS : ∀ e. JSEnv -> JSExp -> List CExp -> SnocList JSExp -> (JSExp -> JSStmt e) -> JSStmt e
+    argsToJS env tm Nil acc k = k (etaExpand env (cast etas) acc tm)
+    argsToJS env tm (x :: xs) acc k = termToJS env x (\ x' => argsToJS (incr env) tm xs (acc :< x') k)
 
 termToJS env (CApp t arg) f = termToJS env t (\ t' => termToJS env arg (\arg' => f (Apply t' (arg' :: Nil))))
 
 termToJS {e} env (CCase t alts) f =
-  -- need to assign the scrutinee to a variable (unless it is a var already?)
-  -- and add (Bnd -> JSExpr map)
-  -- TODO default case, let's drop the extra field.
-
   termToJS env t $ \case
     (Var nm) => maybeCaseStmt env (Var nm) alts
     t' => do
-      -- TODO refactor nm to be a JSExp with Var{} or Dot{}
-      -- FIXME sc$ seemed to shadow something else, lets get this straightened out
-      -- we need freshName names that are not in env (i.e. do not play in debruijn)
+      -- TODO with inlining, we hit cases where the let gets pulled forward more than once
+      -- two cases as separate args, se we need actual unique names. For now, we're calling
+      -- incr when processing App, as a stopgap, we probably need a fresh names state monad
       let nm = "_sc$\{show env.depth}"
       -- increment the bit that goes into the name
-      let env' = MkEnv env.jsenv (1 + env.depth)
+      let env' = incr env
       if simpleJSExp t'
         then (maybeCaseStmt env' t' alts)
         else JSnoc (JConst nm t') (maybeCaseStmt env' (Var nm) alts)
-
   where
     termToJSAlt : JSEnv -> JSExp -> CAlt -> JAlt
     termToJSAlt env nm (CConAlt name info args u) = JConAlt name (termToJS (mkEnv nm 0 env args) u f)
@@ -231,7 +228,7 @@ jsKeywords = (
   "implements" :: "class" :: "let" :: "package" :: "private" :: "protected" :: "public" ::
   "static" :: "yield" ::
   "null" :: "true" :: "false" ::
-  -- might not be a big issue with namespaces on names now.
+  -- might not occur now that we have namespaces on the names
   "String" :: "Number" :: "Array" :: "BigInt" :: Nil)
 
 
@@ -251,17 +248,13 @@ jsIdent id = if elem id jsKeywords then text ("$" ++ id) else text $ pack $ fix 
       else
         '$' :: (toHex (cast x)) ++ fix xs
 
-
-
 stmtToDoc : ∀ e. JSStmt e -> Doc
-
 
 expToDoc : JSExp -> Doc
 expToDoc (LitArray xs) = fatalError "TODO - LitArray to doc"
 expToDoc (LitObject xs) = text "{" <+> folddoc (\ a e => a ++ text ", " <+/> e) (map entry xs) <+> text "}"
   where
     entry : (String × JSExp) -> Doc
-    -- TODO quote if needed
     entry (nm, exp) = jsIdent nm ++ text ":" <+> expToDoc exp
 
 expToDoc (LitString str) = text $ quoteString str
@@ -280,7 +273,6 @@ expToDoc (JPrimOp op t u) = parens 0 1 (expToDoc t) <+> text op <+> parens 0 1 (
 
 caseBody : ∀ e. JSStmt e -> Doc
 caseBody stmt@(JReturn x) = nest 2 (line ++ stmtToDoc stmt)
--- caseBody {e = Return} stmt@(JCase{}) = nest 2 (line ++ stmtToDoc stmt)
 caseBody {e} stmt@(JCase _ _) = nest 2 (line ++ stmtToDoc stmt </> text "break;")
 caseBody stmt = line ++ text "{" ++ nest 2 (line ++ stmtToDoc stmt </> text "break;") </> text "}"
 
@@ -472,5 +464,5 @@ compile = do
       let exec = stmtToDoc $ JPlain $ Apply (Var $ show name) Nil
       pure $ reverse (exec :: tmp)
     Nothing =>
-      -- TODO maybe dump everything if there is no main
+      -- TODO maybe emit everything if there is no main
       error emptyFC "No main function found"

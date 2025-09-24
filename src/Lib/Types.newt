@@ -213,13 +213,24 @@ Val : U
 -- Yaffle is vars -> vars here
 
 Closure : U
+Env : U
+
+data VCaseAlt : U where
+  -- Like a Closure, but with a lot of args
+  VCaseCons : (name : QName) -> (args : List String) -> Env -> Tm ->  VCaseAlt
+  VCaseLit : Literal -> Val -> VCaseAlt
+  VCaseDefault : Val -> VCaseAlt
+  -- VCaseCons : (name : QName) -> (args : List String) -> Tm ->  VCaseAlt
+  -- VCaseLit : Literal -> Tm -> VCaseAlt
+  -- VCaseDefault : Tm -> VCaseAlt
+
 
 data Val : U where
   -- This will be local / flex with spine.
   VVar : FC -> (k : Int) -> (sp : SnocList Val) -> Val
   VRef : FC -> (nm : QName) -> (sp : SnocList Val) -> Val
   -- neutral case
-  VCase : FC -> (sc : Val) -> List CaseAlt -> Val
+  VCase : FC -> (sc : Val) -> List VCaseAlt -> Val
   -- we'll need to look this up in ctx with IO
   VMeta : FC -> QName -> (sp : SnocList Val) -> Val
   VLam : FC -> Name -> Icit -> Quant -> Closure -> Val
@@ -230,7 +241,7 @@ data Val : U where
   VErased : FC -> Val
   VLit : FC -> Literal -> Val
 
-Env : U
+
 Env = List Val
 
 data Closure = MkClosure Env Tm
@@ -262,7 +273,12 @@ instance Show Val where
   show (VPi fc str Implicit rig x y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{showClosure  y})"
   show (VPi fc str Explicit rig x y) = "(%pi (\{show rig} \{str} : \{show  x}). \{showClosure  y})"
   show (VPi fc str Auto rig x y) = "(%pi {{\{show rig} \{str} : \{show  x}}}. \{showClosure  y})"
-  show (VCase fc sc alts) = "(%case \{show sc} ...)"
+  show (VCase fc sc alts) = "(%case \{show sc} \{unwords $ map showAlt alts})"
+    where
+      showAlt : VCaseAlt → String
+      showAlt (VCaseDefault v) = "(%cdef \{show v})"
+      showAlt (VCaseLit lit v) = "(%clit \{show v})"
+      showAlt (VCaseCons nm args env v) = "(%ccon \{show nm} \{unwords $ map show args} [\{show $ length env} env] \{show v}"
   show (VU _) = "U"
   show (VLit _ lit) = show lit
   show (VLet _ nm a b) = "(%let \{show nm} = \{show a} in \{show b}"

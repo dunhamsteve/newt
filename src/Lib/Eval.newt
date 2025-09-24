@@ -98,24 +98,26 @@ forceType env x = do
     | _ => pure x
   forceType env x'
 
+-- for cases applied to a value
+-- TODO this does not handle CaseLit
 evalCase : Env -> Val -> List CaseAlt -> M (Maybe Val)
 evalCase env sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
   top <- getTop
   if nm == name
     then do
       debug $ \ _ =>  "ECase \{show nm} \{show sp} \{show nms} \{showTm t}"
-      go env (sp <>> Nil) nms
+      pushArgs env (sp <>> Nil) nms
     else case lookup nm top of
       (Just (MkEntry _ str type (DCon _ k str1) _)) => evalCase env sc xs
       -- bail for a stuck function
       _ => pure Nothing
   where
-    go : Env -> List Val -> List String -> M (Maybe Val)
-    go env (arg :: args) (nm :: nms) = go (arg :: env) args nms
-    go env args Nil = do
+    pushArgs : Env -> List Val -> List String -> M (Maybe Val)
+    pushArgs env (arg :: args) (nm :: nms) = pushArgs (arg :: env) args nms
+    pushArgs env args Nil = do
       t' <- eval env t
       Just <$> vappSpine t' (Lin <>< args)
-    go env Nil rest = pure Nothing
+    pushArgs env Nil rest = pure Nothing
 -- REVIEW - this is handled in the caller already
 evalCase env sc@(VVar fc k sp) alts = case lookupVar env k of
     Just tt@(VVar fc' k' sp') => do
@@ -131,11 +133,18 @@ evalCase env sc@(VVar fc k sp) alts = case lookupVar env k of
     Nothing => do
         debug $ \ _ =>  "lookup \{show k} is Nothing in env \{show env}"
         pure Nothing
-evalCase env sc (CaseDefault u :: xs) = Just <$> eval (sc :: env) u
+evalCase env sc (CaseDefault u :: xs) = Just <$> eval env u
 evalCase env sc cc = do
   debug $ \ _ =>  "CASE BAIL sc \{show sc} vs " -- \{show cc}"
   debug $ \ _ =>  "env is \{show env}"
   pure Nothing
+
+-- neutral alts
+evalAlt : Env → CaseAlt → M VCaseAlt
+evalAlt env (CaseDefault tm) = VCaseDefault <$> eval env tm
+evalAlt env (CaseLit lit tm) = VCaseLit lit <$> eval env tm
+-- in the cons case, we're binding args
+evalAlt env (CaseCons nm args tm) = pure $ VCaseCons nm args env tm
 
 -- So smalltt says:
 --   Smalltt has the following approach:
@@ -145,7 +154,6 @@ evalCase env sc cc = do
 --   - Any other function application is call-by-value during evaluation.
 
 -- TODO maybe add glueing
-
 
 eval env (Ref fc x) = pure $ VRef fc x Lin
 eval env (App _ t u) = do
@@ -165,7 +173,7 @@ eval env (Pi fc x icit rig a b) = do
   pure $ VPi fc x icit rig a' (MkClosure env b)
 eval env (Let fc nm t u) = do
   t' <- eval env t
-  u' <- eval (VVar fc (cast $ length env) Lin :: env) u
+  u' <- eval (VVar fc (length' env) Lin :: env) u
   pure $ VLet fc nm t' u'
 eval env (LetRec fc nm ty t u) = do
   ty' <- eval env ty
@@ -184,10 +192,14 @@ eval env tm@(Case fc sc alts) = do
   -- TODO we need to be able to tell eval to expand aggressively here.
   sc' <- eval env sc
   sc' <- unlet env sc' -- try to expand lets from pattern matching
+  -- possibly too aggressive?
   sc' <- forceType env sc'
+  Nothing <- evalCase env sc' alts
+    | Just v => pure v
+
   vsc <- eval env sc
-  vcase <- evalCase env sc' alts
-  pure $ fromMaybe (VCase fc vsc alts) vcase
+  alts' <- traverse (evalAlt env) alts
+  pure $ VCase fc vsc alts'
 
 quote : (lvl : Int) -> Val -> M Tm
 
@@ -197,6 +209,18 @@ quoteSp lvl t (xs :< x) = do
   t' <- quoteSp lvl t xs
   x' <- quote lvl x
   pure $ App emptyFC t' x'
+
+quoteAlt : Int → VCaseAlt → M CaseAlt
+quoteAlt l (VCaseDefault val) = CaseDefault <$> quote l val
+quoteAlt l (VCaseLit lit val) = CaseLit lit <$> quote l val
+quoteAlt l (VCaseCons nm args env tm) = do
+  val <- eval (mkenv l env args) tm
+  tm <- quote (length' args + l) val
+  pure $ CaseCons nm args tm
+  where
+    mkenv : Int → Env → List String → Env
+    mkenv l env Nil = env
+    mkenv l env (n :: ns) = mkenv (l + 1) (VVar emptyFC l Lin :: env) ns
 
 quote l (VVar fc k sp) = if k < l
   then quoteSp l (Bnd fc (lvl2ix l k )) sp -- level to index
@@ -226,8 +250,9 @@ quote l (VLetRec fc nm ty t u) = do
   pure $ LetRec fc nm ty' t' u'
 quote l (VU fc) = pure (UU fc)
 quote l (VRef fc n sp) = quoteSp l (Ref fc n) sp
-quote l (VCase fc sc alts) = do
+quote l (VCase fc sc valts) = do
   sc' <- quote l sc
+  alts <- traverse (quoteAlt l) valts
   pure $ Case fc sc' alts
 quote l (VLit fc lit) = pure $ Lit fc lit
 quote l (VErased fc) = pure $ Erased fc
@@ -312,6 +337,7 @@ zonkApp top l env t sp = do
     zonk top l env t')
     (\_ => pure $ appSpine t' sp)
   where
+    -- lookup name and return Def if flagged inline
     inlineDef : Tm → Maybe Tm
     inlineDef (Ref _ nm) = case lookup nm top of
       Just (MkEntry _ _ ty (Fn tm) flags) => if elem Inline flags then Just tm else Nothing
@@ -327,16 +353,20 @@ zonkAlt top l env (CaseCons name args t) = CaseCons name args <$> go l env args 
     go l env Nil tm = zonk top l env t
     go l env (x :: xs) tm = go (1 + l) (VVar (getFC tm) l Lin :: env) xs tm
 
-zonk top l env t = case t of
+zonk top l env t =
+  let env' = VVar emptyFC l Lin :: env in
+  case t of
   (Meta fc k) => zonkApp top l env t Nil
-  (Lam fc nm icit rig u) => Lam fc nm icit rig <$> (zonk top (1 + l) (VVar fc l Lin :: env) u)
-  (App fc t u) => do
-    u' <- zonk top l env u
-    zonkApp top l env t (u' :: Nil)
-  (Pi fc nm icit rig a b) => Pi fc nm icit rig <$> zonk top l env a <*> zonkBind top l env b
-  (Let fc nm t u) => Let fc nm <$> zonk top l env t <*> zonkBind top l env u
-  (LetRec fc nm ty t u) => LetRec fc nm <$> zonk top l env ty <*> zonkBind top l env t <*> zonkBind top l env u
-  (Case fc sc alts) => Case fc <$> zonk top l env sc <*> traverse (zonkAlt top l env) alts
+  (Lam fc nm icit rig u) => Lam fc nm icit rig <$> (zonk top (1 + l) env' u)
+  (App fc _ _) => zonkApp top l env t Nil
+  (Pi fc nm icit rig a b) => Pi fc nm icit rig <$> zonk top l env a <*> zonkBind top (l + 1) env' b
+  (Let fc nm t u) => Let fc nm <$> zonk top l env t <*> zonkBind top (l + 1) env' u
+  (LetRec fc nm ty t u) => LetRec fc nm <$> zonk top l env ty <*> zonkBind top (l + 1) env' t <*> zonkBind top (l + 1) env' u
+  (Case fc sc alts) => do
+      sc' <- zonk top l env sc
+      alts' <- traverse (zonkAlt top l env) alts
+      pure $ Case fc sc' alts'
+
   UU fc => pure $ UU fc
   Lit fc lit => pure $ Lit fc lit
   Bnd fc ix => pure $ Bnd fc ix

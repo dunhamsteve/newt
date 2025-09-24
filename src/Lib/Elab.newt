@@ -809,7 +809,7 @@ checkCase ctx prob scnm scty (dcName, arity, ty) = do
     _ => pure True
 
 -- ok, so this is a single constructor, CaseAlt
--- return Nothing if dcon doesn't unify with scrut
+-- return Nothing if dcon type doesn't unify with scrut
 buildCase : Context -> Problem -> String -> Val -> (QName × Int × Tm) -> M (Maybe CaseAlt)
 buildCase ctx prob scnm scty (dcName, arity, ty) = do
   debug $ \ _ => "CASE \{scnm} match \{show dcName} ty \{rpprint (names ctx) ty}"
