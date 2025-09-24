@@ -6,6 +6,7 @@ module Lib.Compile
 import Prelude
 import Lib.Common
 import Lib.Types
+import Lib.Eval
 import Lib.Prettier
 import Lib.CompileExp
 import Lib.TopContext
@@ -330,8 +331,10 @@ getEntries acc name = do
       pure acc
     Just (MkEntry _ name type def@(Fn exp) _) => case lookupMap' name acc of
       Just _ => pure acc
-      Nothing =>
-        let acc = updateMap name def acc in
+      Nothing => do
+        top <- getTop
+        exp <- zonk top 0 Nil exp
+        let acc = updateMap name (Fn exp) acc
         foldlM getEntries acc $ getNames exp Nil
     Just (MkEntry _ name type def@(PrimFn _ _ used) _) =>
       let acc = updateMap name def acc in

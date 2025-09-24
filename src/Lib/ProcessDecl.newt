@@ -140,9 +140,18 @@ processPrimFn ns fc nm used ty src = do
 -- I'm trying to get ++ and + inlined as javascript +
 complexity : Tm → Int
 complexity (Ref _ _) = 1
+complexity (Meta _ _) = 1 -- what's a good score for this, it's not inlined yet.
 complexity (Lam _ _ _ _ sc) = 1 + complexity sc
-complexity (App _ t u) = complexity t + complexity u
+-- Ignore metas - they may be erased and likely are much smaller when substituted
+complexity (App _ t u) = go t (complexity u)
+  where
+    go : Tm → Int → Int
+    go (App _ t u) acc = go t (acc + complexity u)
+    go (Meta _ _) acc = 1
+    go t acc = acc + complexity t
 complexity (Bnd _ _) = 1
+complexity (UU _) = 0
+complexity (Lit _ _) = 0
 -- These turn into a projection
 complexity (Case _ sc (CaseCons _ _ t :: Nil)) = 1 + complexity sc + complexity t
 complexity _ = 100
@@ -167,21 +176,19 @@ processDef ns fc nm clauses = do
   tm <- buildTree (mkCtx fc) (MkProb clauses' vty)
 
   solveAutos
-  -- TODO - make nf that expands all metas and drop zonk
-  -- Idris2 doesn't expand metas for performance - a lot of these are dropped during erasure.
-  -- Day1.newt is a test case
   -- This inlines metas and functions flagged Inline.
-  tm' <- zonk top 0 Nil tm
-  debug $ \ _ => "NF\n\{render 80 $ pprint Nil tm'}"
-  debug $ \ _ => "Add def \{nm} \{render 90 $ pprint Nil tm'} : \{render 90 $ pprint Nil ty}"
-  updateDef (QN ns nm) fc ty (Fn tm')
-  -- putStrLn "complexity \{show (QN ns nm)} \{show $ complexity tm'}"
-  -- putStrLn $ show tm'
+  -- moved to Compile.newt because it was interfering with type checking (Zoo4eg.newt) via over-reduction
+  -- tm' <- zonk top 0 Nil tm
+
+  debug $ \ _ => "Add def \{nm} \{render 90 $ pprint Nil tm} : \{render 90 $ pprint Nil ty}"
+  updateDef (QN ns nm) fc ty (Fn tm)
+  -- putStrLn "complexity \{show (QN ns nm)} \{show $ complexity tm}"
+  -- putStrLn $ show tm
   -- TODO we need some protection against inlining a function calling itself.
-  -- 14 gets us to 6.21s, higher than 11 breaks Zoo4eg.newt with a unification error (probably need to inline at the end instead)
-  -- But we need better heuristics, maybe fuel and deciding while inlining.
+  -- We need better heuristics, maybe fuel and deciding while inlining.
   -- bind is explicit here because the complexity has a 100 in it.
-  if complexity tm' < 11 || show (QN ns nm) == "Prelude.Prelude.Monad Prelude.IO,bind"
+  let name = show $ QN ns nm
+  if complexity tm < 15 || name == "Prelude.Prelude.Monad Prelude.IO,bind" || name == "Prelude._>>=_"
     then setFlag (QN ns nm) fc Inline
     else pure MkUnit
 

@@ -43,8 +43,6 @@ part1 text digits =
   let nums = map combine $ map digits lines in
   foldl _+_ 0 nums
 
-#check digits1 ∘ unpack : String -> List Int
-
 runFile : String -> IO Unit
 runFile fn = do
   text <- readFile fn
