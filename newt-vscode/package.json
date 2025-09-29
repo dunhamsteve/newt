@@ -61,8 +61,8 @@
       "properties": {
         "newt.path": {
           "type": "string",
-          "default": "build/exec/newt",
-          "description": "Path to the newt executable"
+          "default": "node bootstrap/newt.js",
+          "description": "Command to run newt"
         }
       }
     }

@@ -9,10 +9,7 @@ It has inductive types, dependent pattern matching, a typeclass-like mechanism, 
 to javascript, and is now written in itself. There is a browser playground and vscode extension.
 
 The web playground can be at https://dunhamsteve.github.io/newt. The top left corner
-has a dropdown with some samples. Currently the web playground is using the Idris-built
-version of newt because most browsers lack tail call optimization.
-
-The directory `orig` contains the original version of newt written in Idris. It is used by the playground until TCO is added to newt.
+has a dropdown with some sample code, including `newt` itself.
 
 ## Sample code
 
@@ -23,11 +20,11 @@ The directory `orig` contains the original version of newt written in Idris. It 
 
 ## Building
 
-The `Makefile` will build both the original Idris version of `newt`, which will end up in `build/exec` and the current version of newt, which will be `./newt.js`. There is a `pack.toml` file to allow building the original version of newt with `pack build`.
+The `Makefile` will build builds `./newt.js`. There is a bootstrap version of newt in `bootstrap/newt.js`.
 
-Newt can also be built by running `bun run bootstrap/newt.js src/Main.newt -o newt.js`.
+Newt can also be built by running `node bootstrap/newt.js src/Main.newt -o newt.js`.
 
-There is a vscode extension in `newt-vscode`. Running `make vscode` will build and install it. The extension expects `build/exec/newt` to exist in the workspace. And `make test` will run a few black box tests. Currently it simply checks return codes, since the output format is in flux.
+The source for the vscode extension is found in `newt-vscode`. Running `make vscode` will build and install it. The extension expects `build/exec/newt` to exist in the workspace. And `make test` will run a few black box tests. Currently it simply checks return codes, since the output format is in flux.
 
 ## Playground
 

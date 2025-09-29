@@ -32,7 +32,6 @@ export function activate(context: vscode.ExtensionContext) {
 
     const lastChange = changes[changes.length - 1];
     const text = lastChange.text;
-    console.log("lastChange", lastChange)
     // Check if the last change is a potential shortcut trigger
     if (!text || !( " ')\\".includes(text) || text.startsWith('\n'))) return;
 
@@ -70,8 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
       ? workspaceFolder.uri.fsPath
       : path.dirname(fileName);
     const config = vscode.workspace.getConfiguration("newt");
-    // FIXME wrong newt now.
-    const cmd = config.get<string>("path", "build/exec/newt");
+    const cmd = config.get<string>("path", "node bootstrap/newt.js");
     const command = `${cmd} --top ${fileName}`;
     let st = +new Date();
     exec(
