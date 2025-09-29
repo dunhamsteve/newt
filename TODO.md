@@ -111,7 +111,6 @@
 - [x] Add icit to Lam
 - [ ] add jump to definition magic to vscode extension
   - [x] Working for top level, we may want a proper REPL or LSP (and FC ranges?) before we do others
-- [x] TCO? Probably needed in browser, since v8 doesn't do it. bun and JavaScriptCore do support it.
 - [x] deconstructing `let` (and do arrows)
 - [x] Fix string printing to be js instead of weird Idris strings
 - [x] make $ special
@@ -123,7 +122,6 @@
   - [x] if / then / else sugar
   - [x] `data Foo = A | B` sugar
   - [x] records
-  - [ ] record sugar? (detailed above)
   - [x] where
 - [x] add namespaces
 - [x] magic nat?
@@ -131,9 +129,10 @@
   - Idris needs help with the case tree to keep code size down, do it in stages, one dcon at a time.
   - I'm not sure it can go a few steps deep and have a default hanging off the side, so we may need to put the default case in another function ourselves.
 - [x] Strategy to avoid three copies of `Prelude.newt` in this source tree
-- [ ] `mapM` needs inference help when scrutinee (see Day2.newt)
+- [x] `mapM` needs inference help when scrutinee (see Day2.newt)
   - Meta hasn't been solved yet. It's Normal, but maybe our delayed solving of Auto plays into it. Idris will peek at LHS of CaseAlts to guess the type if it doesn't have one.
-- [ ] Can't skip an auto. We need `{{_}}` to be auto or have a `%search` syntax.
+  - Probably fixed by trying to solve auto immediately
+- [x] Can't skip an auto. We need `{{_}}` to be auto or have a `%search` syntax.
 - [x] add filenames to FC
 - [ ] Add full ranges to FC
 - [x] maybe use backtick for javascript so we don't highlight strings as JS
@@ -232,11 +231,12 @@
 - [ ] LSP
 - [x] don't match forced constructors at runtime
   - I think we got this by not switching for single cases
-- [ ] magic nat (codegen as number with appropriate pattern matching)
+- [x] magic nat (codegen as number with appropriate pattern matching)
 - [ ] magic tuple? (codegen as array)
 - [ ] magic newtype? (drop them in codegen)
 - [x] vscode: syntax highlighting for String
 - [ ] add `pop` or variant of `pfunc` that maps to an operator, giving the js operator and precedence on RHS
+  - This has now been hard-coded in codegen, but a syntax or something would be better.
 - [ ] consider moving caselet, etc. desugaring out of the parser
 - [ ] pattern matching lambda
   - I kept wanting this in AoC and use it a lot in the newt code
@@ -245,7 +245,7 @@
 
 ### Parsing
 
-- [ ] consider allowing σ etc in identifiers
+- [x] consider allowing σ etc in identifiers
   - Probably need to merge oper / ident first and sort out mixfix in parsing
   - The mixfix parsing can handle this now, need to update lexing.
 - [ ] Parse error not ideal for `\x y z b=> b` (points to lambda)
