@@ -114,8 +114,8 @@ export function activate(context: vscode.ExtensionContext) {
           );
           if (match) {
             let [_full, kind, file, line, column, message] = match;
-            let lnum = Number(line);
-            let cnum = Number(column);
+            let lnum = Number(line) - 1;
+            let cnum = Number(column) - 1;
             if (file !== fileName) lnum = cnum = 0;
 
             let start = new vscode.Position(lnum, cnum);

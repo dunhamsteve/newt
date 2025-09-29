@@ -119,7 +119,7 @@ data Error
   | Postpone FC QName String
 
 instance Show FC where
-  show fc = "\{fc.file}:\{show fc.start}"
+  show (MkFC file (l,c)) = "\{file}:(\{show $ l + 1}, \{show $ c + 1})"
 
 
 showError : String -> Error -> String

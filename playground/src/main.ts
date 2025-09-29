@@ -444,8 +444,8 @@ const processOutput = (
     );
     if (match) {
       let [_full, kind, file, line, col, message] = match;
-      let lineNumber = +line + 1;
-      let column = +col + 1;
+      let lineNumber = +line;
+      let column = +col;
       // FIXME - pass the real path in
       if (fn && fn !== file) {
         lineNumber = column = 0;
