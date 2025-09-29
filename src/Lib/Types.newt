@@ -467,9 +467,6 @@ withPos (MkCtx lvl env types bds ctxFC) fc = (MkCtx lvl env types bds fc)
 names : Context -> List String
 names ctx = map fst ctx.types
 
--- public export
--- M : U -> U
--- M = (StateT TopContext (EitherT Error IO))
 
 record M a where
   constructor MkM

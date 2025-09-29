@@ -438,7 +438,6 @@ eraseEntries = do
 -- given a initial function, return a dependency-ordered list of javascript source
 process : QName → M (List Doc)
 process name = do
-  let wat = QN ("Prelude" :: Nil) "arrayToList"
   top <- getTop
   entries <- getEntries emptyMap name
 
