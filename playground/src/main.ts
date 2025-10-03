@@ -472,6 +472,5 @@ const processOutput = (
     }
   }
   console.log("markers", markers);
-  // editor.setMarkers(markers)
   return markers;
 };

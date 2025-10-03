@@ -2,9 +2,6 @@ module Combinatory
 
 -- "A correct-by-construction conversion from lambda calculus to combinatory logic", Wouter Swierstra
 
--- This does not fully typecheck in newt yet, but is adopted from a working Idris file. It
--- seems to do a good job exposing bugs.
-
 data Unit : U where
   MkUnit : Unit
 
@@ -79,11 +76,8 @@ sapp (CApp K t) I = t
 sapp (CApp K t) (CApp K u) = CApp K (CApp t u)
 -- was out of pattern because of unexpanded lets.
 sapp (CApp K t) u = CApp (CApp B t) u
--- TODO unsolved meta, out of pattern fragment (now it's skolem - from changes to updateContext?)
--- so I may need to point the var -> var in another direction (hopefully something simple)
-sapp t (CApp K u) = ? -- CApp (CApp C t) u
--- TODO unsolved meta, out of pattern fragment (ditto, skolem)
-sapp t u = ? -- CApp (CApp S t) u
+sapp t (CApp K u) = CApp (CApp C t) u
+sapp t u = CApp (CApp S t) u
 
 abs : {Γ : Ctx} {σ τ : Type} {f : _} → Comb (σ :: Γ) τ f → Comb Γ (σ ~> τ) (\ env x => f (x ::: env))
 abs S = CApp K S
@@ -92,7 +86,7 @@ abs I = CApp K I
 abs B = CApp K B
 abs C = CApp K C
 abs (CApp t u) = sapp (abs t) (abs u)
--- lookup2 was getting stuck, needed to bounce the types in a rewritten env.
+-- lookup2 was getting stuck, needed to re-eval the types in the rewritten env.
 abs (CVar Here) = I
 abs (CVar (There i)) = CApp K (CVar i)
 

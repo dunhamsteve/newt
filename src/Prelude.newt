@@ -719,8 +719,6 @@ a <= b = compare a b /= GT
 _>_ : ∀ a. {{Ord a}} → a → a → Bool
 a > b = compare a b == GT
 
-search : ∀ cl. {{cl}} → cl
-search {{x}} = x
 
 instance Ord Nat where
   compare Z Z = EQ

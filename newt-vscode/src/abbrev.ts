@@ -5,6 +5,8 @@ export const ABBREV: Record<string, string> = {
   "\\\\": "\\",
   "\\==": "≡",
   "\\circ": "∘",
+  "\\oplus": "⊕",
+  "\\otimes": "⊗",
   "\\1": "₁",
   "\\2": "₂",
   "\\<": "⟨",
