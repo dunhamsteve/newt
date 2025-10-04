@@ -25,7 +25,7 @@ JSStmt : StKind -> U
 JSExp : U
 
 data JAlt : U where
-  JConAlt : ∀ e. String -> JSStmt e -> JAlt
+  JConAlt : ∀ e. Nat -> JSStmt e -> JAlt
   JDefAlt : ∀ e. JSStmt e -> JAlt
   JLitAlt : ∀ e. JSExp -> JSStmt e -> JAlt
 
@@ -172,7 +172,7 @@ termToJS env (CLetRec nm t u) f =
   in case termToJS env' t (JAssign nm') of
     (JAssign _ exp) => JSnoc (JConst nm' exp) (termToJS env' u f)
     t' => JSnoc (JLet nm' t') (termToJS env' u f)
-termToJS env (CConstr nm args) f = go args 0 (\ args => f $ LitObject (("tag", LitString nm) :: args))
+termToJS env (CConstr ix _ args) f = go args 0 (\ args => f $ LitObject (("tag", LitInt (cast ix)) :: args))
   where
     go : ∀ e. List CExp -> Int -> (List (String × JSExp) -> JSStmt e) -> JSStmt e
     go Nil ix k = k Nil
@@ -207,14 +207,14 @@ termToJS {e} env (CCase t alts) f =
         else JSnoc (JConst nm t') (maybeCaseStmt env' (Var nm) alts)
   where
     termToJSAlt : JSEnv -> JSExp -> CAlt -> JAlt
-    termToJSAlt env nm (CConAlt name info args u) = JConAlt name (termToJS (mkEnv nm 0 env args) u f)
+    termToJSAlt env nm (CConAlt ix name info args u) = JConAlt ix (termToJS (mkEnv nm 0 env args) u f)
     -- intentionally reusing scrutinee name here
     termToJSAlt env nm (CDefAlt u) = JDefAlt (termToJS  (env) u f)
     termToJSAlt env nm (CLitAlt lit u) = JLitAlt (litToJS lit) (termToJS env u f)
 
     maybeCaseStmt : JSEnv -> JSExp -> List CAlt -> JSStmt e
     -- If there is a single alt, assume it matched
-    maybeCaseStmt env nm ((CConAlt _ info args u) :: Nil) = (termToJS (mkEnv nm 0 env args) u f)
+    maybeCaseStmt env nm ((CConAlt _ _ info args u) :: Nil) = (termToJS (mkEnv nm 0 env args) u f)
     maybeCaseStmt env nm alts@(CLitAlt _ _  :: _) =
         (JCase nm (map (termToJSAlt env nm) alts))
     maybeCaseStmt env nm alts =
@@ -278,7 +278,7 @@ caseBody {e} stmt@(JCase _ _) = nest 2 (line ++ stmtToDoc stmt </> text "break;"
 caseBody stmt = line ++ text "{" ++ nest 2 (line ++ stmtToDoc stmt </> text "break;") </> text "}"
 
 altToDoc : JAlt -> Doc
-altToDoc (JConAlt nm stmt) = text "case" <+> text (quoteString nm) ++ text ":" ++ caseBody stmt
+altToDoc (JConAlt nm stmt) = text "case" <+> text (show nm) ++ text ":" ++ caseBody stmt
 altToDoc (JDefAlt stmt) = text "default" ++ text ":" ++ caseBody stmt
 altToDoc (JLitAlt a stmt) = text "case" <+> expToDoc a ++ text ":" ++ caseBody stmt
 
@@ -374,7 +374,7 @@ sortedNames : SortedMap QName CExp → QName → List QName
 sortedNames defs qn = map snd $ filter (not ∘ fst) $ go Nil Nil (True, qn)
   where
     getBody : CAlt → CExp
-    getBody (CConAlt _ _ _ t) = t
+    getBody (CConAlt _ _ _ _ t) = t
     getBody (CLitAlt _ t) = t
     getBody (CDefAlt t) = t
 
@@ -398,7 +398,7 @@ sortedNames defs qn = map snd $ filter (not ∘ fst) $ go Nil Nil (True, qn)
     getNames deep acc (CRef qn) = (deep, qn) :: acc
     getNames deep acc (CLet _ t u) = getNames deep (getNames deep acc t) u
     getNames deep acc (CLetRec _ t u) = getNames deep (getNames deep acc t) u
-    getNames deep acc (CConstr _ ts) = foldl (getNames deep) acc ts
+    getNames deep acc (CConstr _ _ ts) = foldl (getNames deep) acc ts
     -- if the CRaw is called, then the deps are called
     getNames deep acc (CRaw _ deps) = map (_,_ deep) deps ++ acc
     -- wrote these out so I get an error when I add a new constructor

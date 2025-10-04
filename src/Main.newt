@@ -51,7 +51,7 @@ writeSource fn = do
   docs <- compile
   let src = unlines $
         ( "\"use strict\";"
-        :: "const bouncer = (f,ini) => { let obj = ini; while (obj.tag !== 'return') obj = f(obj); return obj.h0 };"
+        :: "const bouncer = (f,ini) => { let obj = ini; while (obj.tag) obj = f(obj); return obj.h0 };"
         :: Nil)
         ++ map (render 90 ∘ noAlt) docs
   (Right _) <- liftIO {M} $ writeFile fn src

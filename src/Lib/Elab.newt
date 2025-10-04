@@ -727,7 +727,7 @@ getConstructors ctx scfc (VRef fc nm _) = do
     lookupDCon nm = do
       top <- getTop
       case lookup nm top of
-        (Just (MkEntry _ name type (DCon _ k str) _)) => pure (name, k, type)
+        (Just (MkEntry _ name type (DCon _ _ k str) _)) => pure (name, k, type)
         Just _ => error fc "Internal Error: \{show nm} is not a DCon"
         Nothing => error fc "Internal Error: DCon \{show nm} not found"
 getConstructors ctx scfc tm = do
@@ -964,7 +964,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
               -- TODO can we check this when we make the PatCon?
               top <- getTop
               case lookup nm top of
-                  (Just (MkEntry _ name type (DCon _ k tcname) _)) =>
+                  (Just (MkEntry _ name type (DCon _ _ k tcname) _)) =>
                     if (tcname /= sctynm)
                       then error fc "Constructor is \{show tcname} expected \{show sctynm}"
                       else pure Nothing
@@ -992,7 +992,7 @@ mkPat (tm, icit) = do
   top <- getTop
   case splitArgs tm Nil of
     ((RVar fc nm), b) => case lookupRaw nm top of
-                (Just (MkEntry _ name type (DCon _ k str) _)) => do
+                (Just (MkEntry _ name type (DCon _ _ k str) _)) => do
                   -- TODO check arity, also figure out why we need reverse
                   bpat <- traverse (mkPat) b
                   pure $ PatCon fc icit name bpat Nothing
@@ -1365,7 +1365,7 @@ updateRec ctx fc clauses arg ty = do
       let (Just (MkEntry _ _ _ (TCon _ (conname :: Nil)) _)) = lookup nm top
         | Just _ => error fc "\{show nm} is not a record"
         | _ => error fc "\{show nm} not in scope"
-      let (Just (MkEntry _ _ ty (DCon _ _ _) _)) = lookup conname top
+      let (Just (MkEntry _ _ ty (DCon _ _ _ _) _)) = lookup conname top
         | _ => error fc "\{show conname} not a dcon"
       pure $ (conname, collect arg ty)
     --

@@ -296,7 +296,7 @@ processInstance ns instfc ty decls = do
     | _ => error tyFC "\{show tconName} is not a type constructor"
   let (con :: Nil) = cons
     | _ => error tyFC "\{show tconName} has multiple constructors \{show cons}"
-  let (Just (MkEntry _ _ dcty (DCon _ _ _) _)) = lookup con top
+  let (Just (MkEntry _ _ dcty (DCon _ _ _ _) _)) = lookup con top
     | _ => error tyFC "can't find constructor \{show con}"
   vdcty@(VPi _ nm icit rig a b) <- eval Nil dcty
     | x => error (getFC x) "dcty not Pi"
@@ -411,20 +411,20 @@ populateConInfo entries =
   setInfo zero ZeroCon :: setInfo succ SuccCon :: Nil
   where
     setInfo : TopEntry → ConInfo → TopEntry
-    setInfo (MkEntry fc nm dty (DCon _ arity hn) flags) info = MkEntry fc nm dty (DCon info arity hn) flags
+    setInfo (MkEntry fc nm dty (DCon ix _ arity hn) flags) info = MkEntry fc nm dty (DCon ix info arity hn) flags
     setInfo x _ = x
 
     checkEnum : TopEntry → Maybe TopEntry
-    checkEnum (MkEntry fc nm dty (DCon _ 0 hn) flags) = Just $ MkEntry fc nm dty (DCon EnumCon 0 hn) flags
+    checkEnum (MkEntry fc nm dty (DCon ix _ 0 hn) flags) = Just $ MkEntry fc nm dty (DCon ix EnumCon 0 hn) flags
     checkEnum _ = Nothing
 
     isZero : TopEntry → Bool
-    isZero (MkEntry fc nm dty (DCon _ 0 hn) flags) = True
+    isZero (MkEntry fc nm dty (DCon _ _ 0 hn) flags) = True
     isZero _ = False
 
     -- TODO - handle indexes, etc
     isSucc : TopEntry → Bool
-    isSucc (MkEntry fc nm dty@(Pi _ _ _ _ (Ref _ a) (Ref _ b)) (DCon _ 1 hn) _) = a == b
+    isSucc (MkEntry fc nm dty@(Pi _ _ _ _ (Ref _ a) (Ref _ b)) (DCon _ _ 1 hn) _) = a == b
     isSucc _ = False
 
 processData : List String → FC → String → Raw → List Decl → M Unit
@@ -441,8 +441,8 @@ processData ns fc nm ty cons = do
       unifyCatch fc (mkCtx fc) tyty' type'
     Just _ => error fc "\{show nm} already declared"
     Nothing => setDef (QN ns nm) fc tyty Axiom Nil
-  entries <- join <$> (for cons $ \x => case x of
-      (TypeSig fc names tm) => do
+  entries <- join <$> (for (enumerate cons) $ \x => case x of
+      (ix, TypeSig fc names tm) => do
           traverse (checkAlreadyDef fc) names
           debug $ \ _ => "check dcon \{show names} \{show tm}"
           dty <- check (mkCtx fc) tm (VU fc)
@@ -457,8 +457,8 @@ processData ns fc nm ty cons = do
             | (tm, _) => error (getFC tm) "expected \{nm} got \{render 90 $ pprint tnames tm}"
           when (hn /= QN ns nm) $ \ _ =>
             error (getFC codomain) "Constructor codomain is \{render 90 $ pprint tnames codomain} rather than \{nm}"
-          pure $ map (\ nm' => (MkEntry fc (QN ns nm') dty (DCon NormalCon (getArity dty) hn) Nil)) names
-      decl => throwError $ E (getFC decl) "expected constructor declaration")
+          pure $ map (\ nm' => (MkEntry fc (QN ns nm') dty (DCon ix NormalCon (getArity dty) hn) Nil)) names
+      (_,decl) => throwError $ E (getFC decl) "expected constructor declaration")
   -- type level autos like _++_
   solveAutos
   let entries = populateConInfo entries

@@ -108,7 +108,7 @@ evalCase env sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
       debug $ \ _ =>  "ECase \{show nm} \{show sp} \{show nms} \{showTm t}"
       pushArgs env (sp <>> Nil) nms
     else case lookup nm top of
-      (Just (MkEntry _ str type (DCon _ k str1) _)) => evalCase env sc xs
+      (Just (MkEntry _ str type (DCon _ _ k str1) _)) => evalCase env sc xs
       -- bail for a stuck function
       _ => pure Nothing
   where

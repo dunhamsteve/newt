@@ -283,7 +283,7 @@ ptype Array : U → U
 pfunc listToArray : ∀ a. List a → Array a := `
 (a, l) => {
   let rval = []
-  while (l.tag !== 'Nil') {
+  while (l.tag !== 'Nil' && l.tag) {
     rval.push(l.h1)
     l = l.h2
   }
@@ -409,7 +409,7 @@ pfunc unpack uses (Nil _::_) : String → List Char
 
 pfunc pack : List Char → String := `(cs) => {
   let rval = ''
-  while (cs.tag === '_::_') {
+  while (cs.tag === '_::_' || cs.tag === 1) {
     rval += cs.h1
     cs = cs.h2
   }
@@ -642,7 +642,7 @@ pfunc ioArrayToList uses (Nil _::_ MkIORes) : ∀ a. IOArray a → IO (List a) :
 
 pfunc listToIOArray uses (MkIORes) : ∀ a. List a → IO (Array a) := `(a,list) => w => {
   let rval = []
-  while (list.tag === '_::_') {
+  while (list.tag === '_::_' || list.tag === 1) {
     rval.push(list.h1)
     list = list.h2
   }
@@ -704,7 +704,7 @@ instance Eq Ordering where
   GT == GT = True
   _ == _ = False
 
-pfunc jsCompare : ∀ a. a → a → Ordering := `(_, a, b) => a == b ? "EQ" : a < b ? "LT" : "GT"`
+pfunc jsCompare uses (EQ LT GT) : ∀ a. a → a → Ordering := `(_, a, b) => a == b ? Prelude_EQ : a < b ? Prelude_LT : Prelude_GT`
 
 infixl 6 _<_ _<=_ _>_
 class Ord a where

@@ -1,11 +1,20 @@
 
 ## TODO
 
+- [ ] Add info to Ref/VRef (is dcon, arity, etc)
+  - To save lookups during compilation and it might make eval faster
+- [x] number tags for data constructors
+  - Numeric tags are about 9% faster
+  - Issues:
+    - They make debugging more difficult. I was able to sort out debruijn issues because the names were wrong.
+    - There are a couple of spots I have to fudge in the native code, because there is no constant for `Nil` and `_::_` tags
+    - the debugString pretty printer was leveraging the names
 - [x] Increment row/col in printing, so vscode can click on compiler output
 - [ ] Raw is duplicated between Lib.Syntax and Lib.Compile, but not detected
-  - Maybe add qualified names
+  - [ ] Maybe add qualified names to surface syntax and allow / detect conflicts on reference
+  - [ ] Add `export` keywords
 - [ ] vscode - run newt when switching editors
-- [ ] who calls X?  We can only do this scoped to the current context for now. Someday whole source dir
+- [ ] who calls X?  We can only do this scoped to the current context for now. Someday whole source dir.
 - [ ] case split
   - We could fake this up:
     - given a name and a point in the editor
@@ -14,10 +23,12 @@
     - enumerate valid constructors (and their arity)
     - Repeat the line with each, applied to args
     - For `<-` or `let` we'd want to fudge some `|` lines
-- [ ] inline struct getters during code generation (We'd like  `x.h1.h2`)
-- [ ] Better FC for parse errors (both EOF and the ones that show up just after the error)
 - [ ] Support "Add missing cases"
-- [ ] Code gen for PiType (rather than static JS)
+    - We could possibly fake up missing cases, too. Since they're listed and have an FC pointing at the first one
+    - [ ] Might need proper, enumerated errors for that
+- [x] inline struct getters during code generation (We'd like  `x.h1.h2`)
+- [ ] Better FC for parse errors (both EOF and the ones that show up just after the error)
+- [x] Code gen for PiType (rather than static JS)
 - [x] fix string highlighting
 - [x] implement tail call optimization
 - [x] implement magic nat

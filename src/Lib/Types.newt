@@ -352,13 +352,13 @@ instance Show ConInfo where
   show ZeroCon = "[Z]"
   show EnumCon = "[E]"
 
-data Def = Axiom | TCon Int (List QName) | DCon ConInfo Int QName | Fn Tm | PrimTCon Int
+data Def = Axiom | TCon Int (List QName) | DCon Nat ConInfo Int QName | Fn Tm | PrimTCon Int
          | PrimFn String Nat (List QName)
 
 instance Show Def where
   show Axiom = "axiom"
   show (TCon _ strs) = "TCon \{show strs}"
-  show (DCon ci k tyname) = "DCon \{show k} \{show tyname} \{show ci}"
+  show (DCon ix ci k tyname) = "DCon \{show ix} \{show k} \{show tyname} \{show ci}"
   show (Fn t) = "Fn \{show t}"
   show (PrimTCon _) = "PrimTCon"
   show (PrimFn src arity used) = "PrimFn \{show src} \{show arity} \{show used}"

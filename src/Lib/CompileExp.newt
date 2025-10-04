@@ -17,7 +17,7 @@ import Data.SortedMap
 CExp : U
 
 data CAlt : U where
-  CConAlt : String → ConInfo → List String → CExp → CAlt
+  CConAlt : Nat → String → ConInfo → List String → CExp → CAlt
   -- REVIEW keep var name?
   CDefAlt : CExp -> CAlt
   -- literal
@@ -38,7 +38,7 @@ data CExp : U where
   CLetRec : Name -> CExp -> CExp -> CExp
   CErased : CExp
   -- Data / type constructor
-  CConstr : Name -> List CExp -> CExp
+  CConstr : Nat → Name -> List CExp -> CExp
   -- Raw javascript for `pfunc`
   CRaw : String -> List QName -> CExp
   -- Need this for magic Nat
@@ -70,7 +70,7 @@ arityForName fc nm = do
     Nothing => error fc "Name \{show nm} not in scope"
     (Just Axiom) => pure Z
     (Just (TCon arity strs)) => pure $ cast arity
-    (Just (DCon _ k str)) => pure $ cast k
+    (Just (DCon _ _ k str)) => pure $ cast k
     (Just (Fn t)) => pure $ lamArity t
     (Just (PrimTCon arity)) => pure $ cast arity
     (Just (PrimFn t arity used)) => pure arity
@@ -115,9 +115,9 @@ compileTerm t@(Ref fc nm@(QN _ tag)) = do
     (S Z) => pure $ CRef nm
     Z =>
       case the (Maybe Def) $ lookupMap' nm defs of
-        Just (DCon EnumCon _ _) => pure $ CLit $ LString tag
-        Just (DCon ZeroCon _ _) => pure $ CLit $ LInt 0
-        Just (DCon SuccCon _ _) =>
+        Just (DCon ix EnumCon _ _) => pure $ CLit $ LInt $ cast ix
+        Just (DCon _ ZeroCon _ _) => pure $ CLit $ LInt 0
+        Just (DCon _ SuccCon _ _) =>
           pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
         _ => pure $ CRef nm
     _ => apply nm Nil Lin arity
@@ -136,7 +136,7 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
         let (Nothing) = compilePrimOp (show nm) args'
           | Just cexp => pure cexp
         case the (Maybe Def) $ lookupMap' nm defs of
-          Just (DCon SuccCon _ _) => applySucc args'
+          Just (DCon _ SuccCon _ _) => applySucc args'
           _ => apply nm args' Lin arity
   -- REVIEW maybe we want a different constructor for non-Ref applications?
   (t, args) => do
@@ -163,23 +163,23 @@ compileTerm (Case fc t alts) = do
       defs <- getRef Defs
       def <- lookupDef emptyFC qn
       case def of
-        DCon info _ _ => CConAlt nm info args <$> compileTerm tm
+        DCon ix info _ _ => CConAlt ix nm info args <$> compileTerm tm
         _ => error fc "\{show nm} is not constructor"
 
     CaseLit lit tm => CLitAlt lit <$> compileTerm tm
   pure $ CCase t' $ fancyCons t' alts'
   where
     numAltP : CAlt → Bool
-    numAltP (CConAlt _ SuccCon _ _) = True
-    numAltP (CConAlt _ ZeroCon _ _) = True
+    numAltP (CConAlt _ _ SuccCon _ _) = True
+    numAltP (CConAlt _ _ ZeroCon _ _) = True
     numAltP _ = False
 
     enumAlt : CAlt → CAlt
-    enumAlt (CConAlt nm EnumCon args tm) = CLitAlt (LString nm) tm
+    enumAlt (CConAlt ix nm EnumCon args tm) = CLitAlt (LInt $ cast ix) tm
     enumAlt alt = alt
 
     isInfo : ConInfo → CAlt → Bool
-    isInfo needle (CConAlt _ info _ _)  = needle == info
+    isInfo needle (CConAlt _ _  info _ _)  = needle == info
     isInfo _ _ = False
 
     isDef : CAlt → Bool
@@ -187,14 +187,14 @@ compileTerm (Case fc t alts) = do
     isDef _ = False
 
     getBody : CAlt → CExp
-    getBody (CConAlt _ _ _ t) = t
+    getBody (CConAlt _ _ _ _ t) = t
     getBody (CLitAlt _ t) = t
     getBody (CDefAlt t) = t
 
     doNumCon : CExp → List CAlt → List CAlt
     doNumCon sc alts =
       let zeroAlt = case find (isInfo ZeroCon) alts of
-            Just (CConAlt _ _ _ tm) => CLitAlt (LInt 0) tm :: Nil
+            Just (CConAlt _ _ _ _ tm) => CLitAlt (LInt 0) tm :: Nil
             Just tm => fatalError "ERROR zeroAlt mismatch \{debugStr tm}"
             _ => case find isDef alts of
                   Just (CDefAlt tm) => CLitAlt (LInt 0) tm :: Nil
@@ -202,7 +202,7 @@ compileTerm (Case fc t alts) = do
                   _ => Nil
       in
       let succAlt = case find (isInfo SuccCon) alts of
-            Just (CConAlt _ _ _ tm) => CDefAlt (CLet "x" (CPrimOp "-" sc (CLit $ LInt 1)) tm) :: Nil
+            Just (CConAlt _ _ _ _ tm) => CDefAlt (CLet "x" (CPrimOp "-" sc (CLit $ LInt 1)) tm) :: Nil
             Just tm => fatalError "ERROR succAlt mismatch \{debugStr tm}"
             _ => case find isDef alts of
               Just alt => alt :: Nil
@@ -235,18 +235,19 @@ compileFun tm = go tm Lin
     go tm args = CFun (args <>> Nil) <$> compileTerm tm
 
 -- What are the Defs used for above? (Arity for name)
-compileDCon : QName → ConInfo → Int → CExp
-compileDCon (QN _ nm) EnumCon 0 = CLit $ LString nm
-compileDCon (QN _ nm) info 0 = CConstr nm Nil
-compileDCon (QN _ nm) info arity =
+compileDCon : Nat → QName → ConInfo → Int → CExp
+compileDCon ix (QN _ nm) EnumCon 0 = CLit $ LInt $ cast ix
+compileDCon ix (QN _ nm) info 0 = CConstr ix nm Nil
+compileDCon ix (QN _ nm) info arity =
   let args = map (\k => "h\{show k}") (range 0 arity) in
-  CFun args $ CConstr nm $ map (\k => CBnd $ arity - k - 1) (range 0 arity)
+  CFun args $ CConstr ix nm $ map (\k => CBnd $ arity - k - 1) (range 0 arity)
 
 -- probably want to drop the Ref2 when we can
 defToCExp : {{Ref2 Defs St}} → (QName × Def) -> M (QName × CExp)
 defToCExp (qn, Axiom)          = pure $ (qn, CErased)
-defToCExp (qn, DCon info arity _)   = pure $ (qn, compileDCon qn info arity)
-defToCExp (qn, TCon arity _)   = pure $ (qn, compileDCon qn NormalCon arity)
-defToCExp (qn, PrimTCon arity) = pure $ (qn, compileDCon qn NormalCon arity)
+defToCExp (qn, DCon ix info arity _)   = pure $ (qn, compileDCon ix qn info arity)
+-- FIXME need a number if we ever add typecase.
+defToCExp (qn, TCon arity _)   = pure $ (qn, compileDCon Z qn NormalCon arity)
+defToCExp (qn, PrimTCon arity) = pure $ (qn, compileDCon Z qn NormalCon arity)
 defToCExp (qn, PrimFn src _ deps) = pure $ (qn, CRaw src deps)
 defToCExp (qn, Fn tm)          = (_,_ qn) <$> compileFun tm
