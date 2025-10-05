@@ -444,8 +444,6 @@ process name = do
   -- Maybe move this dance into liftWhere
   ref <- newIORef entries
   let foo = MkRef ref -- for the autos below
-  -- TODO, erasure needs to happen on Tm, but can be part of Tm -> CExp
-  -- if we move the liftWhere down.
   eraseEntries
   liftWhere
   entries <- readIORef ref

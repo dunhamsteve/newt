@@ -523,8 +523,11 @@ enumerate {a} xs = go Z xs
     go k (x :: xs) = (k,x) :: go (S k) xs
 
 filter : ∀ a. (a → Bool) → List a → List a
-filter pred Nil = Nil
-filter pred (x :: xs) = if pred x then x :: filter pred xs else filter pred xs
+filter {a} pred xs = go xs Lin
+  where
+    go : List a → SnocList a → List a
+    go Nil acc = acc <>> Nil
+    go (x :: xs) acc = if pred x then go xs (acc :< x) else go xs acc
 
 drop : ∀ a. Nat → List a → List a
 drop _ Nil = Nil

@@ -32,8 +32,6 @@ tailNames (CConstr _ _ args) = Nil
 tailNames (CBnd _) = Nil
 tailNames (CFun _ tm) = tailNames tm
 tailNames (CLam _ _) = Nil
--- should not happen, FIXME
-tailNames (CAppRef t args n) = Nil
 tailNames (CApp t u) = Nil
 tailNames (CRef _) = Nil
 tailNames CErased = Nil

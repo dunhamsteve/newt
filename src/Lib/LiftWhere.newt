@@ -58,11 +58,6 @@ liftWhereTm name env (LetRec fc nm ty t u) = do
       let (Just _) = lookupMap qn' top | _ => pure qn'
       getName qn (ext ++ "'")
 
-    -- Hacky - CompileExp expects a pi type that matches arity
-    wrapPi : Nat → Tm → Tm
-    wrapPi Z tm = tm
-    wrapPi (S k) tm = Pi fc "_" Explicit Many (Erased fc) $ wrapPi k tm
-
     wrapLam : Nat → Tm → Tm
     wrapLam Z tm = tm
     -- REVIEW We've already erased, hopefully we don't need quantity
