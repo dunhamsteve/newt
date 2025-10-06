@@ -1,0 +1,8 @@
+module LitConCase
+
+data Unit = MkUnit
+
+foo : Int → Unit
+foo 0 = MkUnit
+foo MkUnit = MkUnit
+foo _ = MkUnit

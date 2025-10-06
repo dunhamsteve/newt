@@ -14,9 +14,18 @@ for fn in tests/*.newt ; do
     # we've dropped support for compiling things without main for now.
     $NCC $fn > tmp/${bn}.compile
   fi
-  if [ $? != "0" ]; then
+  cerr=$?
+  if [ -f ${fn}.fail ]; then
+    if ! diff -q tmp/${bn}.compile ${fn}.fail; then
+        echo "Compile failure mismatch for $fn"
+        diff tmp/${bn}.comp ${fn}.fail
+        failed=$((failed + 1))
+        continue
+    fi
+  elif [ $cerr != "0" ]; then
     echo Compile failed for $fn
     failed=$((failed + 1))
+    cat tmp/${bn}.compile
     continue
   fi
   # if there is a golden file, run the code and compare output
@@ -29,6 +38,7 @@ for fn in tests/*.newt ; do
     fi
     if ! diff -q tmp/${bn}.out ${fn}.golden; then
       echo "Output mismatch for $fn"
+      diff -q tmp/${bn}.out ${fn}.golden
       failed=$((failed + 1))
     fi
   fi

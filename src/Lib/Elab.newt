@@ -966,7 +966,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
               case lookup nm top of
                   (Just (MkEntry _ name type (DCon _ _ k tcname) _)) =>
                     if (tcname /= sctynm)
-                      then error fc "Constructor is \{show tcname} expected \{show sctynm}"
+                      then error fc "Constructor is a \{show tcname} expected a \{show sctynm}"
                       else pure Nothing
                   Just _ => error fc "Internal Error: \{show nm} is not a DCon"
                   Nothing => error fc "Internal Error: DCon \{show nm} not found"
@@ -1096,11 +1096,12 @@ checkDone ctx ((x, pat) :: xs) body ty = error (getFC pat) "stray constraint \{x
 -- need to run constructors, then run default
 
 -- wild/var can come before 'x' so we need a list first
-getLits : String -> List Clause -> List Literal
-getLits nm Nil = Nil
-getLits nm ((MkClause fc cons pats expr) :: cs) = case find ((_==_ nm) ∘ fst) cons of
-  Just (_, (PatLit _ lit)) => lit :: getLits nm cs
-  _ => getLits nm cs
+getLits : Val -> String -> List Clause -> M (List Literal)
+getLits ty nm Nil = pure Nil
+getLits ty nm ((MkClause fc cons pats expr) :: cs) = case find ((_==_ nm) ∘ fst) cons of
+  Just (_, (PatLit _ lit)) => _::_ lit <$> getLits ty nm cs
+  Just (_, (PatCon fc _ _ _ _)) => error fc "expected \{show ty}"
+  _ => getLits ty nm cs
 
 -- collect constructors that are matched on
 matchedConstructors : String → List Clause → List QName
@@ -1160,7 +1161,7 @@ buildDefault ctx prob fc scnm missing = do
 
 buildLitCases : Context -> Problem -> FC -> String -> Val -> M (List CaseAlt)
 buildLitCases ctx prob fc scnm scty = do
-  let lits = nub $ getLits scnm prob.clauses
+  lits <- nub <$> getLits scty scnm prob.clauses
   alts <- traverse (buildLitCase ctx prob fc scnm scty) lits
 
   let defclauses = filter isDefault prob.clauses
@@ -1173,7 +1174,7 @@ buildLitCases ctx prob fc scnm scty = do
     isDefault cl = case find ((_==_ scnm) ∘ fst) cl.cons of
       Just (_, (PatVar _ _ _)) => True
       Just (_, (PatWild _ _)) => True
-      Nothing => True
+      Nothing => True -- can this happen?
       _ => False
 
 -- TODO - figure out if these need to be in Prelude or have a special namespace

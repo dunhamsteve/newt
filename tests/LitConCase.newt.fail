@@ -1,0 +1,9 @@
+*** Process tests/LitConCase.newt
+module LitConCase
+ERROR at tests/LitConCase.newt:(7, 5): expected Prim.Int
+  foo : Int → Unit
+  foo 0 = MkUnit
+  foo MkUnit = MkUnit
+      ^
+
+Compile failed
