@@ -11,6 +11,7 @@ import Lib.Prettier
 import Lib.CompileExp
 import Lib.TopContext
 import Lib.LiftWhere
+import Lib.LiftLambda
 import Lib.TCO
 import Lib.Ref2
 import Lib.Erasure
@@ -451,6 +452,8 @@ process name = do
   exprs <- mapM defToCExp $ toList entries
   let cexpMap = foldMap const emptyMap exprs
   cexpMap <- tailCallOpt cexpMap
+  -- Not needed for JS, uncomment to test
+  -- cexpMap <- liftLambda cexpMap
   let names = sortedNames cexpMap name
   pure $ map cexpToDoc $ mapMaybe (\x => lookupMap x cexpMap) names
 

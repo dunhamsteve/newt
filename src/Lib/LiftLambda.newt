@@ -1,0 +1,81 @@
+module Lib.LiftLambda
+
+import Prelude
+import Lib.Common
+import Lib.CompileExp
+import Lib.Types
+import Lib.TopContext
+import Lib.Ref2
+import Data.SortedMap
+import Data.SnocList
+import Data.IORef
+import Monad.State
+
+
+ExpMap : U
+ExpMap = SortedMap QName CExp
+
+liftLambdaTm : QName → SnocList Name → CExp → State ExpMap CExp
+-- CBnd
+liftLambdaTm name env (CFun nms t) = CFun nms <$> liftLambdaTm name (env <>< nms) t
+liftLambdaTm name env (CApp t u) =
+  CApp <$> liftLambdaTm name env t <*> liftLambdaTm name env u
+liftLambdaTm name env (CLet nm v sc) = do
+  v <- liftLambdaTm name env v
+  sc <- liftLambdaTm name (env :< nm) sc
+  pure $ CLet nm v sc
+liftLambdaTm name env (CLetRec nm v sc) = do
+  v <- liftLambdaTm name (env :< nm) v
+  sc <- liftLambdaTm name (env :< nm) sc
+  pure $ CLetRec nm v sc
+
+liftLambdaTm name env tm@(CCase t alts) = do
+  t <- liftLambdaTm name env t
+  alts' <- traverse liftLambdaAlt alts
+  pure $ CCase t alts'
+  where
+    -- This is where I wish I had put indexes on things
+    liftLambdaAlt : CAlt → State ExpMap CAlt
+    liftLambdaAlt (CDefAlt tm) = CDefAlt <$> liftLambdaTm name env tm
+    liftLambdaAlt (CLitAlt l tm) = CLitAlt l <$> liftLambdaTm name env tm
+    liftLambdaAlt (CConAlt ix nm info args tm) =
+      CConAlt ix nm info args <$> liftLambdaTm name (env <>< args) tm
+liftLambdaTm name@(QN ns nm) env tm@(CLam nm t) = do
+  let (nms, t) = splitLam tm Lin
+  t' <- liftLambdaTm name (env <>< nms) t
+  -- TODO - maybe a better name here?
+  qn <- getName name "lifted"
+  modify $ updateMap qn (CFun (env <>> nms) t')
+  pure $ CAppRef qn (makeApp (snoclen env)) (length' nms)
+  where
+    getName : QName → String → State ExpMap QName
+    getName qn@(QN ns nm) ext = do
+      top <- get
+      let qn' = QN ns (nm ++ "." ++ ext)
+      let (Just _) = lookupMap qn' top | _ => pure qn'
+      getName qn (ext ++ "'")
+
+    splitLam : CExp → SnocList Name → List Name × CExp
+    splitLam (CLam nm t) acc = splitLam t (acc :< nm)
+    splitLam t acc = (acc <>> Nil, t)
+
+    wrapLam : Nat → CExp → CExp
+    wrapLam Z t = t
+    wrapLam (S k) t = CLam "_" $ wrapLam k t
+
+    makeApp : Nat → List CExp
+    makeApp Z = Nil
+    makeApp (S k) = CBnd (cast k) :: makeApp k
+liftLambdaTm name env tm = pure tm
+
+liftLambdaFn : QName × CExp → State ExpMap Unit
+liftLambdaFn (name, tm) = do
+  tm' <- liftLambdaTm name Lin tm
+  modify $ updateMap name tm'
+liftLambdaFn _ = pure MkUnit
+
+liftLambda : ExpMap → M ExpMap
+liftLambda defs = do
+  pure $ snd $ (traverse liftLambdaFn $ toList defs).runState defs
+
+
