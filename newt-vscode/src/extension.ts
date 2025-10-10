@@ -11,8 +11,8 @@ interface FC {
 
 interface TopEntry {
   fc: FC;
-  name: String;
-  type: String;
+  name: string;
+  type: string;
 }
 interface TopData {
   context: TopEntry[];
@@ -182,7 +182,28 @@ export function activate(context: vscode.ExtensionContext) {
       }
     )
   );
-
+  context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      { language: "newt" },
+      {
+        provideCompletionItems(document, position, token, context) {
+          if (!topData) return [];
+          const wordRange = document.getWordRangeAtPosition(position);
+          const prefix = wordRange ? document.getText(wordRange) : "";
+          const items: vscode.CompletionItem[] = [];
+          for (const entry of topData.context) {
+            if (entry.name.startsWith(prefix)) {
+              const item = new vscode.CompletionItem(entry.name, vscode.CompletionItemKind.Function);
+              item.detail = entry.type;
+              items.push(item);
+            }
+          }
+          return items;
+        }
+      },
+      ...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_'.split('')
+    )
+  );
   context.subscriptions.push(
     vscode.languages.registerHoverProvider(
       { language: "newt" },
