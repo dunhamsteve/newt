@@ -10,8 +10,7 @@ pfunc readFile uses (MkIORes Left Right) : (fn : String) -> IO (Either String St
     let content = fs.readFileSync(fn, 'utf8')
     result = Prelude_Right(null, null, content)
   } catch (e) {
-    let err = ""+e
-    result = Prelude_Left(null, null, e)
+    result = Prelude_Left(null, null, e+'')
   }
   return Prelude_MkIORes(null, result, w)
 }`
@@ -24,8 +23,7 @@ pfunc writeFile uses (MkIORes MkUnit) : String → String → IO (Either String 
     fs.writeFileSync(fn, content, 'utf8')
     result = Prelude_Right(null, null, Prelude_MkUnit)
   } catch (e) {
-      let err = ""+e
-      result = Prelude_Left(null, null, e)
+      result = Prelude_Left(null, null, e+"")
   }
   return Prelude_MkIORes(null, result, w)
 }`
