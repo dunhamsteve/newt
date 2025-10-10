@@ -52,13 +52,13 @@ quoteTokenise ts@(TS el ec toks chars) startl startc acc = case chars of
         '}' :: cs =>
           let tok = MkBounded (Tok EndInterp "}") (MkBounds el ec el (ec + 1))
           in quoteTokenise (TS el (ec + 1) (toks :< tok) cs) el (ec + 1) Lin
-        cs => Left $ E (MkFC "" (el, ec)) "Expected '{'"
+        cs => Left $ E (MkFC "" (MkBounds el ec el ec)) "Expected '{'"
   -- TODO newline in string should be an error
-  '\n' :: cs => Left $ E (MkFC "" (el, ec)) "Newline in string"
+  '\n' :: cs => Left $ E (MkFC "" (MkBounds el ec el ec)) "Newline in string"
   '\\' :: 'n' :: cs => quoteTokenise (TS el (ec + 2) toks cs) startl startc (acc :< '\n')
   '\\' :: c :: cs => quoteTokenise (TS el (ec + 2) toks cs) startl startc (acc :< c)
   c :: cs => quoteTokenise (TS el (ec + 1) toks cs) startl startc (acc :< c)
-  Nil => Left $ E (MkFC "" (el, ec)) "Expected '\"' at EOF"
+  Nil => Left $ E (MkFC "" (MkBounds el ec el ec)) "Expected '\"' at EOF"
 
   where
     stok : BTok
@@ -78,7 +78,7 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
       Right (TS sl sc toks chars) => case chars of
         '"' :: cs => let tok = mktok False sl (sc + 1) EndQuote "\"" in
           rawTokenise (TS sl (sc + 1) (toks :< tok) cs)
-        cs => Left $ E (MkFC "" (sl, sc)) "Expected '\"'"
+        cs => Left $ E (MkFC "" (MkBounds sl sc sl sc)) "Expected '\"'"
 
   '{' :: '{' :: cs =>
     let tok = mktok False sl (sc + 2) Keyword "{{" in
@@ -87,7 +87,7 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
       Right (TS sl sc toks chars) => case chars of
         '}' :: '}' :: cs => let tok = mktok False sl (sc + 2) Keyword "}}" in
           rawTokenise (TS sl (sc + 2) (toks :< tok) cs)
-        cs => Left $ E (MkFC "" (sl, sc)) "Expected '}}'"
+        cs => Left $ E (MkFC "" (MkBounds sl sc sl sc)) "Expected '}}'"
 
   '}' :: cs => Right ts
   '{' :: cs =>
@@ -97,7 +97,7 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
       Right (TS sl sc toks chars) => case chars of
         '}' :: cs => let tok = mktok False sl (sc + 1) Symbol "}" in
           rawTokenise (TS sl (sc + 1) (toks :< tok) cs)
-        cs => Left $ E (MkFC "" (sl, sc)) "Expected '}'"
+        cs => Left $ E (MkFC "" (MkBounds sl sc sl sc)) "Expected '}'"
 
   ',' :: cs => rawTokenise (TS sl (sc + 1) (toks :< mktok False sl (sc + 1) Ident ",") cs)
   '_' :: ',' :: '_' :: cs => rawTokenise (TS sl (sc + 3) (toks :< mktok False sl (sc + 3) MixFix "_,_") cs)
@@ -125,7 +125,7 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
     isUIdent c = isIdent c || c == '.'
 
     doBacktick : TState -> SnocList Char -> Either Error TState
-    doBacktick (TS l c toks Nil) acc = Left $ E (MkFC "" (l,c)) "EOF in backtick string"
+    doBacktick (TS l c toks Nil) acc = Left $ E (MkFC "" (MkBounds l c l c)) "EOF in backtick string"
     doBacktick (TS el ec toks ('`' :: cs)) acc =
       let tok = MkBounded (Tok JSLit (pack $ acc <>> Nil)) (MkBounds sl sc el ec) in
       rawTokenise (TS el (ec + 1) (toks :< tok) cs)
@@ -144,7 +144,7 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
     lineComment (TS line col toks (c :: cs)) = lineComment (TS line (col + 1) toks cs)
 
     blockComment : TState -> Either Error TState
-    blockComment (TS line col toks Nil) = Left $ E (MkFC "" (line, col)) "EOF in block comment"
+    blockComment (TS line col toks Nil) = Left $ E (MkFC "" (MkBounds line col line col)) "EOF in block comment"
     blockComment (TS line col toks ('-' :: '/' :: cs)) = rawTokenise (TS line (col + 2) toks cs)
     blockComment (TS line col toks ('\n' :: cs)) = blockComment (TS (line + 1) 0 toks cs)
     blockComment (TS line col toks (c :: cs)) = blockComment (TS line (col + 1) toks cs)
@@ -167,7 +167,7 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
 tokenise : String -> String -> Either Error (List BTok)
 tokenise fn text = case rawTokenise (TS 0 0 Lin (unpack text)) of
   Right (TS trow tcol acc Nil) => Right $ acc <>> Nil
-  Right (TS trow tcol acc chars) => Left $ E (MkFC fn (trow, tcol)) "Extra toks"
+  Right (TS trow tcol acc chars) => Left $ E (MkFC fn (MkBounds trow tcol trow tcol)) "Extra toks"
   Left (E (MkFC file start) str) => Left $ E (MkFC fn start) str
   Left err => Left err
 

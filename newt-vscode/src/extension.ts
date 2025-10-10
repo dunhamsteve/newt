@@ -109,21 +109,21 @@ export function activate(context: vscode.ExtensionContext) {
             }
             console.log("top data", topData);
           }
-          const match = line.match(
-            /(INFO|WARN|ERROR) at (.*):\((\d+), (\d+)\):\s*(.*)/
-          );
+            const match = line.match(
+            /(INFO|WARN|ERROR) at (.*):\((\d+):(\d+)-(\d+):(\d+)\):\s*(.*)/
+            );
           if (match) {
-            let [_full, kind, file, line, column, message] = match;
-            let lnum = Number(line) - 1;
-            let cnum = Number(column) - 1;
-            if (file !== fileName) lnum = cnum = 0;
-
+            let [_full, kind, file, line, column, eline, ecol, message] = match;
+            let lnum = +line - 1;
+            let cnum = +column - 1;
+            let elnum = +eline - 1;
+            let ecnum = +ecol - 1;
             let start = new vscode.Position(lnum, cnum);
-            // we don't have the full range, so grab the surrounding word
-            let end = new vscode.Position(lnum, cnum + 1);
-            let range =
-              document.getWordRangeAtPosition(start) ??
-              new vscode.Range(start, end);
+            let end = new vscode.Position(elnum, ecnum);
+            let range = new vscode.Range(start, end);
+            if (file !== fileName) {
+              range = new vscode.Range(new vscode.Position(0,0), new vscode.Position(0,0));
+            }
             // anything indented after the ERROR/INFO line are part of
             // the message
             while (lines[i + 1]?.match(/^(  )/)) message += "\n" + lines[++i];

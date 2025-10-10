@@ -18,7 +18,7 @@ for fn in tests/*.newt ; do
   if [ -f ${fn}.fail ]; then
     if ! diff -q tmp/${bn}.compile ${fn}.fail; then
         echo "Compile failure mismatch for $fn"
-        diff tmp/${bn}.comp ${fn}.fail
+        diff ${fn}.fail tmp/${bn}.compile
         failed=$((failed + 1))
         continue
     fi
@@ -38,7 +38,7 @@ for fn in tests/*.newt ; do
     fi
     if ! diff -q tmp/${bn}.out ${fn}.golden; then
       echo "Output mismatch for $fn"
-      diff -q tmp/${bn}.out ${fn}.golden
+      diff ${fn}.golden tmp/${bn}.out
       failed=$((failed + 1))
     fi
   fi

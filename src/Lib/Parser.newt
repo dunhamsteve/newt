@@ -9,6 +9,8 @@ import Lib.Syntax
 import Lib.Token
 import Lib.Types
 
+-- TODO - anywhere this says getPos, we probably have to fix bounds?  It is token sized though.
+
 lazy : ∀ a. (Unit → Parser a) → Parser a
 lazy pa = pa MkUnit
 
@@ -61,10 +63,8 @@ interp = do
   token EndInterp
   pure tm
 
-
 interpString : Parser Raw
 interpString = do
-  -- fc <- getPos
   ignore $ token StartQuote
   part <- term
   parts <- many (stringLit <|> interp)

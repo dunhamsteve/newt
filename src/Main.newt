@@ -217,13 +217,13 @@ processFile fn = do
   log 1 $ \ _ => "\{show dir} \{show name} \{show ext}"
 
   (Right src) <- liftIO {M} $ readFile fn
-    | Left err => error (MkFC fn (0,0)) "error reading \{fn}: \{show err}"
+    | Left err => error (emptyFC' fn) "error reading \{fn}: \{show err}"
   let (Right toks) = tokenise fn src
     | Left err => throwError err
   let (Right ((nameFC, modName), _, _)) = partialParse fn parseModHeader emptyMap toks
     | Left (err,toks) => throwError err
 
-  (base,qn) <- getBaseDir fn modName
+  (base,qn) <- getBaseDir fn nameFC modName
 
   -- declare internal primitives
 

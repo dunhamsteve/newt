@@ -31,8 +31,6 @@ instance HasFC Pattern where
   getFC (PatWild fc _) = fc
   getFC (PatLit fc lit) = fc
 
--- %runElab deriveShow `{Pattern}
-
 Constraint : U
 Constraint = (String × Pattern)
 

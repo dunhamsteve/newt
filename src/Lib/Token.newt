@@ -1,28 +1,7 @@
 module Lib.Token
 
 import Prelude
-
-record Bounds where
-  constructor MkBounds
-  startLine : Int
-  startCol : Int
-  endLine : Int
-  endCol : Int
-
-
-instance Eq Bounds where
-  (MkBounds sl sc el ec) == (MkBounds sl' sc' el' ec') =
-      sl == sl'
-   && sc == sc'
-   && el == el'
-   && ec == ec'
-
-
-record WithBounds ty where
-  constructor MkBounded
-  val : ty
-  bounds : Bounds
-
+import Lib.Common
 
 data Kind
   = Ident
@@ -98,3 +77,6 @@ value (MkBounded (Tok _ s) _) = s
 
 getStart : BTok -> (Int × Int)
 getStart (MkBounded _ (MkBounds l c _ _)) = (l,c)
+
+getEnd : BTok -> (Int × Int)
+getEnd (MkBounded _ (MkBounds _ _ el ec)) = (el,ec)

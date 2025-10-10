@@ -440,18 +440,20 @@ const processOutput = (
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const match = line.match(
-      /(INFO|ERROR) at ([^:]+):\((\d+), (\d+)\):\s*(.*)/
+      /(INFO|ERROR) at ([^:]+):\((\d+):(\d+)-(\d+):(\d+)\):\s*(.*)/
     );
     if (match) {
-      let [_full, kind, file, line, col, message] = match;
-      let lineNumber = +line;
-      let column = +col;
+      let [_full, kind, file, line, col, eline, ecol, message] = match;
+      let startLineNumber = +line;
+      let startColumn = +col;
+      let endLineNumber = +eline;
+      let endColumn = +ecol
       // FIXME - pass the real path in
       if (fn && fn !== file) {
-        lineNumber = column = 0;
+        startLineNumber = startColumn = 0;
       }
       // we don't have the full range, so grab the surrounding word
-      let endColumn = column + 1;
+      // let endColumn = startColumn + 1;
 
       // heuristics to grab the entire message:
       // anything indented
@@ -460,13 +462,13 @@ const processOutput = (
       while (lines[i + 1]?.match(/^(  )/)) {
         message += "\n" + lines[++i];
       }
-      if (kind === "ERROR" || lineNumber)
+      if (kind === "ERROR" || startLineNumber)
         markers.push({
           severity: kind === "ERROR" ? "error" : "info",
           message,
-          startLineNumber: lineNumber,
-          endLineNumber: lineNumber,
-          startColumn: column,
+          startLineNumber,
+          endLineNumber,
+          startColumn,
           endColumn,
         });
     }

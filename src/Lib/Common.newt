@@ -5,6 +5,32 @@ import Data.String
 import Data.Int
 import Data.SortedMap
 
+record Bounds where
+  constructor MkBounds
+  startLine : Int
+  startCol : Int
+  endLine : Int
+  endCol : Int
+
+-- FIXME we should handle overlap and out of order..
+instance Add Bounds where
+  a + b = MkBounds a.startLine a.startCol b.endLine b.endCol
+
+instance Eq Bounds where
+  (MkBounds sl sc el ec) == (MkBounds sl' sc' el' ec') =
+      sl == sl'
+   && sc == sc'
+   && el == el'
+   && ec == ec'
+
+record WithBounds ty where
+  constructor MkBounded
+  val : ty
+  bounds : Bounds
+
+emptyBounds : Bounds
+emptyBounds = MkBounds 0 0 0 0
+
 -- l is environment size, this works for both lvl2ix and ix2lvl
 
 range : Int → Int → List Int
@@ -74,19 +100,19 @@ instance ToJSON Int where
 record FC where
   constructor MkFC
   file : String
-  start : (Int × Int)
+  bnds : Bounds
 
 
 instance ToJSON FC where
-  toJson (MkFC file (line,col)) = JsonObj (("file", toJson file) :: ("line", toJson line) :: ("col", toJson col) :: Nil)
+  toJson (MkFC file (MkBounds line col endline endcol)) = JsonObj (("file", toJson file) :: ("line", toJson line) :: ("col", toJson col) :: ("endline", toJson endline) :: ("endcol", toJson endcol):: Nil)
 
 
 fcLine : FC -> Int
-fcLine (MkFC file (l, c)) = l
+fcLine fc = fc.bnds.startLine
 
 
 fcCol : FC -> Int
-fcCol (MkFC file (l, c)) = c
+fcCol fc = fc.bnds.startCol
 
 
 class HasFC a where
@@ -96,7 +122,10 @@ primNS : List String
 primNS = ("Prim" :: Nil)
 
 emptyFC : FC
-emptyFC = MkFC "" (0,0)
+emptyFC = MkFC "" (MkBounds 0 0 0 0)
+
+emptyFC' : String → FC
+emptyFC' fn = MkFC fn (MkBounds 0 0 0 0)
 
 -- Error of a parse
 
@@ -119,7 +148,8 @@ data Error
   | Postpone FC QName String
 
 instance Show FC where
-  show (MkFC file (l,c)) = "\{file}:(\{show $ l + 1}, \{show $ c + 1})"
+  -- We add one to the end column so it points after the end, which seems to be what Idris does
+  show (MkFC file (MkBounds l c el ec)) = "\{file}:(\{show $ l + 1}:\{show $ c + 1}-\{show $ el + 1}:\{show $ ec + 2})"
 
 
 showError : String -> Error -> String

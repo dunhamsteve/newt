@@ -34,8 +34,8 @@ splitTele = go Nil
 
 
 
-getBaseDir : String → String → M (String × QName)
-getBaseDir fn modName = do
+getBaseDir : String → FC → String → M (String × QName)
+getBaseDir fn fc modName = do
   let (path, modName') = unsnoc $ split1 modName "."
   let parts = split1 fn "/"
   let (dirs,file) = unsnoc parts
@@ -44,9 +44,9 @@ getBaseDir fn modName = do
   let parts = split1 fn "/"
   let (dirs,file) = unsnoc parts
   let (path, modName') = unsnoc $ split1 modName "."
-  unless (modName' == name) $ \ _ => error (MkFC fn (0,0)) "module name \{modName'} doesn't match \{name}"
+  unless (modName' == name) $ \ _ => error fc "module name \{modName'} doesn't match \{name}"
   let (Right base) = baseDir (Lin <>< dirs) (Lin <>< path)
-    | Left err => error (MkFC fn (0,0)) err
+    | Left err => error fc err
   let base = if base == "" then "." else base
   pure (base, QN path modName')
   where
