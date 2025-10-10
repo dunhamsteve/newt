@@ -793,12 +793,6 @@ checkCase : Context → Problem → String → Val → (QName × Int × Tm) → 
 checkCase ctx prob scnm scty (dcName, arity, ty) = do
   vty <- eval Nil ty
   (ctx', ty', vars, sc) <- extendPi ctx (vty) Lin Lin
-  (Just res) <- catchError (Just <$> unify ctx'.env UPattern ty' scty)
-              (\err => do
-                  debug $ \ _ => "SKIP \{show dcName} because unify error \{errorMsg err}"
-                  pure Nothing)
-    | _ => pure False
-
   (Right res) <- tryError (unify ctx'.env UPattern ty' scty)
           | Left err => do
             debug $ \ _ => "SKIP \{show dcName} because unify error \{errorMsg err}"
@@ -866,6 +860,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         (Right res) <- tryError (unify ctx'.env UPattern ty' scty)
           | Left err => do
             debug $ \ _ => "SKIP \{show dcName} because unify error \{errorMsg err}"
+            putStrLn "SKIP \{show dcName} because unify error \{errorMsg err}"
             pure Nothing
 
         -- Constrain the scrutinee's variable to be dcon applied to args
@@ -1104,10 +1099,10 @@ getLits ty nm ((MkClause fc cons pats expr) :: cs) = case find ((_==_ nm) ∘ fs
   _ => getLits ty nm cs
 
 -- collect constructors that are matched on
-matchedConstructors : String → List Clause → List QName
+matchedConstructors : String → List Clause → List (FC × QName)
 matchedConstructors nm Nil = Nil
 matchedConstructors nm ((MkClause fc cons pats expr) :: cs) = case find ((_==_ nm) ∘ fst) cons of
-  Just (_, (PatCon _ _ dcon _ _)) => dcon :: matchedConstructors nm cs
+  Just (_, (PatCon fc _ dcon _ _)) => (fc, dcon) :: matchedConstructors nm cs
   _ => matchedConstructors nm cs
 
 -- then build a lit case for each of those
@@ -1255,9 +1250,15 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
       -- default cases
       cons <- getConstructors ctx (getFC pat) scty'
       let matched = matchedConstructors scnm prob.clauses
-      let (hit,miss) = partition (flip elem matched ∘ fst) cons
+      let matched' = map snd matched
+      let (hit,miss) = partition (flip elem matched' ∘ fst) cons
       -- need to check miss is possible
       miss' <- filterM (checkCase ctx prob scnm scty') miss
+      for matched $ \case
+       (fc, qn) => do
+          if elem qn (map fst cons)
+            then pure MkUnit
+            else error fc "\{show qn} not a constructor for \{show scty}"
 
       debug $ \ _ => "CONS \{show $ map fst cons} matched \{show matched} miss \{show miss} miss' \{show miss'}"
 

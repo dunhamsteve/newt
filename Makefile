@@ -1,4 +1,3 @@
-OSRCS=$(shell find orig -name "*.idr")
 SRCS=$(shell find src -name "*.newt")
 
 # Node shaves off 40% of the time.
@@ -7,27 +6,7 @@ RUNJS=node
 
 .PHONY:
 
-# all: build/exec/newt build/exec/newt.js build/exec/newt.min.js newt.js
 all: newt.js
-
-# Original idris version
-
-build/exec/newt: ${OSRCS}
-	idris2 --build newt.ipkg
-
-build/exec/newt.js: ${OSRCS}
-	idris2 --cg node -o newt.js -p contrib -c orig/Main.idr
-
-build/exec/newt.min.js: ${OSRCS}
-	idris2 --cg node -o newt.min.js -p contrib -c orig/Main.idr --directive minimal
-
-orig_aoctest: build/exec/newt
-	scripts/orig_aoc
-
-orig_test: build/exec/newt
-	scripts/orig_test
-
-# New version
 
 newt.js: ${SRCS}
 	-rm build/* >/dev/null
