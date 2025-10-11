@@ -440,7 +440,7 @@ const processOutput = (
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const match = line.match(
-      /(INFO|ERROR) at ([^:]+):\((\d+):(\d+)-(\d+):(\d+)\):\s*(.*)/
+      /(INFO|ERROR) at ([^:]+):(\d+):(\d+)--(\d+):(\d+):\s*(.*)/
     );
     if (match) {
       let [_full, kind, file, line, col, eline, ecol, message] = match;

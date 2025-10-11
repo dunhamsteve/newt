@@ -109,7 +109,7 @@ export function activate(context: vscode.ExtensionContext) {
             console.log("top data", topData);
           }
             const match = line.match(
-            /(INFO|WARN|ERROR) at (.*):\((\d+):(\d+)-(\d+):(\d+)\):\s*(.*)/
+            /(INFO|WARN|ERROR) at (.*):(\d+):(\d+)--(\d+):(\d+):\s*(.*)/
             );
           if (match) {
             let [_full, kind, file, line, column, eline, ecol, message] = match;
@@ -288,12 +288,12 @@ export function activate(context: vscode.ExtensionContext) {
         provideCodeActions(document, range, context, token) {
           const actions: vscode.CodeAction[] = [];
           for (const diagnostic of context.diagnostics) {
-            let {message,range} = diagnostic
-            let m = diagnostic.message.match(/missing cases: (.*)/);
+            let {message,range} = diagnostic;
+            let m = message.match(/missing cases: (.*)/);
             if (m) {
               // A lot of this logic would also apply to case split.
               let cons = m[1].split(', ');
-              const line = diagnostic.range.start.line;
+              const line = range.start.line;
               const lineText = document.lineAt(line).text;
               let m2 = lineText.match(/(.*=>?)/);
               if (!m2) continue;

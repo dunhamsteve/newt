@@ -158,8 +158,7 @@ data Error
 
 instance Show FC where
   -- We add one to the end column so it points after the end, which seems to be what Idris does
-  show (MkFC file (MkBounds l c el ec)) = "\{file}:(\{show $ l + 1}:\{show $ c + 1}-\{show $ el + 1}:\{show $ ec + 2})"
-
+  show (MkFC file (MkBounds l c el ec)) = "\{file}:\{show $ l + 1}:\{show $ c + 1}--\{show $ el + 1}:\{show $ ec + 2}"
 
 showError : String -> Error -> String
 showError src (E fc msg) = "ERROR at \{show fc}: \{msg}\n" ++ go 0 (lines src)

@@ -1,6 +1,7 @@
 
 ## TODO
 
+- [x] Take the parens off of FC to make vscode happy
 - [ ] in-scope type at point in vscode
   - So the idea here is that the references will be via FC, we remember the type at declaration and then point the usage back to the declaration (FC -> FC). We could dump all of this. (If we're still doing json.)
   - Do we want to (maybe later) keep the scope as a FC? We could do scope at point then.

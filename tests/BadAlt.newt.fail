@@ -1,10 +1,10 @@
 *** Process tests/BadAlt.newt
 module Prelude
 module BadAlt
-ERROR at tests/BadAlt.newt:(6, 9): Prelude._:<_ not a constructor for (Prelude.List Prim.Int)
+ERROR at tests/BadAlt.newt:6:6--6:13: Prelude._:<_ not a constructor for (Prelude.List Prim.Int)
   
   foo : List Int → Int
   foo (xs :< x) = x
-          ^
+       ^^^^^^^
 
 Compile failed
