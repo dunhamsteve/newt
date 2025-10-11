@@ -990,7 +990,7 @@ mkPat (tm, icit) = do
                 (Just (MkEntry _ name type (DCon _ _ k str) _)) => do
                   -- TODO check arity, also figure out why we need reverse
                   bpat <- traverse (mkPat) b
-                  pure $ PatCon fc icit name bpat Nothing
+                  pure $ PatCon (getFC tm) icit name bpat Nothing
                 -- This fires when a global is shadowed by a pattern var
                 -- Just _ => error (getFC tm) "\{show nm} is not a data constructor"
                 _ => case b of
@@ -1144,9 +1144,27 @@ buildLitCase ctx prob fc scnm scty lit = do
 buildDefault : Context → Problem → FC → String → List QName → M CaseAlt
 buildDefault ctx prob fc scnm missing = do
   let defclauses = filter isDefault prob.clauses
-  when (length' defclauses == 0) $ \ _ => error fc "missing cases \{show missing} on \{show scnm}"
+  -- HACK - For missing cases, we leave enough details in the error message to enable
+  -- the editor to add them
+  -- We can't do this precisely without a better pretty printer.
+  when (length' defclauses == 0) $ \ _ => do
+      missing <- traverse applied missing
+      error fc "missing cases: \{show missing}"
   CaseDefault <$> buildTree ctx (MkProb defclauses prob.ty)
   where
+    -- apply a dcon to _ for each explicit argument
+    applied : QName → M String
+    applied qn = do
+      top <- getTop
+      case lookup qn top of
+        Just (MkEntry _ _ ty (DCon _ _ _ _) _) => pure $ go qn.baseName ty
+        _ => pure qn.baseName
+      where
+        go : String → Tm → String
+        go acc (Pi _ _ Explicit _ _ t) = go "\{acc} _" t
+        go acc (Pi _ _ _ _ _ t) = go acc t
+        go acc _ = acc
+
     isDefault : Clause -> Bool
     isDefault cl = case find ((_==_ scnm) ∘ fst) cl.cons of
       Just (_, (PatVar _ _ _)) => True

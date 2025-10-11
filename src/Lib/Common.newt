@@ -14,7 +14,10 @@ record Bounds where
 
 -- FIXME we should handle overlap and out of order..
 instance Add Bounds where
-  a + b = MkBounds a.startLine a.startCol b.endLine b.endCol
+  a + b =
+    let a' = if a.startLine < b.startLine  || a.startLine == b.startLine && a.startCol < b.startCol then a else b
+        b' = if a.endLine < b.endLine || a.endLine == b.endLine && a.endCol < b.endCol then b else a
+    in MkBounds a'.startLine a'.startCol b'.endLine b'.endCol
 
 instance Eq Bounds where
   (MkBounds sl sc el ec) == (MkBounds sl' sc' el' ec') =
@@ -103,6 +106,9 @@ record FC where
   bnds : Bounds
 
 
+instance Add FC where
+  MkFC fn a + MkFC _ b = MkFC fn (a + b)
+
 instance ToJSON FC where
   toJson (MkFC file (MkBounds line col endline endcol)) = JsonObj (("file", toJson file) :: ("line", toJson line) :: ("col", toJson col) :: ("endline", toJson endline) :: ("endcol", toJson endcol):: Nil)
 
@@ -132,6 +138,9 @@ emptyFC' fn = MkFC fn (MkBounds 0 0 0 0)
 data QName : U where
   QN : List String -> String -> QName
 
+.baseName : QName → String
+(QN _ name).baseName = name
+
 instance Eq QName where
   -- `if` gets us short circuit behavior, idris has a lazy `&&`
   QN ns n == QN ns' n' = if n == n' then ns == ns' else False
@@ -159,7 +168,8 @@ showError src (E fc msg) = "ERROR at \{show fc}: \{msg}\n" ++ go 0 (lines src)
     go l Nil = ""
     go l (x :: xs) =
       if l == fcLine fc then
-        "  \{x}\n  \{replicate (cast $ fcCol fc) ' '}^\n"
+        let width = fc.bnds.endCol - fc.bnds.startCol + 1 in
+        "  \{x}\n  \{replicate (cast $ fcCol fc) ' '}\{replicate (cast width) '^'}\n"
       else if fcLine fc - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
       else go (l + 1) xs
 showError src (Postpone fc ix msg) = "ERROR at \{show fc}: Postpone \{show ix} \{msg}\n" ++ go 0 (lines src)

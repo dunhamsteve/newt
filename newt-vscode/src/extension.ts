@@ -40,7 +40,6 @@ export function activate(context: vscode.ExtensionContext) {
     const lineText = document.lineAt(position.line).text;
     const start = Math.max(0, position.character - 10);
     const snippet = lineText.slice(start, position.character);
-    console.log(`change '${text}' snippet ${snippet}`);
     const m = snippet.match(/(\\[^ ]+)$/);
     if (m) {
       const cand = m[0];
@@ -282,6 +281,49 @@ export function activate(context: vscode.ExtensionContext) {
     if (document.fileName.endsWith(".newt")) checkDocument(document);
 
   context.subscriptions.push(diagnosticCollection);
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(
+      { language: "newt" },
+      {
+        provideCodeActions(document, range, context, token) {
+          const actions: vscode.CodeAction[] = [];
+          for (const diagnostic of context.diagnostics) {
+            let {message,range} = diagnostic
+            let m = diagnostic.message.match(/missing cases: (.*)/);
+            if (m) {
+              // A lot of this logic would also apply to case split.
+              let cons = m[1].split(', ');
+              const line = diagnostic.range.start.line;
+              const lineText = document.lineAt(line).text;
+              let m2 = lineText.match(/(.*=>?)/);
+              if (!m2) continue;
+              let s = range.start.character;
+              let e = range.end.character;
+              let a = lineText.slice(0,s);
+              let b = lineText.slice(e,m2[0].length);
+              let parens = a.endsWith('(') && b.startsWith(')');
+              let lines = cons.map(con =>
+                !parens && con.includes('_')
+                ? `${a}(${con})${b} ?`
+                : `${a}${con}${b} ?`);
+                const fix = new vscode.CodeAction(
+                  "Add missing cases",
+                  vscode.CodeActionKind.QuickFix
+                );
+                fix.edit = new vscode.WorkspaceEdit();
+                // TODO - we should skip over subsequent lines that are indented more than the current.
+                const insertPos = new vscode.Position(line + 1, 0);
+                fix.edit.insert(document.uri, insertPos, lines.join('\n') + '\n');
+                fix.diagnostics = [diagnostic];
+                fix.isPreferred = true;
+                actions.push(fix);
+            }
+          }
+          return actions;
+        }
+      }
+    )
+  );
 }
 
 export function deactivate() {}

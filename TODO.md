@@ -1,6 +1,19 @@
 
 ## TODO
 
+- [ ] in-scope type at point in vscode
+  - So the idea here is that the references will be via FC, we remember the type at declaration and then point the usage back to the declaration (FC -> FC). We could dump all of this. (If we're still doing json.)
+  - Do we want to (maybe later) keep the scope as a FC? We could do scope at point then.
+  - But ideally we'd switch to a server/repl, so we don't have to mess around with serializing stuff.
+- [ ] LSP and/or more editor support
+  - [ ] would be nice to have "add missing cases" and "case split"
+  - [x] Probably need ranges for FC
+  - [ ] leave an interactive process running
+  - [ ] collect metadata or run through the serialization data
+  - [ ] rename in editor for top level functions (and maybe stuff in scope probably need LSP first)
+- [ ] Look into descriptions, etc.
+  - Can generating descriptions help with automatic "show" implementations
+  - We lost debug printing when switching to numeric tags
 - [ ] Add info to Ref/VRef (is dcon, arity, etc)
   - To save lookups during compilation and it might make eval faster
 - [x] number tags for data constructors
@@ -14,7 +27,8 @@
   - [ ] Maybe add qualified names to surface syntax and allow / detect conflicts on reference
   - [ ] Add `export` keywords
 - [ ] vscode - run newt when switching editors
-- [ ] who calls X?  We can only do this scoped to the current context for now. Someday whole source dir.
+- [ ] who calls X?  We can only do this scoped to the current context for now. Someday whole source dir. #lsp
+- [ ] Magic to make Bool a boolean
 - [ ] case split
   - We could fake this up:
     - given a name and a point in the editor
@@ -23,9 +37,9 @@
     - enumerate valid constructors (and their arity)
     - Repeat the line with each, applied to args
     - For `<-` or `let` we'd want to fudge some `|` lines
-- [ ] Support "Add missing cases"
-    - We could possibly fake up missing cases, too. Since they're listed and have an FC pointing at the first one
-    - [ ] Might need proper, enumerated errors for that
+- [x] Support "Add missing cases"
+  - This has been hakced together
+  - We could possibly fake up missing cases, too. Since they're listed and  have an FC pointing at the first one
 - [x] inline struct getters during code generation (We'd like  `x.h1.h2`)
 - [ ] Better FC for parse errors (both EOF and the ones that show up just after the error)
 - [x] Code gen for PiType (rather than static JS)
@@ -58,12 +72,7 @@
   - [ ] see if we can make the typeclass stuff a little leaner, e.g. inline a projection of a static record.
   - It would be nice if IO looked like imperative JS, but that might be a bit of a stretch.
 
-- [ ] LSP and/or more editor support
-  - [ ] would be nice to have "add missing cases" and "case split"
-  - [ ] Probably need ranges for FC
-  - [ ] leave an interactive process running
-  - [ ] collect metadata or run through the serialization data
-  - [ ] rename in editor for top level functions (and maybe stuff in scope, probably need LSP first)
+
 - [ ] warn on unused imports?
 - [x] redo code to determine base path
 - [x] emit only one branch for default case when splitting inductives
@@ -78,9 +87,10 @@
 - [x] get port to run
   - [x] something goes terribly wrong with traverse_ and for_ (related to erasure, I think)
 - [x] ~~don't use `take` - it's not stack safe~~ The newt version is stack safe
-- [ ] report info in case of error
+- [ ] show user hole info even in case of error
 - [x] tokenizer that can be ported to newt
 - [ ] Add default path for library, so we don't need symlinks everywhere and can write tests for the library
+  - We need this to work for tests / dev and for installed newt.
 - [x] string interpolation?
   - The tricky part here is the `}` - I need to run the normal tokenizer in a way that treats `}` specially.
   - Idris handles `putStrLn "done \{ show $ add {x=1} 2}"` - it recurses for `{` `}` pairs.  Do we want that complexity?
@@ -91,7 +101,8 @@
 - [x] for parse error, seek to col 0 token and process next decl
 - [x] record update sugar
 - [x] Change `Ord` to be more like Idris - LT / EQ / GT (and entail equality)
-- [ ] Keep a `compare` function on `SortedMap` (like lean)
+- [x] Keep a `compare` function on `SortedMap` (like lean)
+  - `emptyMap` helper defaults to `compare` from `Ord a`
 - [x] keymap for monaco
 - [x] SortedMap.newt issue in `where`
 - [x] fix "insufficient patterns", wire in M or Either String
@@ -163,7 +174,7 @@
 - [x] Check for shadowing when declaring dcon
   - Handles the forward decl in `Zoo1.newt`, but we'll need different syntax if
     we have different core terms for TCon/DCon/Function
-- [ ] Require infix decl before declaring names with `_` (helps find bugs) or implicitly define infixl something if it's missing
+- [ ] Require infix decl before declaring mixfix names with `_` (helps find bugs) or implicitly define as infixl something if it is missing
 - [x] sugar for typeclasses
 - [x] maybe add implicits in core to help resugar operators?
 - [ ] consider putting binders in environment, like Idris, to better mark `let` and to provide names
@@ -182,7 +193,8 @@
   - actual `if_then_else_` isn't practical because the language is strict
 - [x] Search should look at context
 - [ ] copattern matching
-- [ ] Get `Combinatory.newt` to work
+- [x] Get `Combinatory.newt` to work
+  - Fixed when eval was fixed
 - [x] Remember operators from imports
 - [x] Default cases for non-primitives (currently gets expanded to all constructors)
   - This may need a little care. But I think I could collect all constructors that only match wildcards into a single case. This would lose any information from breaking out the individual, unnamed cases though.
@@ -235,11 +247,9 @@
   - [x] push down to value/term
   - [x] check quantity
   - [x] erase in output
-  - [ ] remove erased top level arguments
+- [ ] remove erased top level arguments
 - [x] top level at point in vscode
-- [ ] in-scope type at point in vscode
 - [ ] repl
-- [ ] LSP
 - [x] don't match forced constructors at runtime
   - I think we got this by not switching for single cases
 - [x] magic nat (codegen as number with appropriate pattern matching)
@@ -249,10 +259,11 @@
 - [ ] add `pop` or variant of `pfunc` that maps to an operator, giving the js operator and precedence on RHS
   - This has now been hard-coded in codegen, but a syntax or something would be better.
 - [ ] consider moving caselet, etc. desugaring out of the parser
-- [ ] pattern matching lambda
+- [-] pattern matching lambda
+  - `\case` is sufficient
   - I kept wanting this in AoC and use it a lot in the newt code
   - This conflicts with current code (unused?) that allows telescope information in lambdas
-  - For now, I'll implement `\case`
+
 
 ### Parsing
 

@@ -74,7 +74,7 @@ interpString = do
     append : Raw -> Raw -> Raw
     append t u =
       let fc = getFC t in
-      (RApp (getFC t) (RApp fc (RVar fc "_++_") t Explicit) u Explicit)
+      (RApp (fc + getFC u) (RApp fc (RVar fc "_++_") t Explicit) u Explicit)
 
 intLit : Parser Raw
 intLit = do
@@ -166,19 +166,18 @@ pratt ops prec stop left spine = do
         case lookupMap' nm ops of
           Just (MkOp name p fix False rule) => if p < prec
             then pure (left, spine)
-            else
-              runRule p fix stop rule (RApp fc (RVar fc name) left Explicit) rest
+            else runRule p fix stop rule (RApp (getFC left + fc) (RVar fc name) left Explicit) rest
           Just _ => fail "expected operator"
           Nothing =>
             if isPrefixOf "." nm
-            then pratt ops prec stop (RApp (getFC tm) tm left Explicit) rest
-            else pratt ops prec stop (RApp (getFC left) left tm Explicit) rest
-    ((icit, fc, tm) :: rest) => pratt ops prec stop (RApp (getFC left) left tm icit) rest
+            then pratt ops prec stop (RApp (getFC left + getFC tm) tm left Explicit) rest
+            else pratt ops prec stop (RApp (getFC left + getFC tm) left tm Explicit) rest
+    ((icit, fc, tm) :: rest) => pratt ops prec stop (RApp (getFC left + getFC tm) left tm icit) rest
   where
     projectHead : Raw -> AppSpine -> (Raw × AppSpine)
     projectHead t sp@((Explicit, fc', RVar fc nm) :: rest) =
       if isPrefixOf "." nm
-        then projectHead (RApp fc (RVar fc nm) t Explicit) rest
+        then projectHead (RApp (fc + getFC t) (RVar fc nm) t Explicit) rest
         else (t,sp)
     projectHead t sp = (t, sp)
 
@@ -188,7 +187,7 @@ pratt ops prec stop left spine = do
     runProject : AppSpine -> AppSpine
     runProject (t@(Explicit, fc', tm) :: u@(Explicit, _, RVar fc nm) :: rest) =
       if isPrefixOf "." nm
-        then runProject ((Explicit, fc', RApp fc (RVar fc nm) tm Explicit) :: rest)
+        then runProject ((Explicit, fc', RApp (fc + getFC tm) (RVar fc nm) tm Explicit) :: rest)
         else (t :: u :: rest)
     runProject tms = tms
 
@@ -203,7 +202,7 @@ pratt ops prec stop left spine = do
       case spine of
                 ((_, fc, right) :: rest) => do
                   (right, rest) <- pratt ops pr stop right rest
-                  pratt ops prec stop (RApp (getFC left) left right Explicit) rest
+                  pratt ops prec stop (RApp (getFC left + getFC right) left right Explicit) rest
                 _ => fail "trailing operator"
 
     runRule p fix stop (nm :: rule) left spine = do
@@ -215,7 +214,7 @@ pratt ops prec stop left spine = do
           let ((_,fc',RVar fc name) :: rest) = rest
             | _ => fail "expected \{nm}"
           if name == nm
-            then runRule p fix stop rule (RApp (getFC left) left right Explicit) rest
+            then runRule p fix stop rule (RApp (getFC left + getFC right) left right Explicit) rest
             else fail "expected \{nm}"
 
     -- run any prefix operators
@@ -417,7 +416,9 @@ term = do
   where
     apply : Raw -> List (FC × Raw) -> Raw
     apply t Nil = t
-    apply t ((fc,x) :: xs) = RApp fc t (apply x xs) Explicit
+    apply t ((fc,x) :: xs) =
+      let u = apply x xs in
+      RApp (getFC t + getFC u) t u Explicit
 
 varname : Parser String
 varname = (ident <|> uident <|> keyword "_" *> pure "_")
