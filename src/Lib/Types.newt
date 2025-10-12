@@ -427,7 +427,6 @@ record TopContext where
   -- Global values
   verbose : Int -- command line flag
   errors : IORef (List Error)
-  -- what do we do here? we can accumulate for now, but we'll want to respect import
   ops : Operators
 
 -- we'll use this for typechecking, but need to keep a TopContext around too.
@@ -445,13 +444,11 @@ record Context where
   ctxFC : FC
 
 -- add a binding to environment
-
 extend : Context -> String -> Val -> Context
 extend (MkCtx lvl env types bds ctxFC) name ty =
   MkCtx (1 + lvl) (VVar emptyFC lvl Lin :: env) ((name,ty) :: types) (Bound :: bds) ctxFC
 
--- I guess we define things as values?
-
+-- add a def to the environment
 define : Context -> String -> Val -> Val -> Context
 define (MkCtx lvl env types bds ctxFC) name val ty =
   MkCtx (1 + lvl) (val :: env) ((name,ty) :: types) (Defined :: bds) ctxFC

@@ -510,7 +510,7 @@ unify env mode t u = do
           vtm <- eval Nil tm
           appvtm <- vappSpine vtm sp'
           unify env mode t appvtm
-        _ => error fc' "unify failed \{show t} =?= \{show u} [no Fn]\n  env is \{show env}"
+        _ => error fc' "unify failed \{show t} =?= \{show u} [no Fn]"
 
     unifyRef t@(VRef fc k sp) u = do
       debug $ \ _ => "expand %ref \{show k} \{show sp} =?= \{show u}"
@@ -520,7 +520,7 @@ unify env mode t u = do
           vtm <- eval Nil tm
           tmsp <- vappSpine vtm sp
           unify env mode tmsp u
-        _ => error fc "unify failed \{show t} [no Fn] =?= \{show u}\n  env is \{show env}"
+        _ => error fc "unify failed \{show t} [no Fn] =?= \{show u}"
     unifyRef t u = unifyRest t u
 
     unifyVar : Val -> Val -> M UnifyResult
@@ -783,7 +783,6 @@ updateContext ctx ((k, val) :: cs) =
       updateContext ctx cs
     Nothing => error (getFC val) "INTERNAL ERROR: bad index in updateContext"
   where
-
     replaceV : ∀ a. Nat -> a -> List a -> List a
     replaceV k x Nil = Nil
     replaceV Z x (y :: xs) = x :: xs
@@ -1037,9 +1036,6 @@ checkWhere ctx decls body ty = do
   -- But I'll attempt letrec first
   tm <- buildTree (withPos ctx' defFC) (MkProb clauses' vty)
   vtm <- eval ctx'.env tm
-  -- Should we run the rest with the definition in place?
-  -- I'm wondering if switching from bind to define will mess with metas
-  -- let ctx' = define ctx name vtm vty
   ty' <- checkWhere ctx' decls' body ty
   pure $ LetRec sigFC name funTy tm ty'
 

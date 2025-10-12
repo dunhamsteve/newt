@@ -37,7 +37,7 @@ lookupRaw raw top =
 
 
 instance Show TopContext where
-  show (MkTop _ _ _ _ defs metas _ _ _) = "\nContext:\n [\{ joinBy "\n" $ map (show ∘ snd) $ toList defs}]"
+  show top = "\nContext:\n [\{ joinBy "\n" $ map (show ∘ snd) $ toList top.defs}]"
 
 -- TODO need to get class dependencies working
 emptyTop : ∀ io. {{Monad io}} {{HasIO io}} -> io TopContext
@@ -52,32 +52,22 @@ setFlag name fc flag = do
   top <- getTop
   let (Just (MkEntry fc nm ty def flags)) = lookupMap' name top.defs
     | Nothing => error fc "\{show name} not declared"
-  modifyTop $ \case
-    MkTop mods imp hints ns defs metaCtx verbose errors ops =>
-      let defs = (updateMap name (MkEntry fc name ty def (flag :: flags)) defs) in
-      MkTop mods imp hints ns defs metaCtx verbose errors ops
+  modifyTop $ \ top => [ defs := (updateMap name (MkEntry fc name ty def (flag :: flags)) top.defs) ] top
 
 setDef : QName -> FC -> Tm -> Def → List EFlag -> M Unit
 setDef name fc ty def flags = do
   top <- getTop
   let (Nothing) = lookupMap' name top.defs
     | Just (MkEntry fc' nm' ty' def' _) => error fc "\{show name} is already defined at \{show fc'}"
-  modifyTop $ \case
-    MkTop mods imp hints ns defs metaCtx verbose errors ops =>
-      let defs = (updateMap name (MkEntry fc name ty def flags) top.defs) in
-      MkTop mods imp hints ns defs metaCtx verbose errors ops
-
+  modifyTop $ \top =>
+    [ defs := (updateMap name (MkEntry fc name ty def flags) top.defs)] top
 
 updateDef : QName -> FC -> Tm -> Def -> M Unit
 updateDef name fc ty def = do
   top <- getTop
   let (Just (MkEntry fc' nm' ty' def' flags)) = lookupMap' name top.defs
     | Nothing => error fc "\{show name} not declared"
-  modifyTop $ \case
-    MkTop mods imp hints ns defs metaCtx verbose errors ops =>
-      let defs = (updateMap name (MkEntry fc' name ty def flags) defs) in
-      MkTop mods imp hints ns defs metaCtx verbose errors ops
-
+  putTop $ [ defs := updateMap name (MkEntry fc' name ty def flags) top.defs ] top
 
 typeName : Tm → Maybe QName
 typeName (Pi fc nm Explicit rig t u) = Nothing
@@ -93,14 +83,10 @@ addHint qn = do
     Just entry => do
       let (Just tyname) = typeName entry.type
         | Nothing => error entry.fc "can't find tcon name for \{show qn}"
-
       let xs = fromMaybe Nil $ lookupMap' tyname top.hints
       let hints = updateMap tyname ((qn, entry.type) :: xs) top.hints
-      putTop $ MkTop top.modules top.imported hints top.ns top.defs top.metaCtx top.verbose top.errors top.ops
-      pure MkUnit
-
+      putTop $ [ hints := hints ] top
     Nothing => pure MkUnit
-
 
 addError : Error -> M Unit
 addError err = do
