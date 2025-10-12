@@ -62,6 +62,8 @@ export function activate(context: vscode.ExtensionContext) {
 
   function checkDocument(document: vscode.TextDocument) {
     const fileName = document.fileName;
+    if (!fileName.endsWith(".newt")) return;
+
     // Is there a better way to do this? It will get fussy with quoting and all plus it's not visible to the user.
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
     const cwd = workspaceFolder
@@ -144,10 +146,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   const runNewt = vscode.commands.registerCommand("newt-vscode.check", () => {
     const editor = vscode.window.activeTextEditor;
-    if (editor) {
-      const document = editor.document;
-      if (document.fileName.endsWith(".newt")) checkDocument(document);
-    }
+    if (editor) checkDocument(editor.document);
   });
 
   context.subscriptions.push(
@@ -268,17 +267,14 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(runNewt);
-
-  vscode.workspace.onDidSaveTextDocument((document) => {
-    if (document.fileName.endsWith(".newt"))
-      vscode.commands.executeCommand("newt-vscode.check");
+  vscode.window.onDidChangeActiveTextEditor((editor) => {
+    if (editor?.document.fileName.endsWith(".newt") && !editor.document.isDirty) {
+      checkDocument(editor.document);
+    }
   });
-  vscode.workspace.onDidOpenTextDocument((document) => {
-    if (document.fileName.endsWith(".newt"))
-      vscode.commands.executeCommand("newt-vscode.check");
-  });
-  for (let document of vscode.workspace.textDocuments)
-    if (document.fileName.endsWith(".newt")) checkDocument(document);
+  vscode.workspace.onDidSaveTextDocument(checkDocument);
+  vscode.workspace.onDidOpenTextDocument(checkDocument);
+  vscode.workspace.textDocuments.forEach(checkDocument);
 
   context.subscriptions.push(diagnosticCollection);
   context.subscriptions.push(
