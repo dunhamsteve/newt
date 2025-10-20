@@ -1189,15 +1189,17 @@ buildLitCases ctx prob fc scnm scty = do
 -- TODO - figure out if these need to be in Prelude or have a special namespace
 -- If we lookupRaw "String", we could get different answers in different contexts.
 -- maybe Hardwire this one
-stringType intType charType : QName
+stringType intType charType boolType : QName
 stringType = QN primNS "String"
 intType = QN primNS "Int"
 charType = QN primNS "Char"
+boolType = QN primNS "Bool"
 
 litTyName : Literal -> QName
 litTyName (LString str) = stringType
 litTyName (LInt i) = intType
 litTyName (LChar c) = charType
+litTyName (LBool _) = boolType -- not used
 
 renameContext : String -> String -> Context -> Context
 renameContext from to ctx = MkCtx ctx.lvl ctx.env (go ctx.types) ctx.bds ctx.ctxFC

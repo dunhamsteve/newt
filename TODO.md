@@ -2,6 +2,10 @@
 ## TODO
 
 - [x] Take the parens off of FC to make vscode happy
+- [x] Magic to make Bool a boolean
+- [ ] Look into using holes for errors (https://types.pl/@AndrasKovacs/115401455046442009)
+  - This would let us hit more cases in a function when we hit an error.
+  - I've been wanting to try holes for parse errors too.
 - [ ] in-scope type at point in vscode
   - So the idea here is that the references will be via FC, we remember the type at declaration and then point the usage back to the declaration (FC -> FC). We could dump all of this. (If we're still doing json.)
   - Do we want to (maybe later) keep the scope as a FC? We could do scope at point then.
@@ -29,7 +33,7 @@
   - [ ] Add `export` keywords
 - [ ] vscode - run newt when switching editors
 - [ ] who calls X?  We can only do this scoped to the current context for now. Someday whole source dir. #lsp
-- [ ] Magic to make Bool a boolean
+q
 - [ ] case split
   - We could fake this up:
     - given a name and a point in the editor

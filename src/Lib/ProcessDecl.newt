@@ -137,6 +137,7 @@ processPrimFn ns fc nm used ty src = do
   let arity = piArity ty'
   setDef (QN ns nm) fc ty' (PrimFn src arity used') Nil
 
+-- Heuristic for whether a function is simple enough to inline
 -- I'm trying to get ++ and + inlined as javascript +
 complexity : Tm → Int
 complexity (Ref _ _) = 1
@@ -186,7 +187,7 @@ processDef ns fc nm clauses = do
   -- putStrLn $ show tm
   -- TODO we need some protection against inlining a function calling itself.
   -- We need better heuristics, maybe fuel and deciding while inlining.
-  -- bind is explicit here because the complexity has a 100 in it.
+  -- IO,bind is explicit here because the complexity has a 100 in it.
   let name = show $ QN ns nm
   if complexity tm < 15 || name == "Prelude.Prelude.Monad Prelude.IO,bind" || name == "Prelude._>>=_"
     then setFlag (QN ns nm) fc Inline
@@ -404,6 +405,8 @@ processShortData ns fc lhs sigs = do
 populateConInfo : List TopEntry → List TopEntry
 populateConInfo entries =
   let (Nothing) = traverse checkEnum entries
+    -- Boolean
+    | Just (a :: b :: Nil) => (setInfo a FalseCon :: setInfo b TrueCon :: Nil)
     | Just entries => entries in
   let (a :: b :: Nil) = entries | _ => entries in
   let (Just succ) = find isSucc entries | _ => entries in

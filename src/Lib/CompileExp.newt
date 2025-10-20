@@ -52,11 +52,17 @@ lamArity : Tm -> Nat
 lamArity (Lam _ _ _ _ t) = S (lamArity t)
 lamArity _ = Z
 
+-- It would be nice to be able to declare these
 compilePrimOp : String → List CExp → Maybe CExp
 compilePrimOp "Prelude.addString" (x :: y :: Nil) = Just (CPrimOp "+" x y)
 compilePrimOp "Prelude.addInt" (x :: y :: Nil) = Just (CPrimOp "+" x y)
 compilePrimOp "Prelude.mulInt" (x :: y :: Nil) = Just (CPrimOp "*" x y)
 compilePrimOp "Prelude.subInt" (x :: y :: Nil) = Just (CPrimOp "-" x y)
+compilePrimOp "Prelude._&&_" (x :: y :: Nil) = Just (CPrimOp "&&" x y)
+compilePrimOp "Prelude._||_" (x :: y :: Nil) = Just (CPrimOp "||" x y)
+-- Assumes Bool is in the right order!
+compilePrimOp "Prelude.jsEq" (_ :: x :: y :: Nil) = Just (CPrimOp "==" x y)
+compilePrimOp "Prelude.jsLt" (_ :: x :: y :: Nil) = Just (CPrimOp "<" x y)
 compilePrimOp "Prelude.divInt" (x :: y :: Nil) = Just (CPrimOp "|" (CPrimOp "/" x y) (CLit $ LInt 0))
 compilePrimOp _ _ = Nothing
 
@@ -104,6 +110,11 @@ lookupDef fc nm = do
     Nothing => error fc "\{show nm} not in scope"
     Just def => pure def
 
+getBody : CAlt → CExp
+getBody (CConAlt _ _ _ _ t) = t
+getBody (CLitAlt _ t) = t
+getBody (CDefAlt t) = t
+
 compileTerm : {{Ref2 Defs St}} → Tm -> M CExp
 compileTerm (Bnd _ k) = pure $ CBnd k
 -- need to eta expand to arity
@@ -116,6 +127,8 @@ compileTerm t@(Ref fc nm@(QN _ tag)) = do
     Z =>
       case the (Maybe Def) $ lookupMap' nm defs of
         Just (DCon ix EnumCon _ _) => pure $ CLit $ LInt $ cast ix
+        Just (DCon ix FalseCon _ _) => pure $ CLit $ LBool False
+        Just (DCon ix TrueCon _ _) => pure $ CLit $ LBool True
         Just (DCon _ ZeroCon _ _) => pure $ CLit $ LInt 0
         Just (DCon _ SuccCon _ _) =>
           pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
@@ -176,6 +189,8 @@ compileTerm (Case fc t alts) = do
 
     enumAlt : CAlt → CAlt
     enumAlt (CConAlt ix nm EnumCon args tm) = CLitAlt (LInt $ cast ix) tm
+    enumAlt (CConAlt ix nm FalseCon args tm) = CLitAlt (LBool False) tm
+    enumAlt (CConAlt ix nm TrueCon args tm) = CLitAlt (LBool True) tm
     enumAlt alt = alt
 
     isInfo : ConInfo → CAlt → Bool
@@ -186,10 +201,6 @@ compileTerm (Case fc t alts) = do
     isDef (CDefAlt _) = True
     isDef _ = False
 
-    getBody : CAlt → CExp
-    getBody (CConAlt _ _ _ _ t) = t
-    getBody (CLitAlt _ t) = t
-    getBody (CDefAlt t) = t
 
     doNumCon : CExp → List CAlt → List CAlt
     doNumCon sc alts =
@@ -237,6 +248,8 @@ compileFun tm = go tm Lin
 -- What are the Defs used for above? (Arity for name)
 compileDCon : Nat → QName → ConInfo → Int → CExp
 compileDCon ix (QN _ nm) EnumCon 0 = CLit $ LInt $ cast ix
+compileDCon ix (QN _ nm) TrueCon 0 = CLit $ LBool True
+compileDCon ix (QN _ nm) FalseCon 0 = CLit $ LBool False
 compileDCon ix (QN _ nm) info 0 = CConstr ix nm Nil
 compileDCon ix (QN _ nm) info arity =
   let args = map (\k => "h\{show k}") (range 0 arity) in

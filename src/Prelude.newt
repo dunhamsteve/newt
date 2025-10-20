@@ -10,7 +10,8 @@ const : ∀ a b. a → b → a
 const a b = a
 
 data Unit = MkUnit
-data Bool = True | False
+-- False first so it ends up being false
+data Bool = False | True
 
 not : Bool → Bool
 not True = False

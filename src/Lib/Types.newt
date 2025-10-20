@@ -51,10 +51,11 @@ instance HasFC BindInfo where
 
 Tm : U
 
-data Literal = LString String | LInt Int | LChar Char
+data Literal = LString String | LInt Int | LChar Char | LBool Bool
 
 instance Show Literal where
   show (LString str) = quoteString str
+  show (LBool b) = if b then "true" else "false"
   show (LInt i) = show i
   show (LChar c) = "'\{show c}'" -- FIXME single quote
 
@@ -337,17 +338,21 @@ instance Eq MetaMode where
   NoCheck == NoCheck = True
   _ == _ = False
 
-data ConInfo = NormalCon | SuccCon | ZeroCon | EnumCon
+data ConInfo = NormalCon | SuccCon | ZeroCon | EnumCon | TrueCon | FalseCon
 
 instance Eq ConInfo where
   NormalCon == NormalCon = True
   SuccCon == SuccCon = True
   ZeroCon == ZeroCon = True
   EnumCon == EnumCon = True
+  TrueCon == TrueCon = True
+  FalseCon == FalseCon = True
   _ == _ = False
 
 instance Show ConInfo where
   show NormalCon = ""
+  show FalseCon = "[F]"
+  show TrueCon = "[T]"
   show SuccCon = "[S]"
   show ZeroCon = "[Z]"
   show EnumCon = "[E]"

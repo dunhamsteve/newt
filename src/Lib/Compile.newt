@@ -31,15 +31,16 @@ data JAlt : U where
   JLitAlt : ∀ e. JSExp -> JSStmt e -> JAlt
 
 data JSExp : U where
-  LitArray : List JSExp -> JSExp
   LitObject : List (String × JSExp) -> JSExp
   LitString : String -> JSExp
+  LitBool : Bool -> JSExp
   LitInt : Int -> JSExp
   Apply : JSExp -> List JSExp -> JSExp
   Var : String -> JSExp
   JLam : List String -> JSStmt Return -> JSExp
   JPrimOp : String → JSExp → JSExp → JSExp
   JUndefined : JSExp
+  JTernary : JSExp → JSExp → JSExp → JSExp
   Index : JSExp -> JSExp -> JSExp
   Dot : JSExp -> String -> JSExp
   Raw : String -> JSExp
@@ -54,6 +55,7 @@ data JSStmt : StKind -> U where
   JAssign : (nm : String) -> JSExp -> JSStmt (Assign nm)
   -- TODO - switch to Int tags
   JCase : ∀ a. JSExp -> List JAlt -> JSStmt a
+  JIfThen : ∀ a. JSExp -> JSStmt a -> JSStmt a -> JSStmt a
   -- throw can't be used
   JError : ∀ a. String -> JSStmt a
 
@@ -80,6 +82,7 @@ emptyJSEnv = MkEnv Nil 0
 
 litToJS : Literal -> JSExp
 litToJS (LString str) = LitString str
+litToJS (LBool b) = LitBool b
 litToJS (LChar c) = LitString $ pack (c :: Nil)
 litToJS (LInt i) = LitInt i
 
@@ -87,8 +90,6 @@ litToJS (LInt i) = LitInt i
 mkEnv : JSExp -> Int -> JSEnv -> List String -> JSEnv
 mkEnv nm k env Nil = env
 mkEnv nm k env (x :: xs) = mkEnv nm (1 + k) (push env (Dot nm "h\{show k}")) xs
-
-envNames : Env -> List String
 
 -- given a name, find a similar one that doesn't shadow in Env
 freshName : String -> JSEnv -> String
@@ -195,8 +196,11 @@ termToJS env (CApp t arg) f = termToJS env t (\ t' => termToJS env arg (\arg' =>
 
 termToJS {e} env (CCase t alts) f =
   termToJS env t $ \case
-    (Var nm) => maybeCaseStmt env (Var nm) alts
+    (Var nm) => do
+      let (Nothing) = jsITE (Var nm) alts f | Just rval => rval
+      maybeCaseStmt env (Var nm) alts
     t' => do
+      let (Nothing) = jsITE t' alts f | Just rval => rval
       -- TODO with inlining, we hit cases where the let gets pulled forward more than once
       -- two cases as separate args, se we need actual unique names. For now, we're calling
       -- incr when processing App, as a stopgap, we probably need a fresh names state monad
@@ -207,6 +211,18 @@ termToJS {e} env (CCase t alts) f =
         then (maybeCaseStmt env' t' alts)
         else JSnoc (JConst nm t') (maybeCaseStmt env' (Var nm) alts)
   where
+    tertiary : JSExp → JSStmt e → JSStmt e → Cont e → JSStmt e
+    tertiary sc (JReturn t) (JReturn f) k = JReturn $ JTernary sc t f
+    tertiary sc (JAssign nm t) (JAssign _ f) k = JAssign nm $ JTernary sc t f
+    tertiary sc t f k = JIfThen sc t f
+
+    jsITE : JSExp → List CAlt → Cont e → Maybe (JSStmt e)
+    jsITE sc (CLitAlt (LBool b) rhs :: alt :: Nil) f =
+      let t = termToJS env rhs f
+          e = termToJS env (getBody alt) f
+      in Just $ if b then tertiary sc t e f else tertiary sc e t f
+    jsITE sc alts f = Nothing
+
     termToJSAlt : JSEnv -> JSExp -> CAlt -> JAlt
     termToJSAlt env nm (CConAlt ix name info args u) = JConAlt ix (termToJS (mkEnv nm 0 env args) u f)
     -- intentionally reusing scrutinee name here
@@ -253,7 +269,8 @@ jsIdent id = if elem id jsKeywords then text ("$" ++ id) else text $ pack $ fix 
 stmtToDoc : ∀ e. JSStmt e -> Doc
 
 expToDoc : JSExp -> Doc
-expToDoc (LitArray xs) = fatalError "TODO - LitArray to doc"
+expToDoc (LitBool b) = if b then text "true" else text "false"
+expToDoc (JTernary sc t f) = bracket "(" (expToDoc sc <+> text "?" <+> expToDoc t <+> text ":" <+> expToDoc f )")"
 expToDoc (LitObject xs) = text "{" <+> folddoc (\ a e => a ++ text ", " <+/> e) (map entry xs) <+> text "}"
   where
     entry : (String × JSExp) -> Doc
@@ -291,6 +308,10 @@ stmtToDoc (JAssign nm expr) = jsIdent nm <+> text "=" <+> expToDoc expr ++ text 
 stmtToDoc (JConst nm x) = text "const" <+> jsIdent nm <+> nest 2 (text "=" <+/> expToDoc x ++ text ";")
 stmtToDoc (JReturn x) = text "return" <+> expToDoc x ++ text ";"
 stmtToDoc (JError str) = text "throw new Error(" ++ text (quoteString str) ++ text ");"
+stmtToDoc (JIfThen sc t e) =
+  text "if (" ++ expToDoc sc ++ text ")"
+    <+> bracket "{" (stmtToDoc t) "}"
+    <+> text "else" <+> bracket "{" (stmtToDoc e) "}"
 stmtToDoc (JCase sc alts) =
   text "switch (" ++ expToDoc sc ++ text ")" <+> bracket "{" (stack $ map altToDoc alts) "}"
 

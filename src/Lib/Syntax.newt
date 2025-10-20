@@ -212,6 +212,7 @@ instance Show Raw where
 
 instance Pretty Literal where
   pretty (LString t) = text t
+  pretty (LBool b) = if b then text "true" else text "false"
   pretty (LInt i) = text $ show i
   pretty (LChar c) = text $ show c
 
