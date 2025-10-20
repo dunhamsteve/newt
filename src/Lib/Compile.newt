@@ -86,10 +86,10 @@ litToJS (LBool b) = LitBool b
 litToJS (LChar c) = LitString $ pack (c :: Nil)
 litToJS (LInt i) = LitInt i
 
--- Stuff nm.h1, nm.h2, ... into environment
-mkEnv : JSExp -> Int -> JSEnv -> List String -> JSEnv
-mkEnv nm k env Nil = env
-mkEnv nm k env (x :: xs) = mkEnv nm (1 + k) (push env (Dot nm "h\{show k}")) xs
+-- Stuff nm.h1, nm.h2, ... into environment for constructor match
+conAltEnv : JSExp -> Int -> JSEnv -> List String -> JSEnv
+conAltEnv sc k env Nil = env
+conAltEnv sc k env (x :: xs) = conAltEnv sc (1 + k) (push env (Dot sc "h\{show k}")) xs
 
 -- given a name, find a similar one that doesn't shadow in Env
 freshName : String -> JSEnv -> String
@@ -126,6 +126,7 @@ simpleJSExp (JUndefined) = True
 simpleJSExp (Index a b) = if simpleJSExp a then simpleJSExp b else False
 simpleJSExp (LitInt _) = True
 simpleJSExp (LitString _) = True
+simpleJSExp (LitBool _) = True
 simpleJSExp _ = False
 
 -- This is inspired by A-normalization, look into the continuation monad
@@ -196,18 +197,15 @@ termToJS env (CApp t arg) f = termToJS env t (\ t' => termToJS env arg (\arg' =>
 
 termToJS {e} env (CCase t alts) f =
   termToJS env t $ \case
-    (Var nm) => do
-      let (Nothing) = jsITE (Var nm) alts f | Just rval => rval
-      maybeCaseStmt env (Var nm) alts
-    t' => do
-      let (Nothing) = jsITE t' alts f | Just rval => rval
+    (Var nm) => maybeCaseStmt env (Var nm) alts
+    t' =>
       -- TODO with inlining, we hit cases where the let gets pulled forward more than once
       -- two cases as separate args, se we need actual unique names. For now, we're calling
       -- incr when processing App, as a stopgap, we probably need a fresh names state monad
       let nm = "_sc$\{show env.depth}"
-      -- increment the bit that goes into the name
-      let env' = incr env
-      if simpleJSExp t'
+          -- increment the bit that goes into the name
+          env' = incr env
+      in if simpleJSExp t'
         then (maybeCaseStmt env' t' alts)
         else JSnoc (JConst nm t') (maybeCaseStmt env' (Var nm) alts)
   where
@@ -216,26 +214,33 @@ termToJS {e} env (CCase t alts) f =
     tertiary sc (JAssign nm t) (JAssign _ f) k = JAssign nm $ JTernary sc t f
     tertiary sc t f k = JIfThen sc t f
 
-    jsITE : JSExp → List CAlt → Cont e → Maybe (JSStmt e)
-    jsITE sc (CLitAlt (LBool b) rhs :: alt :: Nil) f =
-      let t = termToJS env rhs f
-          e = termToJS env (getBody alt) f
-      in Just $ if b then tertiary sc t e f else tertiary sc e t f
-    jsITE sc alts f = Nothing
-
     termToJSAlt : JSEnv -> JSExp -> CAlt -> JAlt
-    termToJSAlt env nm (CConAlt ix name info args u) = JConAlt ix (termToJS (mkEnv nm 0 env args) u f)
+    termToJSAlt env nm (CConAlt ix name info args u) = JConAlt ix (termToJS (conAltEnv nm 0 env args) u f)
     -- intentionally reusing scrutinee name here
     termToJSAlt env nm (CDefAlt u) = JDefAlt (termToJS  (env) u f)
     termToJSAlt env nm (CLitAlt lit u) = JLitAlt (litToJS lit) (termToJS env u f)
 
+    getArgs : CAlt → List String
+    getArgs (CDefAlt _) = Nil
+    getArgs (CLitAlt args _) = Nil
+    getArgs (CConAlt _ _ _ args _) = args
+
     maybeCaseStmt : JSEnv -> JSExp -> List CAlt -> JSStmt e
     -- If there is a single alt, assume it matched
-    maybeCaseStmt env nm ((CConAlt _ _ info args u) :: Nil) = (termToJS (mkEnv nm 0 env args) u f)
-    maybeCaseStmt env nm alts@(CLitAlt _ _  :: _) =
-        (JCase nm (map (termToJSAlt env nm) alts))
-    maybeCaseStmt env nm alts =
-          (JCase (Dot nm "tag") (map (termToJSAlt env nm) alts))
+    maybeCaseStmt env sc ((CConAlt _ _ info args u) :: Nil) = (termToJS (conAltEnv sc 0 env args) u f)
+    maybeCaseStmt env sc alts@(CLitAlt _ _  :: _) =
+        (JCase sc (map (termToJSAlt env sc) alts))
+    maybeCaseStmt env sc alts = case alts of
+        CLitAlt (LBool b) rhs :: alt :: Nil =>
+          let t' = termToJS env rhs f
+              e' = termToJS env (getBody alt) f
+          in if b then tertiary sc t' e' f else tertiary sc e' t' f
+        CConAlt ix name info args t :: alt :: Nil =>
+          let cond = (JPrimOp "==" (Dot sc "tag") (LitInt $ cast ix))
+              t' = termToJS (conAltEnv sc 0 env args) t f
+              u' = termToJS (conAltEnv sc 0 env $ getArgs alt) (getBody alt) f
+          in tertiary cond t' u' f
+        alts => JCase (Dot sc "tag") (map (termToJSAlt env sc) alts)
 
 jsKeywords : List String
 jsKeywords = (

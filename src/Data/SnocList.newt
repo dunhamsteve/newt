@@ -12,3 +12,11 @@ snoclen {a} xs = go xs Z
 snocelem : ∀ a. {{Eq a}} → a → SnocList a → Bool
 snocelem a Lin = False
 snocelem a (xs :< x) = if a == x then True else snocelem a xs
+
+snocGetAt : ∀ a. Nat → SnocList a → Maybe a
+snocGetAt _ Lin = Nothing
+snocGetAt Z (xs :< x) = Just x
+snocGetAt (S k) (xs :< x) = snocGetAt k xs
+
+snocGetAt' : ∀ a. Int → SnocList a → Maybe a
+snocGetAt' ix xs = snocGetAt (cast ix) xs

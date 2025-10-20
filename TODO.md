@@ -1,6 +1,7 @@
 
 ## TODO
 
+- [ ] Add error for non-linear names in pattern matching (currently it picks one)
 - [x] Take the parens off of FC to make vscode happy
 - [x] Magic to make Bool a boolean
 - [ ] Look into using holes for errors (https://types.pl/@AndrasKovacs/115401455046442009)
@@ -33,7 +34,6 @@
   - [ ] Add `export` keywords
 - [ ] vscode - run newt when switching editors
 - [ ] who calls X?  We can only do this scoped to the current context for now. Someday whole source dir. #lsp
-q
 - [ ] case split
   - We could fake this up:
     - given a name and a point in the editor
