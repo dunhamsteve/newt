@@ -444,8 +444,9 @@ processData ns fc nm ty cons = do
       unifyCatch fc (mkCtx fc) tyty' type'
     Just _ => error fc "\{show nm} already declared"
     Nothing => setDef (QN ns nm) fc tyty Axiom Nil
-  entries <- join <$> (for (enumerate cons) $ \x => case x of
-      (ix, TypeSig fc names tm) => do
+  -- check cons, return list of type,con
+  allCons <- join <$> (for cons $ \x => case x of
+      (TypeSig fc names tm) => do
           traverse (checkAlreadyDef fc) names
           debug $ \ _ => "check dcon \{show names} \{show tm}"
           dty <- check (mkCtx fc) tm (VU fc)
@@ -460,11 +461,12 @@ processData ns fc nm ty cons = do
             | (tm, _) => error (getFC tm) "expected \{nm} got \{render 90 $ pprint tnames tm}"
           when (hn /= QN ns nm) $ \ _ =>
             error (getFC codomain) "Constructor codomain is \{render 90 $ pprint tnames codomain} rather than \{nm}"
-          pure $ map (\ nm' => (MkEntry fc (QN ns nm') dty (DCon ix NormalCon (getArity dty) hn) Nil)) names
-      (_,decl) => throwError $ E (getFC decl) "expected constructor declaration")
+          pure $ map (_,_ dty) names
+      decl => throwError $ E (getFC decl) "expected constructor declaration")
   -- type level autos like _++_
   solveAutos
-  let entries = populateConInfo entries
+
+  let entries = populateConInfo $ map makeConEntry $ enumerate allCons
   for entries $ \case (MkEntry name fc dty def flags) => setDef fc name dty def flags
   let cnames = map (\x => x.name) entries
 
@@ -472,6 +474,9 @@ processData ns fc nm ty cons = do
   let arity = cast $ piArity tyty
   updateDef (QN ns nm) fc tyty (TCon arity cnames)
   where
+    makeConEntry : (Nat × Tm × String) → TopEntry
+    makeConEntry (ix, dty, nm') = MkEntry fc (QN ns nm') dty (DCon ix NormalCon (getArity dty) (QN ns nm)) Nil
+
     binderName : Binder → Name
     binderName (MkBinder _ nm _ _ _) = nm
 

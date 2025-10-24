@@ -158,7 +158,7 @@ run fn = do
 
   -- the space is illegal spot
   let numpad = fromList $ filter (not ∘ _==_ ' ' ∘ fst) $ gridPoints "789\n456\n123\n 0A"
-  debugLog $ toList numpad
+  printLn $ toList numpad
 
   let rob1 = KP "r1" (0,2) (0,0) EmptyMap Nothing
   let robn = makeKeypad 2 rob1

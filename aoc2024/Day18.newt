@@ -94,7 +94,7 @@ run fn size time = do
     | Right (_, cs) => putStrLn $ "extra: " ++ pack cs
   let p1map = step EmptyMap points time
   let p1 = minPath p1map size
-  debugLog $ length $ toList p1map
+  printLn $ length $ toList p1map
   putStrLn $ "part1 " ++ show p1
   let p2map = step2 EmptyMap points 0
   let p2 = part2 p2map size

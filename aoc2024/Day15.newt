@@ -94,12 +94,12 @@ run fn = do
   putStrLn fn
   text <- readFile fn
   let (Right (grid,steps)) = parseFile text | Left err => putStrLn $ "Error " ++ err
-  let ((start,_) :: Nil) = filter ((_==_ '@') ∘ snd) $ toList grid | x => debugLog x
+  let ((start,_) :: Nil) = filter ((_==_ '@') ∘ snd) $ toList grid | x => printLn x
   let (grid', end) = foldl step (grid, start) steps
   let p1 = foldl _+_ 0 $ map (gps ∘ fst) $ filter (_==_ 'O' ∘ snd) $ toList grid'
   putStrLn $ "part1 " ++ show p1
   let grid2 = mkPart2 grid
-  let ((start,_) :: Nil) = filter ((_==_ '@') ∘ snd) $ toList grid2 | x => debugLog x
+  let ((start,_) :: Nil) = filter ((_==_ '@') ∘ snd) $ toList grid2 | x => printLn x
   let (grid2', end) = foldl step (grid2, start) steps
   let p2 = foldl _+_ 0 $ map (gps ∘ fst) $ filter (_==_ '[' ∘ snd) $ toList grid2'
   putStrLn $ "part2 " ++ show p2

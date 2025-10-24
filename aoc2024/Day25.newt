@@ -57,7 +57,7 @@ run fn = do
   text <- readFile fn
   let chunks = parseFile text
   let (locks,keys) = splitKeys chunks Nil Nil
-  debugLog (length locks, length keys)
+  printLn (length locks, length keys)
   let p1 = foldl _+_ 0 $ map (\ l => foldl _+_ 0 $ map (check l) keys) locks
   putStrLn $ "part1 " ++ show p1
 

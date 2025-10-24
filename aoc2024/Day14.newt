@@ -92,18 +92,18 @@ run fn w h = do
     | Left msg => putStrLn $ "Parse Error " ++ msg
     | Right (robots, rest) => putStrLn $ "stuck at¬" ++ pack rest
   let result = map (move w h 100) robots
-  -- debugLog result
+  -- printLn result
   let q1 = count quad1 result
   let q2 = count quad2 result
   let q3 = count quad3 result
   let q4 = count quad4 result
-  debugLog (q1,q2,q3,q4)
+  printLn (q1,q2,q3,q4)
   let p1 = q1 * q2 * q3 * q4
   putStrLn $ "part1 " ++ show p1
   printLn $ count (\ x => True) robots
   let scores = collect robots 0 Nil
   let stuff = qsort (\ a b => snd a < snd b) $ collect robots 0 Nil
-  -- debugLog stuff
+  -- printLn stuff
   dump robots stuff 1
   where
     dump : List Robot → List (Int × Int) → Int → IO Unit
