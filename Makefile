@@ -21,8 +21,10 @@ newt3.js: newt2.js
 	time $(RUNJS) newt2.js src/Main.newt -o newt3.js
 	cmp newt2.js newt3.js
 
-min.js: newt3.js
+min.js: newt3.js scripts/pack
 	scripts/pack
+	gzip -kf min.js
+	ls -l min.js min.js.gz
 
 test: newt.js
 	scripts/test

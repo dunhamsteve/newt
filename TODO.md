@@ -2,6 +2,12 @@
 ## TODO
 
 - [ ] Remove erased args from primitive functions
+- [ ] consider moving primitive functions to a support file
+  - Downside here is that we lose some dead code elimination, but it better supports bootstrapping when calling convention changes.
+- [ ] allow declaration of primitive operators
+  - Removes assumptions of hack in Compile.newt, but might not support other backends
+  - Alternate solution would be to pull from Prelude and hard code for all backends
+  - POper added to physical syntax types, but not implemented
 - [x] Remove erased fields from constructor data
 - [ ] Teach magic nat / magic enum about erased args
 - [ ] Update LiftLambda.newt for arg removal changes

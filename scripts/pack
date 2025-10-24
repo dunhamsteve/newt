@@ -1,0 +1,7 @@
+#!/bin/sh
+(
+  echo '(function(){'
+  cat newt3.js
+  echo '})()'
+) > iife.js
+esbuild --minify iife.js > min.js
