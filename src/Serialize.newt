@@ -16,7 +16,7 @@ pfunc checksum uses (MkIORes) : String → IO String := `(a) => (w) => {
   for (let i = 0; i < arr.length; i++) {
     val = ((val * 33) + arr[i]) | 0
   }
-  return Prelude_MkIORes(null, ""+val, w);
+  return Prelude_MkIORes(""+val, w);
 }`
 
 -- this was an experiment, prepping for dumping module information
@@ -27,7 +27,7 @@ pfunc dumpModFile uses (MkIORes MkUnit): String → ModFile → IO Unit := `(fn,
     let enc = EncFile.encode(a)
     fs.writeFileSync(fn, enc)
   } catch (e) {}
-  return Prelude_MkIORes(null, Prelude_MkUnit, w)
+  return Prelude_MkIORes(Prelude_MkUnit, w)
 }`
 
 
@@ -47,9 +47,9 @@ pfunc readModFile uses (MkIORes Just Nothing): String → IO (Maybe ModFile) := 
     let {DecFile} = require('./serializer')
     let data = fs.readFileSync(fn)
     let dec = DecFile.decode(data)
-    return Prelude_MkIORes(null, Prelude_Just(null, dec), w)
+    return Prelude_MkIORes(Prelude_Just(dec), w)
   } catch (e) {
-    return Prelude_MkIORes(null, Prelude_Nothing, w)
+    return Prelude_MkIORes(Prelude_Nothing(), w)
   }
 }`
 

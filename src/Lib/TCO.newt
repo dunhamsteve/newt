@@ -28,7 +28,7 @@ tailNames (CCase _ alts) = join $ map altTailNames alts
     altTailNames (CLitAlt _ exp) = tailNames exp
 tailNames (CLet _ _ t) = tailNames t
 tailNames (CLetRec _ _ t) = tailNames t
-tailNames (CConstr _ _ args) = Nil
+tailNames (CConstr _ _ args _) = Nil
 tailNames (CBnd _) = Nil
 tailNames (CFun _ tm) = tailNames tm
 tailNames (CLam _ _) = Nil
@@ -43,14 +43,16 @@ tailNames (CPrimOp _ _ _) = Nil
 -- rewrite tail calls to return an object
 rewriteTailCalls : List QName → CExp → CExp
 rewriteTailCalls nms tm = case tm of
-  CAppRef nm args 0 =>
-      case getTag (S Z) nm nms of
-        Just ix => CConstr ix (show nm) args
-        Nothing => CConstr Z "return" (tm :: Nil)
+  CAppRef nm args qs =>
+      if length' args == length' qs
+      then case getTag (S Z) nm nms of
+        Just ix => CConstr ix (show nm) args $ map (const Many) args
+        Nothing => CConstr Z "return" (tm :: Nil) (Many :: Nil)
+      else CConstr Z "return" (tm :: Nil) (Many :: Nil)
   CLetRec nm t u => CLetRec nm t $ rewriteTailCalls nms u
   CLet nm t u => CLet nm t $ rewriteTailCalls nms u
   CCase sc alts => CCase sc $ map rewriteAlt alts
-  tm => CConstr Z "return" (tm :: Nil)
+  tm => CConstr Z "return" (tm :: Nil) (Many :: Nil)
   where
       getTag : Nat → QName → List QName → Maybe Nat
       getTag t nm Nil = Nothing
@@ -71,15 +73,17 @@ doOptimize fns = do
   let nms = map fst fns
   let alts = map (mkAlt nms) $ enumerate splitFuns
   recName <- mkRecName nms
-  let recfun = CFun ("arg" :: Nil) $ CCase (CBnd 0) alts
+  let recfun = CFun ((Many, "arg") :: Nil) $ CCase (CBnd 0) alts
   wrapped <- traverse (mkWrap recName) (enumerate fns)
   pure $ (recName, recfun) :: wrapped
   where
     mkWrap : QName → Nat × QName × CExp → M (QName × CExp)
     mkWrap recName (ix, qn, CFun args _) = do
       let arglen = length' args
-      let arg = CConstr (S ix) (show qn) $ map (\k => CBnd (arglen - k - 1)) (range 0 arglen)
-      let body = CAppRef bouncer (CRef recName :: arg :: Nil) 0
+      let conargs = map (\k => CBnd (arglen - k - 1)) (range 0 arglen)
+      let conquant = map (const Many) conargs
+      let arg = CConstr (S ix) (show qn) conargs conquant
+      let body = CAppRef bouncer (CRef recName :: arg :: Nil) (Many :: Many :: Nil)
       pure $ (qn, CFun args body)
     mkWrap _ (qn, _) = error emptyFC "error in mkWrap: \{show qn} not a CFun"
 
@@ -87,10 +91,10 @@ doOptimize fns = do
     mkRecName Nil = error emptyFC "INTERNAL ERROR: Empty List in doOptimize"
     mkRecName (QN ns nm :: _) = pure $ QN ns "REC_\{nm}"
 
-    mkAlt : List QName → (Nat × QName × List Name × CExp) -> CAlt
-    mkAlt nms (ix, qn, args, tm) = CConAlt (S ix) (show qn) NormalCon args (rewriteTailCalls nms tm)
+    mkAlt : List QName → (Nat × QName × List (Quant × Name) × CExp) -> CAlt
+    mkAlt nms (ix, qn, args, tm) = CConAlt (S ix) (show qn) NormalCon (map snd args) (rewriteTailCalls nms tm)
 
-    splitFun : (QName × CExp) → M (QName × List Name × CExp)
+    splitFun : (QName × CExp) → M (QName × List (Quant × Name) × CExp)
     splitFun (qn, CFun args body) = pure (qn, args, body)
     splitFun (qn, _) = error emptyFC "TCO error: \{show qn} not a function"
 

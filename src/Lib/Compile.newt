@@ -11,7 +11,7 @@ import Lib.Prettier
 import Lib.CompileExp
 import Lib.TopContext
 import Lib.LiftWhere
-import Lib.LiftLambda
+-- import Lib.LiftLambda -- NOW needs update for arg erasure
 import Lib.TCO
 import Lib.Ref2
 import Lib.Erasure
@@ -109,14 +109,17 @@ freshName' nm env =
       env' = push env (Var nm')
   in (nm', env')
 
-freshNames : List String -> JSEnv -> (List String × JSEnv)
+freshNames : List (Quant × String) -> JSEnv -> (List String × JSEnv)
 freshNames nms env = go nms env Lin
   where
-    go : List Name -> JSEnv -> SnocList Name -> (List String × JSEnv)
+    go : List (Quant × String) -> JSEnv -> SnocList Name -> (List String × JSEnv)
     go Nil env acc = (acc <>> Nil, env)
-    go (n :: ns) env acc =
+    go ((Many, n) :: ns) env acc =
       let (n', env') = freshName' n env
       in go ns env' (acc :< n')
+    go ((Zero, n) :: ns) env acc =
+      let env' = push env JUndefined
+      in go ns env' acc
 
 -- These expressions are added to the environment rather than assigned to a name
 simpleJSExp : JSExp → Bool
@@ -175,23 +178,39 @@ termToJS env (CLetRec nm t u) f =
   in case termToJS env' t (JAssign nm') of
     (JAssign _ exp) => JSnoc (JConst nm' exp) (termToJS env' u f)
     t' => JSnoc (JLet nm' t') (termToJS env' u f)
-termToJS env (CConstr ix _ args) f = go args 0 (\ args => f $ LitObject (("tag", LitInt (cast ix)) :: args))
+termToJS env (CConstr ix _ args qs) f = go args qs 0 (\ args => f $ LitObject (("tag", LitInt (cast ix)) :: args))
   where
-    go : ∀ e. List CExp -> Int -> (List (String × JSExp) -> JSStmt e) -> JSStmt e
-    go Nil ix k = k Nil
-    go (t :: ts) ix k = termToJS env t $ \ t' => go ts (ix + 1) $ \ args => k $ ("h\{show ix}", t') :: args
-termToJS env (CAppRef nm args etas) f = termToJS env (CRef nm) (\ t' => (argsToJS env t' args Lin f))
+    go : ∀ e. List CExp -> List Quant -> Int -> (List (String × JSExp) -> JSStmt e) -> JSStmt e
+    go (t :: ts) (Many :: qs) ix k = termToJS env t $ \ t' => go ts qs (ix + 1) $ \ args => k $ ("h\{show ix}", t') :: args
+    go (t :: ts) (q :: qs) ix k = go ts qs (ix + 1) $ \ args => k args
+    go _ _ ix k = k Nil
+termToJS env (CAppRef nm args quants) f = termToJS env (CRef nm) (\ t' => (argsToJS env t' args quants Lin f))
   where
-    etaExpand : JSEnv -> Nat -> SnocList JSExp -> JSExp -> JSExp
-    etaExpand env Z args tm = Apply tm (args <>> Nil)
-    etaExpand env (S etas) args tm =
+    etaExpand : JSEnv -> List Quant -> SnocList JSExp -> JSExp -> JSExp
+    etaExpand env Nil args tm = Apply tm (args <>> Nil)
+    etaExpand env (q :: qs) args tm =
       let nm' = freshName "eta" env
           env' = push env (Var nm')
-       in JLam (nm' :: Nil) $ JReturn $ etaExpand (push env (Var nm')) etas (args :< Var nm') tm
+       in case q of
+        Many => JLam (nm' :: Nil) $ JReturn $ etaExpand (push env (Var nm')) qs (args :< Var nm') tm
+        _ => JLam (nm' :: Nil) $ JReturn $ etaExpand (push env (Var nm')) qs args tm
 
-    argsToJS : ∀ e. JSEnv -> JSExp -> List CExp -> SnocList JSExp -> (JSExp -> JSStmt e) -> JSStmt e
-    argsToJS env tm Nil acc k = k (etaExpand env (cast etas) acc tm)
-    argsToJS env tm (x :: xs) acc k = termToJS env x (\ x' => argsToJS (incr env) tm xs (acc :< x') k)
+    apply : ∀ e. JSEnv → JSExp → (List CExp) → (JSExp → JSStmt e) → JSStmt e
+    apply env tm Nil k = k tm
+    apply env tm (x :: xs) k = termToJS env x $ \ x' => apply env (Apply tm (x' :: Nil)) xs k
+
+    argsToJS : ∀ e. JSEnv -> JSExp -> List CExp -> List Quant -> SnocList JSExp -> (JSExp -> JSStmt e) -> JSStmt e
+    argsToJS env tm Nil qs acc k = k (etaExpand env qs acc tm)
+    argsToJS env tm (x :: xs) (Many :: qs) acc k = termToJS env x (\ x' => argsToJS (incr env) tm xs qs (acc :< x') k)
+    argsToJS env tm (x :: xs) (q :: qs) acc k = argsToJS (incr env) tm xs qs acc k
+    -- REVIEW For now, functions whose arguments are all erased still get (), but no-arg functions don't
+    argsToJS env tm (x :: xs) Nil acc k = case quants of
+      Nil => apply env tm (x :: xs) k
+      _ => apply env (Apply tm (acc <>> Nil)) (x :: xs) k
+    argsToJS env tm (x :: xs) Nil Lin k = apply env tm (x :: xs) k
+    argsToJS env tm (x :: xs) Nil acc k = apply env (Apply tm (acc <>> Nil)) (x :: xs) k
+      -- backwards too...
+        -- termToJS env x $ \ x' => argsToJS env tm xs Nil acc $ \ tm' => k $ Apply tm' (x' :: Nil)
 
 termToJS env (CApp t arg) f = termToJS env t (\ t' => termToJS env arg (\arg' => f (Apply t' (arg' :: Nil))))
 
@@ -411,21 +430,22 @@ sortedNames defs qn = map snd $ filter (not ∘ fst) $ go Nil Nil (True, qn)
     getNames deep acc (CLam _ t) = getNames deep acc t
     -- top level 0-ary function, doesn't happen
     getNames deep acc (CFun _ t) = if deep then getNames deep acc t else acc
-    -- 0-ary call is not deep invocation
-    getNames deep acc (CAppRef nm Nil 0) =  (True, nm) :: acc
-    -- full call is deep ref to the head, arguments may be applied by `nm`
-    getNames deep acc (CAppRef nm ts 0) =  foldl (getNames True) ((True, nm) :: acc) ts
-    -- non-zero are closures
-    getNames deep acc (CAppRef nm ts _) =  foldl (getNames deep) ((deep, nm) :: acc) ts
-    -- True is needed for an issue in the parser. symbol -> keyword -> indented
-    -- TODO look at which cases generate CApp
+
+    getNames deep acc (CAppRef nm args qs) =
+      if length' args == length' qs
+        then case args of
+          Nil => (True, nm) :: acc
+          ts => foldl (getNames True) ((True, nm) :: acc) ts
+        else
+          foldl (getNames deep) ((deep, nm) :: acc) args
+   -- TODO look at which cases generate CApp
     getNames deep acc (CApp t u) = getNames True (getNames deep acc u) t
     getNames deep acc (CCase t alts) = foldl (getNames deep) acc $ t :: map getBody alts
     -- we're not calling it
     getNames deep acc (CRef qn) = (deep, qn) :: acc
     getNames deep acc (CLet _ t u) = getNames deep (getNames deep acc t) u
     getNames deep acc (CLetRec _ t u) = getNames deep (getNames deep acc t) u
-    getNames deep acc (CConstr _ _ ts) = foldl (getNames deep) acc ts
+    getNames deep acc (CConstr _ _ ts _) = foldl (getNames deep) acc ts
     -- if the CRaw is called, then the deps are called
     getNames deep acc (CRaw _ deps) = map (_,_ deep) deps ++ acc
     -- wrote these out so I get an error when I add a new constructor

@@ -297,9 +297,9 @@ pfunc aget : ∀ a. Array a → Int → a := `(a, arr, ix) => arr[ix]`
 pfunc aempty : ∀ a. Unit → Array a := `() => []`
 
 pfunc arrayToList uses (Nil _::_) : ∀ a. Array a → List a := `(a,arr) => {
-  let rval = Prelude_Nil(null)
+  let rval = Prelude_Nil()
   for (let i = arr.length - 1;i >= 0; i--) {
-    rval = Prelude__$3A$3A_(a, arr[i], rval)
+    rval = Prelude__$3A$3A_(arr[i], rval)
   }
   return rval
 }`
@@ -315,9 +315,9 @@ pfunc p_strTail : (s : String) → String := `(s) => s[0]`
 pfunc trim : String → String := `s => s.trim()`
 pfunc split uses (Nil _::_) : String → String → List String := `(s, by) => {
   let parts = s.split(by)
-  let rval = Prelude_Nil(null)
+  let rval = Prelude_Nil()
   parts.reverse()
-  parts.forEach(p => { rval = Prelude__$3A$3A_(null, p, rval) })
+  parts.forEach(p => { rval = Prelude__$3A$3A_(p, rval) })
   return rval
 }`
 
@@ -329,6 +329,14 @@ pfunc intToNat : Int → Nat := `(n) => n>0?n:0`
 
 pfunc fastConcat uses (listToArray) : List String → String := `(xs) => Prelude_listToArray(null, xs).join('')`
 pfunc replicate uses (natToInt) : Nat → Char → String := `(n,c) => c.repeat(Prelude_natToInt(n))`
+
+-- TODO this should be replicate and the chars thing should have a different name
+replicate' : ∀ a. Nat → a → List a
+replicate' {a} n x = go n Nil
+  where
+    go : Nat → List a → List a
+    go Z xs = xs
+    go (S k) xs = go k (x :: xs)
 
 -- I don't want to use an empty type because it would be a proof of void
 ptype World
@@ -377,7 +385,7 @@ instance HasIO IO where
 
 pfunc primPutStrLn uses (MkIORes MkUnit) : String → IO Unit := `(s) => (w) => {
   console.log(s)
-  return Prelude_MkIORes(null,Prelude_MkUnit,w)
+  return Prelude_MkIORes(Prelude_MkUnit,w)
 }`
 
 putStrLn : ∀ io. {{HasIO io}} → String → io Unit
@@ -403,8 +411,8 @@ pfunc chr : Int → Char := `(c) => String.fromCharCode(c)`
 
 pfunc unpack uses (Nil _::_) : String → List Char
   := `(s) => {
-    let acc = Prelude_Nil(null)
-    for (let i = s.length - 1; 0 <= i; i--) acc = Prelude__$3A$3A_(null, s[i], acc)
+    let acc = Prelude_Nil()
+    for (let i = s.length - 1; 0 <= i; i--) acc = Prelude__$3A$3A_(s[i], acc)
     return acc
 }`
 
@@ -628,20 +636,20 @@ instance Div Double where x / y = divDouble x y
 ptype IOArray : U → U
 
 pfunc newArray uses (MkIORes) : ∀ a. Int → a → IO (IOArray a) :=
-  `(_, n, v) => (w) => Prelude_MkIORes(null, Prelude_Array(n).fill(v),w)`
-pfunc arrayGet : ∀ a. IOArray a → Int → IO a := `(_, arr, ix) => w => Prelude_MkIORes(null, arr[ix], w)`
+  `(_, n, v) => (w) => Prelude_MkIORes(Prelude_Array(n).fill(v),w)`
+pfunc arrayGet : ∀ a. IOArray a → Int → IO a := `(_, arr, ix) => w => Prelude_MkIORes(arr[ix], w)`
 pfunc arraySet uses (MkIORes MkUnit) : ∀ a. IOArray a → Int → a → IO Unit := `(_, arr, ix, v) => w => {
   arr[ix] = v
-  return Prelude_MkIORes(null, Prelude_MkUnit, w)
+  return Prelude_MkIORes(Prelude_MkUnit, w)
 }`
-pfunc arraySize uses (MkIORes) : ∀ a. IOArray a → IO Int := `(_, arr) => w => Prelude_MkIORes(null, arr.length, w)`
+pfunc arraySize uses (MkIORes) : ∀ a. IOArray a → IO Int := `(_, arr) => w => Prelude_MkIORes(arr.length, w)`
 
 pfunc ioArrayToList uses (Nil _::_ MkIORes) : ∀ a. IOArray a → IO (List a) := `(a,arr) => w => {
-  let rval = Prelude_Nil(null)
+  let rval = Prelude_Nil()
   for (let i = arr.length - 1;i >= 0; i--) {
-    rval = Prelude__$3A$3A_(a, arr[i], rval)
+    rval = Prelude__$3A$3A_(arr[i], rval)
   }
-  return Prelude_MkIORes(null, rval, w)
+  return Prelude_MkIORes(rval, w)
 }`
 
 pfunc listToIOArray uses (MkIORes) : ∀ a. List a → IO (Array a) := `(a,list) => w => {
@@ -650,7 +658,7 @@ pfunc listToIOArray uses (MkIORes) : ∀ a. List a → IO (Array a) := `(a,list)
     rval.push(list.h1)
     list = list.h2
   }
-  return Prelude_MkIORes(null,rval,w)
+  return Prelude_MkIORes(rval,w)
 }`
 
 class Cast a b where

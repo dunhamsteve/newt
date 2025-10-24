@@ -357,11 +357,13 @@ instance Show ConInfo where
   show ZeroCon = "[Z]"
   show EnumCon = "[E]"
 
-data Def = Axiom | TCon Int (List QName) | DCon Nat ConInfo Int QName | Fn Tm | PrimTCon Int
+data Def = Axiom | TCon Int (List QName) | DCon Nat ConInfo (List Quant) QName | Fn Tm | PrimTCon Int
          | PrimFn String Nat (List QName)
+         | PrimOp String
 
 instance Show Def where
   show Axiom = "axiom"
+  show (PrimOp op) = "PrimOp \{show op}"
   show (TCon _ strs) = "TCon \{show strs}"
   show (DCon ix ci k tyname) = "DCon \{show ix} \{show k} \{show tyname} \{show ci}"
   show (Fn t) = "Fn \{show t}"
@@ -439,13 +441,15 @@ record TopContext where
 record Context where
   constructor MkCtx
   lvl : Int
-  -- shall we use lvl as an index?
+  -- Kovacs splits this into multiple fields
+  -- I was going to recombine them, but realized I'd have to regenerate env for eval
   env : Env                  -- Values in scope
+  -- TODO add fc, maybe add BD and make this a proper type
   types : List (String × Val) -- types and names in scope
   -- so we'll try "bds" determines length of local context
   bds : List BD          -- bound or defined
 
-  -- FC to use if we don't have a better option
+  -- FC to use for errors if we don't have a better option
   ctxFC : FC
 
 -- add a binding to environment

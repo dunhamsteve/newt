@@ -27,8 +27,8 @@ data CExp : U where
   CBnd : Int -> CExp
   -- How is CLam different from CFun with one arg?
   CLam : Name -> CExp -> CExp
-  CFun : List Name -> CExp -> CExp
-  CAppRef : QName -> List CExp -> Int -> CExp
+  CFun : List (Quant × Name) -> CExp -> CExp
+  CAppRef : QName -> List CExp -> List Quant -> CExp
   CApp : CExp -> CExp -> CExp
   CCase : CExp -> List CAlt -> CExp
   CRef : QName -> CExp
@@ -38,7 +38,7 @@ data CExp : U where
   CLetRec : Name -> CExp -> CExp -> CExp
   CErased : CExp
   -- Data / type constructor
-  CConstr : Nat → Name -> List CExp -> CExp
+  CConstr : Nat → Name → List CExp → List Quant → CExp
   -- Raw javascript for `pfunc`
   CRaw : String -> List QName -> CExp
   -- Need this for magic Nat
@@ -48,9 +48,9 @@ data CExp : U where
 -- I'm counting Lam in the term for arity.  This matches what I need in
 -- code gen.
 
-lamArity : Tm -> Nat
-lamArity (Lam _ _ _ _ t) = S (lamArity t)
-lamArity _ = Z
+lamArity : Tm -> List Quant
+lamArity (Lam _ _ _ quant t) = quant :: (lamArity t)
+lamArity _ = Nil
 
 -- It would be nice to be able to declare these
 compilePrimOp : String → List CExp → Maybe CExp
@@ -62,46 +62,45 @@ compilePrimOp "Prelude._&&_" (x :: y :: Nil) = Just (CPrimOp "&&" x y)
 compilePrimOp "Prelude._||_" (x :: y :: Nil) = Just (CPrimOp "||" x y)
 -- Assumes Bool is in the right order!
 compilePrimOp "Prelude.jsEq" (_ :: x :: y :: Nil) = Just (CPrimOp "==" x y)
-compilePrimOp "Prelude.jsLt" (_ :: x :: y :: Nil) = Just (CPrimOp "<" x y)
 compilePrimOp "Prelude.divInt" (x :: y :: Nil) = Just (CPrimOp "|" (CPrimOp "/" x y) (CLit $ LInt 0))
 compilePrimOp _ _ = Nothing
 
 -- This is how much we want to curry at top level
 -- leading lambda Arity is used for function defs and metas
 -- TODO - figure out how this will work with erasure
-arityForName : {{Ref2 Defs St}} → FC -> QName -> M Nat
+arityForName : {{Ref2 Defs St}} → FC -> QName -> M (List Quant)
 arityForName fc nm = do
   defs <- getRef Defs
   case lookupMap' nm defs of
     Nothing => error fc "Name \{show nm} not in scope"
-    (Just Axiom) => pure Z
-    (Just (TCon arity strs)) => pure $ cast arity
-    (Just (DCon _ _ k str)) => pure $ cast k
+    (Just Axiom) => pure Nil
+    (Just (PrimOp _)) => pure $ Many :: Many :: Nil
+    (Just (TCon arity strs)) => pure $ replicate' (cast arity) Many
+    (Just (DCon _ _ arity str)) => pure arity
     (Just (Fn t)) => pure $ lamArity t
-    (Just (PrimTCon arity)) => pure $ cast arity
-    (Just (PrimFn t arity used)) => pure arity
+    (Just (PrimTCon arity)) => pure $ replicate' (cast arity) Many
+    (Just (PrimFn t arity used)) => pure $ replicate' arity Many
+  where
+
 
 any : ∀ a. (a → Bool) → List a → Bool
 any f Nil = False
 any f (x :: xs) = if f x then True else any f xs
 
+-- NOW so we stuff quant and the args in here and sort it out later?
+
 -- apply an expression at an arity to a list of args
 -- CAppRef will specify any missing args, for eta conversion later
 -- and any extra args get individual CApp.
-apply : QName -> List CExp -> SnocList CExp -> Nat -> M CExp
+apply : QName -> List CExp -> List Quant -> M CExp
 -- out of args, make one up (fix that last arg)
-apply t Nil acc (S k) =
-  pure $ CAppRef t (acc <>> Nil) (1 + cast k)
-apply t (x :: xs) acc (S k)  =  apply t xs (acc :< x) k
--- once we hit zero, we fold the rest
-apply t ts acc Z = case acc of
-  -- drop zero arg call
-  Lin => go (CRef t) ts
-  _ => go (CAppRef t (acc <>> Nil) 0) ts
+apply qn args quants = pure $ CAppRef qn args quants
+  -- go (CAppRef qn args quants) args quants
   where
-    go : CExp -> List CExp -> M CExp
-    go t Nil = pure t
-    go t (arg :: args) = go (CApp t arg) args
+    go : CExp -> List CExp -> List Quant → M CExp
+    go t (arg :: args) (q :: qs) = go t args qs
+    go t Nil _ = pure t
+    go t (arg :: args) Nil = go (CApp t arg) args Nil
 
 lookupDef : {{Ref2 Defs St}} → FC → QName → M Def
 lookupDef fc nm = do
@@ -123,8 +122,7 @@ compileTerm t@(Ref fc nm@(QN _ tag)) = do
   defs <- getRef Defs
   case arity of
     -- we don't need to curry functions that take one argument
-    (S Z) => pure $ CRef nm
-    Z =>
+    Nil =>
       case the (Maybe Def) $ lookupMap' nm defs of
         Just (DCon ix EnumCon _ _) => pure $ CLit $ LInt $ cast ix
         Just (DCon ix FalseCon _ _) => pure $ CLit $ LBool False
@@ -133,7 +131,7 @@ compileTerm t@(Ref fc nm@(QN _ tag)) = do
         Just (DCon _ SuccCon _ _) =>
           pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
         _ => pure $ CRef nm
-    _ => apply nm Nil Lin arity
+    _ => apply nm Nil arity
 
 compileTerm (Meta fc k) = error fc "Compiling meta \{show k}"
 compileTerm (Lam _ nm _ _ t) = CLam nm <$> compileTerm t
@@ -150,7 +148,7 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
           | Just cexp => pure cexp
         case the (Maybe Def) $ lookupMap' nm defs of
           Just (DCon _ SuccCon _ _) => applySucc args'
-          _ => apply nm args' Lin arity
+          _ => apply nm args' arity
   -- REVIEW maybe we want a different constructor for non-Ref applications?
   (t, args) => do
         debug $ \ _ => "apply other \{render 90 $ pprint Nil t}"
@@ -166,7 +164,7 @@ compileTerm (UU _) = pure $ CRef (QN Nil "U")
 compileTerm (Pi _ nm icit rig t u) = do
   t' <- compileTerm t
   u' <- compileTerm u
-  pure $ CAppRef (QN primNS "PiType") (t' :: CLam nm u' :: Nil) 0
+  pure $ CAppRef (QN primNS "PiType") (t' :: CLam nm u' :: Nil) (Many :: Many :: Nil)
 compileTerm (Case fc t alts) = do
   t' <- compileTerm t
   alts' <- for alts $ \case
@@ -240,27 +238,44 @@ compileTerm (Erased _) = pure CErased
 compileFun : {{Ref2 Defs St}} → Tm -> M CExp
 compileFun tm = go tm Lin
   where
-    go : Tm -> SnocList String -> M CExp
-    go (Lam _ nm _ _ t) acc = go t (acc :< nm)
+    go : Tm -> SnocList (Quant × String) -> M CExp
+    go (Lam _ nm _ quant t) acc = go t (acc :< (quant, nm))
     go tm Lin = compileTerm tm
     go tm args = CFun (args <>> Nil) <$> compileTerm tm
 
+compilePop : QName → M CExp
+compilePop qn = do
+  top <- getTop
+  let (Just def) = lookup qn top | _ => error emptyFC "\{show qn} not found"
+  pure $ CErased -- FIXME - not implemented
+
 -- What are the Defs used for above? (Arity for name)
-compileDCon : Nat → QName → ConInfo → Int → CExp
-compileDCon ix (QN _ nm) EnumCon 0 = CLit $ LInt $ cast ix
-compileDCon ix (QN _ nm) TrueCon 0 = CLit $ LBool True
-compileDCon ix (QN _ nm) FalseCon 0 = CLit $ LBool False
-compileDCon ix (QN _ nm) info 0 = CConstr ix nm Nil
+compileDCon : Nat → QName → ConInfo → List Quant → CExp
+compileDCon ix (QN _ nm) EnumCon Nil = CLit $ LInt $ cast ix
+compileDCon ix (QN _ nm) TrueCon Nil = CLit $ LBool True
+compileDCon ix (QN _ nm) FalseCon Nil = CLit $ LBool False
+compileDCon ix (QN _ nm) info Nil = CConstr ix nm Nil Nil
 compileDCon ix (QN _ nm) info arity =
-  let args = map (\k => "h\{show k}") (range 0 arity) in
-  CFun args $ CConstr ix nm $ map (\k => CBnd $ arity - k - 1) (range 0 arity)
+  -- so we're fully applying this here, but dropping the args later?
+  -- The weird thing is that lambdas need the
+  let args = mkArgs Z arity
+      alen = length' arity
+  in CFun args $ CConstr ix nm (map (\k => CBnd $ alen - k - 1) (range 0 alen)) arity
+  where
+    mkArgs : Nat → List Quant → List (Quant × String)
+    mkArgs k (quant :: args) = (quant, "h\{show k}") :: mkArgs (S k) args
+    mkArgs k Nil = Nil
+
+
 
 -- probably want to drop the Ref2 when we can
 defToCExp : {{Ref2 Defs St}} → (QName × Def) -> M (QName × CExp)
-defToCExp (qn, Axiom)          = pure $ (qn, CErased)
+defToCExp (qn, Axiom)      = pure $ (qn, CErased)
+defToCExp (qn, (PrimOp _)) = (_,_ qn) <$> compilePop qn
 defToCExp (qn, DCon ix info arity _)   = pure $ (qn, compileDCon ix qn info arity)
--- FIXME need a number if we ever add typecase.
-defToCExp (qn, TCon arity _)   = pure $ (qn, compileDCon Z qn NormalCon arity)
-defToCExp (qn, PrimTCon arity) = pure $ (qn, compileDCon Z qn NormalCon arity)
+-- We're not using these are runtime at the moment, no typecase
+-- we need to sort out tag number if we do that
+defToCExp (qn, TCon arity conNames) = pure $ (qn, compileDCon Z qn NormalCon (replicate' (cast arity) Many))
+defToCExp (qn, PrimTCon arity) = pure $ (qn, compileDCon Z qn NormalCon (replicate' (cast arity) Many))
 defToCExp (qn, PrimFn src _ deps) = pure $ (qn, CRaw src deps)
 defToCExp (qn, Fn tm)          = (_,_ qn) <$> compileFun tm

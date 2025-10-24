@@ -165,10 +165,10 @@ contextMatches ctx ty = go (zip ctx.env ctx.types)
           modifyTop [ metaCtx := mc]
           go xs)
 
-getArity : Tm -> Int
-getArity (Pi x str icit rig t u) = 1 + getArity u
+getArity : Tm -> List Quant
+getArity (Pi x str icit rig t u) = rig :: getArity u
 -- Ref or App (of type constructor) are valid
-getArity _ = 0
+getArity _ = Nil
 
 -- Makes the arg for `solve` when we solve an auto
 makeSpine : Int -> List BD -> SnocList Val
@@ -727,7 +727,7 @@ getConstructors ctx scfc (VRef fc nm _) = do
     lookupDCon nm = do
       top <- getTop
       case lookup nm top of
-        (Just (MkEntry _ name type (DCon _ _ k str) _)) => pure (name, k, type)
+        (Just (MkEntry _ name type (DCon _ _ k str) _)) => pure (name, length' k, type)
         Just _ => error fc "Internal Error: \{show nm} is not a DCon"
         Nothing => error fc "Internal Error: DCon \{show nm} not found"
 getConstructors ctx scfc tm = do

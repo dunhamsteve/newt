@@ -1,7 +1,13 @@
 
 ## TODO
 
+- [ ] Remove erased args from primitive functions
+- [x] Remove erased fields from constructor data
+- [ ] Teach magic nat / magic enum about erased args
+- [ ] Update LiftLambda.newt for arg removal changes
 - [ ] Add error for non-linear names in pattern matching (currently it picks one)
+  - We probably should handle forced values. Idris requires them to have the same name.
+- [ ] Functions with erased-only arguments still get called with `()` - do we want this or should they be constants?
 - [x] Take the parens off of FC to make vscode happy
 - [x] Magic to make Bool a boolean
 - [ ] Look into using holes for errors (https://types.pl/@AndrasKovacs/115401455046442009)
@@ -9,14 +15,20 @@
   - I've been wanting to try holes for parse errors too.
 - [ ] in-scope type at point in vscode
   - So the idea here is that the references will be via FC, we remember the type at declaration and then point the usage back to the declaration (FC -> FC). We could dump all of this. (If we're still doing json.)
+  - This information _could_ support renaming, too (but there may be indentation issues).
   - Do we want to (maybe later) keep the scope as a FC? We could do scope at point then.
   - But ideally we'd switch to a server/repl, so we don't have to mess around with serializing stuff.
 - [ ] LSP and/or more editor support
+  - [ ] refactor to query based?  E.g. importing a module
   - [ ] would be nice to have "add missing cases" and "case split"
   - [x] Probably need ranges for FC
   - [ ] leave an interactive process running
-  - [ ] collect metadata or run through the serialization data
-  - [ ] rename in editor for top level functions (and maybe stuff in scope probably need LSP first)
+  - [ ] restart mid file (we could save state per top level decl)
+  - [ ] rename in editor (need to accumulate all names and what they reference)
+  - [ ] who calls X?  We can only do this scoped to the current context for now. Someday whole source dir. #lsp
+- [ ] Pretty print
+  - Can we format code? Maybe pull nearby comments or attach them like FC to tokens?
+  - We would need to address stack and laziness issues in prettier printer (or make it merely pretty)
 - [ ] Look into descriptions, etc.
   - Can generating descriptions help with automatic "show" implementations
   - We lost debug printing when switching to numeric tags
@@ -32,8 +44,7 @@
 - [ ] Raw is duplicated between Lib.Syntax and Lib.Compile, but not detected
   - [ ] Maybe add qualified names to surface syntax and allow / detect conflicts on reference
   - [ ] Add `export` keywords
-- [ ] vscode - run newt when switching editors
-- [ ] who calls X?  We can only do this scoped to the current context for now. Someday whole source dir. #lsp
+- [x] vscode - run newt when switching editors
 - [ ] case split
   - We could fake this up:
     - given a name and a point in the editor
@@ -51,12 +62,15 @@
 - [x] fix string highlighting
 - [x] implement tail call optimization
 - [x] implement magic nat
+- [ ] Consider splitting desugar/check
+  - We can only check physical syntax at the moment, which has been inconvenient in a couple of spots where we want to check generated code. E.g. solutions to auto implicits.
 - [ ] record update can't elaborate if type is unsolved meta
   - need to postpone elab until meta is known. Create fresh meta for the term to return and have postponed elab fill it in later.
-- [ ] drop erased args on types and top level functions
-- [ ] can I do some inlining without blowing up code size?
-  - [ ] Maybe tag some functions as inline
-  - [ ] Eq Nat is not tail recursive because of the call to `==`
+- [x] drop erased args on types and top level functions
+- [x] can I do some inlining without blowing up code size?
+  - [x] Maybe tag some functions as inline
+  - [x] Eq Nat is not tail recursive because of the call to `==`
+- [ ] Eq Nat does things the hard way, can we turn it into `==`?
 - [x] use hint table for auto solving. (I think walking the `toList` is a big chunk of performance in `Elab.newt`.)
 - [x] implement string enum (or number, but I'm using strings for tags at the moment)
 - [x] use monaco input method instead of lean's
@@ -102,10 +116,13 @@
   - The mini version would be recurse on `{`, pop on `}` (and expect caller to handle), fail if we get to the top with a tokens remaining.
 - [ ] mutual recursion in where?
   - need to scan sigs and then defs, will have to make sure Compile.idr puts them all in scope before processing each.
+  - we probably want this, just haven't gotten around to it.
+  - LetRec would have to be extended to have multiple names.
 - [x] Move on to next decl in case of error
 - [x] for parse error, seek to col 0 token and process next decl
 - [x] record update sugar
 - [x] Change `Ord` to be more like Idris - LT / EQ / GT (and entail equality)
+- [ ] Consider making `<` independent of `Ord`, so we get the `<` oper in the javascript.
 - [x] Keep a `compare` function on `SortedMap` (like lean)
   - `emptyMap` helper defaults to `compare` from `Ord a`
 - [x] keymap for monaco
@@ -253,16 +270,19 @@
   - [x] check quantity
   - [x] erase in output
 - [ ] remove erased top level arguments
+  - maybe have something shaped like `List Bool` for `arity`
 - [x] top level at point in vscode
 - [ ] repl
 - [x] don't match forced constructors at runtime
   - I think we got this by not switching for single cases
 - [x] magic nat (codegen as number with appropriate pattern matching)
 - [ ] magic tuple? (codegen as array)
+  - Seems like this would be tricky as soon as the user starts peeling off the tail or consing them
 - [ ] magic newtype? (drop them in codegen)
 - [x] vscode: syntax highlighting for String
-- [ ] add `pop` or variant of `pfunc` that maps to an operator, giving the js operator and precedence on RHS
+- [ ] add `poper` or variant of `pfunc` that maps to an operator, giving the js operator and precedence on RHS
   - This has now been hard-coded in codegen, but a syntax or something would be better.
+  - We want to drop implicit / erased args - i.e. pick the right two args for the native operator, see jsEq
 - [ ] consider moving caselet, etc. desugaring out of the parser
 - [-] pattern matching lambda
   - `\case` is sufficient

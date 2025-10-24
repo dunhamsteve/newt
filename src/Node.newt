@@ -2,17 +2,17 @@ module Node
 
 import Prelude
 
-pfunc getArgs uses (arrayToList MkIORes) :  IO (List String) := `(w) => Prelude_MkIORes(null, Prelude_arrayToList(null, process.argv.slice(1)), w)`
+pfunc getArgs uses (arrayToList MkIORes) :  IO (List String) := `(w) => Prelude_MkIORes( Prelude_arrayToList(null, process.argv.slice(1)), w)`
 pfunc readFile uses (MkIORes Left Right) : (fn : String) -> IO (Either String String) := `(fn) => (w) => {
   let fs = require('fs')
   let result
   try {
     let content = fs.readFileSync(fn, 'utf8')
-    result = Prelude_Right(null, null, content)
+    result = Prelude_Right(content)
   } catch (e) {
-    result = Prelude_Left(null, null, e+'')
+    result = Prelude_Left(e+'')
   }
-  return Prelude_MkIORes(null, result, w)
+  return Prelude_MkIORes(result, w)
 }`
 
 -- I wonder if I should automatically `uses` the constructors in the types
@@ -21,11 +21,11 @@ pfunc writeFile uses (MkIORes MkUnit) : String → String → IO (Either String 
   let result
   try {
     fs.writeFileSync(fn, content, 'utf8')
-    result = Prelude_Right(null, null, Prelude_MkUnit)
+    result = Prelude_Right( Prelude_MkUnit)
   } catch (e) {
-      result = Prelude_Left(null, null, e+"")
+      result = Prelude_Left(e+"")
   }
-  return Prelude_MkIORes(null, result, w)
+  return Prelude_MkIORes(result, w)
 }`
 
 -- maybe System.exit or something, like the original putStrLn msg >> exitFailure

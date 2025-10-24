@@ -418,16 +418,16 @@ populateConInfo entries =
     setInfo x _ = x
 
     checkEnum : TopEntry → Maybe TopEntry
-    checkEnum (MkEntry fc nm dty (DCon ix _ 0 hn) flags) = Just $ MkEntry fc nm dty (DCon ix EnumCon 0 hn) flags
+    checkEnum (MkEntry fc nm dty (DCon ix _ Nil hn) flags) = Just $ MkEntry fc nm dty (DCon ix EnumCon Nil hn) flags
     checkEnum _ = Nothing
 
     isZero : TopEntry → Bool
-    isZero (MkEntry fc nm dty (DCon _ _ 0 hn) flags) = True
+    isZero (MkEntry fc nm dty (DCon _ _ Nil hn) flags) = True
     isZero _ = False
 
     -- TODO - handle indexes, etc
     isSucc : TopEntry → Bool
-    isSucc (MkEntry fc nm dty@(Pi _ _ _ _ (Ref _ a) (Ref _ b)) (DCon _ _ 1 hn) _) = a == b
+    isSucc (MkEntry fc nm dty@(Pi _ _ _ _ (Ref _ a) (Ref _ b)) (DCon _ _ (Many :: Nil) hn) _) = a == b
     isSucc _ = False
 
 processData : List String → FC → String → Raw → List Decl → M Unit
