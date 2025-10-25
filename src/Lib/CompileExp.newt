@@ -87,8 +87,6 @@ any : ∀ a. (a → Bool) → List a → Bool
 any f Nil = False
 any f (x :: xs) = if f x then True else any f xs
 
--- NOW so we stuff quant and the args in here and sort it out later?
-
 -- apply an expression at an arity to a list of args
 -- CAppRef will specify any missing args, for eta conversion later
 -- and any extra args get individual CApp.

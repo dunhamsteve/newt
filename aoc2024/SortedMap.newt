@@ -1,1 +1,203 @@
-../newt/SortedMap.newt
+module SortedMap
+
+import Prelude
+
+-- TODO We'll want to replace Ord/Eq with (a → Ordering) (and rewrite most of our aoc solutions...)
+-- data Ordering : U where
+--   LT EQ GT : Ordering
+
+data T23 : Nat -> U -> U -> U where
+  Leaf : ∀ k v. k -> v -> T23 Z k v
+  Node2 : ∀ h k v. T23 h k v -> k -> T23 h k v -> T23 (S h) k v
+  Node3 : ∀ h k v. T23 h k v -> k -> T23 h k v -> k -> T23 h k v -> T23 (S h) k v
+
+lookupT23 : ∀ h k v. {{Ord k}} {{Eq k}} -> k -> T23 h k v -> Maybe (k × v)
+lookupT23 key (Leaf k v)= if k == key then Just (k,v) else Nothing
+lookupT23 key (Node2 t1 k1 t2) =
+  if key <= k1 then lookupT23 key t1 else lookupT23 key t2
+lookupT23 key (Node3 t1 k1 t2 k2 t3) =
+  if key <= k1 then lookupT23 key t1
+  else if key <= k2 then lookupT23 key t2
+  else lookupT23 key t3
+
+insertT23 : ∀ h k v. {{Ord k}} {{Eq k}} -> k -> v -> T23 h k v -> Either (T23 h k v) (T23 h k v × k × T23 h k v)
+insertT23 key value (Leaf k v) =
+  if key == k then Left (Leaf key value)
+  else if key <= k then Right (Leaf key value, key, Leaf k v)
+  else Right (Leaf k v, k, Leaf key value)
+insertT23 key value (Node2 t1 k1 t2) =
+  if key <= k1 then
+    case insertT23 key value t1 of
+      Left t1' => Left (Node2 t1' k1 t2)
+      Right (a,b,c) => Left (Node3 a b c k1 t2)
+  else case insertT23 key value t2 of
+      Left t2' => Left (Node2 t1 k1 t2')
+      Right (a,b,c) => Left (Node3 t1 k1 a b c)
+insertT23 key value (Node3 t1 k1 t2 k2 t3) =
+  if key <= k1 then
+    case insertT23 key value t1 of
+      Left t1' => Left (Node3 t1' k1 t2 k2 t3)
+      Right (a,b,c) => Right (Node2 a b c, k1, Node2 t2 k2 t3)
+  else if key <= k2 then
+    case insertT23 key value t2 of
+      Left t2' => Left (Node3 t1 k1 t2' k2 t3)
+      Right (a,b,c) => Right (Node2 t1 k1 a, b, Node2 c k2 t3)
+  else
+    case insertT23 key value t3 of
+      Left t3' => Left (Node3 t1 k1 t2 k2 t3')
+      Right (a,b,c) => Right (Node2 t1 k1 t2, k2, Node2 a b c)
+
+-- This is cribbed from Idris. Deleting nodes takes a bit of code.
+Hole : Nat → U → U → U
+Hole Z k v = Unit
+Hole (S n) k v = T23 n k v
+
+Node4 : ∀ k v h. T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → T23 (S (S h)) k v
+Node4 t1 k1 t2 k2 t3 k3 t4 = Node2 (Node2 t1 k1 t2) k2 (Node2 t3 k3 t4)
+
+Node5 : ∀ k v h. T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → T23 (S (S h)) k v
+Node5 a b c d e f g h i = Node2 (Node2 a b c) d (Node3 e f g h i)
+
+Node6 : ∀ k v h. T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → T23 (S (S h)) k v
+Node6 a b c d e f g h i j k = Node2 (Node3 a b c d e) f (Node3 g h i j k)
+
+Node7 : ∀ k v h. T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → T23 (S (S h)) k v
+Node7 a b c d e f g h i j k l m = Node3 (Node3 a b c d e) f (Node2 g h i) j (Node2 k l m)
+
+merge1 : ∀ k v h. T23 h k v → k → T23 (S h) k v → k → T23 (S h) k v → T23 (S (S h)) k v
+merge1 a b (Node2 c d e) f (Node2 g h i) = Node5 a b c d e f g h i
+merge1 a b (Node2 c d e) f (Node3 g h i j k) = Node6 a b c d e f g h i j k
+merge1 a b (Node3 c d e f g) h (Node2 i j k) = Node6 a b c d e f g h i j k
+merge1 a b (Node3 c d e f g) h (Node3 i j k l m) = Node7 a b c d e f g h i j k l m
+
+merge2 : ∀ k v h. T23 (S h) k v → k → T23 h k v → k → T23 (S h) k v → T23 (S (S h)) k v
+merge2 (Node2 a b c) d e f (Node2 g h i) = Node5 a b c d e f g h i
+merge2 (Node2 a b c) d e f (Node3 g h i j k) = Node6 a b c d e f g h i j k
+merge2 (Node3 a b c d e) f g h (Node2 i j k) = Node6 a b c d e f g h i j k
+merge2 (Node3 a b c d e) f g h (Node3 i j k l m) = Node7 a b c d e f g h i j k l m
+
+merge3 : ∀ k v h. T23 (S h) k v → k → T23 (S h) k v → k → T23 h k v → T23 (S (S h)) k v
+merge3 (Node2 a b c) d (Node2 e f g) h i = Node5 a b c d e f g h i
+merge3 (Node2 a b c) d (Node3 e f g h i) j k = Node6 a b c d e f g h i j k
+merge3 (Node3 a b c d e) f (Node2 g h i) j k = Node6 a b c d e f g h i j k
+merge3 (Node3 a b c d e) f (Node3 g h i j k) l m = Node7 a b c d e f g h i j k l m
+
+-- height is erased in the data everywhere but the top, but needed for case
+-- I wonder if we could use a 1 + 1 + 1 type instead of Either Tree Hole and condense this
+deleteT23 : ∀ k v. {{Ord k}} {{Eq k}} → (h : Nat) -> k -> T23 h k v -> Either (T23 h k v) (Hole h k v)
+deleteT23 Z key (Leaf k v) = if k == key then Right MkUnit else Left (Leaf k v)
+deleteT23 (S Z) key (Node2 t1 k1 t2) =
+  if key <= k1
+  then case deleteT23 Z key t1 of
+    Left t1 => Left (Node2 t1 k1 t2)
+    Right _ => Right t2
+  else case deleteT23 Z key t2 of
+    Left t2 => Left (Node2 t1 k1 t2)
+    Right MkUnit => Right t1
+deleteT23 (S Z) key (Node3 t1 k1 t2 k2 t3) =
+  if key <= k1
+  then case deleteT23 _ key t1 of
+    Left t1 => Left (Node3 t1 k1 t2 k2 t3)
+    Right MkUnit => Left (Node2 t2 k2 t3)
+  else if key <= k2 then case deleteT23 _ key t2 of
+    Left t2 => Left (Node3 t1 k1 t2 k2 t3)
+    Right _ => Left (Node2 t1 k1 t3)
+  else case deleteT23 _ key t3 of
+    Left t3 => Left (Node3 t1 k1 t2 k2 t3)
+    Right _ => Left (Node2 t1 k1 t2)
+deleteT23 (S (S h)) key (Node2 t1 k1 t2) =
+  if key <= k1
+  then case deleteT23 (S h) key t1 of
+    Left t1 => Left (Node2 t1 k1 t2)
+    Right t1 => case t2 of
+      Node2 t2' k2' t3' => Right (Node3 t1 k1 t2' k2' t3')
+      Node3 t2 k2 t3 k3 t4 => Left $ Node4 t1 k1 t2 k2 t3 k3 t4
+  else case deleteT23 _ key t2 of
+    Left t2 => Left (Node2 t1 k1 t2)
+    Right t2 => case t1 of
+      Node2 a b c => Right (Node3 a b c k1 t2)
+      Node3 a b c d e => Left (Node4 a b c d e k1 t2)
+deleteT23 (S (S h)) key (Node3 t1 k1 t2 k2 t3) =
+  if key <= k1
+  then case deleteT23 _ key t1 of
+    Left t1 => Left (Node3 t1 k1 t2 k2 t3)
+    Right t1 => Left (merge1 t1 k1 t2 k2 t3)
+  else if key <= k2 then case deleteT23 _ key t2 of
+    Left t2 => Left (Node3 t1 k1 t2 k2 t3)
+    Right t2 => Left (merge2 t1 k1 t2 k2 t3)
+  else case deleteT23 _ key t3 of
+    Left t3 => Left (Node3 t1 k1 t2 k2 t3)
+    Right t3 => Left (merge3 t1 k1 t2 k2 t3)
+
+treeLeft : ∀ h k v. T23 h k v → (k × v)
+treeLeft (Leaf k v) = (k, v)
+treeLeft (Node2 t1 _ _) = treeLeft t1
+treeLeft (Node3 t1 _ _ _ _) = treeLeft t1
+
+treeRight : ∀ h k v. T23 h k v → (k × v)
+treeRight (Leaf k v) = (k, v)
+treeRight (Node2 _ _ t2) = treeRight t2
+treeRight (Node3 _ _ _ _ t3) = treeRight t3
+
+
+data SortedMap : U -> U -> U where
+  EmptyMap : ∀ k v. SortedMap k v
+  -- not erased so we know what happens in delete
+  MapOf : ∀ k v. {h : Nat} →  T23 h k v -> SortedMap k v
+
+deleteMap : ∀ k v. {{Ord k}} {{Eq k}} → k → SortedMap k v → SortedMap k v
+deleteMap key EmptyMap = EmptyMap
+-- REVIEW if I split h separately in a nested case, it doesn't sort out Hole
+deleteMap key (MapOf {k} {v} {Z} tree) = case deleteT23 Z key tree of
+  Left t => MapOf t
+  Right t => EmptyMap
+deleteMap key (MapOf {k} {v} {S n} tree) = case deleteT23 (S n) key tree of
+  Left t => MapOf t
+  Right t => MapOf t
+
+leftMost : ∀ k v. SortedMap k v → Maybe (k × v)
+leftMost EmptyMap = Nothing
+leftMost (MapOf m) = Just (treeLeft m)
+
+rightMost : ∀ k v. SortedMap k v → Maybe (k × v)
+rightMost EmptyMap = Nothing
+rightMost (MapOf m) = Just (treeRight m)
+
+-- TODO issue with metas and case if written as `do` block
+pop : ∀ k v. {{Eq k}} {{Ord k}} → SortedMap k v → Maybe ((k × v) × SortedMap k v)
+pop m = case leftMost m of
+    Just (k,v) => Just ((k,v), deleteMap k m)
+    Nothing => Nothing
+
+lookupMap : ∀ k v. {{Ord k}} {{Eq k}} -> k -> SortedMap k v -> Maybe (k × v)
+lookupMap k EmptyMap = Nothing
+lookupMap k (MapOf map) = lookupT23 k map
+
+lookupMap' : ∀ k v. {{Ord k}} {{Eq k}} -> k -> SortedMap k v -> Maybe v
+lookupMap' k EmptyMap = Nothing
+lookupMap' k (MapOf map) = snd <$> lookupT23 k map
+
+
+updateMap : ∀ k v. {{Ord k}} {{Eq k}} -> k -> v -> SortedMap k v -> SortedMap k v
+updateMap k v EmptyMap = MapOf $ Leaf k v
+updateMap k v (MapOf map) = case insertT23 k v map of
+  Left map' => MapOf map'
+  Right (a, b, c) => MapOf (Node2 a b c)
+
+toList : ∀ k v. SortedMap k v → List (k × v)
+toList {k} {v} (MapOf smap) = reverse $ go smap Nil
+  where
+    go : ∀ h. T23 h k v → List (k × v) → List (k × v)
+    go (Leaf k v) acc = (k, v) :: acc
+    go (Node2 t1 k1 t2) acc = go t2 (go t1 acc)
+    go (Node3 t1 k1 t2 k2 t3) acc = go t3 $ go t2 $ go t1 acc
+toList _ = Nil
+
+foldMap : ∀ a b. {{Ord a}} {{Eq a}} → (b → b → b) → SortedMap a b → List (a × b) → SortedMap a b
+foldMap f m Nil = m
+foldMap f m ((a,b) :: xs) = case lookupMap a m of
+  Nothing => foldMap f (updateMap a b m) xs
+  Just (_, b') => foldMap f (updateMap a (f b' b) m) xs
+
+listValues : ∀ k v. SortedMap k v → List v
+listValues sm = map snd $ toList sm
