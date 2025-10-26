@@ -119,7 +119,6 @@ compileTerm t@(Ref fc nm@(QN _ tag)) = do
   arity <- arityForName fc nm
   defs <- getRef Defs
   case arity of
-    -- we don't need to curry functions that take one argument
     Nil =>
       case the (Maybe Def) $ lookupMap' nm defs of
         Just (DCon ix EnumCon _ _) => pure $ CLit $ LInt $ cast ix

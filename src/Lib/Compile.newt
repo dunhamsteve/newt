@@ -11,7 +11,7 @@ import Lib.Prettier
 import Lib.CompileExp
 import Lib.TopContext
 import Lib.LiftWhere
--- import Lib.LiftLambda -- NOW needs update for arg erasure
+import Lib.LiftLambda
 import Lib.TCO
 import Lib.Ref2
 import Lib.Erasure

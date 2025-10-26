@@ -10,12 +10,13 @@
   - POper added to physical syntax types, but not implemented
 - [x] Remove erased fields from constructor data
 - [ ] Teach magic nat / magic enum about erased args
-- [ ] Update LiftLambda.newt for arg removal changes
+- [x] Update LiftLambda.newt for arg removal changes
 - [ ] Add error for non-linear names in pattern matching (currently it picks one)
   - We probably should handle forced values. Idris requires them to have the same name.
 - [ ] Functions with erased-only arguments still get called with `()` - do we want this or should they be constants?
 - [x] Take the parens off of FC to make vscode happy
 - [x] Magic to make Bool a boolean
+- [ ] Lifted closures could elide unused arguments (LiftWhere / LiftLambda)
 - [ ] Look into using holes for errors (https://types.pl/@AndrasKovacs/115401455046442009)
   - This would let us hit more cases in a function when we hit an error.
   - I've been wanting to try holes for parse errors too.

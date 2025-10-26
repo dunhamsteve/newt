@@ -11,22 +11,22 @@ import Data.SnocList
 import Data.IORef
 import Monad.State
 
-
 ExpMap : U
 ExpMap = SortedMap QName CExp
 
-liftLambdaTm : QName → SnocList Name → CExp → State ExpMap CExp
+liftLambdaTm : QName → SnocList (Quant × Name) → CExp → State ExpMap CExp
 -- CBnd
 liftLambdaTm name env (CFun nms t) = CFun nms <$> liftLambdaTm name (env <>< nms) t
 liftLambdaTm name env (CApp t u) =
   CApp <$> liftLambdaTm name env t <*> liftLambdaTm name env u
 liftLambdaTm name env (CLet nm v sc) = do
   v <- liftLambdaTm name env v
-  sc <- liftLambdaTm name (env :< nm) sc
+  sc <- liftLambdaTm name (env :< (Many, nm)) sc
   pure $ CLet nm v sc
 liftLambdaTm name env (CLetRec nm v sc) = do
-  v <- liftLambdaTm name (env :< nm) v
-  sc <- liftLambdaTm name (env :< nm) sc
+  -- references should be removed by liftWhere
+  v <- liftLambdaTm name (env :< (Zero, nm)) v
+  sc <- liftLambdaTm name (env :< (Zero, nm)) sc
   pure $ CLetRec nm v sc
 
 liftLambdaTm name env tm@(CCase t alts) = do
@@ -39,14 +39,15 @@ liftLambdaTm name env tm@(CCase t alts) = do
     liftLambdaAlt (CDefAlt tm) = CDefAlt <$> liftLambdaTm name env tm
     liftLambdaAlt (CLitAlt l tm) = CLitAlt l <$> liftLambdaTm name env tm
     liftLambdaAlt (CConAlt ix nm info args tm) =
-      CConAlt ix nm info args <$> liftLambdaTm name (env <>< args) tm
+      CConAlt ix nm info args <$> liftLambdaTm name (env <>< map (_,_ Many) args) tm
 liftLambdaTm name@(QN ns nm) env tm@(CLam nm t) = do
   let (nms, t) = splitLam tm Lin
   t' <- liftLambdaTm name (env <>< nms) t
+  let env' = env <>> nms
   -- TODO - maybe a better name here?
   qn <- getName name "lifted"
-  modify $ updateMap qn (CFun (env <>> nms) t')
-  pure $ CAppRef qn (makeApp (snoclen env)) (length' nms)
+  modify $ updateMap qn (CFun env' t')
+  pure $ CAppRef qn (makeApp (snoclen env)) (map fst env')
   where
     getName : QName → String → State ExpMap QName
     getName qn@(QN ns nm) ext = do
@@ -55,8 +56,8 @@ liftLambdaTm name@(QN ns nm) env tm@(CLam nm t) = do
       let (Just _) = lookupMap qn' top | _ => pure qn'
       getName qn (ext ++ "'")
 
-    splitLam : CExp → SnocList Name → List Name × CExp
-    splitLam (CLam nm t) acc = splitLam t (acc :< nm)
+    splitLam : CExp → SnocList (Quant × Name) → List (Quant × Name) × CExp
+    splitLam (CLam nm t) acc = splitLam t (acc :< (Many, nm))
     splitLam t acc = (acc <>> Nil, t)
 
     wrapLam : Nat → CExp → CExp

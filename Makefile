@@ -44,3 +44,6 @@ profile: .PHONY
 	rm isolate* build/*; node --prof newt.js -o newt2.js src/Main.newt
 	node --prof-process isolate* > profile.txt
 
+clean:
+	rm newt*.js iife.js min.js min.js.gz
+

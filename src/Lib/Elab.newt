@@ -1186,9 +1186,7 @@ buildLitCases ctx prob fc scnm scty = do
       Nothing => True -- can this happen?
       _ => False
 
--- TODO - figure out if these need to be in Prelude or have a special namespace
--- If we lookupRaw "String", we could get different answers in different contexts.
--- maybe Hardwire this one
+-- Names of builtin primitive types, declared in Main.newt
 stringType intType charType boolType : QName
 stringType = QN primNS "String"
 intType = QN primNS "Int"
