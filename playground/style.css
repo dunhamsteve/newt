@@ -122,3 +122,6 @@ svg.icon path {
 .cm-editor .cm-content {
   font-family: 'Comic Code', monospace;
 }
+.cm-editor {
+  height: 100%;
+}

@@ -75,6 +75,9 @@ insert : {l u h} -> Intv l u -> T23 l u h -> TooBig l u h + T23 l u h
 insert (intv x lx xu) (leaf lu) = inl (x , (leaf lx , leaf xu))
 insert (intv x lx xu) (node2 y tly tyu) = case cmp x y of
   -- u := N y is not solved at this time
+  -- The problem looks like
+  -- %v13 <= %v8 =?= N %v13 <<= (?m104 ...)
+  -- This might work if ?m104 is solved another way, so perhaps it could be postponed
   inl xy => case insert (intv {_} {N y} x lx xy) tly of
     inl (z , (tlz , tzy)) => inr (node3 z y tlz tzy tyu)
     inr tly' => inr (node2 y tly' tyu)
