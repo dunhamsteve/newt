@@ -1,0 +1,6 @@
+module BadAlt
+
+import Prelude
+
+foo : List Int → Int
+foo (xs :< x) = x

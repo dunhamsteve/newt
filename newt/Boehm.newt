@@ -1,0 +1,119 @@
+module Boehm
+
+-- https://okmij.org/ftp/tagless-final/course/Boehm-Berarducci.html
+
+import Prelude
+
+data Exp  = Lit Int
+          | Neg Exp
+          | ADD Exp Exp
+
+ti1 : Exp
+ti1 = ADD (Lit 8) (Neg (ADD (Lit 1) (Lit 2)))
+
+view : Exp → String
+view (Lit n) = show n
+view (Neg e) = "(-" ++ view e ++ ")"
+view (ADD e1 e2) = "("++ view e1 ++ " + " ++ view e2 ++ ")"
+
+record ExpOps a where
+  olit : Int → a
+  oneg : a → a
+  oadd : a → a → a
+
+foldExp : ∀ a. (Int → a) → (a → a) → (a → a → a) → Exp → a
+foldExp onlit onneg onadd (Lit n) = onlit n
+foldExp onlit onneg onadd (Neg e) = onneg (foldExp onlit onneg onadd e)
+foldExp onlit onneg onadd (ADD e1 e2) =
+  onadd (foldExp onlit onneg onadd e1)
+        (foldExp onlit onneg onadd e2)
+
+foldExp' : ∀ a. ExpOps a → Exp → a
+foldExp' ops = foldExp ops.olit ops.oneg ops.oadd
+
+viewOps : ExpOps String
+viewOps = MkExpOps show
+                   (\ e => "(-" ++ e ++ ")")
+                   (\ e1 e2 => "(" ++ e1 ++ " + " ++ e2 ++ ")")
+
+-- ok, I feel like I've done this before?
+-- or it was an example in another of his articles
+pushNeg : Exp → Exp
+pushNeg e@(Lit _) = e
+pushNeg e@(Neg (Lit _)) = e
+pushNeg (Neg (Neg e)) = e
+pushNeg (Neg (ADD e1 e2)) = (ADD (pushNeg $ Neg e1) (pushNeg $ Neg e2))
+pushNeg (ADD e1 e2) = ADD (pushNeg e1) (pushNeg e2)
+
+ti1Norm  : Exp
+ti1Norm = pushNeg ti1
+
+ti1NormView ti1NNormView : String
+ti1NormView = view ti1Norm
+
+ti1NNormView = view (pushNeg (Neg ti1))
+
+ExpBB1 : U
+ExpBB1 = ∀ a. ExpOps a → a
+
+-- curry record (he newtypes this.  do we need to?)
+
+ExpBB : U
+ExpBB = ∀ a. (Int → a) → (a → a) → (a → a → a) → a
+
+lit : Int → ExpBB
+lit x = \onlit onneg onadd => onlit x
+
+neg : ExpBB → ExpBB
+neg e = \ {a} onlit onneg onadd => onneg (e {a} onlit onneg onadd)
+
+add : ExpBB → ExpBB → ExpBB
+add e1 e2 = \ {a} onlit onneg onadd =>
+  onadd (e1 {a} onlit onneg onadd)
+        (e2 {a} onlit onneg onadd)
+
+bbOps : ExpOps ExpBB
+bbOps = MkExpOps lit neg add
+
+viewBB : ExpBB → String
+-- FIXME - without the {String} it is unifying Int → String with U
+-- Like an insert is not happening?
+viewBB e = e {String} onlit onneg onadd
+  where
+    onlit : Int → String
+    onlit n = show n
+    onneg : String → String
+    onneg e = "(-" ++ e ++ ")"
+    onadd : String → String → String
+    onadd e1 e2 = "(" ++ e1 ++ " , " ++ e2 ++ ")"
+
+
+-- extensionally:
+-- e (olit bbOps) (oneg bbOps) (oAdd bbOps) == e
+
+data ExpF a = FLit Int
+            | FNeg a
+            | FAdd a a
+
+roll : ExpF ExpBB → ExpBB
+roll (FLit n) = lit n
+roll (FNeg e) = neg e
+-- FIXME a {a} arg is being stripped off of the type before it's compared with ExpBB
+roll (FAdd e1 e2) = add e1 e2
+
+unroll : ExpBB → ExpF ExpBB
+unroll e = e onlit onneg onadd
+  where
+    onlit : Int → ExpF ExpBB
+    onlit n = FLit n
+    onneg : ExpF ExpBB → ExpF ExpBB
+    onneg e = FNeg (roll e)
+    onadd : ExpF ExpBB → ExpF ExpBB →  ExpF ExpBB
+    onadd e1 e2 = FAdd (roll e1) (roll e2)
+
+
+main : IO Unit
+main = do
+  putStrLn ti1NormView
+  putStrLn ti1NNormView
+

@@ -1,0 +1,6 @@
+module Duplicate
+
+-- duplicate name should fail
+data Either : U -> U -> U where
+  Left : {a b : U} -> a -> Either a b
+  Left : {a b : U} -> b -> Either a b

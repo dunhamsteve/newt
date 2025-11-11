@@ -1,6 +1,8 @@
 
 ## TODO
 
+- [ ] `newt/Problem.newt` coverage issues
+- [ ] Maybe make the editor json more compact
 - [ ] Remove erased args from primitive functions
 - [ ] consider moving primitive functions to a support file
   - Downside here is that we lose some dead code elimination, but it better supports bootstrapping when calling convention changes.

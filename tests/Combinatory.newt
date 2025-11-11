@@ -1,0 +1,96 @@
+module Combinatory
+
+-- "A correct-by-construction conversion from lambda calculus to combinatory logic", Wouter Swierstra
+
+data Unit : U where
+  MkUnit : Unit
+
+infixr 7 _::_
+data List : U -> U where
+  Nil : {A : U} -> List A
+  _::_ : {A : U} -> A -> List A -> List A
+
+-- prj/menagerie/papers/combinatory
+
+infixr 6 _~>_
+data Type : U where
+  ι : Type
+  _~>_ : Type -> Type -> Type
+
+A : U
+A = Unit
+
+Val : Type -> U
+Val ι = A
+Val (x ~> y) = Val x -> Val y
+
+Ctx : U
+Ctx = List Type
+
+data Ref : Type -> Ctx -> U where
+  Here : {σ : Type} {Γ : Ctx} -> Ref σ (σ :: Γ)
+  There : {σ τ : Type} {Γ : Ctx} -> Ref σ Γ -> Ref σ (τ :: Γ)
+
+data Term : Ctx -> Type -> U where
+  App : {Γ : Ctx} {σ τ : Type} -> Term Γ (σ ~> τ) -> Term Γ σ -> Term Γ τ
+  Lam : {Γ : Ctx} {σ τ : Type} -> Term (σ :: Γ) τ -> Term Γ (σ ~> τ)
+  Var : {Γ : Ctx} {σ : Type} -> Ref σ Γ → Term Γ σ
+
+infixr 7 _:::_
+data Env : Ctx -> U where
+  ENil : Env Nil
+  _:::_ : {Γ : Ctx} {σ : Type} → Val σ → Env Γ → Env (σ :: Γ)
+
+-- TODO there is a problem here with coverage checking
+-- I suspect something is being split before it's ready
+
+-- lookup : {σ : Type} {Γ : Ctx} → Ref σ Γ → Env Γ → Val σ
+-- lookup Here (x ::: y) = x
+-- lookup (There i) (x ::: env) = lookup i env
+
+lookup2 : {σ : Type} {Γ : Ctx} → Env Γ → Ref σ Γ → Val σ
+lookup2 (x ::: y) Here = x
+lookup2 (x ::: env) (There i) = lookup2 env i
+
+-- TODO MixFix - this was ⟦_⟧
+eval : {Γ : Ctx} {σ : Type} → Term Γ σ → (Env Γ → Val σ)
+-- there was a unification error in direct application
+eval (App t u) env = (eval t env) (eval u env)
+eval (Lam t) env = \ x => eval t (x ::: env)
+eval (Var i) env = lookup2 env i
+
+data Comb : (Γ : Ctx) → (u : Type) → (Env Γ → Val u) → U where
+  S : {Γ : Ctx} {σ τ τ' : Type} → Comb Γ ((σ ~> τ ~> τ') ~> (σ ~> τ) ~> (σ ~> τ')) (\ env => \ f g x => (f x) (g x))
+  K : {Γ : Ctx} {σ τ : Type} → Comb Γ (σ ~> (τ ~> σ)) (\ env => \ x y => x)
+  I : {Γ : Ctx} {σ : Type} → Comb Γ (σ ~> σ) (\ env => \ x => x)
+  B : {Γ : Ctx} {σ τ τ' : Type} → Comb Γ ((τ ~> τ') ~> (σ ~> τ) ~> (σ ~> τ')) (\ env => \ f g x => f (g x))
+  C : {Γ : Ctx} {σ τ τ' : Type} → Comb Γ ((σ ~> τ ~> τ') ~> τ ~> (σ ~> τ')) (\ env => \ f g x => (f x) g)
+  CVar : {Γ : Ctx} {σ : Type} → (i : Ref σ Γ) → Comb Γ σ (\ env => lookup2 env i)
+  CApp : {Γ : Ctx} {σ τ : Type} {f : _} {x : _} → Comb Γ (σ ~> τ) f → Comb Γ σ x → Comb Γ τ (\ env => (f env) (x env))
+
+sapp : {Γ : Ctx} {σ τ ρ : Type} {f : _} {x : _} →
+  Comb Γ (σ ~> τ ~> ρ) f →
+  Comb Γ (σ ~> τ) x →
+  Comb Γ (σ ~> ρ) (\ env y => (f env y) (x env y))
+sapp (CApp K t) I = t
+sapp (CApp K t) (CApp K u) = CApp K (CApp t u)
+-- was out of pattern because of unexpanded lets.
+sapp (CApp K t) u = CApp (CApp B t) u
+sapp t (CApp K u) = CApp (CApp C t) u
+sapp t u = CApp (CApp S t) u
+
+abs : {Γ : Ctx} {σ τ : Type} {f : _} → Comb (σ :: Γ) τ f → Comb Γ (σ ~> τ) (\ env x => f (x ::: env))
+abs S = CApp K S
+abs K = CApp K K
+abs I = CApp K I
+abs B = CApp K B
+abs C = CApp K C
+abs (CApp t u) = sapp (abs t) (abs u)
+-- lookup2 was getting stuck, needed to re-eval the types in the rewritten env.
+abs (CVar Here) = I
+abs (CVar (There i)) = CApp K (CVar i)
+
+translate : {Γ : Ctx} {σ : Type} → (tm : Term Γ σ) → Comb Γ σ (eval tm)
+translate (App t u) = CApp (translate t) (translate u)
+translate (Lam t) = abs (translate t)
+translate (Var i) = CVar i

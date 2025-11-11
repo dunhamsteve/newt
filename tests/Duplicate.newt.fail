@@ -1,0 +1,9 @@
+*** Process tests/Duplicate.newt
+module Duplicate
+ERROR at tests/Duplicate.newt:4:1--4:5: Duplicate.Left is already defined at tests/Duplicate.newt:4:1--4:5
+  
+  -- duplicate name should fail
+  data Either : U -> U -> U where
+  ^^^^
+
+Compile failed

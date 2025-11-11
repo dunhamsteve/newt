@@ -1,0 +1,55 @@
+module Problem
+
+data Unit : U where
+  MkUnit : Unit
+
+infixr 7 _::_
+data List : U -> U where
+  Nil : {A : U} -> List A
+  _::_ : {A : U} -> A -> List A -> List A
+
+-- prj/menagerie/papers/combinatory
+
+infixr 6 _~>_
+data Type : U where
+  ι : Type
+  _~>_ : Type -> Type -> Type
+
+A : U
+A = Unit
+
+Val : Type -> U
+Val ι = A
+Val (x ~> y) = Val x -> Val y
+
+Ctx : U
+Ctx = List Type
+
+data Ref : Type -> Ctx -> U where
+  Z : {σ : Type} {Γ : Ctx} -> Ref σ (σ :: Γ)
+  S : {σ τ : Type} {Γ : Ctx} -> Ref σ Γ -> Ref σ (τ :: Γ)
+
+data Term : Ctx -> Type -> U where
+  App : {Γ : Ctx} {σ τ : Type} -> Term Γ (σ ~> τ) -> Term Γ σ -> Term Γ τ
+  Lam : {Γ : Ctx} {σ τ : Type} -> Term (σ :: Γ) τ -> Term Γ (σ ~> τ)
+  Var : {Γ : Ctx} {σ : Type} -> Ref σ Γ → Term Γ σ
+
+infixr 7 _:::_
+data Env : Ctx -> U where
+  ENil : Env Nil
+  _:::_ : {Γ : Ctx} {σ : Type} → Val σ → Env Γ → Env (σ :: Γ)
+
+-- FIXME there is a problem here with coverage checking
+-- if we split Z first, we are fine.
+-- ENil is an impossible case, but we need to look at the constructors
+-- if we're running backwards, so
+--   lookup () ENil
+-- we don't have that notation yet.
+
+lookup : {σ : Type} {Γ : Ctx} → Ref σ Γ → Env Γ → Val σ
+lookup Z (x ::: y) = x
+-- and we have to way to say no cases here, either...
+-- lookup ref ENil = case ref of {}
+-- This does work
+-- lookup Z env = case env of (x ::: y) => x
+lookup (S i) (x ::: env) = lookup i env
