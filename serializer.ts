@@ -8,6 +8,8 @@ const INDUCT = 3;
 const STRING = 4;
 const NUMBER = 5;
 const NULL = 6;
+const TRUE = 7;
+const FALSE = 8;
 const te = new TextEncoder();
 
 class DeserializationStream {
@@ -98,7 +100,7 @@ export class DecFile {
       case NUMBER:
         return this.buf.readSignedVarint();
       case INDUCT:
-        const tag = this.pool[this.buf.readVarint()];
+        const tag = this.buf.readVarint()
         const obj: any = { tag };
         let i = 0;
         while (this.buf.buf[this.buf.pos] !== END) {
@@ -106,6 +108,10 @@ export class DecFile {
         }
         this.buf.pos++;
         return obj;
+      case TRUE:
+        return true;
+      case FALSE:
+        return false;
       default:
         debugger
         throw new Error(`Unknown type: ${type}`);
@@ -204,20 +210,22 @@ export class EncFile {
     } else if (typeof a === "number") {
       this.buf.writeByte(NUMBER);
       this.buf.writeSignedVarint(a);
-    } else if (a.tag) {
+    } else if (a === true) {
+      this.buf.writeByte(TRUE);
+    } else if (a === false) {
+      this.buf.writeByte(FALSE);
+    } else if (a.tag !== undefined) {
       this.buf.writeByte(INDUCT);
-      this.writeString(a.tag);
-      // we're actually missing a bunch of data here...
-      // with null, hack is not needed.
-      let i = 0
-      for (; i <= 20; i++) {
-        let key = 'h' + i
-        let v = a[key]
-        if (v === undefined) break
-        this.write(v);
+      this.buf.writeVarint(a.tag);
+      // Sometimes keys are skipped
+      let end = 0
+      for (let k in a) {
+        if (k[0] == 'h') end = Math.max(end, +k.slice(1))
       }
-      if (a['h' + (i + 1)] !== undefined) {
-        throw new Error("BOOM")
+      for (let i = 0; i <= end; i++) {
+        let key = 'h' + i
+        let v = a[key] ?? null
+        this.write(v);
       }
     this.buf.writeByte(END);
     } else {
@@ -228,13 +236,13 @@ export class EncFile {
     const poolArray = this.pool.toUint8Array();
     const bufArray = this.buf.toUint8Array();
     const rval = new Uint8Array(poolArray.length + bufArray.length);
-    // console.log('psize', poolArray.byteLength, poolArray.length)
     rval.set(poolArray);
     rval.set(bufArray, poolArray.length);
     return rval;
   }
 }
 
+// This was for testing
 function deepEqual(a: any, b: any): boolean {
   if (a === b) return true;
   if (typeof a !== typeof b) return false;
