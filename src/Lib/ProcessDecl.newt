@@ -157,7 +157,7 @@ complexity (Lit _ _) = 0
 complexity (Case _ sc (CaseCons _ _ t :: Nil)) = 1 + complexity sc + complexity t
 complexity _ = 100
 
-processDef : List String → FC → String → List (Raw × Raw) → M Unit
+processDef : List String → FC → String → List (Raw × Maybe Raw) → M Unit
 processDef ns fc nm clauses = do
   log 1 $ \ _ => "-----"
   log 1 $ \ _ => "Def \{show nm}"
@@ -234,7 +234,7 @@ processClass ns classFC nm tele decls = do
       let autoPat = foldl mkAutoApp (RVar classFC dcName) fields
       let lhs = makeLHS (RVar fc name) tele
       let lhs = RApp classFC lhs autoPat Auto
-      let decl = FunDef fc name ((lhs, (RVar fc name)) :: Nil)
+      let decl = FunDef fc name ((lhs, (Just $ RVar fc name)) :: Nil)
 
       log 1 $ \ _ => "\{name} : \{render 90 $ pretty funType}"
       log 1 $ \ _ => "\{render 90 $ pretty decl}"
@@ -336,7 +336,7 @@ processInstance ns instfc ty decls = do
     debug $ \ _ => render 80 $ pretty decl
     processDecl ns decl
   let (QN _ con') = con
-  let decl = FunDef instfc instname ((RVar instfc instname, mkRHS instname conTele (RVar instfc con')) :: Nil)
+  let decl = FunDef instfc instname ((RVar instfc instname, (Just $ mkRHS instname conTele (RVar instfc con'))) :: Nil)
   log 1 $ \ _ => "SIGDECL"
   log 1 $ \ _ => "\{render 90 $ pretty sigDecl}"
   log 1 $ \ _ => render 80 $ pretty decl
@@ -515,7 +515,7 @@ processRecord ns recordFC nm tele cname decls = do
       let pname = "." ++ name
       let lhs = foldl (\acc x => case the (BindInfo × Raw) x of (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc pname) tele
       let lhs = RApp recordFC lhs autoPat Explicit
-      let pdecl = FunDef fc pname ((lhs, (RVar fc name)) :: Nil)
+      let pdecl = FunDef fc pname ((lhs, (Just $ RVar fc name)) :: Nil)
       log 1 $ \ _ => "\{pname} : \{render 90 $ pretty funType}"
       log 1 $ \ _ => "\{render 90 $ pretty pdecl}"
       processDecl ns $ TypeSig fc (pname :: Nil) funType

@@ -593,3 +593,27 @@ lookupMeta ix@(QN ns nm) = do
 
 mkCtx : FC -> Context
 mkCtx fc = MkCtx 0 Nil Nil Nil fc
+
+data Pattern
+  = PatVar FC Icit Name
+  | PatCon FC Icit QName (List Pattern) (Maybe Name)
+  | PatWild FC Icit
+  | PatLit FC Literal
+  | PatImpossible FC
+
+getIcit : Pattern -> Icit
+getIcit (PatVar x icit str) = icit
+getIcit (PatCon x icit str xs as) = icit
+getIcit (PatWild x icit) = icit
+getIcit (PatLit fc lit) = Explicit
+getIcit (PatImpossible _) = Explicit
+
+instance HasFC Pattern where
+  getFC (PatVar fc _ _) = fc
+  getFC (PatCon fc _ _ _ _) = fc
+  getFC (PatWild fc _) = fc
+  getFC (PatLit fc lit) = fc
+  getFC (PatImpossible fc) = fc
+
+data Constraint = PC String Pattern
+

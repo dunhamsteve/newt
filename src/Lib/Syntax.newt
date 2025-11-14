@@ -8,33 +8,6 @@ import Lib.Types
 
 Raw : U
 
-
-data Pattern
-  = PatVar FC Icit Name
-  | PatCon FC Icit QName (List Pattern) (Maybe Name)
-  | PatWild FC Icit
-  -- Not handling this yet, but we need to be able to work with numbers and strings...
-  | PatLit FC Literal
-
-
-getIcit : Pattern -> Icit
-getIcit (PatVar x icit str) = icit
-getIcit (PatCon x icit str xs as) = icit
-getIcit (PatWild x icit) = icit
-getIcit (PatLit fc lit) = Explicit
-
-
-
-instance HasFC Pattern where
-  getFC (PatVar fc _ _) = fc
-  getFC (PatCon fc _ _ _ _) = fc
-  getFC (PatWild fc _) = fc
-  getFC (PatLit fc lit) = fc
-
-Constraint : U
-Constraint = (String × Pattern)
-
-
 record Clause where
   constructor MkClause
   clauseFC : FC
@@ -47,11 +20,11 @@ record Clause where
   pats : List Pattern
   -- We'll need some context to typecheck this
   -- it has names from Pats, which will need types in the env
-  expr : Raw
+  expr : Maybe Raw
 
 -- could be a pair, but I suspect stuff will be added?
 
-data RCaseAlt = MkAlt Raw Raw
+data RCaseAlt = MkAlt Raw (Maybe Raw)
 
 data UpdateClause = AssignField FC String Raw | ModifyField FC String Raw
 
@@ -66,6 +39,7 @@ data Raw : U where
   RLam : (fc : FC) -> BindInfo -> (sc : Raw) -> Raw
   RApp : (fc : FC) -> (t : Raw) -> (u : Raw) -> (icit : Icit) -> Raw
   RU   : (fc : FC) -> Raw
+  RImpossible   : (fc : FC) -> Raw
   RPi  : (fc : FC) -> BindInfo -> (ty : Raw) -> (sc : Raw) -> Raw
   RLet : (fc : FC) -> (nm : Name) -> (ty : Raw) -> (v : Raw) -> (sc : Raw) -> Raw
   RAnn : (fc : FC) -> (tm : Raw) -> (ty : Raw) -> Raw
@@ -98,7 +72,7 @@ instance HasFC Raw where
   getFC (RWhere fc _ _) = fc
   getFC (RAs fc _ _) = fc
   getFC (RUpdateRec fc _ _) = fc
-
+  getFC (RImpossible fc) = fc
 
 data Import = MkImport FC Name
 
@@ -110,7 +84,7 @@ Telescope = List (BindInfo × Raw)
 
 data Decl
   = TypeSig FC (List Name) Raw
-  | FunDef FC Name (List (Raw × Raw))
+  | FunDef FC Name (List (Raw × Maybe Raw))
   | DCheck FC Raw Raw
   | Data FC Name Raw (List Decl)
   | ShortData FC Raw (List Raw)
@@ -148,6 +122,9 @@ foo ts = "(" ++ unwords ts ++ ")"
 instance Show Raw
 instance Show Pattern
 
+instance Show Constraint where
+  show (PC nm pat) = show (nm,pat)
+
 instance Show Clause where
   show (MkClause fc cons pats expr) = show (fc, cons, pats, expr)
 
@@ -179,6 +156,7 @@ instance Show Module where
 
 instance Show Pattern where
   show (PatVar _ icit str) = foo ("PatVar" :: show icit :: show str :: Nil)
+  show (PatImpossible _) = "PatImp"
   show (PatCon _ icit str xs as) = foo ("PatCon" :: show icit :: show str :: show xs :: show as :: Nil)
   show (PatWild _ icit) = foo ("PatWild" :: show icit :: Nil)
   show (PatLit _ lit) = foo ("PatLit" :: show lit :: Nil)
@@ -193,6 +171,7 @@ instance Show UpdateClause where
 
 instance Show Raw where
   show (RImplicit _) = "_"
+  show (RImpossible _) = "()"
   show (RHole _) = "?"
   show (RUpdateRec _ clauses tm) = foo ("RUpdateRec" :: show clauses :: show tm :: Nil)
   show (RVar _ name) = foo ("RVar" :: show name :: Nil)
@@ -223,6 +202,7 @@ wrap Auto x = text "{{" ++ x ++ text "}}"
 
 instance Pretty Pattern where
   pretty (PatVar _ Implicit str) = text str
+  pretty (PatImpossible _) = text "()"
   pretty (PatVar _ icit str) = wrap icit $ text str
   pretty (PatCon _ icit nm args Nothing) = text (show nm) <+> spread (map pretty args)
   pretty (PatCon _ icit nm args (Just as)) = text as ++ text "@(" ++ text (show nm) <+> spread (map pretty args) ++ text ")"
@@ -258,6 +238,7 @@ instance Pretty Raw where
     asDoc p (RLit _ lit) = pretty lit
     asDoc p (RCase _ x xs) = text "TODO - RCase"
     asDoc p (RImplicit _) = text "_"
+    asDoc p (RImpossible _) = text "()"
     asDoc p (RHole _) = text "?"
     asDoc p (RDo _ stmts) = text "TODO - RDo"
     asDoc p (RIf _ x y z) = par p 0 $ text "if" <+> asDoc 0 x <+/> text "then" <+> asDoc 0 y <+/> text "else" <+> asDoc 0 z
@@ -276,8 +257,9 @@ instance Pretty Decl where
   pretty (TypeSig _ nm ty) = spread (map text nm) <+> text ":" <+> nest 2 (pretty ty)
   pretty (FunDef _ nm clauses) = stack $ map prettyPair clauses
     where
-      prettyPair : Raw × Raw → Doc
-      prettyPair (a, b) = pretty a <+> text "=" <+> pretty b
+      prettyPair : Raw × Maybe Raw → Doc
+      prettyPair (a, Nothing) = pretty a
+      prettyPair (a, Just b) = pretty a <+> text "=" <+> pretty b
   pretty (Data _ nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map pretty xs))
   pretty (DCheck _ x y) = text "#check" <+> pretty x <+> text ":" <+> pretty y
   pretty (PType _ nm ty) = text "ptype" <+> text nm <+> (maybe empty (\ty => text ":" <+> pretty ty) ty)

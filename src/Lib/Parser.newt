@@ -110,6 +110,18 @@ asAtom = do
 -- the inside of Raw
 recordUpdate : Parser Raw
 
+parenTypeExp : Parser Raw
+parenTypeExp = do
+  fc <- getPos
+  symbol "("
+  -- fc' is a little hacky, need bounded or something cleaner
+  fc' <- getPos
+  Nothing <- optional $ symbol ")"
+    | Just tm => do pure $ RImpossible (fc + fc')
+  t <- typeExpr
+  symbol ")"
+  pure t
+
 atom : Parser Raw
 atom = do
   pure MkUnit
@@ -121,7 +133,7 @@ atom = do
     <|> lit
     <|> RImplicit <$> getPos <* keyword "_"
     <|> RHole <$> getPos <* keyword "?"
-    <|> parenWrap typeExpr
+    <|> parenTypeExp
     <|> recordUpdate
 
 updateClause : Parser UpdateClause
@@ -240,11 +252,6 @@ parseOp = do
     | _ => fail "extra stuff"
   pure res
 
-
--- TODO case let? We see to only have it for `do`
--- try (keyword "let" >> symbol "(")
-
-
 letExpr : Parser Raw
 letExpr = do
   keyword "let"
@@ -286,6 +293,7 @@ pLamArg = impArg <|> autoArg <|> expArg
     expArg : Parser (Icit × String × Maybe Raw)
     expArg = do
       nm <- parenWrap (ident <|> uident)
+      -- FIXME - this is broken, outside parenWrap, guess I never used it?
       ty <- optional (symbol ":" >> typeExpr)
       pure (Explicit, nm, ty)
 
@@ -306,8 +314,7 @@ caseAlt : Parser RCaseAlt
 caseAlt = do
   pure MkUnit
   pat <- typeExpr
-  keyword "=>"
-  t <- term
+  t <- optional (keyword "=>" >> term)
   pure $ MkAlt pat t
 
 
@@ -342,7 +349,7 @@ caseLet = do
   alts <- startBlock $ manySame $ symbol "|" *> caseAlt
   keyword "in"
   body <- term
-  pure $ RCase fc sc (MkAlt pat body :: alts)
+  pure $ RCase fc sc (MkAlt pat (Just body) :: alts)
 
 doCaseLet : Parser DoStmt
 doCaseLet = do
@@ -357,7 +364,7 @@ doCaseLet = do
   alts <- startBlock $ manySame $ symbol "|" *> caseAlt
   bodyFC <- getPos
   body <- RDo <$> getPos <*> someSame doStmt
-  pure $ DoExpr fc (RCase fc sc (MkAlt pat body :: alts))
+  pure $ DoExpr fc (RCase fc sc (MkAlt pat (Just body) :: alts))
 
 doArrow : Parser DoStmt
 doArrow = do
@@ -542,7 +549,9 @@ parseDef = do
   fc <- getPos
   t <- typeExpr
   nm <- getName t
-  keyword "="
+  Just _ <- optional $ keyword "="
+    -- impossible clause
+    | Nothing => pure $ FunDef fc nm ((t,Nothing) :: Nil)
   body <- typeExpr
   wfc <- getPos
   w <- optional $ do
@@ -550,7 +559,7 @@ parseDef = do
     startBlock $ manySame $ (parseSig <|> parseDef)
   let body = maybe body (\ decls => RWhere wfc decls body) w
   -- these get collected later
-  pure $ FunDef fc nm ((t, body) :: Nil) -- (MkClause fc Nil t body :: Nil)
+  pure $ FunDef fc nm ((t, Just body) :: Nil)
 
 
 parsePType : Parser Decl
