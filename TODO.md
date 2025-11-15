@@ -1,11 +1,14 @@
 
 ## TODO
 
-- [ ] `newt/Problem.newt` coverage issues
+- [x] `newt/Problem.newt` coverage issues
 - [ ] Maybe make the editor json more compact
 - [ ] Remove erased args from primitive functions
+  - But we need separate `+` functions rather than the magic `∀ a. a -> a -> a` to support other backends
 - [ ] consider moving primitive functions to a support file
   - Downside here is that we lose some dead code elimination, but it better supports bootstrapping when calling convention changes.
+- [ ] Alternate backend
+  - Options are scheme, C, WASM, arm assembly. Maybe C is the next step.
 - [ ] allow declaration of primitive operators
   - Removes assumptions of hack in Compile.newt, but might not support other backends
   - Alternate solution would be to pull from Prelude and hard code for all backends
@@ -13,6 +16,9 @@
 - [x] Remove erased fields from constructor data
 - [ ] Teach magic nat / magic enum about erased args
 - [x] Update LiftLambda.newt for arg removal changes
+- [ ] See if we can split up `Elab.newt`
+  - Unify, checking, and case builder have circular references.
+  - Perhaps unify should return constraints instead of calling solve directly.
 - [ ] Add error for non-linear names in pattern matching (currently it picks one)
   - We probably should handle forced values. Idris requires them to have the same name.
 - [ ] Functions with erased-only arguments still get called with `()` - do we want this or should they be constants?

@@ -8,6 +8,7 @@ import Lib.Types
 
 Raw : U
 
+-- Maybe this moves to Elab..
 record Clause where
   constructor MkClause
   clauseFC : FC
@@ -120,10 +121,7 @@ foo : List String -> String
 foo ts = "(" ++ unwords ts ++ ")"
 
 instance Show Raw
-instance Show Pattern
 
-instance Show Constraint where
-  show (PC nm pat) = show (nm,pat)
 
 instance Show Clause where
   show (MkClause fc cons pats expr) = show (fc, cons, pats, expr)
@@ -152,14 +150,6 @@ instance Show Decl where
 
 instance Show Module where
   show (MkModule name imports decls) = foo ("MkModule" :: show name :: show imports :: show decls :: Nil)
-
-
-instance Show Pattern where
-  show (PatVar _ icit str) = foo ("PatVar" :: show icit :: show str :: Nil)
-  show (PatImpossible _) = "PatImp"
-  show (PatCon _ icit str xs as) = foo ("PatCon" :: show icit :: show str :: show xs :: show as :: Nil)
-  show (PatWild _ icit) = foo ("PatWild" :: show icit :: Nil)
-  show (PatLit _ lit) = foo ("PatLit" :: show lit :: Nil)
 
 
 instance Show RCaseAlt where

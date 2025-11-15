@@ -1,0 +1,6 @@
+module Possible
+
+import Prelude
+
+foo : Nat → Nat
+foo ()

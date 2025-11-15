@@ -615,5 +615,13 @@ instance HasFC Pattern where
   getFC (PatLit fc lit) = fc
   getFC (PatImpossible fc) = fc
 
-data Constraint = PC String Pattern
+instance Show Pattern where
+  show (PatVar _ icit str) = "(PatVar " ++ show icit ++ " " ++ show str ++ ")"
+  show (PatImpossible _) = "PatImp"
+  show (PatCon _ icit str xs as) = "(PatCon " ++ show icit ++ " " ++ show str ++ " " ++ show xs ++ " " ++ show as ++ ")"
+  show (PatWild _ icit) = "(PatWild " ++ show icit ++ ")"
+  show (PatLit _ lit) = "(PatLit " ++ show lit ++ ")"
 
+data Constraint = PC String Pattern Val
+instance Show Constraint where
+  show (PC nm pat ty) = show (nm,pat,ty)

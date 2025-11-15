@@ -1,3 +1,4 @@
+// This needs to be flexhed out a lot, I've been adding them as needed
 export const ABBREV: Record<string, string> = {
   "\\x": "×",
   "\\r": "→",
@@ -16,5 +17,11 @@ export const ABBREV: Record<string, string> = {
   "\\_2": "₂",
   "\\_3": "₃",
   "\\neg": "¬",
-  "\\bN": "ℕ"
+  "\\bN": "ℕ",
+  "\\bZ": "ℤ",
+  "\\gi": "ι",
+  "\\gs": "σ",
+  "\\gt": "τ",
+  "\\gD": "Δ",
+  "\\gG": "Γ"
 };
