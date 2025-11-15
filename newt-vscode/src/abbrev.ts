@@ -1,4 +1,5 @@
-// This needs to be flexhed out a lot, I've been adding them as needed
+// This needs to be fleshed out a lot, I've been adding them as needed
+// There is a mix of agda, lean, and my own shortcuts here
 export const ABBREV: Record<string, string> = {
   "\\x": "×",
   "\\r": "→",
@@ -8,20 +9,26 @@ export const ABBREV: Record<string, string> = {
   "\\circ": "∘",
   "\\oplus": "⊕",
   "\\otimes": "⊗",
+  // lean
   "\\1": "₁",
   "\\2": "₂",
   "\\<": "⟨",
   "\\>": "⟩",
+  // agda
   "\\_0": "₀",
   "\\_1": "₁",
   "\\_2": "₂",
   "\\_3": "₃",
+  // lean has \n here, which is a royal pain
   "\\neg": "¬",
   "\\bN": "ℕ",
   "\\bZ": "ℤ",
-  "\\gi": "ι",
-  "\\gs": "σ",
-  "\\gt": "τ",
-  "\\gD": "Δ",
-  "\\gG": "Γ"
+  "\\GG": "Γ",
+  "\\Gi": "ι",
+  "\\Gl": "λ",
+  "\\Gs": "σ",
+  "\\Gt": "τ",
+  "\\GD": "Δ",
+  "\\[[": "⟦",
+  "\\]]": "⟧",
 };

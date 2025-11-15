@@ -179,7 +179,11 @@ pratt ops prec stop left spine = do
           Just (MkOp name p fix False rule) => if p < prec
             then pure (left, spine)
             else runRule p fix stop rule (RApp (getFC left + fc) (RVar fc name) left Explicit) rest
-          Just _ => fail "expected operator"
+          -- The argument is a prefix op
+          Just (MkOp name p fix True rule) => do
+            (arg, rest) <- runPrefix stop tm rest
+            pratt ops prec stop (RApp (getFC left + getFC arg) left arg Explicit) rest
+            -- fail "expected operator \{show spine} got \{show name}"
           Nothing =>
             if isPrefixOf "." nm
             then pratt ops prec stop (RApp (getFC left + getFC tm) tm left Explicit) rest
@@ -236,6 +240,8 @@ pratt ops prec stop left spine = do
            -- TODO False should be an error here
          Just (MkOp name p fix True rule) => do
             runRule p fix stop rule (RVar fc name) spine
+         Just (MkOp name p fix False rule) => do
+            fail "got infix \{show name} in prefix position"
          _ =>
           pure (left, spine)
     runPrefix stop left spine = pure (left, spine)

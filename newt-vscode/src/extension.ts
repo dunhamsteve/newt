@@ -30,10 +30,14 @@ export function activate(context: vscode.ExtensionContext) {
     const changes = event.contentChanges;
     if (changes.length === 0) return;
 
+    // TODO - agda input mode does the replacement as soon as possible
+    // but if the sequence is a prefix, it will change for subsequent characters
+    // The latter would require keeping state, but if we don't allow sequences to prefix
+    // each other, we could activate quicker.
     const lastChange = changes[changes.length - 1];
     const text = lastChange.text;
     // Check if the last change is a potential shortcut trigger
-    if (!text || !( " ')\\".includes(text) || text.startsWith('\n'))) return;
+    if (!text || !( " ')\\_".includes(text) || text.startsWith('\n'))) return;
 
     const document = editor.document;
     const position = lastChange.range.end;
