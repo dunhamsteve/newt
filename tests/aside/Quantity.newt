@@ -1,0 +1,14 @@
+module Quantity
+
+import Prelude
+
+
+foo : Nat → Nat
+foo x = x
+
+-- This should fail to compile
+bar : ∀ x. Nat
+bar {x} = foo x
+
+main : IO Unit
+main = printLn $ bar {S Z}

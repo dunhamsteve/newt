@@ -1,7 +1,6 @@
 
 ## TODO
 
-- [x] `newt/Problem.newt` coverage issues
 - [ ] Maybe make the editor json more compact
 - [ ] Remove erased args from primitive functions
   - But we need separate `+` functions rather than the magic `∀ a. a -> a -> a` to support other backends
@@ -13,6 +12,7 @@
   - Removes assumptions of hack in Compile.newt, but might not support other backends
   - Alternate solution would be to pull from Prelude and hard code for all backends
   - POper added to physical syntax types, but not implemented
+- [ ] Fix issue with erasure checking: `tests/aside/Quantity.newt`.
 - [x] Remove erased fields from constructor data
 - [ ] Teach magic nat / magic enum about erased args
 - [x] Update LiftLambda.newt for arg removal changes
