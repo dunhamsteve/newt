@@ -47,3 +47,6 @@ profile: .PHONY
 clean:
 	rm newt*.js iife.js min.js min.js.gz
 
+audit: .PHONY
+	(cd playground && npm audit)
+	(cd newt-vscode && npm audit)
