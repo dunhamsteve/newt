@@ -1,0 +1,12 @@
+module DayXX
+
+import Prelude
+import Node
+import Aoc
+
+run : String → IO Unit
+
+main : IO Unit
+main = do
+  run "aoc2025/dayXX/eg.txt"
+  run "aoc2025/dayXX/input.txt"

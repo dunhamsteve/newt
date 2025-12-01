@@ -1,0 +1,7 @@
+module Node
+
+import Prelude
+
+pfunc fs : JSObject := `require('fs')`
+pfunc getArgs : List String := `arrayToList(String, process.argv)`
+pfunc readFile uses (MkIORes) : (fn : String) -> IO String := `(fn) => (w) => Prelude_MkIORes(require('fs').readFileSync(fn, 'utf8'), w)`

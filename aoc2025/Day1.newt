@@ -1,0 +1,54 @@
+module Day1
+
+import Prelude
+import Node
+
+parseLine : String → Maybe Int
+parseLine s = case unpack s of
+  ('L' :: rest) => Just $ 0 - stringToInt (pack rest)
+  ('R' :: rest) => Just $ stringToInt (pack rest)
+  _ => Nothing
+
+parse : String → List Int
+parse text = mapMaybe parseLine $ split (trim text) "\n"
+
+part1 : List Int → Int
+part1 xs = go 0 50 xs
+  where
+    go : Int → Int → List Int → Int
+    go acc pos Nil = acc
+    go acc pos (x :: xs) =
+      let pos = mod (x + pos)  100
+          acc = if pos == 0 then acc + 1 else acc
+      in go acc pos xs
+
+-- This is uglier than I'd like
+part2 : List Int → Nat
+part2 xs = go Z 50 xs
+  where
+    go : Nat → Int → List Int → Nat
+    go acc pos Nil = acc
+    go acc pos (0 :: xs) = go acc pos xs
+    go acc pos (x :: xs) =
+      if x == 0 then go acc pos xs
+      else if x <= -100 then go (S acc) pos (x + 100 :: xs)
+      else if 100 <= x then go (S acc) pos (x - 100 :: xs)
+      else if x + pos < 0 then go (if pos == 0 then acc else S acc) (x + pos + 100) xs
+      else if x + pos == 0 then go (S acc) (x + pos) xs
+      else if 100 <= x + pos  then go (S acc) (x + pos - 100) xs
+      else go acc (x + pos) xs
+
+run : String → IO Unit
+run fn = do
+  printLn fn
+  text <- readFile fn
+  let xs = parse text
+  let p1 = part1 xs
+  printLn "part1 \{show p1}"
+  let p2 = part2 xs
+  printLn "part2 \{show p2}"
+
+main : IO Unit
+main = do
+  run "aoc2025/day1/eg.txt"
+  run "aoc2025/day1/input.txt"
