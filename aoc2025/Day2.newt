@@ -1,0 +1,75 @@
+module Day2
+
+import Prelude
+import Node
+import Aoc
+
+parse : String → List (Int × Int)
+parse text = map mkPair $ split text ","
+  where
+    mkPair : String → Int × Int
+    mkPair t = case split t "-" of
+      (a :: b :: Nil) => (stringToInt a, stringToInt b)
+      bad => fatalError "BAD \{t}"
+
+invalid : String → Bool
+invalid s =
+  let l = slen s
+      h = l / 2
+  in if h * 2 /= l then False
+  else go 0 h
+  where
+    go : Int → Int → Bool
+    go i h = if i == h
+      then True
+      else if sindex s i == sindex s (i + h) then go (i + 1) h else False
+
+match : List Char → List Char → Bool
+match pat cs = go pat cs
+  where
+    go : List Char → List Char → Bool
+    go (p :: ps) (c :: cs) = if p == c then go ps cs else False
+    go Nil Nil = True
+    go Nil cs = go pat cs
+    go (p :: ps) Nil = False
+
+invalid' : String → Bool
+invalid' s =
+  let l = slen s
+      h = l / 2
+  in check (S Z) (cast h) $ unpack s
+  where
+    check : Nat → Nat → List Char → Bool
+    check a h cs =
+      if a > h then False else
+        if match (take a cs) cs then True else check (S a) h cs
+
+scan : (String → Bool) → Int → Int → SnocList Int → List Int
+scan invalid a b acc =
+  let acc = if invalid (show a) then acc :< a else acc in
+  if a == b then acc <>> Nil else scan invalid (a + 1) b acc
+
+part1 : String → Int
+part1 text =
+  let pairs = parse text
+      results = join $ map (\x => scan invalid (fst x) (snd x) Lin) pairs
+  in foldl _+_ 0 results
+
+part2 : String → Int
+part2 text =
+  let pairs = parse text
+      results = join $ map (\x => scan invalid' (fst x) (snd x) Lin) pairs
+  in foldl _+_ 0 results
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  printLn $ parse text
+  putStrLn $ "part1 " ++ show (part1 text)
+  putStrLn $ "part2 " ++ show (part2 text)
+
+main : IO Unit
+main = do
+  run "aoc2025/day2/eg.txt"
+  run "aoc2025/day2/input.txt"

@@ -4,7 +4,15 @@ import Prelude
 import Node
 import Aoc
 
-run : String → IO Unit
+part1 : String → Int
+part2 : String → Int
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  putStrLn $ "part1 " ++ show (part1 text)
+  putStrLn $ "part2 " ++ show (part2 text)
 
 main : IO Unit
 main = do
