@@ -12,54 +12,50 @@ parse text = map mkPair $ split text ","
       (a :: b :: Nil) => (stringToInt a, stringToInt b)
       bad => fatalError "BAD \{t}"
 
-invalid : String → Bool
-invalid s =
-  let l = slen s
+invalid : Int → Bool
+invalid n =
+  let s = show n
+      l = slen s
       h = l / 2
   in if h * 2 /= l then False
-  else go 0 h
+  else go s 0 h
+  where
+    go : String → Int → Int → Bool
+    go s i h = if i == h
+      then True
+      else if sindex s i == sindex s (i + h) then go s (i + 1) h else False
+
+match : Int → Int → Bool
+match f n = let v = mod n f in if v * 10 < f then False else go v n
   where
     go : Int → Int → Bool
-    go i h = if i == h
-      then True
-      else if sindex s i == sindex s (i + h) then go (i + 1) h else False
+    go pat 0 = True
+    go pat n = if (mod n f) /= pat then False else go pat (n / f)
 
-match : List Char → List Char → Bool
-match pat cs = go pat cs
+invalid2 : Int → Bool
+invalid2 s = go 10 s
   where
-    go : List Char → List Char → Bool
-    go (p :: ps) (c :: cs) = if p == c then go ps cs else False
-    go Nil Nil = True
-    go Nil cs = go pat cs
-    go (p :: ps) Nil = False
+    go : Int → Int → Bool
+    go f n =
+      if f * f > n * 10 then False
+      else if match f n then True
+      else go (f * 10) n
 
-invalid' : String → Bool
-invalid' s =
-  let l = slen s
-      h = l / 2
-  in check (S Z) (cast h) $ unpack s
-  where
-    check : Nat → Nat → List Char → Bool
-    check a h cs =
-      if a > h then False else
-        if match (take a cs) cs then True else check (S a) h cs
-
-scan : (String → Bool) → Int → Int → Int → Int
+scan : (Int → Bool) → Int → Int → Int → Int
 scan invalid a b acc =
-  let acc = if invalid (show a) then acc + a else acc in
+  let acc = if invalid a then acc + a else acc in
   if a == b then acc else scan invalid (a + 1) b acc
 
 part1 : String → Int
 part1 text = foldl (\acc x => scan invalid (fst x) (snd x) acc) 0 $ parse text
 
 part2 : String → Int
-part2 text = foldl (\acc x => scan invalid' (fst x) (snd x) acc) 0 $ parse text
+part2 text = foldl (\acc x => scan invalid2 (fst x) (snd x) acc) 0 $ parse text
 
 run : String -> IO Unit
 run fn = do
   putStrLn fn
   text <- readFile fn
-  printLn $ parse text
   putStrLn $ "part1 " ++ show (part1 text)
   putStrLn $ "part2 " ++ show (part2 text)
 
