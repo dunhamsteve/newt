@@ -44,22 +44,16 @@ invalid' s =
       if a > h then False else
         if match (take a cs) cs then True else check (S a) h cs
 
-scan : (String → Bool) → Int → Int → SnocList Int → List Int
+scan : (String → Bool) → Int → Int → Int → Int
 scan invalid a b acc =
-  let acc = if invalid (show a) then acc :< a else acc in
-  if a == b then acc <>> Nil else scan invalid (a + 1) b acc
+  let acc = if invalid (show a) then acc + a else acc in
+  if a == b then acc else scan invalid (a + 1) b acc
 
 part1 : String → Int
-part1 text =
-  let pairs = parse text
-      results = join $ map (\x => scan invalid (fst x) (snd x) Lin) pairs
-  in foldl _+_ 0 results
+part1 text = foldl (\acc x => scan invalid (fst x) (snd x) acc) 0 $ parse text
 
 part2 : String → Int
-part2 text =
-  let pairs = parse text
-      results = join $ map (\x => scan invalid' (fst x) (snd x) Lin) pairs
-  in foldl _+_ 0 results
+part2 text = foldl (\acc x => scan invalid' (fst x) (snd x) acc) 0 $ parse text
 
 run : String -> IO Unit
 run fn = do
