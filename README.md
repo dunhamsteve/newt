@@ -13,10 +13,10 @@ has a dropdown with some sample code, including `newt` itself.
 
 ## Sample code
 
-- `src` contains a copy of newt written in newt
-- `newt` contains miscellaneous samples
-- `aoc2024` contains solutions for 2024 Advent of Code in newt
-- `tests` contains test cases
+- [`src`](src) contains a copy of newt written in newt
+- [`playground/samples`](playground/samples) contains miscellaneous samples from the web playground
+- [`aoc2024`](aoc2024) contains solutions for 2024 Advent of Code in newt
+- [`tests`](tests) contains test cases
 
 ## Building
 
