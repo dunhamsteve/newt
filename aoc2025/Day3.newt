@@ -1,0 +1,52 @@
+module Day3
+
+import Prelude
+import Node
+
+parse : String → List (List Int)
+parse text = map mkbank $ split (trim text) "\n"
+  where
+    mkbank : String → List Int
+    mkbank line = map (\c => ord c - 48) $ unpack line
+
+part1 : List (List Int) → Int
+part1 banks = foldl _+_ 0 $ map (max 0 0) banks
+  where
+    max : Int → Int → List Int → Int
+    max a b Nil = a * 10 + b
+    max a b (c :: Nil) = if c > b then max a c Nil else max a b Nil
+    max a b (c :: cs) = if c > a then max c 0 cs else if c > b then max a c cs else max a b cs
+
+twelve : Nat
+twelve = cast 12
+
+part2 : List (List Int) → Int
+part2 banks = foldl _+_ 0 $ map go banks
+  where
+    calc : Int → List Int → Int
+    calc acc Nil = acc
+    calc acc (x :: xs) = calc (10 * acc + x) xs
+
+    try : List Int → Int → List Int
+    try (a :: b :: cs) n = if a < b then b :: cs ++ (n :: Nil) else a :: try (b :: cs) n
+    try (a :: Nil) n = if a < n then n :: Nil else a :: Nil
+    try Nil n = Nil
+
+    go : List Int → Int
+    go xs =
+      let cand = take twelve xs
+          rest = drop twelve xs
+      in calc 0 $ foldl try cand rest
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let banks = parse text
+  putStrLn $ "part1 " ++ show (part1 banks)
+  putStrLn $ "part2 " ++ show (part2 banks)
+
+main : IO Unit
+main = do
+  run "aoc2025/day3/eg.txt"
+  run "aoc2025/day3/input.txt"
