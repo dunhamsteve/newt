@@ -1,0 +1,79 @@
+module Day4
+
+import Prelude
+import Node
+import Aoc
+import Data.SortedMap
+
+gridPoints : String → List (Char × Int × Int)
+gridPoints text = go 0 0 (unpack text) Nil
+  where
+    go : Int → Int → List Char → List (Char × Int × Int) → List (Char × Int × Int)
+    go row col Nil points = points
+    go row col ('\n' :: cs) points = go (row + 1) 0 cs points
+    go row col (c :: cs) points = go row (col + 1) cs ((c,row,col) :: points)
+
+Grid : U
+Grid = SortedMap Point Int
+
+getGrid : String → Grid
+getGrid text = foldl update (EmptyMap compare) $ gridPoints text
+  where
+    update : Grid → Char × Point → Grid
+    update grid (c,pt) = updateMap pt (ord c) grid
+
+neighbors : Point → List Point
+neighbors pt = map (_+_ pt) (
+  (0 - 1, 0 - 1) :: (0 - 1, 0) :: (0 - 1, 1) ::
+  (0, 0 - 1) :: (0, 1) ::
+  (1, 0 - 1) :: (1, 0) :: (1, 1) :: Nil)
+
+part1 : Grid → Int
+part1 grid = go 0 $ toList grid
+  where
+    full : Maybe Int → Bool
+    full (Just 64) = True
+    full _ = False
+
+    go : Int → List (Point × Int) → Int
+    go acc Nil = acc
+    go acc ((pt,64) :: rest) =
+      let count = length' $ filter full $ map (flip lookupMap' grid) $ neighbors pt
+      in if count < 4 then go (acc + 1) rest else go acc rest
+    go acc (_ :: rest) = go acc rest
+
+part2 : Grid → Int
+part2 grid =
+  let todo = filter (\ x => snd x == 64) $ toList grid
+   in go todo emptyMap grid
+  where
+    full : (Point × Int) → Bool
+    full (_, 64) = True
+    full _ = False
+
+    helper : Grid → (Point × Int) → Grid
+    helper todo (k, v) = updateMap k v todo
+
+    go : List (Point × Int) → Grid → Grid → Int
+    go Nil todo grid = do
+      case toList todo of
+        Nil => length' $ filter (\ x => snd x == 0) $ toList {Point} {Int} grid
+        todo => go todo emptyMap grid
+    go ((pt, _) :: xs) todo grid = do
+      let pts = filter full $ mapMaybe (flip lookupMap grid) $ neighbors pt
+      if length' pts < 4
+        then go xs (foldl helper todo pts) (updateMap pt 0 grid)
+        else go xs todo grid
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let grid = getGrid text
+  putStrLn $ "part1 " ++ show (part1 grid)
+  putStrLn $ "part2 " ++ show (part2 grid)
+
+main : IO Unit
+main = do
+  run "aoc2025/day4/eg.txt"
+  run "aoc2025/day4/input.txt"
