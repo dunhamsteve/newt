@@ -1,0 +1,64 @@
+module Day5
+
+import Prelude
+import Node
+import Aoc
+
+Range : U
+Range = Int × Int
+
+record Problem where
+  constructor MkP
+  pairs : List Range
+  avail : List Int
+
+
+parse : String → Either String Problem
+parse text = do
+
+  let (a :: b :: Nil) = split (trim text) "\n\n"
+    | cs => Left "got \{show $ length cs} chunks"
+  pairs <- traverse parsePair $ split a "\n"
+  let avail = map stringToInt $ split b "\n"
+  Right $ MkP pairs avail
+  where
+    parsePair : String → Either String Range
+    parsePair s = do
+      let (a :: b :: Nil) = map stringToInt $ split s "-"
+        | _ => Left "not a  pair '\{show s}'"
+      Right (a,b)
+
+part1 : Problem → Int
+part1 prob = length' $ filter (isFresh prob.pairs) prob.avail
+  where
+    isFresh : List Range → Int → Bool
+    isFresh ((a,b) :: pairs) v = if a <= v && v <= b then True else isFresh pairs v
+    isFresh Nil v = False
+
+max : ∀ a. {{Ord a}} → a → a → a
+max a b = if a < b then b else a
+
+part2 : List Range → Int
+part2 pairs = foldl _+_ 0 $ map size $ merge $ qsort (\a b => a < b) pairs
+    where
+      size : Range → Int
+      size (a,b) = b - a + 1
+
+      merge : List Range → List Range
+      merge ((s,e) :: (s', e') :: xs) =
+        if e < s' then (s,e) :: merge ((s', e') :: xs)
+          else merge ((s, max e e') :: xs)
+      merge xs = xs
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let (Right prob) = parse text | Left msg => putStrLn msg
+  putStrLn $ "part1 " ++ show (part1 prob)
+  putStrLn $ "part2 " ++ show (part2 prob.pairs)
+
+main : IO Unit
+main = do
+  run "aoc2025/day5/eg.txt"
+  run "aoc2025/day5/input.txt"
