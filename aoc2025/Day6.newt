@@ -1,0 +1,74 @@
+module Day6
+
+import Prelude
+import Node
+import Aoc
+
+data Oper = Plus | Times
+
+getOp : Char → Maybe Oper
+getOp '+' = Just Plus
+getOp '*' = Just Times
+getOp _ = Nothing
+
+head' : ∀ a. List a → Maybe a
+head' (x :: xs) = Just x
+head' _ = Nothing
+
+transpose : ∀ a. List (List a) → List (List a)
+transpose {a} Nil = Nil
+transpose {a} (Nil :: xs) = Nil
+transpose {a} xs = mapMaybe head' xs :: transpose (map tail xs)
+
+calc : List (List Int) → List Oper → Int
+calc rows ops = foldl _+_ 0 $ map go $ zip ops $ rows
+    where
+      go : Oper × List Int → Int
+      go (Plus, nums) = foldl _+_ 0 nums
+      go (Times, nums) = foldl _*_ 1 nums
+
+part1 : String → Int
+part1 text =
+  let lines = split (trim text) "\n" in
+  case reverse lines of
+    Nil => -1
+    last :: rest =>
+      let key = unpack last
+       in calc (transpose (map (splitLine 0 key ∘ unpack) rest)) $ mapMaybe getOp key
+  where
+    splitLine : Int → List Char → List Char → List Int
+    splitLine acc (a :: b :: cs) (d :: ds) =
+      if b == ' '
+        then let acc = if d == ' ' then acc else acc * 10 + (ord d - 48)
+              in splitLine acc (b :: cs) ds
+        else acc :: splitLine 0 (b :: cs) ds
+    splitLine acc _ (d :: ds) =
+      let acc = if d == ' ' then acc else acc * 10 + (ord d - 48)
+       in splitLine acc Nil ds
+    splitLine acc _ Nil = acc :: Nil
+
+part2 : String → Int
+part2 text =
+  let lines = split (trim text) "\n" in
+  case reverse lines of
+      Nil => -1
+      last :: rest =>
+        let key = unpack last
+        in calc (splitOn 0 $ map (packNum 0) $ transpose $ map unpack $ reverse rest) $ mapMaybe getOp key
+  where
+    packNum : Int → List Char → Int
+    packNum acc Nil = acc
+    packNum acc (' ' :: cs) = packNum acc cs
+    packNum acc (c :: cs) = packNum (acc * 10 + (ord c - 48)) cs
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  putStrLn $ "part1 \{show $ part1 text}"
+  putStrLn $ "part2 \{show $ part2 text}"
+
+main : IO Unit
+main = do
+  run "aoc2025/day6/eg.txt"
+  run "aoc2025/day6/input.txt"
