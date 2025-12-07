@@ -6,6 +6,9 @@ import Prelude
 nums' : String → String → List Int
 nums' by s = map stringToInt $ filter (_/=_ "") $ split (trim s) by
 
+max : ∀ a. {{Ord a}} → a → a → a
+max a b = if a < b then b else a
+
 nums : String → List Int
 nums s = map stringToInt $ filter (_/=_ "") $ split (trim s) " "
 

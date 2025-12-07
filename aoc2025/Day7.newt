@@ -1,0 +1,73 @@
+module Day7
+
+import Prelude
+import Node
+import Aoc
+import Data.SortedMap
+import Monad.State
+
+gridPoints : String → List (Char × Int × Int)
+gridPoints text = go 0 0 (unpack text) Nil
+  where
+    go : Int → Int → List Char → List (Char × Int × Int) → List (Char × Int × Int)
+    go row col Nil points = points
+    go row col ('\n' :: cs) points = go (row + 1) 0 cs points
+    go row col (c :: cs) points = go row (col + 1) cs ((c,row,col) :: points)
+
+Grid : U
+Grid = SortedMap Point Int
+
+getGrid : String → Grid
+getGrid text = foldl update (EmptyMap compare) $ gridPoints text
+  where
+    update : Grid → Char × Point → Grid
+    update grid (c,pt) = updateMap pt (ord c) grid
+
+process : Int → Grid → Int × Int
+process rows g =
+  let grid' = foldl update (EmptyMap compare) $ toList g
+      part1 = foldl _+_ 0 $ map (isSplit grid') $ toList g
+      part2 = foldl _+_ 0 $ map isLast $ toList grid'
+  in  (part1, part2)
+  where
+    isSplit : Grid → (Point × Int) → Int
+    isSplit grid ((r,c), 94) = case lookupMap' (r - 1,c) grid of
+      Just n => if n > 0 then 1 else 0
+      _ => 0
+    isSplit grid _ = 0
+
+    isLast : (Point × Int) → Int
+    isLast ((r,c),n) = if r + 1 == rows then n else 0
+
+    addStates : Point → Int → Grid → Grid
+    addStates pt n g = let prev = fromMaybe 0 $ lookupMap' pt g
+                        in updateMap pt (n + prev) g
+
+    update : Grid → (Point × Int) → Grid
+    update counts ((0,c),83) = addStates (1,c) ( 1) counts
+    update counts ((0,c),_) = counts
+
+    update counts ((r,c),46) = case lookupMap' (r - 1,c) counts of
+      Just 0 => counts
+      Just n => addStates (r,c) ( n) counts
+      _ => counts
+    update counts ((r,c),94) = case lookupMap' (r - 1,c) counts of
+      Just n => addStates (r,c - 1) (n) $ addStates (r,c + 1) n counts
+      _ => counts
+    update counts ((r,c),_) = counts
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let grid = getGrid text
+  let rows = trace "rows" $ foldl max 0 $ map (fst ∘ fst) $ toList grid
+  let cols = trace "cols" $ foldl max 0 $ map (snd ∘ fst) $ toList grid
+  let (part1, part2) = process rows grid
+  putStrLn $ "part1 \{show part1}"
+  putStrLn $ "part2 \{show part2}"
+
+main : IO Unit
+main = do
+  run "aoc2025/day7/eg.txt"
+  run "aoc2025/day7/input.txt"

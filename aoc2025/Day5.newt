@@ -35,9 +35,6 @@ part1 prob = length' $ filter (isFresh prob.pairs) prob.avail
     isFresh ((a,b) :: pairs) v = if a <= v && v <= b then True else isFresh pairs v
     isFresh Nil v = False
 
-max : ∀ a. {{Ord a}} → a → a → a
-max a b = if a < b then b else a
-
 part2 : List Range → Int
 part2 pairs = foldl _+_ 0 $ map size $ merge $ qsort (\a b => a < b) pairs
     where

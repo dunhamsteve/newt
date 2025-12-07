@@ -12,9 +12,9 @@ run fn = do
   putStrLn fn
   text <- readFile fn
   putStrLn $ "part1 " ++ show (part1 text)
-  putStrLn $ "part2 " ++ show (part2 text)
+  -- putStrLn $ "part2 " ++ show (part2 text)
 
 main : IO Unit
 main = do
   run "aoc2025/dayXX/eg.txt"
-  run "aoc2025/dayXX/input.txt"
+  -- run "aoc2025/dayXX/input.txt"
