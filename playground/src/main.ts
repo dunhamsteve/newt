@@ -16,6 +16,10 @@ import { deflate } from "./deflate.ts";
 import { inflate } from "./inflate.ts";
 import { IPC } from "./ipc.ts";
 import helpText from "./help.md?raw";
+import share from "./share.svg"
+import share_light from "./share_light.svg"
+import play from "./play.svg"
+import play_light from "./play_light.svg"
 
 let topData: undefined | TopData;
 
@@ -357,13 +361,7 @@ preload.then(() => {
   }
 });
 
-function EditWrap({
-  vertical,
-  toggle,
-}: {
-  vertical: boolean;
-  toggle: () => void;
-}) {
+function EditWrap() {
   const options = state.files.value.map((value) =>
     h("option", { value }, value)
   );
@@ -376,14 +374,6 @@ function EditWrap({
     }
   };
 
-  const char = vertical ? "↕" : "↔"
-
-  // let d = vertical
-  //   ? "M0 0 h20 v20 h-20 z M0 10 h20"
-  //   : "M0 0 h20 v20 h-20 z M10 0 v20";
-  // let play = "M0 0 L20 10 L0 20 z";
-  // let svg = (d: string) =>
-  //   h("svg", { width: 20, height: 20, className: "icon" }, h("path", { d }));
   return h(
     "div",
     { className: "tabPanel left" },
@@ -397,10 +387,10 @@ function EditWrap({
         options
       ),
       h("div", { style: { flex: "1 1" } }),
-      h("button", { onClick: copyToClipboard, title: "copy url" }, "📋"),
-      h("button", { onClick: runOutput, title: "run program" }, "▶"),
-      h("button", { onClick: toggle, title: "change layout" }, char),
-      // h("button", { onClick: toggle }, svg(d))
+      h("div", {},
+        h("button", { onClick: copyToClipboard, title: "copy url" }, h('img', {src: state.dark.value ? share : share_light})),
+        h("button", { onClick: runOutput, title: "run program" }, h('img', {src: state.dark.value ? play : play_light})),
+      )
     ),
     h("div", { className: "tabBody" }, h(Editor, { initialValue: value }))
   );
@@ -416,12 +406,12 @@ function App() {
   if (state.toast.value) {
     toast = h("p", { className: "toast" }, h("div", {}, state.toast.value));
   }
-  let className = `wrapper ${vertical ? "vertical" : "horizontal"}`;
+  let className = `wrapper`;
   return h(
     "div",
     { className },
     toast,
-    h(EditWrap, { vertical, toggle }),
+    h(EditWrap, {}),
     h(Tabs, {})
   );
 }

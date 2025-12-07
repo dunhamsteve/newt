@@ -53,29 +53,34 @@ svg.icon path {
 #editor {
   height: 100%;
 }
-.wrapper.horizontal {
+
+.wrapper {
   display: flex;
   flex-direction: row;
   height: 100%;
 }
-.wrapper.horizontal > div {
-  flex: 1 1;
-  /* allow smaller than natural */
-  width: 100px;
+@media (width >= 1024px) {
+  .wrapper > div {
+    flex: 1 1;
+    /* allow smaller than natural */
+    width: 100px;
+  }
 }
-.wrapper.vertical {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-.wrapper.vertical .tabPanel.left {
-  /* designed to go down to the keyboard on my phone */
-  flex: .65 .65;
-  height: 100px;
-}
-.wrapper.vertical .tabPanel.right {
-  flex: .35 .35;
-  height: 100px;
+
+@media (width <=1024px) {
+  .wrapper {
+    flex-direction: column;
+  }
+  .wrapper .tabPanel.left {
+    /* designed to go down to the keyboard on my phone */
+    flex: .65 .65;
+    height: 100px;
+  }
+
+  .wrapper .tabPanel.right {
+    flex: .35 .35;
+    height: 100px;
+  }
 }
 .tabBar button {
   border: none;
