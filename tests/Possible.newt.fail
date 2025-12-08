@@ -1,7 +1,7 @@
 *** Process tests/Possible.newt
 module Prelude
 module Possible
-ERROR at tests/Possible.newt:6:5--6:8: possible constructors: Prelude.Z, Prelude.S
+ERROR at tests/Possible.newt:6:5--6:8: possible constructors: [Prelude.Z, Prelude.S]
   
   foo : Nat → Nat
   foo ()
