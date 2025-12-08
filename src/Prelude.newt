@@ -353,9 +353,14 @@ instance Monad IO where
 
 bindList : ∀ a b. List a → (a → List b) → List b
 
+-- Tail recursive, but may be hard to write proofs?
 instance ∀ a. Concat (List a) where
-  Nil ++ ys = ys
-  (x :: xs) ++ ys = x :: (xs ++ ys)
+  xs ++ ys = go (reverse xs) ys
+    where
+      go : ∀ a. List a → List a → List a
+      go Nil ys = ys
+      go (x :: xs) ys = go xs (x :: ys)
+
 
 instance Monad List where
   pure a = a :: Nil

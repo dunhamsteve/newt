@@ -1,0 +1,102 @@
+module Day8
+
+import Prelude
+import Node
+import Aoc
+import Data.SortedMap
+
+XYZ : U
+XYZ = (Int × Int × Int)
+
+-- don't need sqrt for sorting
+dist2 : XYZ → XYZ → Int
+dist2 (a,(b,c)) (d,(e,f)) = (a - d)*(a - d) + (b - e)*(b - e) + (c - f) * (c - f)
+
+parseLine : String → XYZ
+parseLine line =
+  let (x :: y :: z :: Nil) = split line "," | _ => fatalError "parseLine"
+  in (stringToInt x,(stringToInt y, stringToInt z))
+
+parse : String → List XYZ
+parse text = map parseLine $ split (trim text) "\n"
+
+-- List distances between pairs of points
+dists : List XYZ → List (Int × XYZ × XYZ)
+dists pts = go pts Nil
+  where
+    pairs : XYZ → List XYZ  → List (Int × XYZ × XYZ) → List (Int × XYZ × XYZ)
+    pairs pt Nil acc = acc
+    pairs a (b :: pts) acc = pairs a pts ((dist2 a b, a, b) :: acc)
+
+    go : List XYZ → List (Int × XYZ × XYZ) → List (Int × XYZ × XYZ)
+    go Nil acc = acc
+    go (pt :: pts) acc = go pts (pairs pt pts acc)
+
+lookup : ∀ a b. {{Eq a}} → a → List (a × b) → Maybe b
+lookup key Nil = Nothing
+lookup key ((a,b) :: rest) = if a == key then Just b else lookup key rest
+
+part1 : List XYZ → List (Int × XYZ × XYZ) → Int → Int
+part1 pts pairs count =
+  -- node -> component
+  let g = map (\ a => (a, a)) pts in
+  let node2id = merge g (cast count) pairs in
+  let id2nodes = foldl addNode emptyMap $ map swap node2id in
+  let stuff = take (cast 3) $ qsort _>_ $ map fst $ map getSize $ toList id2nodes in
+  foldl _*_ 1 stuff
+  where
+    getSize : XYZ × List XYZ → Int × XYZ
+    getSize (id,pts) = (length' pts, id)
+
+    addNode : SortedMap XYZ (List XYZ) → XYZ × XYZ → SortedMap XYZ (List XYZ)
+    addNode g (a,b) = updateMap a (b :: fromMaybe Nil (lookupMap' a g)) g
+
+    rename : XYZ → XYZ → XYZ × XYZ → XYZ × XYZ
+    rename a b (c,d) = if d == a then (c,b) else (c,d)
+
+    merge : List (XYZ × XYZ) → Nat → List (Int × XYZ × XYZ) → List (XYZ × XYZ)
+    merge g Z _ = g
+    merge g (S k) ((_, (a,b)) :: rest) =
+      let (Just a') = lookup a g | _ => fatalError "No \{show a}" in
+      let (Just b') = lookup b g | _ => fatalError "No \{show b}" in
+      if a' /= b'
+        then merge (map (rename a' b') g) k rest
+        else merge g k rest
+    merge g (S k) Nil = fatalError "too few points"
+
+part2 : List XYZ → List (Int × XYZ × XYZ) → Int
+part2 pts pairs = merge (map (\ a => (a, a)) pts) pairs
+  where
+    rename : XYZ → XYZ → XYZ × XYZ → XYZ × XYZ
+    rename a b (c,d) = if d == a then (c,b) else (c,d)
+
+    connected : List (XYZ × XYZ) → Bool
+    connected (a :: b :: rest) = if snd a == snd b then connected (a :: rest) else False
+    connected _ = True
+
+    merge : List (XYZ × XYZ) → List (Int × XYZ × XYZ) → Int
+    merge g ((_, (a,b)) :: rest) =
+      let (Just a') = lookup a g | _ => fatalError "No \{show a}" in
+      let (Just b') = lookup b g | _ => fatalError "No \{show b}" in
+      if a' == b'
+        then merge g rest
+        else let g = map (rename a' b') g in
+          if connected g
+            then fst a * fst b
+            else merge g rest
+    merge g Nil = fatalError "too few points"
+
+
+run : String -> Int → IO Unit
+run fn cnt = do
+  putStrLn fn
+  text <- readFile fn
+  let points = parse text
+  let pairs = qsort _<_ $ dists points
+  putStrLn $ "part1 " ++ show (part1 points pairs cnt)
+  putStrLn $ "part2 " ++ show (part2 points pairs)
+
+main : IO Unit
+main = do
+  run "aoc2025/day8/eg.txt" 10
+  run "aoc2025/day8/input.txt" 1000
