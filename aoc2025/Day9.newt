@@ -34,8 +34,8 @@ area (B l r t b) = (abs (l - r) + 1) * (abs (t - b) + 1)
 mkbox : Point → Point → Box
 mkbox (a,b) (c,d) = B (min a c) (max a c) (min b d) (max b d)
 
-boxes : List Point → List Box
-boxes pts = go pts Nil
+makeBoxes : List Point → List Box
+makeBoxes pts = go pts Nil
   where
     go2 : Point → List Point → List Box → List Box
     go2 pt (x :: xs) acc = go2 pt xs (mkbox pt x :: acc)
@@ -63,8 +63,7 @@ getLines points = go points Nil
 
 -- I'm assuming the winner isn't a single row/column
 part2 : List (Int × Box) → List Line → Int
-part2 Nil _ = 0
-part2 ((size, box) :: rest) lines = if checkRec box then size else part2 rest lines
+part2 boxes lines = go boxes lines 0
   where
     winds : Box → Line → Bool
     winds (B l r t b) (VL x y1 y2) =
@@ -77,17 +76,24 @@ part2 ((size, box) :: rest) lines = if checkRec box then size else part2 rest li
       let (Nothing) = find (isect box) lines | _ => False in
       let winding = length' $ filter (winds box) lines in mod winding 2 == 1
 
+    go : List (Int × Box) → List Line → Int → Int
+    go Nil _ acc = acc
+    go ((size, box) :: rest) lines acc =
+      if size < acc then go rest lines acc
+      else if checkRec box then go rest lines size
+      else go rest lines acc
+
 run : String -> IO Unit
 run fn = do
   putStrLn fn
   text <- readFile fn
   let (pts@(a :: _)) = parse text | _ => putStrLn "empty input"
-  -- printLn pts
-  let sortBoxes = qsort (\ a b => fst a > fst b) $ map (\box => (area box, box)) $ boxes pts
-  let ((p1,_) :: _ ) = sortBoxes | _ => printLn "no boxes"
-  putStrLn $ "part1 \{show p1}"
+  let boxes = map (\box => (area box, box)) $ makeBoxes pts
+  let ((p1,_) :: _ ) = boxes | _ => printLn "no boxes"
+  let x = foldl (\ acc x => if fst x > acc then fst x else acc) 0 boxes
+  putStrLn $ "part1 \{show p1} \{show x}"
   let vl = getLines $ a :: reverse pts
-  putStrLn $ "part2 " ++ show (part2 sortBoxes vl)
+  putStrLn $ "part2 " ++ show (part2 boxes vl)
 
 main : IO Unit
 main = do
