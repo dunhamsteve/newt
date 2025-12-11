@@ -1,0 +1,78 @@
+module Day11
+
+import Prelude
+import Node
+import Aoc
+import Data.SortedMap
+import Monad.State
+
+Graph : U
+Graph = SortedMap String (List String)
+
+part1 : Graph →  Int
+part1 g = fst $ (count "you").runState emptyMap
+  where
+    count : String → State (SortedMap String Int) Int
+    count "out" = pure 1
+    count node = do
+      st <- get
+      case lookupMap' node st of
+        Just v => pure v
+        Nothing => do
+          let (Just nodes) = lookupMap' node g | _ => trace "\{show node} missing" $ pure 0
+          counts <- traverse count nodes
+          let total = foldl _+_ 0 counts
+          modify $ updateMap node total
+          pure total
+
+data Result = MkRes Int Int Int Int
+
+emptyResult : Result
+emptyResult = MkRes 0 0 0 0
+
+part2 : Graph →  Int
+part2 g =
+  let (MkRes none dac fft both) = fst $ (count "svr").runState emptyMap in both
+  where
+    addCount : String → Result → Result → Result
+    addCount "fft" (MkRes n d f b) (MkRes n' d' f' b') = MkRes n (d) (f + f' + n') (b + b' + d')
+    addCount "dac" (MkRes n d f b) (MkRes n' d' f' b') = MkRes n (d + d' + n') (f) (b + b' + f')
+    addCount _ (MkRes n d f b) (MkRes n' d' f' b') = MkRes (n + n') (d + d') (f + f') (b + b')
+
+    count : String → State (SortedMap String Result) Result
+    count "out" = pure $ MkRes 1 0 0 0
+    count node = do
+      st <- get
+      case lookupMap' node st of
+        Just v => pure v
+        Nothing => do
+          let (Just nodes) = lookupMap' node g | _ => trace "\{show node} missing" $ pure $ MkRes 0 0 0 0
+          counts <- traverse count nodes
+          let total = foldl (addCount node) emptyResult counts
+          modify $ updateMap node total
+          pure total
+
+parse : String → Either String Graph
+parse text = do
+  let lines = split (trim text) "\n"
+  nodes <- traverse parseNode lines
+  pure $ mapFromList $ nodes
+  where
+    parseNode : String → Either String (String × List String)
+    parseNode txt = case split txt ": " of
+      (a :: b :: Nil) => Right (a, split b " ")
+      x => Left "\{show $ length x} parts"
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  let (Right graph) = parse text | Left err => putStrLn err
+  putStrLn $ "part1 " ++ show (part1 graph)
+  putStrLn $ "part2 " ++ show (part2 graph)
+
+main : IO Unit
+main = do
+  run "aoc2025/day11/eg.txt"
+  run "aoc2025/day11/eg2.txt"
+  run "aoc2025/day11/input.txt"
