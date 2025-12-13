@@ -526,6 +526,7 @@ unify env mode t u = do
     unifyVar : Val -> Val -> M UnifyResult
     unifyVar t'@(VVar fc k sp)  u'@(VVar fc' k' sp')  =
       if k == k' then unifySpine env mode (k == k') sp sp'
+      -- FIXME - get some names in here.
       else error fc "Failed to unify \{show t'} and \{show u'}"
 
     unifyVar t'@(VVar fc k Lin) u = do

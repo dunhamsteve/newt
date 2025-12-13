@@ -787,7 +787,7 @@ instance Cast Int Nat where
   cast n = intToNat n
 
 instance Show Char where
-  show c = jsShow c
+  show c = "'\{jsShow c}'"
 
 swap : ∀ a b. a × b → b × a
 swap (a,b) = (b,a)
@@ -885,7 +885,7 @@ ignore = map (const MkUnit)
 
 instance ∀ a. {{Show a}} → Show (Maybe a) where
   show Nothing = "Nothing"
-  show (Just a) = "Just {show a}"
+  show (Just a) = "Just \{show a}"
 
 pfunc isPrefixOf uses (True False): String → String → Bool := `(pfx, s) => s.startsWith(pfx) ? Prelude_True : Prelude_False`
 pfunc isSuffixOf uses (True False): String → String → Bool := `(pfx, s) => s.endsWith(pfx) ? Prelude_True : Prelude_False`

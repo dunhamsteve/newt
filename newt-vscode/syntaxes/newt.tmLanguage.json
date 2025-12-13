@@ -4,6 +4,10 @@
   "scopeName": "source.newt",
   "patterns": [
     {
+      "name": "invalid.illegal.trace",
+      "match": "\\b(trace|fatalError)\\b"
+    },
+    {
       "name": "comment.block.newt",
       "begin": "/-",
       "end": "-/",

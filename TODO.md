@@ -1,6 +1,19 @@
 
 ## TODO
 
+- [ ] Show Either
+- [ ] `local` for `where`-like `let` clauses? (I want a `where` that closes over more stuff)
+- [ ] Erasure checking happens at compile time and isn't surfaced to editor..
+- [ ] Add Foldable?
+- [ ] "Failed to unify %var0 and %var1" - get names in there
+  - Need fancier `Env`
+- [ ] add missing cases should skip indented lines
+- [ ] add missing cases should handle `_::_`
+- [ ] "Not in scope" should offer to import
+- [ ] Dependent records (I guess I missed that bit)
+- [ ] Arguments on records
+- [ ] Add sugar for type aliases (maybe infer arguments)
+- [ ] see if we can get a better error on `for` instead of `for_` in do blocks
 - [ ] Maybe make the editor json more compact
 - [ ] Remove erased args from primitive functions
   - But we need separate `+` functions rather than the magic `∀ a. a -> a -> a` to support other backends
@@ -28,6 +41,7 @@
 - [ ] Look into using holes for errors (https://types.pl/@AndrasKovacs/115401455046442009)
   - This would let us hit more cases in a function when we hit an error.
   - I've been wanting to try holes for parse errors too.
+  - [ ] Missing `∀ k` in type is error -> no declaration for, if we insert a hole, we can get the declaration.
 - [ ] in-scope type at point in vscode
   - So the idea here is that the references will be via FC, we remember the type at declaration and then point the usage back to the declaration (FC -> FC). We could dump all of this. (If we're still doing json.)
   - This information _could_ support renaming, too (but there may be indentation issues).

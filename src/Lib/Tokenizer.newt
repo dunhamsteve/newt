@@ -56,6 +56,7 @@ quoteTokenise ts@(TS el ec toks chars) startl startc acc = case chars of
   -- TODO newline in string should be an error
   '\n' :: cs => Left $ E (MkFC "" (MkBounds el ec el ec)) "Newline in string"
   '\\' :: 'n' :: cs => quoteTokenise (TS el (ec + 2) toks cs) startl startc (acc :< '\n')
+  '\\' :: 't' :: cs => quoteTokenise (TS el (ec + 2) toks cs) startl startc (acc :< chr 9)
   '\\' :: c :: cs => quoteTokenise (TS el (ec + 2) toks cs) startl startc (acc :< c)
   c :: cs => quoteTokenise (TS el (ec + 1) toks cs) startl startc (acc :< c)
   Nil => Left $ E (MkFC "" (MkBounds el ec el ec)) "Expected '\"' at EOF"
@@ -103,7 +104,10 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
   '_' :: ',' :: '_' :: cs => rawTokenise (TS sl (sc + 3) (toks :< mktok False sl (sc + 3) MixFix "_,_") cs)
   '_' :: '.' :: '_' :: cs => rawTokenise (TS sl (sc + 3) (toks :< mktok False sl (sc + 3) MixFix "_._") cs)
   '\'' :: '\\' :: c :: '\'' :: cs =>
-    let ch = ite (c == 'n') '\n' c
+    let ch = case c of
+              'n' => '\n'
+              't' => chr 9
+              c => c
     in rawTokenise (TS sl (sc + 4) (toks :< mktok False sl (sc + 4) Character (singleton ch)) cs)
   '\'' :: c :: '\'' :: cs => rawTokenise (TS sl (sc + 3) (toks :< mktok False sl (sc + 3) Character (singleton c)) cs)
   '#' :: cs => doRest (TS sl (sc + 1) toks cs) Pragma isIdent (Lin :< '#')

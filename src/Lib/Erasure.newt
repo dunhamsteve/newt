@@ -44,8 +44,10 @@ eraseSpine env t ((fc, arg) :: args) _ = do
   eraseSpine env (App fc t u) args Nothing
 
 doAlt : EEnv -> CaseAlt -> M CaseAlt
--- REVIEW do we extend env?
+-- REVIEW we're sticking Erased on RHS for impossible, might want a runtime error or elide the case.
+doAlt env (CaseDefault (Erased fc)) = pure $ CaseDefault (Erased fc)
 doAlt env (CaseDefault t) = CaseDefault <$> erase env t Nil
+doAlt env (CaseCons name args (Erased fc)) = pure (CaseCons name args (Erased fc))
 doAlt env (CaseCons name args t) = do
   top <- getTop
   let (Just (MkEntry _ str type def _)) = lookup name top

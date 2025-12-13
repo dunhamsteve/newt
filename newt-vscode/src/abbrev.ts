@@ -29,6 +29,8 @@ export const ABBREV: Record<string, string> = {
   "\\Gs": "σ",
   "\\Gt": "τ",
   "\\GD": "Δ",
+  "\\GS": "Σ",
+  "\\GP": "∏",
   "\\[[": "⟦",
   "\\]]": "⟧",
 };
