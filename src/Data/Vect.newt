@@ -1,0 +1,52 @@
+module Data.Vect
+
+import Prelude
+import Data.Fin
+
+infixr 6 _:-_
+data Vect : (0 n : Nat) → (0 a : U) → U where
+  VNil :  ∀ a. Vect Z a
+  _:-_ : ∀ k a. a → Vect k a → Vect (S k) a
+
+vindex : ∀ n a. Fin n → Vect n a → a
+vindex FZ (x :- _) = x
+vindex (FS k) (x :- rest) = vindex k rest
+vindex () VNil -- Idris doesn't need this hint.
+
+instance ∀ k. Functor (Vect k) where
+  map f VNil = VNil
+  map f (x :- xs) = f x :- map f xs
+
+toVect : ∀ a. (n : Nat) -> List a -> Maybe (Vect n a)
+toVect (S k) (x :: xs) = _:-_ x <$> toVect k xs
+toVect Z Nil = Just VNil
+toVect _ _ = Nothing
+
+instance ∀ n a. Cast (Vect n a) (List a) where
+  cast VNil = Nil
+  cast (x :- xs) = x :: cast xs
+
+instance ∀ n a. {{Show a}} → Show (Vect n a) where
+  show {n} {a} xs = show $ cast {_} {List a} xs
+
+vIndexes : (n : Nat) → Vect n (Fin n)
+vIndexes Z = VNil
+vIndexes (S k) = FZ :- map FS (vIndexes k)
+
+vIndexes' : ∀ n a. Vect n a → Vect n (Fin n)
+vIndexes' VNil = VNil
+vIndexes' ( _ :- xs) = FZ :- map FS (vIndexes' xs)
+
+venum : ∀ n a. Vect n a → Vect n (Fin n × a)
+venum VNil = VNil
+venum (x :- xs) = (FZ, x) :- map (mapFst FS) (venum xs)
+
+zipVect : ∀ n a b. Vect n a → Vect n b → Vect n (a × b)
+zipVect VNil VNil = VNil
+zipVect (x :- xs) (y :- ys) = (x,y) :- zipVect xs ys
+
+vset : ∀ n a. Fin n → a → Vect n a → Vect n a
+vset () el VNil
+vset FZ el (x :- xs) = el :- xs
+vset (FS k) el (x :- xs) = x :- vset k el xs
+

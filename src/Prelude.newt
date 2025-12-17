@@ -607,7 +607,14 @@ elem v (x :: xs) = if v == x then True else elem v xs
 -- TODO no empty value on my `Add`, I need a group..
 -- sum : ∀ a. {{Add a}} → List a → a
 -- sum xs = foldl _+_
+
+-- TODO debugStr is not super useful any more.
 pfunc trace uses (debugStr) : ∀ a. String → a → a := `(_, msg, a) => { console.log(msg,Prelude_debugStr(_,a)); return a }`
+
+pfunc prim_strace : String → String → String := `(msg, a) => { console.log(msg,a); return a }`
+
+strace : ∀ a. {{Show a}} → String → a → a
+strace msg a = let x = prim_strace msg (show a) in a
 
 mapMaybe : ∀ a b. (a → Maybe b) → List a → List b
 mapMaybe {a} {b} f xs = go Lin xs
@@ -694,6 +701,11 @@ mapSnd f ab = bimap id f ab
 isNothing : ∀ a. Maybe a → Bool
 isNothing Nothing = True
 isNothing _ = False
+
+isJust : ∀ a. Maybe a → Bool
+isJust Nothing = False
+isJust _ = True
+
 
 instance Bifunctor _×_ where
   bimap f g (a,b) = (f a, g b)

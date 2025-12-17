@@ -1,0 +1,34 @@
+module Data.Fin
+import Prelude
+
+-- TODO - handle erased params in Nat transform.
+-- TODO - double check we erase params to type constructors
+data Fin : Nat → U where
+  FZ : ∀ k. Fin (S k)
+  FS : ∀ k. Fin k → Fin (S k)
+
+allFins : (n : Nat) → List (Fin n)
+allFins Z = Nil
+allFins (S k) = FZ :: map FS (allFins k)
+
+-- TODO maybe teach compiler to recognize and make magic Nat Eq fast?
+instance ∀ n. Eq (Fin n) where
+  FZ == FZ = True
+  FS l == FS n = l == n
+  _ == _ = False
+
+-- TODO - recognize identity functions
+weaken : ∀ k. Fin k → Fin (S k)
+weaken FZ = FZ
+weaken (FS k) = FS $ weaken k
+
+instance ∀ n. Cast (Fin n) Nat where
+  cast FZ = Z
+  cast (FS x) = S (cast x)
+
+instance ∀ k. Show (Fin k) where
+  show x = show {Nat} $ cast x
+
+lastFin : {n : _} -> Fin (S n)
+lastFin {Z} = FZ
+lastFin {S _} = FS lastFin

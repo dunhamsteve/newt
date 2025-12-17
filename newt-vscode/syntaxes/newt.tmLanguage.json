@@ -5,7 +5,7 @@
   "patterns": [
     {
       "name": "invalid.illegal.trace",
-      "match": "\\b(trace|fatalError)\\b"
+      "match": "\\b(trace|strace|fatalError)\\b"
     },
     {
       "name": "comment.block.newt",
