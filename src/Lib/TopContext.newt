@@ -43,8 +43,7 @@ instance Show TopContext where
 emptyTop : ∀ io. {{Monad io}} {{HasIO io}} -> io TopContext
 emptyTop = do
   let mcctx = MC emptyMap Nil 0 CheckAll
-  errs <- newIORef $ the (List Error) Nil
-  pure $ MkTop emptyMap Nil emptyMap Nil emptyMap mcctx 0 errs emptyMap
+  pure $ MkTop emptyMap Nil emptyMap Nil emptyMap mcctx 0 Nil emptyMap
 
 
 setFlag : QName → FC → EFlag → M Unit
@@ -91,4 +90,4 @@ addHint qn = do
 addError : Error -> M Unit
 addError err = do
   top <- getTop
-  modifyIORef top.errors (_::_ err)
+  modifyTop [ errors $= _::_ err ]

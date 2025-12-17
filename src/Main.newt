@@ -165,19 +165,15 @@ processModule importFC base stk qn@(QN ns nm) = do
   top <- getTop
 
   let mod = MkModCtx csum top.defs top.metaCtx top.ops
-  errors <- liftIO {M} $ readIORef top.errors
-  if stk /= Nil && length' errors == 0
+  if stk /= Nil && length' top.errors == 0
     then dumpModule qn src mod
     else pure MkUnit
 
   let modules = updateMap modns mod top.modules
   modifyTop [modules := modules]
 
-  (Nil) <- liftIO {M} $ readIORef top.errors
-    | errors => do
-        -- we're now showing errors when they occur, so they're next to debug messages
-        -- traverse (putStrLn ∘ showError src) errors
-        exitFailure "Compile failed"
+  let (Nil) = top.errors
+    | errors => exitFailure "Compile failed"
   logMetas $ reverse $ listValues top.metaCtx.metas
   pure src
   where
@@ -199,7 +195,7 @@ showErrors : String -> String -> M Unit
 showErrors fn src = do
   top <- getTop
   -- TODO {M} needed to sort out scrutinee
-  (Nil) <- liftIO {M} $ readIORef top.errors
+  let (Nil) = top.errors
     | errors => do
         traverse (putStrLn ∘ showError src) errors
         exitFailure "Compile failed"

@@ -433,7 +433,7 @@ record TopContext where
 
   -- Global values
   verbose : Int -- command line flag
-  errors : IORef (List Error)
+  errors : List Error
   ops : Operators
 
 -- we'll use this for typechecking, but need to keep a TopContext around too.
