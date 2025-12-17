@@ -16,11 +16,9 @@ The editor will typecheck the file with newt and render errors as the file is ch
 
 ## Buttons
 
-▶ Compile and run the current file in an iframe, console output is collected to the console tab.
+:play: Compile and run the current file in an iframe, console output is collected to the console tab.
 
-📋 Embed the current file in the URL and copy to clipboard
-
-↕ or ↔ Toggle vertical or horziontal layout (for mobile)
+:share: Embed the current file in the URL and copy to clipboard.
 
 ## Keyboard
 

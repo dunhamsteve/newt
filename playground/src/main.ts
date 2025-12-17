@@ -26,13 +26,15 @@ let topData: undefined | TopData;
 const ipc = new IPC();
 
 function mdline2nodes(s: string) {
-  let cs: (VNode|string)[] = []
-  let toks = s.matchAll(/(\*\*.*?\*\*)|(\*.*?\*)|(_.*?_)|[^*]+|\*/g)
+  let cs: (VNode<any>|string)[] = []
+  let toks = s.matchAll(/\*\*(.*?)\*\*|\*(.*?)\*|_(.*?)_|!\[(.*?)\]\((.*?)\)|:(\w+):|[^*]+|\*/g);
   for (let tok of toks) {
-    if (tok[1]) cs.push(h('b',{},tok[0].slice(2,-2)))
-    else if (tok[2]) cs.push(h('em',{},tok[0].slice(1,-1)))
-    else if (tok[3]) cs.push(h('em',{},tok[0].slice(1,-1)))
-    else cs.push(tok[0])
+       tok[1] && cs.push(h('b',{},tok[1]))
+    || tok[2] && cs.push(h('em',{},tok[2]))
+    || tok[3] && cs.push(h('em',{},tok[0].slice(1,-1)))
+    || tok[5] && cs.push(h('img',{src: tok[5], alt: tok[4]}))
+    || tok[6] && cs.push(h(Icon, {name: tok[6]}))
+    || cs.push(tok[0])
   }
   return cs
 }
@@ -360,6 +362,19 @@ preload.then(() => {
     state.files.value = files;
   }
 });
+
+const icons: Record<string,string> = {
+  'play-dark': play,
+  'play-light': play_light,
+  'share-dark': share,
+  'share-light': share_light,
+};
+
+function Icon({name}: {name: string}) {
+  let dark = state.dark.value ? 'dark' : 'light'
+  let src = icons[name + '-' + dark];
+  return h('img', {src});
+}
 
 function EditWrap() {
   const options = state.files.value.map((value) =>
