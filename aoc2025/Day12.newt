@@ -1,0 +1,73 @@
+module Day12
+
+import Prelude
+import Node
+import Aoc
+import Parser
+import Data.List1
+
+data Row = MkR Int Int (List Int)
+data Gift = MkG Int
+
+
+record Problem where
+  gifts : List Int
+  rows : List Row
+
+
+
+parse : String → Either String Problem
+parse txt = do
+  let chunks = split (trim txt) "\n\n"
+  let (c :: cs) = chunks | _ => Left "no chunks"
+  let (gifts, prob) = unsnoc (c ::: cs)
+  let lines = split prob "\n"
+  rows <- traverse parseRow lines
+  Right $ MkProblem (map weight gifts) rows
+  where
+    weight : String → Int
+    weight line = length' $ filter (_==_ '#') $ unpack line
+
+    parseRow : String → Either String Row
+    parseRow line = do
+      let (a :: b :: Nil) = split line ": " | _ => Left "no colon: \{show line}"
+      let ns = nums b
+      let (w :: h :: Nil) = nums' "x" a | _ => Left "bad dims \{show a}"
+      Right $ MkR w h ns
+
+part1 : String → IO Unit
+part1 text = do
+  let (Right prob) = parse text
+    | Left err => putStrLn {IO} err
+  printLn prob.gifts
+  let rows = prob.rows
+  let (easy, rest) = partition isEasy rows
+  let (maybe, imp) = partition (isPossible prob.gifts) rest
+  printLn "\{show $ length rows} rows, \{show $ length' easy} easy, \{show $ length' maybe} maybe, \{show $ length' imp} impossible"
+  -- and there is nothing to do for the input, the "maybe" group is empty.
+  pure MkUnit
+  where
+    isEasy : Row → Bool
+    isEasy (MkR w h boxes) =
+      let bw = w / 3
+          bh = h / 3
+          tbox = foldl _+_ 0 boxes
+       in tbox <= bw * bh
+
+    isPossible : List Int → Row → Bool
+    isPossible gifts (MkR w h boxes) =
+      let weight = foldl _+_ 0 $ map (uncurry _*_) $ zip boxes gifts
+       in weight <= w * h
+
+part2 : String → Int
+
+run : String -> IO Unit
+run fn = do
+  putStrLn fn
+  text <- readFile fn
+  part1 text
+
+main : IO Unit
+main = do
+  run "aoc2025/day12/eg.txt"
+  run "aoc2025/day12/input.txt"
