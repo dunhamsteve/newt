@@ -1,0 +1,46 @@
+module Z3
+
+import Prelude
+import Node
+
+ptype Context
+-- Flag if optimizer or solver
+ptype Solver : Bool → U
+ptype Arith
+ptype Z3Bool
+ptype Model
+ptype Z3
+
+pfunc initZ3 : Promise Z3 := `require('z3-solver').init()`
+pfunc z3ResetMemory : Promise Z3 := `(z3) => z3.Z3.reset_memory()`
+pfunc initContext : Z3 → String → Context := `(z3, name) => z3.Context(name)`
+
+pfunc newSolver : Context → Solver False := `(Context) => new Context.Solver()`
+pfunc newOptimizer : Context → Solver True := `(Context) => new Context.Optimize()`
+
+
+-- These probably should be IO or Promise
+pfunc freshInt : {{Context}} → Promise Arith := `(Context) => Promise.resolve(Context.Int.fresh())`
+pfunc z3const : {{Context}} → String → Arith := `(Context, name) => Context.Int.const(name)`
+pfunc arith_add : Arith → Arith → Arith := `(a,b) => a.add(b)`
+pfunc z3int : {{Context}} → Int → Arith := `(Context,a) => Context.Int.val(a)`
+
+-- We can't overload operators for these because of the return type
+
+pfunc z3eq : Arith → Arith → Z3Bool := `(a,b) => a.eq(b)`
+pfunc z3ge : Arith → Arith → Z3Bool := `(a,b) => a.ge(b)`
+
+pfunc z3add : ∀ b. Solver b → Z3Bool → Promise Unit := `(_, solver, exp) => Promise.resolve(solver.add(exp))`
+pfunc z3minimize : Solver True → Arith → Promise Unit := `(solver, exp) => Promise.resolve(solver.minimize(exp))`
+
+pfunc z3check : ∀ b. Solver b → Promise String := `(b, solver) => solver.check()`
+
+pfunc getModel : ∀ b. Solver b → Promise Model := `(b, solver) => Promise.resolve(solver.model())`
+
+pfunc getInt : {{Model}} → Arith → Int := `(model, exp) => {
+  let n = +(model.eval(exp).toString())
+  return isNaN(n) ? 0 : n
+}`
+
+instance Add Arith where
+  a + b = arith_add a b

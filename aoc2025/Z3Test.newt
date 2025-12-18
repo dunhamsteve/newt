@@ -1,0 +1,38 @@
+module Z3Test
+
+import Prelude
+import Node
+import Z3
+
+test : Promise Unit
+test = do
+  context <- initZ3 "main"
+  x0 <- freshInt
+  x1 <- freshInt
+  x2 <- freshInt
+  x3 <- freshInt
+  x4 <- freshInt
+  x5 <- freshInt
+  let solver = newOptimizer context
+
+  z3add solver $ z3ge x0 $ z3int 0
+  z3add solver $ z3ge x1 $ z3int 0
+  z3add solver $ z3ge x2 $ z3int 0
+  z3add solver $ z3ge x3 $ z3int 0
+  z3add solver $ z3ge x4 $ z3int 0
+  z3add solver $ z3ge x5 $ z3int 0
+
+  z3add solver $ z3eq (x4 + x5) (z3int 3)
+  z3add solver $ z3eq (x1 + x5) (z3int 5)
+  z3add solver $ z3eq (x2 + x3 + x4) (z3int 4)
+  z3add solver $ z3eq (x0 + x1 + x3) (z3int 7)
+
+  z3minimize solver $ x0 + x1 + x2 + x3 + x4 + x5
+
+  res <- z3check solver
+  liftIO $ putStrLn "GOT \{res}"
+
+
+-- switch to promise mode
+main : IO (Promise Unit)
+main = pure test

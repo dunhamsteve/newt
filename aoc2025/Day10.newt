@@ -1,0 +1,126 @@
+module Day10
+
+import Prelude
+import Node
+import Aoc
+import Parser
+import Data.Vect
+import Data.Fin
+import Z3
+
+instance ∀ a b. {{Show a}} → {{Show b}} → Show (Either a b) where
+  show (Left a) = "Left \{show a}"
+  show (Right b) = "Right \{show b}"
+
+record Machine where
+  goal : Int
+  buttons : List Int
+  jolts : List Int
+
+infixr 2 _**_
+
+abs : Int → Int
+abs x = if x < 0 then 0 - x else x
+
+data Σ : (a : U) → (a → U) → U where
+  _**_ : ∀ A. {0 B : A → U} → (x : A) →  (_ : B x) → Σ A B
+
+instance Show Machine where
+  show m  = "Mach{goal=\{show m.goal}, buttons=\{show m.buttons}, goal=\{show m.jolts}}"
+
+parseGroup : Char → Char → Parser (List Int)
+parseGroup start end = do
+  match start
+  nums <- some $ number <* optional (match ',')
+  match end
+  ws
+  pure nums
+
+pfunc pow : Int → Int → Int := `(x,y) => x ** y`
+pfunc xor : Int → Int → Int := `(x,y) => x ^ y`
+
+parseMachine : Parser Machine
+parseMachine = do
+  match '['
+  marks <- some $ match '.' <|> match '#'
+  match ']'
+  ws
+  buttons <- some $ parseGroup '(' ')'
+  costs <- parseGroup '{' '}'
+  pure $ MkMachine (mkgoal marks) (map mkbutton buttons) costs
+  where
+    mkbutton : List Int → Int
+    mkbutton (n :: ns) = pow 2 n + mkbutton ns
+    mkbutton Nil = 0
+
+    mkgoal : List Char → Int
+    mkgoal ('#' :: xs) = 1 + 2 * mkgoal xs
+    mkgoal (_ :: xs) = 2 * mkgoal xs
+    mkgoal Nil = 0
+
+parseFile : Parser (List Machine)
+parseFile = some $ parseMachine <* match '\n'
+
+solve : Machine → Int
+solve m = go 0 m.buttons
+  where
+    go : Int → List Int → Int
+    go st Nil = if st == m.goal then 0 else 999
+    go st (b :: bs) =
+      if st == m.goal
+        then 0
+        else min (1 + go (xor st b) bs) (go st bs)
+
+infixl 7 _&_
+pfunc _&_ : Int → Int → Int := `(x,y) => x & y`
+
+part2z3 : {{Context}} → Machine → Promise Int
+part2z3 {{context}} mach = do
+  let rows = length mach.jolts
+  let (Just todo) = toVect rows mach.jolts | _ => fatalError "jolt/rows length"
+  let vars = map (\i => z3const "x\{show $ fst i}") $ enumerate mach.buttons
+  let solver = newOptimizer context
+
+  traverse_ (constrain solver $ zip vars mach.buttons) (enumerate mach.jolts)
+  for_ vars $ \v => z3add solver $ z3ge v (z3int 0)
+  z3minimize solver $ sum vars
+  "sat" <- z3check solver | res => fatalError "GOT \{res}"
+  model <- getModel solver
+  pure $ foldl _+_ 0 $ map getInt vars
+  where
+    sum : List Arith → Arith
+    sum Nil = z3int 0
+    sum (a :: as) = foldl _+_ a as
+
+    constrain : ∀ b. Solver b → List (Arith × Int) → (Nat × Int) → Promise Unit
+    constrain solver bs (ix, goal) =
+      let mask = pow 2 $ cast ix in
+      z3add solver $ z3eq (z3int goal) $ row mask bs (z3int 0)
+      where
+        row : Int → List (Arith × Int) → Arith → Arith
+        row mask Nil acc = acc
+        row mask ((x , b) :: bs) acc = if b & mask == 0 then row mask bs acc else row mask bs (acc + x)
+
+    button2List : ∀ rows. Vect rows Int → Int → Int → Vect rows Int
+    button2List VNil _ _ = VNil
+    button2List (_ :- rest) mask b =
+      (if (b & mask) == 0 then 0 else 1) :- button2List rest (mask * 2) b
+
+run : String -> Promise Unit
+run fn = do
+  putStrLn {Promise} fn
+  text <- liftIO {Promise} $ readFile fn
+  let (Right (probs,_)) = parseFile (unpack text)
+    | Left msg => putStrLn "ERR: \{msg}"
+  let part1 = foldl _+_ 0 $ map solve probs
+  putStrLn $ "part1 \{show part1}"
+  z3 <- initZ3
+  let context = initContext z3 "main"
+  p2s <- traverse part2z3 probs
+  let p2 = foldl _+_ 0 p2s
+  putStrLn "part2 \{show p2}"
+
+main : IO Unit
+main = runPromise $ do
+  run "aoc2025/day10/eg.txt"
+  run "aoc2025/day10/input.txt"
