@@ -1,9 +1,12 @@
 
 ## TODO
 
+- [ ] "Expected keyword" at `\ a ->` should be error at the `->`
 - [ ] Show Either
 - [ ] `local` for `where`-like `let` clauses? (I want a `where` that closes over more stuff)
-- [ ] Erasure checking happens at compile time and isn't surfaced to editor..
+  - I can do `let f : ... = \ a b c => ...`. But it doesn't work for recursion and cases are awkward.
+- [x] Erasure checking happens at compile time and isn't surfaced to editor..
+- [ ] Erasure issue during AoC from case building replacing a non-erased value with erased.
 - [ ] Add Foldable?
 - [ ] "Failed to unify %var0 and %var1" - get names in there
   - Need fancier `Env`

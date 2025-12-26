@@ -181,12 +181,17 @@ processDef ns fc nm clauses = do
   -- moved to Compile.newt because it was interfering with type checking (Zoo4eg.newt) via over-reduction
   -- tm' <- zonk top 0 Nil tm
 
+  -- for effect, so we see errors in the editor
+  -- We need to keep the _unerased_ term for checking
+  _ <- erase Nil tm Nil
+
   debug $ \ _ => "Add def \{nm} \{render 90 $ pprint Nil tm} : \{render 90 $ pprint Nil ty}"
   updateDef (QN ns nm) fc ty (Fn tm)
   -- putStrLn "complexity \{show (QN ns nm)} \{show $ complexity tm}"
   -- putStrLn $ show tm
   -- TODO we need some protection against inlining a function calling itself.
   -- We need better heuristics, maybe fuel and deciding while inlining.
+  -- someday users will tag functions as inline, so maybe an explicit loop check
   -- IO,bind is explicit here because the complexity has a 100 in it.
   let name = show $ QN ns nm
   if complexity tm < 15 || name == "Prelude.Prelude.Monad Prelude.IO,bind" || name == "Prelude._>>=_"
