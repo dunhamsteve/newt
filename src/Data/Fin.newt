@@ -26,6 +26,10 @@ instance ∀ n. Cast (Fin n) Nat where
   cast FZ = Z
   cast (FS x) = S (cast x)
 
+instance ∀ n. Cast (Fin n) Int where
+  cast FZ = 0
+  cast (FS x) = 1 + (cast x)
+
 instance ∀ k. Show (Fin k) where
   show x = show {Nat} $ cast x
 
