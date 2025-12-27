@@ -899,6 +899,10 @@ instance ∀ a. {{Show a}} → Show (Maybe a) where
   show Nothing = "Nothing"
   show (Just a) = "Just \{show a}"
 
+instance ∀ a b. {{Show a}} → {{Show b}} → Show (Either a b) where
+  show (Left a) = "Left \{show a}"
+  show (Right b) = "Right \{show b}"
+
 pfunc isPrefixOf uses (True False): String → String → Bool := `(pfx, s) => s.startsWith(pfx) ? Prelude_True : Prelude_False`
 pfunc isSuffixOf uses (True False): String → String → Bool := `(pfx, s) => s.endsWith(pfx) ? Prelude_True : Prelude_False`
 pfunc strIndex : String → Int → Char := `(s, ix) => s[ix]`

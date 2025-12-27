@@ -2,26 +2,31 @@
 ## TODO
 
 - [ ] "Expected keyword" at `\ a ->` should be error at the `->`
-- [ ] Show Either
+- [x] Show Either
 - [ ] `local` for `where`-like `let` clauses? (I want a `where` that closes over more stuff)
   - I can do `let f : ... = \ a b c => ...`. But it doesn't work for recursion and cases are awkward.
 - [x] Erasure checking happens at compile time and isn't surfaced to editor..
 - [ ] Erasure issue during AoC from case building replacing a non-erased value with erased.
 - [ ] Add Foldable?
 - [ ] "Failed to unify %var0 and %var1" - get names in there
-  - Need fancier `Env`
-- [ ] add missing cases should skip indented lines
-- [ ] add missing cases should handle `_::_`
-- [ ] "Not in scope" should offer to import
+  - Need fancier `Env` or the index...
+- Editor support:
+  - [ ] add missing cases should skip indented lines
+  - [ ] add missing cases should handle `_::_`
+  - [ ] add missing cases should share code between vscode and playground
+  - [ ] "Not in scope" should offer to import
 - [ ] Dependent records (I guess I missed that bit)
 - [ ] Arguments on records
 - [ ] Add sugar for type aliases (maybe infer arguments)
-- [ ] see if we can get a better error on `for` instead of `for_` in do blocks
-- [ ] Maybe make the editor json more compact
+  - Lean has this, we maybe could run infer on the RHS and call it a day? We would need a simple LHS, though.
+- [ ] see if we can get a better error if `for` is used instead of `for_` in do blocks
+- [ ] Maybe make the editor json more compact (we want to replace this with REPL / LSP though)
 - [ ] Remove erased args from primitive functions
   - But we need separate `+` functions rather than the magic `∀ a. a -> a -> a` to support other backends
 - [ ] consider moving primitive functions to a support file
-  - Downside here is that we lose some dead code elimination, but it better supports bootstrapping when calling convention changes.
+  - Downside here is that we lose some dead code elimination
+  - it better supports bootstrapping when calling convention changes.
+  - it better supports other
 - [ ] Alternate backend
   - Options are scheme, C, WASM, arm assembly. Maybe C is the next step.
 - [ ] allow declaration of primitive operators
