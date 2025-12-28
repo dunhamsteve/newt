@@ -1,3 +1,9 @@
+:root {
+  --border-color: #888;
+  --tab-select-color: #555;
+  --text-color: black;
+  --tab-text-color: #555;
+}
 body {
   overflow: hidden;
   font-size: 12px;
@@ -7,9 +13,35 @@ svg.icon path {
   fill: none;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tab-select-color: #eee;
+    --tab-text-color: #aaa;
+    --text-color: white;
+    background-color: black;
+    color-scheme: dark;
+  }
+
+	body {
+    color: var(--text-color);
+
+  }
+  svg.icon path {
+    stroke: white;
+    fill: none;
+  }
+  .tabBody {
+    /* match editor */
+    color: #abb2bf;
+    background-color: #282c34;
+  }
+}
+
 #help {
   padding: 5px;
   font-family: 'Comic Code', monospace;
+  overflow: auto;
+  height: 100%;
 }
 
 #help>div {
@@ -32,17 +64,13 @@ svg.icon path {
   background: white;
   text-align: center;
 }
-@media (prefers-color-scheme: dark) {
-	body {
-    color: white;
-    background-color: black;
-  }
-  svg.icon path {
-    stroke: white;
-    fill: none;
-  }
-}
 
+#javascript {
+  height: 100%;
+}
+.right .tabBody {
+  border-left: solid 1px var(--border-color);
+}
 #app {
   top: 0;
   bottom: 0;
@@ -97,7 +125,7 @@ svg.icon path {
   flex-direction: row;
   gap: 10px;
   margin: 10px 0 0 0;
-  border-bottom: solid 1px black;
+  border-bottom: solid 1px var(--border-color);
   height: 30px;
 }
 .tabBar>select {
@@ -105,17 +133,18 @@ svg.icon path {
 }
 .tab {
   padding: 4px;
-  border: solid 1px transparent;
+  border-bottom: solid 2px transparent;
+  color: var(--tab-text-color);
 }
 .tab.selected {
-  border: solid 1px black;
-  border-bottom: 0px
+  border-bottom: solid 2px var(--tab-select-color);
+  color: var(--text-color);
 }
 .tabBody {
-  overflow: auto;
   flex: 1 1;
+  height: 0; /* min height */
 }
-#result, #javascript {
+#result {
   font-family: 'Comic Code', monospace;
   font-size: 12px;
   white-space: pre;

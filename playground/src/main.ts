@@ -20,6 +20,10 @@ import share from "./share.svg"
 import share_light from "./share_light.svg"
 import play from "./play.svg"
 import play_light from "./play_light.svg"
+import { basicSetup, EditorView } from "codemirror";
+import {Compartment, EditorState} from "@codemirror/state";
+import { javascript } from "@codemirror/lang-javascript";
+import { oneDark } from "@codemirror/theme-one-dark";
 
 let topData: undefined | TopData;
 
@@ -161,7 +165,7 @@ const state = {
 // Monitor dark mode state (TODO - let user override system setting)
 if (window.matchMedia) {
   function checkDark(ev: { matches: boolean }) {
-    console.log("CHANGE", ev);
+    console.log("CHANGE", ev.matches, ev);
     if (ev.matches) {
       document.body.className = "dark";
       state.dark.value = true;
@@ -224,7 +228,8 @@ const language: EditorDelegate = {
       // This causes problems with stuff like aoc/...
       state.currentFile.value = module.replace(".", "/") + ".newt";
     }
-    state.javascript.value = ''
+    // This is a little flashy
+    // state.javascript.value = ''
     let fileName = state.currentFile.value;
     console.log("FN", fileName);
     try {
@@ -246,6 +251,8 @@ const language: EditorDelegate = {
           message: marker.message,
         });
       }
+      // less flashy version
+      ipc.sendMessage("compile", [fileName]).then(js => state.javascript.value = js);
       return diags;
     } catch (e) {
       console.log("ERR", e);
@@ -261,19 +268,53 @@ function Editor({ initialValue }: EditorProps) {
   useEffect(() => {
     const container = ref.current!;
     const editor = new CMEditor(container, value, language);
-    // const editor = new MonacoEditor(container, value, language)
     state.editor.value = editor;
     editor.setDark(state.dark.value);
     if (initialValue === LOADING) loadFile("Tour.newt");
   }, []);
-
   return h("div", { id: "editor", ref });
 }
 
 // for extra credit, we could have a read-only monaco
 function JavaScript() {
   const text = state.javascript.value;
-  return h("div", { id: "javascript" }, text);
+
+  // return h("div", { id: "javascript" }, text);
+  const ref = useRef<HTMLDivElement>(null);
+  const editorView = useRef<EditorView>(null);
+  const themeRef = useRef<Compartment>(null);
+  useEffect(() => {
+    console.log('JSEFFECT')
+    const container = ref.current!;
+    themeRef.current = new Compartment();
+
+    const editor = new EditorView({
+      doc: text,
+      parent: container,
+      extensions: [
+        basicSetup,
+        themeRef.current.of(state.dark.value ? oneDark : EditorView.baseTheme({})),
+        javascript(),
+        EditorState.readOnly.of(true),
+        EditorView.editable.of(false),
+      ],
+    });
+    // const editor = new CMEditor(container, text, language);
+    // state.editor.value = editor;
+    // editor.setDark(state.dark.value);
+    editorView.current = editor;
+  }, []);
+  let isDark = state.dark.value;
+  let ev = editorView.current;
+  if (ev) {
+    ev.dispatch({
+      effects: themeRef.current?.reconfigure(
+        isDark ? oneDark : EditorView.baseTheme({})
+      ),
+      changes: { from: 0, to: ev.state.doc.length, insert: text },
+    });
+  }
+  return h("div", { id: "javascript", ref });
 }
 
 function Result() {
