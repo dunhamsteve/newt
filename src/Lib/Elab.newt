@@ -98,6 +98,9 @@ instance Monoid UnifyResult where
   neutral = MkResult Nil
 
 data UnifyMode = UNormal | UPattern
+instance Show UnifyMode where
+  show UNormal = "UNormal"
+  show UPattern = "UPattern"
 
 check : Context -> Raw -> Val -> M Tm
 
@@ -581,7 +584,9 @@ unify env mode t u = do
         (Lin,Lin) => if k < k'
           then pure $ MkResult ((k, u') :: Nil)
           else pure $ MkResult ((k', t') :: Nil)
-        _ => error fc "Failed to unify \{show t'} and \{show u'}"
+        (Lin,_) => pure $ MkResult ((k, u') :: Nil)
+        (_,Lin) => pure $ MkResult ((k', t') :: Nil)
+        _ => error fc "Failed to unify \{show t'} and \{show u'} at \{show mode}"
 
     unifyPattern (VVar fc k Lin) u = pure $ MkResult((k, u) :: Nil)
     unifyPattern t (VVar fc k Lin) = pure $ MkResult ((k, t) :: Nil)
