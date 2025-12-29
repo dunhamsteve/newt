@@ -273,7 +273,6 @@ letExpr = do
     letAssign = do
       fc <- getPos
       name <- ident
-      -- TODO type assertion
       ty <- optional (keyword ":" *> typeExpr)
       keyword "="
       t <- typeExpr
@@ -329,16 +328,17 @@ caseExpr = do
   fc <- getPos
   keyword "case"
   sc <- term
+  ty <- optional (keyword ":" *> typeExpr)
   keyword "of"
   alts <- startBlock $ someSame $ caseAlt
-  pure $ RCase fc sc alts
+  pure $ RCase fc sc ty alts
 
 caseLamExpr : Parser Raw
 caseLamExpr = do
   fc <- getPos
   try ((keyword "\\" <|> keyword "λ") *> keyword "case")
   alts <- startBlock $ someSame $ caseAlt
-  pure $ RLam fc (BI fc "$case" Explicit Many) $ RCase fc (RVar fc "$case") alts
+  pure $ RLam fc (BI fc "$case" Explicit Many) $ RCase fc (RVar fc "$case") Nothing alts
 
 doExpr : Parser Raw
 doStmt : Parser DoStmt
@@ -355,7 +355,7 @@ caseLet = do
   alts <- startBlock $ manySame $ symbol "|" *> caseAlt
   keyword "in"
   body <- term
-  pure $ RCase fc sc (MkAlt pat (Just body) :: alts)
+  pure $ RCase fc sc Nothing (MkAlt pat (Just body) :: alts)
 
 doCaseLet : Parser DoStmt
 doCaseLet = do
@@ -370,7 +370,7 @@ doCaseLet = do
   alts <- startBlock $ manySame $ symbol "|" *> caseAlt
   bodyFC <- getPos
   body <- RDo <$> getPos <*> someSame doStmt
-  pure $ DoExpr fc (RCase fc sc (MkAlt pat (Just body) :: alts))
+  pure $ DoExpr fc (RCase fc sc Nothing (MkAlt pat (Just body) :: alts))
 
 doArrow : Parser DoStmt
 doArrow = do

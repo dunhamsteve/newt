@@ -45,7 +45,7 @@ data Raw : U where
   RLet : (fc : FC) -> (nm : Name) -> (ty : Raw) -> (v : Raw) -> (sc : Raw) -> Raw
   RAnn : (fc : FC) -> (tm : Raw) -> (ty : Raw) -> Raw
   RLit : (fc : FC) -> Literal -> Raw
-  RCase : (fc : FC) -> (scrut : Raw) -> (alts : List RCaseAlt) -> Raw
+  RCase : (fc : FC) -> (scrut : Raw) -> (mty : Maybe Raw) -> (alts : List RCaseAlt) -> Raw
   RImplicit : (fc : FC) -> Raw
   RHole : (fc : FC) -> Raw
   RDo : (fc : FC) -> List DoStmt -> Raw
@@ -65,7 +65,7 @@ instance HasFC Raw where
   getFC (RLet fc nm ty v sc) = fc
   getFC (RAnn fc tm ty) = fc
   getFC (RLit fc y) = fc
-  getFC (RCase fc scrut alts) = fc
+  getFC (RCase fc scrut mty alts) = fc
   getFC (RImplicit fc) = fc
   getFC (RHole fc) = fc
   getFC (RDo fc stmts) = fc
@@ -171,7 +171,8 @@ instance Show Raw where
   show (RPi _ bi y z) = foo ( "Pi" :: show bi :: show y :: show z :: Nil)
   show (RApp _ x y z) = foo ( "App" :: show x :: show y :: show z :: Nil)
   show (RLam _ bi y) = foo ( "Lam" :: show bi :: show y :: Nil)
-  show (RCase _ x xs) = foo ( "Case" :: show x :: show xs :: Nil)
+  show (RCase _ x Nothing xs) = foo ( "Case" :: show x :: " of " :: show xs :: Nil)
+  show (RCase _ x (Just ty) xs) = foo ( "Case" :: show x :: " : " :: show ty :: " of " :: show xs :: Nil)
   show (RDo _ stmts) = foo ( "DO" :: "FIXME" :: Nil)
   show (RU _) = "U"
   show (RIf _ x y z) = foo ( "If" :: show x :: show y :: show z :: Nil)
@@ -224,15 +225,15 @@ instance Pretty Raw where
           <+> text "=" <+> asDoc p v
           <+/> text "in" <+> asDoc p scope
     -- does this exist?
-    asDoc p (RAnn _ x y) = text "TODO - RAnn"
+    asDoc p (RAnn _ x y) = text "TODO - Pretty RAnn"
     asDoc p (RLit _ lit) = pretty lit
-    asDoc p (RCase _ x xs) = text "TODO - RCase"
+    asDoc p (RCase _ x _ xs) = text "TODO - Pretty RCase"
     asDoc p (RImplicit _) = text "_"
     asDoc p (RImpossible _) = text "()"
     asDoc p (RHole _) = text "?"
-    asDoc p (RDo _ stmts) = text "TODO - RDo"
+    asDoc p (RDo _ stmts) = text "TODO - Pretty RDo"
     asDoc p (RIf _ x y z) = par p 0 $ text "if" <+> asDoc 0 x <+/> text "then" <+> asDoc 0 y <+/> text "else" <+> asDoc 0 z
-    asDoc p (RWhere _ dd b) = text "TODO pretty where"
+    asDoc p (RWhere _ dd b) = text "TODO pretty RWhere"
     asDoc p (RAs _ nm x) = text nm ++ text "@(" ++ asDoc 0 x ++ text ")"
     asDoc p (RUpdateRec _ clauses tm) = text "{" <+> text "TODO RUpdateRec" <+> text "}"
 

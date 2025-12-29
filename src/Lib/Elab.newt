@@ -1358,7 +1358,7 @@ undo prev ((DoArrow fc left@(RVar fc' nm) right Nil) :: xs) = do
     Just _ => do
       let nm = "$sc"
       xs' <- undo fc xs
-      rest <- pure $ RCase fc (RVar fc nm) (MkAlt left (Just xs') :: Nil)
+      rest <- pure $ RCase fc (RVar fc nm) Nothing (MkAlt left (Just xs') :: Nil)
       pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
         (RLam fc (BI fc nm Explicit Many) rest) Explicit
     Nothing => do
@@ -1368,7 +1368,7 @@ undo prev ((DoArrow fc left@(RVar fc' nm) right Nil) :: xs) = do
 undo prev ((DoArrow fc left right alts) :: xs) = do
   let nm = "$sc"
   xs' <- undo fc xs
-  rest <- pure $ RCase fc (RVar fc nm) (MkAlt left (Just xs') :: alts)
+  rest <- pure $ RCase fc (RVar fc nm) Nothing (MkAlt left (Just xs') :: alts)
   pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
     (RLam fc (BI fc nm Explicit Many) rest) Explicit
 
@@ -1426,13 +1426,20 @@ check ctx tm ty = do
     (RUpdateRec fc clauses arg, ty) => updateRec ctx fc clauses arg ty
     (RWhere fc decls body, ty) => checkWhere ctx (collectDecl decls) body ty
     (RIf fc a b c, ty) =>
-      let tm' = RCase fc a ( MkAlt (RVar (getFC b) "True") (Just b) :: MkAlt (RVar (getFC c) "False") (Just c)  :: Nil) in
+      -- REVIEW maybe stuff Bool in here?
+      let tm' = RCase fc a Nothing (MkAlt (RVar (getFC b) "True") (Just b) :: MkAlt (RVar (getFC c) "False") (Just c)  :: Nil) in
       check ctx tm' ty
     (RDo fc stmts, ty) => do
       stmts' <- undo fc stmts
       check ctx stmts' ty
-    (RCase fc rsc alts, ty) => do
-      (sc, scty) <- infer ctx rsc
+    (RCase fc rsc mty alts, ty) => do
+      (sc, scty) <- case mty of
+        Nothing => infer ctx rsc
+        Just ty => do
+          scty <- check ctx ty (VU emptyFC)
+          vscty <- eval ctx.env scty
+          sc <- check ctx rsc vscty
+          pure (sc, vscty)
       scty <- forceMeta scty
       debug $ \ _ => "SCTM \{rpprint (names ctx) sc}"
       debug $ \ _ => "SCTY \{show scty}"

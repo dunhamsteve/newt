@@ -1,6 +1,7 @@
 
 ## TODO
 
+- [x] add optional types to case `case xxx : Maybe Int of ...`
 - [ ] "Expected keyword" at `\ a ->` should be error at the `->`
 - [x] Show Either
 - [ ] `local` for `where`-like `let` clauses? (I want a `where` that closes over more stuff)
