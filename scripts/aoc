@@ -1,6 +1,7 @@
 #!/bin/sh
 mkdir -p tmp
 echo "Test AoC 2024 solutions"
+# FIXME - it turns out there are some stack issues here (including length)
 NCC="bun run newt.js"
 total=0
 failed=0

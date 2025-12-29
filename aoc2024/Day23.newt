@@ -27,10 +27,6 @@ startT s = case unpack s of
   ('t' :: _) => True
   _ => False
 
-isJust : ∀ a. Maybe a → Bool
-isJust (Just x) = True
-isJust _ = False
-
 checkK3 : Graph → EdgeSet → Edge → Int
 checkK3 g es (a,b) =
   let cand = fromMaybe Nil $ snd <$> lookupMap b g
