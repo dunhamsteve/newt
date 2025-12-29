@@ -4,7 +4,6 @@ import Prelude
 import Node
 import Aoc
 import Data.SortedMap
-import Monad.State
 
 gridPoints : String → List (Char × Int × Int)
 gridPoints text = go 0 0 (unpack text) Nil

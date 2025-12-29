@@ -8,10 +8,6 @@ import Data.Vect
 import Data.Fin
 import Z3
 
-instance ∀ a b. {{Show a}} → {{Show b}} → Show (Either a b) where
-  show (Left a) = "Left \{show a}"
-  show (Right b) = "Right \{show b}"
-
 record Machine where
   goal : Int
   buttons : List Int
