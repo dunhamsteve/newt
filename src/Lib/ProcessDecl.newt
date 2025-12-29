@@ -319,10 +319,10 @@ processInstance ns instfc ty decls = do
   -- declare individual functions, collect their defs
   defs <- for conTele $ \case
      (MkBinder fc nm Explicit rig ty) => do
-       let ty' = foldr (\ x acc => case the Binder x of (MkBinder fc nm' icit rig ty') => Pi fc nm' icit rig ty' acc) ty tele
+       let ty' = foldr (\ x acc => case x : Binder of (MkBinder fc nm' icit rig ty') => Pi fc nm' icit rig ty' acc) ty tele
        let nm' = "\{instname},\{nm}"
        -- we're working with a Tm, so we define directly instead of processDecl
-       let (Just (FunDef fc name xs)) = find (\x => case the Decl x of
+       let (Just (FunDef fc name xs)) = find (\x => case x : Decl of
         (FunDef y name xs) => name == nm
         _ => False) decls
           | _ => error instfc "no definition for \{nm}"
@@ -499,9 +499,9 @@ processRecord ns recordFC nm tele cname decls = do
   let dcName = fromMaybe "Mk\{show nm}" cname
   let tcType = teleToPi tele (RU recordFC)
   -- REVIEW - I probably want to stick the telescope in front of the fields
-  let tail = foldl (\ acc bi => case the (BindInfo × Raw) bi of (BI fc nm icit _, _) => RApp fc acc (RVar fc nm) icit) (RVar recordFC nm) tele
+  let tail = foldl (\ acc bi => case bi : BindInfo × Raw of (BI fc nm icit _, _) => RApp fc acc (RVar fc nm) icit) (RVar recordFC nm) tele
   let dcType = teleToPi (impTele tele) $
-    foldr (\ x acc => case the (FC × String × Raw) x of (fc, nm, ty) =>  RPi fc (BI fc nm Explicit Many) ty acc  ) tail fields
+    foldr (\ x acc => case x : FC × String × Raw of (fc, nm, ty) =>  RPi fc (BI fc nm Explicit Many) ty acc  ) tail fields
 
   log 1 $ \ _ => "tcon type \{render 90 $ pretty tcType}"
   log 1 $ \ _ => "dcon type \{render 90 $ pretty dcType}"
@@ -514,11 +514,11 @@ processRecord ns recordFC nm tele cname decls = do
       -- TODO dependency isn't handled yet
       -- we'll need to replace stuff like `len` with `len self`.
       let funType = teleToPi (impTele tele) $ RPi fc (BI fc "_" Explicit Many) tail ty
-      let autoPat = foldl (\acc x => case the (FC × String × Raw) x of (fc,nm,ty) => RApp fc acc (RVar fc nm) Explicit) (RVar recordFC dcName) fields
+      let autoPat = foldl (\acc x => case x : FC × String × Raw of (fc,nm,ty) => RApp fc acc (RVar fc nm) Explicit) (RVar recordFC dcName) fields
 
       -- `.fieldName`
       let pname = "." ++ name
-      let lhs = foldl (\acc x => case the (BindInfo × Raw) x of (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc pname) tele
+      let lhs = foldl (\acc x => case x : BindInfo × Raw of (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc pname) tele
       let lhs = RApp recordFC lhs autoPat Explicit
       let pdecl = FunDef fc pname ((lhs, (Just $ RVar fc name)) :: Nil)
       log 1 $ \ _ => "\{pname} : \{render 90 $ pretty funType}"

@@ -1549,7 +1549,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
 
 infer ctx (RApp fc t u icit) = do
   -- If the app is explicit, add any necessary metas
-  (icit, t, tty) <- case the Icit icit of
+  (icit, t, tty) <- case icit of
       Explicit => do
         (t, tty) <- infer ctx t
         (t, tty) <- insert ctx t tty

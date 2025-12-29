@@ -120,7 +120,7 @@ compileTerm t@(Ref fc nm@(QN _ tag)) = do
   defs <- getRef Defs
   case arity of
     Nil =>
-      case the (Maybe Def) $ lookupMap' nm defs of
+      case lookupMap' nm defs : Maybe Def of
         Just (DCon ix EnumCon _ _) => pure $ CLit $ LInt $ cast ix
         Just (DCon ix FalseCon _ _) => pure $ CLit $ LBool False
         Just (DCon ix TrueCon _ _) => pure $ CLit $ LBool True
@@ -143,7 +143,7 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
         arity <- arityForName fc nm
         let (Nothing) = compilePrimOp (show nm) args'
           | Just cexp => pure cexp
-        case the (Maybe Def) $ lookupMap' nm defs of
+        case lookupMap' nm defs : Maybe Def of
           Just (DCon _ SuccCon _ _) => applySucc args'
           _ => apply nm args' arity
   -- REVIEW maybe we want a different constructor for non-Ref applications?
