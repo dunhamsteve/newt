@@ -1,47 +1,46 @@
 module Reasoning
 
-infix 4 _≡_
-data _≡_ : {A : U} → A → A → U where
-  Refl : ∀ A. {x : A} → x ≡ x
+-- From the "Lists" chapter of Programming Language Foundations in Agda
+-- https://plfa.github.io/Lists/
 
-sym : ∀ A. {x y : A} → x ≡ y → y ≡ x
+-- We define a few types and functions on lists and prove a couple of properties
+-- about them. This example demonstrates mixfix operators.
+
+infix 4 _≡_
+data _≡_ : ∀ A. A → A → U where
+  Refl : ∀ A. {0 x : A} → x ≡ x
+
+sym : ∀ A. {0 x y : A} → x ≡ y → y ≡ x
 sym Refl = Refl
 
-trans : ∀ A. {x y z : A} → x ≡ y → y ≡ z → x ≡ z
+trans : ∀ A. {0 x y z : A} → x ≡ y → y ≡ z → x ≡ z
 trans Refl eq = eq
 
-cong : ∀ A B. (f : A → B) {x y : A}
+cong : ∀ A B. (0 f : A → B) {0 x y : A}
   → x ≡ y
   → f x ≡ f y
 cong f Refl = Refl
 
-cong-app : ∀ A B. {f g : A → B}
+cong-app : ∀ A B. {0 f g : A → B}
   → f ≡ g
-  → (x : A) →  f x ≡ g x
+  → (0 x : A) →  f x ≡ g x
 cong-app Refl = λ y => Refl
 
 infixl 1 begin_
 infixr 2 _≡⟨⟩_ _≡⟨_⟩_
 infixl 3 _∎
 
-begin_ : ∀ A. {x y : A} → x ≡ y → x ≡ y
+begin_ : ∀ A. {0 x y : A} → x ≡ y → x ≡ y
 begin x≡y = x≡y
 
-_≡⟨⟩_  : ∀ A. (x : A) {y : A} → x ≡ y → x ≡ y
+_≡⟨⟩_  : ∀ A. (0 x : A) {0 y : A} → x ≡ y → x ≡ y
 x ≡⟨⟩ x≡y = x≡y
 
-_≡⟨_⟩_ : ∀ A. (x : A) {y z : A} → x ≡ y → y ≡ z → x ≡ z
+_≡⟨_⟩_ : ∀ A. (0 x : A) {0 y z : A} → x ≡ y → y ≡ z → x ≡ z
 x ≡⟨ x≡y ⟩ y≡z = trans x≡y y≡z
 
-_∎ : ∀ A. (x : A) → x ≡ x
+_∎ : ∀ A. (0 x : A) → x ≡ x
 x ∎ = Refl
-
-
--- From the "Lists" chapter of Programming Language Foundations in Agda
--- https://plfa.github.io/Lists/
-
--- We define a few types and functions on lists and prove a couple of properties
--- about them
 
 -- Natural numbers are zero (Z) or the successor (S) of a natural number
 -- We'll use these to represent the length of lists

@@ -2,7 +2,7 @@
 
 Newt is a dependent typed programming language that compiles to javascript. This playground embeds the newt compiler and a codemirror based editor.
 
-The editor will typecheck the file with newt and render errors as the file is changed. The current file is saved to localStorage and will be restored if there is no data in the URL. Cmd-s or Ctrl-s will create a url embedding the file contents. There is a layout toggle for phone use.
+The editor will typecheck the file with newt and render errors as the file is changed. The current file is saved to localStorage and will be restored if there is no data in the URL. Cmd-s or Ctrl-s will create a url embedding the file contents.
 
 ## Tabs
 
