@@ -84,7 +84,7 @@ doOptimize fns = do
       let conquant = map (const Many) conargs
       let arg = CConstr (S ix) (show qn) conargs conquant
       let body = CAppRef bouncer (CRef recName :: arg :: Nil) (Many :: Many :: Nil)
-      pure $ (qn, CFun args body)
+      pure (qn, CFun args body)
     mkWrap _ (qn, _) = error emptyFC "error in mkWrap: \{show qn} not a CFun"
 
     mkRecName : List QName → M QName

@@ -66,7 +66,7 @@ logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
           let (VRef _ tyname _) = ty | _ => pure Nil
           let cands = fromMaybe Nil $ lookupMap' tyname top.hints
           matches <- findMatches ctx ty cands
-          pure $ ("  \{show $ length' matches} Solutions: \{show matches}" :: Nil)
+          pure ("  \{show $ length' matches} Solutions: \{show matches}" :: Nil)
 
         _ => pure Nil
       info fc $ unlines ((msg :: Nil) ++ msgs ++ sols)

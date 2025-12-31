@@ -1413,7 +1413,7 @@ updateRec ctx fc clauses arg ty = do
         | _ => error fc "\{show nm} not in scope"
       let (Just (MkEntry _ _ ty (DCon _ _ _ _) _)) = lookup conname top
         | _ => error fc "\{show conname} not a dcon"
-      pure $ (conname, collect arg ty)
+      pure (conname, collect arg ty)
     --
     getTele Nothing (VPi _ _ _ _ a b) = getTele (Just $ RVar fc "$ru") a
     getTele Nothing v = error (getFC v) "Expected a pi type, got \{show v}"
@@ -1544,7 +1544,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
           vty <- eval Nil ty
           pure (Ref fc name, vty)
         Nothing => error fc "\{show nm} not in scope"
-    go i ((x, ty) :: xs) = if x == nm then pure $ (Bnd fc i, ty)
+    go i ((x, ty) :: xs) = if x == nm then pure (Bnd fc i, ty)
       else go (i + 1) xs
 
 infer ctx (RApp fc t u icit) = do
@@ -1595,7 +1595,7 @@ infer ctx (RLet fc nm ty v sc) = do
   vv <- eval ctx.env v'
   let ctx' = define ctx nm vv vty
   (sc',scty) <- infer ctx' sc
-  pure $ (Let fc nm v' sc', scty)
+  pure (Let fc nm v' sc', scty)
 
 infer ctx (RAnn fc tm rty) = do
   ty <- check ctx rty (VU fc)
@@ -1609,7 +1609,7 @@ infer ctx (RLam _ (BI fc nm icit quant) tm) = do
   (tm', b) <- infer ctx' tm
   debug $ \ _ => "make lam for \{show nm} scope \{rpprint (names ctx) tm'} : \{show b}"
   tyb <- quote (1 + ctx.lvl) b
-  pure $ (Lam fc nm icit quant tm', VPi fc nm icit quant a (MkClosure ctx.env tyb))
+  pure (Lam fc nm icit quant tm', VPi fc nm icit quant a (MkClosure ctx.env tyb))
 
 infer ctx (RImplicit fc) = do
   ty <- freshMeta ctx fc (VU emptyFC) Normal

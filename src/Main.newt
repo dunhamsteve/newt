@@ -252,7 +252,7 @@ cmdLine (fn :: args) = do
   let (True) = isSuffixOf ".newt" fn
     | _ => error emptyFC "Bad argument \{show fn}"
   (out, files) <- cmdLine args
-  pure $ (out, fn :: files)
+  pure (out, fn :: files)
 
 main' : M Unit
 main' = do

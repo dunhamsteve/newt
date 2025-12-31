@@ -263,16 +263,14 @@ compileDCon ix (QN _ nm) info arity =
     mkArgs k (quant :: args) = (quant, "h\{show k}") :: mkArgs (S k) args
     mkArgs k Nil = Nil
 
-
-
 -- probably want to drop the Ref2 when we can
 defToCExp : {{Ref2 Defs St}} → (QName × Def) -> M (QName × CExp)
-defToCExp (qn, Axiom)      = pure $ (qn, CErased)
+defToCExp (qn, Axiom)      = pure (qn, CErased)
 defToCExp (qn, (PrimOp _)) = (_,_ qn) <$> compilePop qn
-defToCExp (qn, DCon ix info arity _)   = pure $ (qn, compileDCon ix qn info arity)
+defToCExp (qn, DCon ix info arity _)   = pure (qn, compileDCon ix qn info arity)
 -- We're not using these are runtime at the moment, no typecase
 -- we need to sort out tag number if we do that
-defToCExp (qn, TCon arity conNames) = pure $ (qn, compileDCon Z qn NormalCon (replicate' (cast arity) Many))
-defToCExp (qn, PrimTCon arity) = pure $ (qn, compileDCon Z qn NormalCon (replicate' (cast arity) Many))
-defToCExp (qn, PrimFn src _ deps) = pure $ (qn, CRaw src deps)
+defToCExp (qn, TCon arity conNames) = pure (qn, compileDCon Z qn NormalCon (replicate' (cast arity) Many))
+defToCExp (qn, PrimTCon arity) = pure (qn, compileDCon Z qn NormalCon (replicate' (cast arity) Many))
+defToCExp (qn, PrimFn src _ deps) = pure (qn, CRaw src deps)
 defToCExp (qn, Fn tm)          = (_,_ qn) <$> compileFun tm
