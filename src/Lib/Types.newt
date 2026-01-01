@@ -402,6 +402,7 @@ record ModContext where
   modMetaCtx : MetaContext
   -- longer term maybe drop this, put the operator decls in ctxDefs and collect them on import
   ctxOps : Operators
+  modDeps : List QName
 
 -- Top level context.
 -- Most of the reason this is separate is to have a different type
@@ -412,7 +413,7 @@ record ModContext where
 
 -- A placeholder while walking through dependencies of a module
 emptyModCtx : String → ModContext
-emptyModCtx csum = MkModCtx csum emptyMap (MC emptyMap Nil 0 NoCheck) emptyMap
+emptyModCtx csum = MkModCtx csum emptyMap (MC emptyMap Nil 0 NoCheck) emptyMap Nil
 
 HintTable : U
 HintTable = SortedMap QName (List (QName × Tm))

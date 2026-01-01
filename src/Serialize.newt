@@ -7,7 +7,7 @@ import Lib.Types
 import Data.SortedMap
 
 ModFile : U
-ModFile = (String × List TopEntry × List (String × OpDef) × List (QName × MetaEntry))
+ModFile = (String × List TopEntry × List (String × OpDef) × List (QName × MetaEntry) × List QName)
 
 pfunc checksum uses (MkIORes) : String → IO String := `(a) => (w) => {
   const arr = new TextEncoder().encode(a);
@@ -39,7 +39,8 @@ dumpModule qn src mod = do
   let defs = listValues mod.modDefs
   let ops = toList mod.ctxOps
   let mctx = toList mod.modMetaCtx.metas
-  liftIO $ dumpModFile fn (csum,defs,ops,mctx)
+  let deps = mod.modDeps
+  liftIO $ dumpModFile fn (csum,defs,ops,mctx, deps)
 
 pfunc readModFile uses (MkIORes Just Nothing): String → IO (Maybe ModFile) := `(fn) => (w) => {
   let fs = require('fs')
@@ -56,7 +57,7 @@ pfunc readModFile uses (MkIORes Just Nothing): String → IO (Maybe ModFile) := 
 loadModule : QName → String → M (Maybe ModContext)
 loadModule qn src = do
   let fn = "build/\{show qn}.newtmod"
-  (Just (csum, defs, ops, mctx)) <- liftIO {M} $ readModFile fn
+  (Just (csum, defs, ops, mctx, deps)) <- liftIO {M} $ readModFile fn
      | _ => pure Nothing
 
   let ops = mapFromList ops
@@ -64,5 +65,5 @@ loadModule qn src = do
       -- REVIEW can we ignore those last two inside a module
   let mctx = MC (mapFromList mctx) Nil 0 NoCheck
   if csum == src
-    then pure $ Just $ MkModCtx csum defs mctx ops
+    then pure $ Just $ MkModCtx csum defs mctx ops deps
     else pure Nothing

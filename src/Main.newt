@@ -91,6 +91,9 @@ importHints (entry :: entries) = do
   when (elem Hint entry.eflags) $ \ _ => addHint entry.name
   importHints entries
 
+importToQN : Import → QName
+importToQN  (MkImport fc name') = uncurry QN $ unsnoc $ split1 name' "."
+
 -- New style loader, one def at a time
 processModule : FC -> String -> List String -> QName -> M String
 processModule importFC base stk qn@(QN ns nm) = do
@@ -119,6 +122,8 @@ processModule importFC base stk qn@(QN ns nm) = do
 
   let (Right (imports, ops, toks)) = partialParse fn parseImports ops toks
     | Left (err, toks) => exitFailure (showError src err)
+
+  let importNames = map importToQN imports
 
   imported <- for imports $ \case
     MkImport fc name' => do
@@ -164,7 +169,7 @@ processModule importFC base stk qn@(QN ns nm) = do
   -- update modules with result, leave the rest of context in case this is top file
   top <- getTop
 
-  let mod = MkModCtx csum top.defs top.metaCtx top.ops
+  let mod = MkModCtx csum top.defs top.metaCtx top.ops importNames
   if stk /= Nil && length' top.errors == 0
     then dumpModule qn src mod
     else pure MkUnit
@@ -229,7 +234,7 @@ processFile fn = do
   setDef (QN primNS "PiType") emptyFC (Erased emptyFC) (PrimFn "(h0, h1) => ({ tag: \"PiType\", h0, h1 });" (S (S Z)) Nil) Nil
 
   top <- getTop
-  let modules = updateMap primNS (MkModCtx "" top.defs (MC emptyMap Nil 0 CheckAll) top.ops) top.modules
+  let modules = updateMap primNS (MkModCtx "" top.defs (MC emptyMap Nil 0 CheckAll) top.ops Nil) top.modules
   modifyTop (\ top => MkTop modules (primNS :: Nil) emptyMap Nil emptyMap top.metaCtx top.verbose top.errors top.ops)
 
   src <- processModule emptyFC base Nil qn
