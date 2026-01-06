@@ -1,7 +1,5 @@
-
-
 /-
-  This is newt, a self-hosted, dependent typed programming language that
+  Newt is a self-hosted, dependent typed programming language that
   compiles to javascript and borrows a lot of syntax from Idris and Agda.
 
   This page is a very simple web playground based on the codemirror editor.
@@ -18,27 +16,45 @@
 -- it must match the filename
 module Tour
 
--- We can import other modules, with a flat namespace and no cycles,
--- diamonds are ok, Prelude is not imported by default, only explicitly
--- imported modules are in scope
+-- We can import other modules with no cycles, diamonds are ok, cycles
+-- are an error. Prelude is not imported by default. Only explicitly
+-- imported modules are in scope. Duplicate names are not allowed.
 
--- commented out because we redefine parts of Prelude in this file.
--- import Prelude
+-- Example import is commented out because we redefine Prelude
+-- functions below.
 
--- We're calling the universe U and are doing type in type for now
+/-
+
+import Prelude
+
+-/
+
+
+-- The universe is U and are doing type in type for now.
+
+-- INDUCTIVE TYPES
 
 -- Inductive type definitions are similar to Idris, Agda, or Haskell
 data Nat : U where
   Z : Nat
   S : Nat -> Nat
 
--- Nat-shaped data is turned into numbers in codegen.
+-- Like in Idris, Nat-shaped data is turned into numbers at runtime.
+-- We are not yet ignoring erased fields though.
 
 -- Multiple names are allowed on the left:
 data Bool : U where
   True False : Bool
 
--- Enum shaped data becomes a bare string (the constructor name) in codegen.
+-- There also is an abbreviated syntactic sugar for simple types:
+
+data Tree a = Node a (Tree a) (Tree a) | Leaf
+
+-- Enum shaped data becomes a number at runtime (the constructor tag).
+
+data Answer = Yes | No | Maybe
+
+-- FUNCTIONS
 
 -- function definitions are equations using dependent pattern matching
 plus : Nat -> Nat -> Nat
