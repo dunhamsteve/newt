@@ -289,7 +289,7 @@ export function activate(context: vscode.ExtensionContext) {
           const actions: vscode.CodeAction[] = [];
           for (const diagnostic of context.diagnostics) {
             let {message,range} = diagnostic;
-            let m = message.match(/missing cases: (.*)/);
+            let m = message.match(/missing cases: \[(.*)\]/);
             if (m) {
               // A lot of this logic would also apply to case split.
               let cons = m[1].split(', ');
