@@ -1190,7 +1190,7 @@ buildDefault ctx prob fc scnm missing = do
         _ => pure qn.baseName
       where
         go : String → Tm → String
-        go acc (Pi _ _ Explicit _ _ t) = go "\{acc} _" t
+        go acc (Pi _ nm Explicit _ _ t) = go "\{acc} \{nm}" t
         go acc (Pi _ _ _ _ _ t) = go acc t
         go acc _ = acc
 
