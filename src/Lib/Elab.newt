@@ -1597,12 +1597,6 @@ infer ctx (RLet fc nm ty v sc) = do
   (sc',scty) <- infer ctx' sc
   pure (Let fc nm v' sc', scty)
 
-infer ctx (RAnn fc tm rty) = do
-  ty <- check ctx rty (VU fc)
-  vty <- eval ctx.env ty
-  tm <- check ctx tm vty
-  pure (tm, vty)
-
 infer ctx (RLam _ (BI fc nm icit quant) tm) = do
   a <- freshMeta ctx fc (VU emptyFC) Normal >>= eval ctx.env
   let ctx' = extend ctx nm a

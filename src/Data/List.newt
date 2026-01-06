@@ -1,0 +1,7 @@
+module Data.List
+
+import Prelude
+
+lookup : ∀ a b. {{Eq a}} → a → List (a × b) → Maybe b
+lookup key Nil = Nothing
+lookup key ((k,v) :: rest) = if k == key then Just v else lookup key rest

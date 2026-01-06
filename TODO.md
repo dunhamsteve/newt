@@ -1,6 +1,8 @@
 
 ## TODO
 
+- [ ] maybe add fat arrows, I keep wanting to type them, `{{...}}` is a little ugly
+- [ ] get some names on add missing cases (if not too difficult)
 - [x] add optional types to case `case xxx : Maybe Int of ...`
 - [ ] "Expected keyword" at `\ a ->` should be error at the `->`
 - [x] Show Either
@@ -19,7 +21,7 @@
 - [ ] Delay checking
   - We have things like `foldr (\ x acc => case x : ...`, where the lambda doesn't have a good type, so we have to be explicit. If we could defer the checking of that expression until more things are solved, we might not need the annotation (e.g. checking the other arguments). Some `case` statements may have a similar situation.
   - One idea is to throw the checks onto some sort of TODO list and run whatever works. (I think Idris may have a heuristic where it checks arguments backwards in some cases.)
-- [ ] Dependent records (I guess I missed that bit)
+- [x] Dependent records (I guess I missed that bit)
 - [ ] Arguments on records
 - [ ] Add sugar for type aliases (maybe infer arguments)
   - Lean has this, we maybe could run infer on the RHS and call it a day? We would need a simple LHS, though.

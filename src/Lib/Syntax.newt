@@ -3,6 +3,7 @@ module Lib.Syntax
 import Prelude
 import Lib.Common
 import Data.String
+import Data.List
 import Lib.Prettier
 import Lib.Types
 
@@ -43,7 +44,6 @@ data Raw : U where
   RImpossible   : (fc : FC) -> Raw
   RPi  : (fc : FC) -> BindInfo -> (ty : Raw) -> (sc : Raw) -> Raw
   RLet : (fc : FC) -> (nm : Name) -> (ty : Raw) -> (v : Raw) -> (sc : Raw) -> Raw
-  RAnn : (fc : FC) -> (tm : Raw) -> (ty : Raw) -> Raw
   RLit : (fc : FC) -> Literal -> Raw
   RCase : (fc : FC) -> (scrut : Raw) -> (mty : Maybe Raw) -> (alts : List RCaseAlt) -> Raw
   RImplicit : (fc : FC) -> Raw
@@ -63,7 +63,6 @@ instance HasFC Raw where
   getFC (RU fc) = fc
   getFC (RPi fc _ ty sc) = fc
   getFC (RLet fc nm ty v sc) = fc
-  getFC (RAnn fc tm ty) = fc
   getFC (RLit fc y) = fc
   getFC (RCase fc scrut mty alts) = fc
   getFC (RImplicit fc) = fc
@@ -165,7 +164,6 @@ instance Show Raw where
   show (RHole _) = "?"
   show (RUpdateRec _ clauses tm) = foo ("RUpdateRec" :: show clauses :: show tm :: Nil)
   show (RVar _ name) = foo ("RVar" :: show name :: Nil)
-  show (RAnn _ t ty) = foo ( "RAnn" :: show t :: show ty :: Nil)
   show (RLit _ x) = foo ( "RLit" :: show x :: Nil)
   show (RLet _ x ty v scope) = foo ( "Let" :: show x :: " : " :: show ty :: " = " :: show v :: " in " :: show scope :: Nil)
   show (RPi _ bi y z) = foo ( "Pi" :: show bi :: show y :: show z :: Nil)
@@ -224,8 +222,6 @@ instance Pretty Raw where
       par p 0 $ text "let" <+> text x <+> text ":" <+> asDoc p ty
           <+> text "=" <+> asDoc p v
           <+/> text "in" <+> asDoc p scope
-    -- does this exist?
-    asDoc p (RAnn _ x y) = text "TODO - Pretty RAnn"
     asDoc p (RLit _ lit) = pretty lit
     asDoc p (RCase _ x _ xs) = text "TODO - Pretty RCase"
     asDoc p (RImplicit _) = text "_"
@@ -264,6 +260,67 @@ instance Pretty Decl where
   pretty (Instance _ _ _) = text "TODO pretty Instance"
   pretty (ShortData _ lhs sigs) = text "data" <+> pretty lhs <+> text "=" <+> pipeSep (map pretty sigs)
 
+lhsNames : Raw → List String
+lhsNames tm = case tm of
+  RVar fc n => n :: Nil
+  RAs _ n tm => n :: lhsNames tm
+  RApp _ t u _ => lhsNames t ++ lhsNames u
+  -- the rest have no names or don't occur on LHS
+  _ => Nil
+
+-- used for the projection type in dependent records, probably overkill, but maybe it will be useful elsewhere
+-- TODO unit tests on substRaw
+substRaw : List (String × Raw) → Raw → Raw
+substRaw ss t = case t of
+  RVar fc n => fromMaybe t (lookup n ss)
+  (RUpdateRec fc uc target) => RUpdateRec fc (map substUC uc) (map (substRaw ss) target)
+  -- LHS only
+  (RAs fc nm t) => RAs fc nm (substRaw ss t)
+  (RIf fc c t e) => RIf fc (substRaw ss c) (substRaw ss t) (substRaw ss e)
+  (RLet fc nm ty v sc) => RLet fc nm (substRaw ss ty) (substRaw ss v) (substRaw ss sc)
+  (RPi fc info a b) => RPi fc info (substRaw ss a) (substRaw (filterBind info ss) b)
+  (RApp fc t u icit) => RApp fc (substRaw ss t) (substRaw ss u) icit
+  (RLam fc info sc) => RLam fc info (substRaw (filterBind info ss) sc)
+  -- FIXME shadowing
+  (RWhere fc ds body) => RWhere fc (map substDecl ds) (substRaw ss body)
+  (RDo fc stmts) => RDo fc (substStmts ss stmts)
+  (RCase fc scrut mdef alts) => RCase fc (substRaw ss scrut) (map (substRaw ss) mdef) (map substAlt alts)
+  -- Enumerate to force consideration of new cases
+  t@(RImpossible _) => t
+  t@(RU _) => t
+  t@(RHole fc) => t
+  t@(RImplicit fc) => t
+  t@(RLit _ _) => t
+    where
+      -- Need to handle shadowing!
+      filter : ∀ a. List String → List (String × a) → List (String × a)
+      filter nms Nil = Nil
+      filter nms (x@(a,b) :: xs) = if elem a nms then filter nms xs else x :: filter nms xs
+
+      filterBind : ∀ a. BindInfo → List (String × a) → List (String × a)
+      filterBind (BI fc nm _ _) xs = filter (nm :: Nil) xs
+
+      substUC : UpdateClause → UpdateClause
+      substUC (AssignField fc nm t) = AssignField fc nm (substRaw ss t)
+      substUC (ModifyField fc nm t) = ModifyField fc nm (substRaw ss t)
+
+      substClause : Raw × Maybe Raw → Raw × Maybe Raw
+      substClause (a,b) = (substRaw ss a, map (substRaw ss) b)
+
+      substDecl : Decl → Decl
+      substDecl (TypeSig fc nms ty) = TypeSig fc nms (substRaw ss ty)
+      substDecl (FunDef fc nm clauses) = FunDef fc nm $ map substClause clauses
+      substDecl d = d -- shouldn't happen
+
+      substAlt : RCaseAlt → RCaseAlt
+      substAlt (MkAlt a b) = MkAlt (substRaw ss a) (map (substRaw (filter (lhsNames a) ss)) b)
+
+      substStmts : List (String × Raw) → List DoStmt → List DoStmt
+      substStmts ss Nil = Nil
+      substStmts ss (DoExpr fc t :: rest) = DoExpr fc (substRaw ss t) :: substStmts ss rest
+      substStmts ss (DoArrow fc pat sc alts :: rest) =
+        DoArrow fc (substRaw ss pat) (substRaw ss sc) (map (substAlt) alts) :: substStmts (filter (lhsNames pat) ss) rest
+      substStmts ss (DoLet fc nm t :: rest) = DoLet fc nm (substRaw ss t) :: substStmts (filter (nm :: Nil) ss) rest
 
 instance Pretty Module where
   pretty (MkModule name imports decls) =

@@ -498,7 +498,6 @@ processRecord ns recordFC nm tele cname decls = do
   let fields = getSigs decls
   let dcName = fromMaybe "Mk\{show nm}" cname
   let tcType = teleToPi tele (RU recordFC)
-  -- REVIEW - I probably want to stick the telescope in front of the fields
   let tail = foldl (\ acc bi => case bi : BindInfo × Raw of (BI fc nm icit _, _) => RApp fc acc (RVar fc nm) icit) (RVar recordFC nm) tele
   let dcType = teleToPi (impTele tele) $
     foldr (\ x acc => case x : FC × String × Raw of (fc, nm, ty) =>  RPi fc (BI fc nm Explicit Many) ty acc  ) tail fields
@@ -509,12 +508,17 @@ processRecord ns recordFC nm tele cname decls = do
   log 1 $ \ _ => "Decl:"
   log 1 $ \ _ => render 90 $ pretty decl
   processDecl ns decl
-  ignore $ for fields $ \case
-    (fc,name,ty) => do
+  -- pattern to peel out fields on LHS
+  let autoPat = foldl (\acc x => case x : FC × String × Raw of (fc,nm,ty) => RApp fc acc (RVar fc nm) Explicit) (RVar recordFC dcName) fields
+  processFields autoPat tail Nil fields
+  where
+    processFields : Raw → Raw → List (String × Raw) → List (FC × String × Raw) → M Unit
+    processFields _ _ _ Nil = pure MkUnit
+    processFields autoPat tail deps ((fc,name,ty) :: rest) = do
       -- TODO dependency isn't handled yet
       -- we'll need to replace stuff like `len` with `len self`.
-      let funType = teleToPi (impTele tele) $ RPi fc (BI fc "_" Explicit Many) tail ty
-      let autoPat = foldl (\acc x => case x : FC × String × Raw of (fc,nm,ty) => RApp fc acc (RVar fc nm) Explicit) (RVar recordFC dcName) fields
+
+      let funType = substRaw deps $ teleToPi (impTele tele) $ RPi fc (BI fc "$self" Explicit Many) tail ty
 
       -- `.fieldName`
       let pname = "." ++ name
@@ -526,6 +530,8 @@ processRecord ns recordFC nm tele cname decls = do
       processDecl ns $ TypeSig fc (pname :: Nil) funType
       processDecl ns pdecl
       setFlag (QN ns pname) fc Inline
+      let deps = ((name, RApp fc (RVar fc pname) (RVar fc "$self") Explicit) :: deps)
+      processFields autoPat tail deps rest
 
 -- currently mixfix registration is handled in the parser
 -- since we now run a decl at a time we could do it here.
