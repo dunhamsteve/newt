@@ -19,7 +19,9 @@ lookup qn@(QN ns nm) top =
       Just mod => lookupMap' qn mod.modDefs
       Nothing => Nothing
 
--- TODO - look at imported namespaces, and either have a map of imported names or search imported namespaces..
+lookupAll : String → TopContext -> List TopEntry
+lookupAll raw top =
+  mapMaybe (flip lookup top) $ (QN top.ns raw) :: map (flip QN raw) top.imported
 
 lookupRaw : String -> TopContext -> Maybe TopEntry
 lookupRaw raw top =

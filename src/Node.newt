@@ -34,3 +34,24 @@ pfunc exitFailure : ∀ a. String → a := `(_, msg) => {
   process.exit(1);
 }`
 
+pfunc putStr uses (MkIORes MkUnit): String → IO Unit := `(s) => (w) => {
+  let {writeSync} = require('fs');
+  let buf = new TextEncoder().encode(s);
+  writeSync(1, buf);
+  return Prelude_MkIORes(Prelude_MkUnit, w);
+}`
+
+pfunc readLine uses (MkIORes Left Right) : IO (Either String String) := `(w) => {
+    let {readSync} = require('fs');
+    let buf = Buffer.alloc(1024);
+    let p = 0
+    while (readSync(0, buf, p, 1, null)) {
+        if (buf[p++] == 10) return Prelude_MkIORes(Prelude_Right(new TextDecoder().decode(buf.slice(0,p))),w);
+        if (p + 10 > buf.length) {
+            let tmp = Buffer.alloc(buf.length * 1.5);
+            tmp.set(buf);
+            buf = tmp;
+        }
+    }
+    return Prelude_MkIORes(Prelude_Left("EOF"));
+}`

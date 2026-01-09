@@ -1,0 +1,86 @@
+module Lib.ReplParser
+
+import Prelude
+import Lib.Parser.Impl
+import Lib.Parser
+import Lib.Token
+import Lib.Common
+import Data.List1
+
+data ReplCommand
+    = Load String
+    | OutputJS String
+    | Verbose (Maybe Int)
+    | GetDoc String
+    | BrowseCmd QName
+    | HelpCmd
+
+kw : String → Parser String
+kw s = satisfy (\t => t.val.text == s) "Expected \{show s}"
+
+replString : Parser String
+replString = do
+    token StartQuote
+    s <- token StringKind
+    token EndQuote
+    pure s
+
+replInt : Parser Int
+replInt = do
+    t <- token Number
+    pure $ stringToInt t
+
+replQN : Parser QName
+replQN = do
+  ident <- uident
+  rest <- many $ token Projection
+  let name = joinBy "" (ident :: rest)
+  pure $ uncurry QN $ unsnoc $ split1 name "."
+
+data ArgType = ArgNone | ArgString | ArgIdent | ArgOptInt | ArgQName
+
+argCon : ArgType → U
+argCon ArgNone = ReplCommand
+argCon ArgOptInt = Maybe Int → ReplCommand
+argCon ArgIdent = String → ReplCommand
+argCon ArgString = String → ReplCommand
+argCon ArgQName = QName → ReplCommand
+
+data CmdDesc : U where
+    MkCmd : String → String → (arg : ArgType) → argCon arg → CmdDesc
+
+commands : List CmdDesc
+commands
+    = MkCmd ":h" "Show this help" ArgNone HelpCmd
+    :: MkCmd ":help" "Show this help" ArgNone HelpCmd
+    :: MkCmd ":l" "load file" ArgString Load
+    :: MkCmd ":load" "load file" ArgString Load
+    :: MkCmd ":o" "write javascript file" ArgString OutputJS
+    :: MkCmd ":out" "write javascript file" ArgString OutputJS
+    :: MkCmd ":v" "change verbosity" ArgOptInt Verbose
+    :: MkCmd ":d" "document function" ArgIdent GetDoc
+    :: MkCmd ":doc" "document function" ArgIdent GetDoc
+    :: MkCmd ":b" "browse namespace" ArgQName BrowseCmd
+    -- type at point
+    -- solve hole
+    -- search by prefix (for autocomplete - ideally include types at point, but we'd need recovery)
+    --   Ideally we could auto-import too
+    -- case split
+    :: Nil
+
+parseCommand : Parser ReplCommand
+parseCommand = do
+    key <- ident
+    let (Just cmd) = lookup key commands
+        | _ => fail "Unknown command"
+    the (Parser ReplCommand) $ case cmd of
+        MkCmd _ _ ArgNone cstr => pure cstr
+        MkCmd _ _ ArgOptInt cstr => cstr <$> optional replInt
+        MkCmd _ _ ArgIdent cstr => cstr <$> (ident <|> uident)
+        MkCmd _ _ ArgString cstr => cstr <$> replString
+        MkCmd _ _ ArgQName cstr => cstr <$> replQN
+    where
+        lookup : String → List CmdDesc → Maybe CmdDesc
+        lookup key (cmd@(MkCmd nm _ _ _) :: rest) =
+            if key == nm then Just cmd else lookup key rest
+        lookup key Nil = Nothing

@@ -18,8 +18,10 @@ import Lib.Tokenizer
 import Lib.TopContext
 import Lib.Types
 import Lib.Syntax
+import Lib.ReplParser
 import Node
 import Serialize
+import Revision
 
 -- For editors, dump some information about the context (fc, name, type)
 jsonTopContext : M Json
@@ -259,10 +261,72 @@ cmdLine (fn :: args) = do
   (out, files) <- cmdLine args
   pure (out, fn :: files)
 
+browseTop : QName → M Unit
+browseTop qn@(QN ns x) = do
+  top <- getTop
+  let ns = snoc ns x
+  let (Just mod) = lookupMap' ns top.modules
+    | _ => putStrLn "module \{show qn} not loaded"
+  go $ listValues mod.modDefs
+  where
+    go : List TopEntry → M Unit
+    go Nil = pure MkUnit
+    go (e :: es) = do
+      putStrLn "\{show e.name} : \{rpprint Nil e.type}"
+      go es
+
+replHeader : M Unit
+replHeader = putStrLn "Newt REPL (\{show gitRevision})\n"
+
+getDoc : String → M Unit
+getDoc name = do
+  top <- getTop
+  for_ (lookupAll name top) $ \e =>
+      putStrLn "\{show e.name} : \{rpprint Nil e.type}"
+
+replHelp : M Unit
+replHelp =
+  for_ commands $ \cmd => do
+    let args = case cmd of
+      MkCmd _ _ ArgNone _ => ""
+      MkCmd _ _ ArgQName _ => " Lib.Types"
+      MkCmd _ _ ArgOptInt _ => " [ 1 ]"
+      MkCmd _ _ ArgIdent _ => " map"
+      MkCmd _ _ ArgString _ => " \"name\""
+    case cmd of
+      (MkCmd kw desc _ _) => putStrLn "\{kw}\{args} - \{desc}"
+
+runCommand : ReplCommand → M Unit
+runCommand (Load fn) = processFile fn
+runCommand (HelpCmd) = replHelp
+runCommand (BrowseCmd qn) = browseTop qn
+runCommand (GetDoc name) = getDoc name
+runCommand (Verbose Nothing) = modifyTop [ verbose $= _+_ 1 ]
+runCommand (Verbose (Just v)) = modifyTop [ verbose := v ]
+runCommand (OutputJS fn) = writeSource fn
+
+runRepl : M Unit
+runRepl = do
+  liftIO $ putStr "> "
+  Right line <- liftIO {M} $ readLine
+    | Left err => pure MkUnit
+  let (Right toks) = tokenise "<stdin>" line
+    | Left err => putStrLn (showError line err) >> runRepl
+  let (Right cmd) = parse "<stdin>" parseCommand toks
+    | Left err => putStrLn (showError line err) >> runRepl
+  catchError (runCommand cmd) (\ err => putStrLn $ showError line err)
+  runRepl
+
+-- TODO translate args into REPL commands?
 main' : M Unit
 main' = do
   (arg0 :: args) <- liftIO {M} $ getArgs
     | _ => error emptyFC "error reading args"
+  -- run REPL if there are no args
+  let (_ :: _) = args
+        | _ => do
+            replHeader
+            runRepl
   (out, files) <- cmdLine args
   traverse processFile files
 
@@ -273,7 +337,6 @@ main' = do
   case out of
     Nothing => pure MkUnit
     Just name => writeSource name
-
 
 main : IO Unit
 main = do
