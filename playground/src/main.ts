@@ -16,12 +16,6 @@ import { deflate } from "./deflate.ts";
 import { inflate } from "./inflate.ts";
 import { IPC } from "./ipc.ts";
 import helpText from "./help.md?raw";
-import github from "./github.svg"
-import github_light from "./github_light.svg"
-import share from "./share.svg"
-import share_light from "./share_light.svg"
-import play from "./play.svg"
-import play_light from "./play_light.svg"
 import { basicSetup, EditorView } from "codemirror";
 import {Compartment, EditorState} from "@codemirror/state";
 import { javascript } from "@codemirror/lang-javascript";
@@ -406,17 +400,8 @@ preload.then(() => {
   }
 });
 
-const icons: Record<string,string> = {
-  'play-dark': play,
-  'play-light': play_light,
-  'share-dark': share,
-  'share-light': share_light,
-};
-
 function Icon({name}: {name: string}) {
-  let dark = state.dark.value ? 'dark' : 'light'
-  let src = icons[name + '-' + dark];
-  return h('img', {src});
+  return h('svg', {'class':'icon'}, h('use', {href:`#${name}`}))
 }
 
 function EditWrap() {
@@ -444,11 +429,12 @@ function EditWrap() {
         h("option", { value: "" }, "-- load sample --"),
         options
       ),
-      h("a", { href: 'https://github.com/dunhamsteve/newt', target: '_blank', title: "github" }, h('img', {src: state.dark.value ? github : github_light})),
+      // h("a", { href: 'https://github.com/dunhamsteve/newt', target: '_blank', title: "github" }, h('img', {src: state.dark.value ? github : github_light})),
+      h("a", { href: 'https://github.com/dunhamsteve/newt', target: '_blank', title: "github" }, h('svg', {'class':'icon'}, h('use', {href:'#github'}))),
       h("div", { style: { flex: "1 1" } }),
       h("div", {},
-        h("button", { onClick: copyToClipboard, title: "copy url" }, h('img', {src: state.dark.value ? share : share_light})),
-        h("button", { onClick: runOutput, title: "run program" }, h('img', {src: state.dark.value ? play : play_light})),
+        h("button", { onClick: copyToClipboard, title: "copy url" },  h('svg', {'class':'icon'}, h('use', {href:'#share'}))),
+        h("button", { onClick: runOutput, title: "run program" }, h('svg', {'class':'icon'}, h('use', {href:'#play'}))),
       )
     ),
     h("div", { className: "tabBody" }, h(Editor, { initialValue: value }))

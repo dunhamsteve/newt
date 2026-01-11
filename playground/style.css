@@ -15,7 +15,11 @@ svg.icon path {
 a>img {
   width: 20px;
 }
-
+svg.icon {
+  color: var(--text-color);
+  width: 24px;
+  height: 24px;
+}
 @media (prefers-color-scheme: dark) {
   :root {
     --tab-select-color: #eee;
