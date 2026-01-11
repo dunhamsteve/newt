@@ -16,6 +16,8 @@ import { deflate } from "./deflate.ts";
 import { inflate } from "./inflate.ts";
 import { IPC } from "./ipc.ts";
 import helpText from "./help.md?raw";
+import github from "./github.svg"
+import github_light from "./github_light.svg"
 import share from "./share.svg"
 import share_light from "./share_light.svg"
 import play from "./play.svg"
@@ -442,6 +444,7 @@ function EditWrap() {
         h("option", { value: "" }, "-- load sample --"),
         options
       ),
+      h("a", { href: 'https://github.com/dunhamsteve/newt', target: '_blank', title: "github" }, h('img', {src: state.dark.value ? github : github_light})),
       h("div", { style: { flex: "1 1" } }),
       h("div", {},
         h("button", { onClick: copyToClipboard, title: "copy url" }, h('img', {src: state.dark.value ? share : share_light})),

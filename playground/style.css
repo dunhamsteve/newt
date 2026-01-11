@@ -12,6 +12,9 @@ svg.icon path {
   stroke: black;
   fill: none;
 }
+a>img {
+  width: 20px;
+}
 
 @media (prefers-color-scheme: dark) {
   :root {
