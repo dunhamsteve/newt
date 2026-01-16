@@ -16,12 +16,12 @@ TokenList = List BTok
 
 data Result : U -> U where
   OK : ∀ a. a -> Bounds -> (toks : TokenList) -> (com : Bool) -> Operators -> Result a
-  Fail : ∀ a. Bool -> Error -> Bounds -> (toks : TokenList) -> (com : Bool) -> Operators -> Result a
+  Fail : ∀ a. Error -> Bounds -> (toks : TokenList) -> (com : Bool) -> Operators -> Result a
 
 
 instance Functor Result where
   map f (OK a last toks com ops) = OK (f a) last toks com ops
-  map _ (Fail fatal err last toks com ops) = Fail fatal err last toks com ops
+  map _ (Fail err last toks com ops) = Fail err last toks com ops
 
 -- So sixty just has a newtype function here now (probably for perf).
 -- A record might be more ergonomic, but would require a record impl before
@@ -50,7 +50,7 @@ perror fn ((MkBounded val bnds) :: _) msg = E (MkFC fn bnds) msg
 
 parse : ∀ a. String -> Parser a -> TokenList -> Either Error a
 parse fn pa toks = case runP pa emptyBounds toks False emptyMap (MkFC fn (MkBounds -1 -1  -1 -1)) of
-  Fail fatal err last toks com ops => Left err
+  Fail err last toks com ops => Left err
   OK a _ Nil _ _ => Right a
   OK a _ ts _ _ => Left (perror fn ts "Extra toks")
 
@@ -58,22 +58,17 @@ parse fn pa toks = case runP pa emptyBounds toks False emptyMap (MkFC fn (MkBoun
 
 partialParse : ∀ a. String -> Parser a -> Operators -> TokenList -> Either (Error × TokenList) (a × Operators × TokenList)
 partialParse fn pa ops toks = case runP pa emptyBounds toks False ops (emptyFC' fn) of
-  Fail fatal err last toks com ops => Left (err, toks)
+  Fail err last toks com ops => Left (err, toks)
   OK a last toks _ ops => Right (a,ops,toks)
 
 try : ∀ a. Parser a -> Parser a
 try (P pa) = P $ \last toks com ops col => case pa last toks com ops col of
-  (Fail x err last toks _ ops) => Fail x err last toks com ops
+  (Fail err last toks _ ops) => Fail err last toks com ops
   res => res
 
 
 fail : ∀ a. String -> Parser a
-fail msg = P $ \last toks com ops col => Fail False (perror col.file toks msg) last toks com ops
-
-
--- fatal : ∀ a. String -> Parser a
--- fatal msg = P $ \last toks com ops col => Fail True (perror col.file toks msg) last toks com ops
-
+fail msg = P $ \last toks com ops col => Fail (perror col.file toks msg) last toks com ops
 
 getOps : Parser (Operators)
 getOps = P $ \last toks com ops col => OK ops last toks com ops
@@ -85,7 +80,7 @@ addOp nm prec fix = P $ \ last toks com ops col =>
   case parts of
     "" :: key :: rule => OK MkUnit last toks com (updateMap key (MkOp nm prec fix False rule) ops)
     key :: rule => OK MkUnit last toks com (updateMap key (MkOp nm prec fix True rule) ops)
-    Nil => Fail False (perror col.file toks "Internal error parsing mixfix") last toks com ops
+    Nil => Fail (perror col.file toks "Internal error parsing mixfix") last toks com ops
 
 instance Functor Parser where
   map f (P pa) = P $ \ last toks com ops col => map f (pa last toks com ops col)
@@ -95,11 +90,11 @@ instance Applicative Parser where
   return pa = P (\ last toks com ops col => OK pa last toks com ops)
   P pab <*> P pa = P $ \last toks com ops col =>
     case pab last toks com ops col of
-      Fail fatal err last toks com ops => Fail fatal err last toks com ops
+      Fail err last toks com ops => Fail err last toks com ops
       OK f last toks com ops =>
         case pa last toks com ops col of
           (OK x last toks com ops) => OK (f x) last toks com ops
-          (Fail fatal err last toks com ops) => Fail fatal err last toks com ops
+          (Fail err last toks com ops) => Fail err last toks com ops
 
 -- Second argument lazy so we don't have circular refs when defining parsers.
 
@@ -107,9 +102,9 @@ instance Alternative Parser where
   (P pa) <|> (P pb) = P $ \last toks com ops col =>
     case pa last toks False ops col of
       OK a last' toks' _ ops => OK a last' toks' com ops
-      Fail True  err last' toks' com ops  => Fail True err last' toks' com ops
-      Fail fatal err last' toks' True ops => Fail fatal err last' toks' True ops
-      Fail fatal err last' toks' False ops => pb last toks com ops col
+      -- Fail  err last' toks' com ops  => Fail err last' toks' com ops
+      Fail err last' toks' True ops => Fail err last' toks' True ops
+      Fail err last' toks' False ops => pb last toks com ops col
 
 
 instance Monad Parser where
@@ -117,14 +112,14 @@ instance Monad Parser where
   bind (P pa) pab = P $ \last toks com ops col =>
     case pa last toks com ops col of
       (OK a last toks com ops) => runP (pab a) last toks com ops col
-      (Fail fatal err last toks x ops) => Fail fatal err last toks x ops
+      (Fail err last toks x ops) => Fail err last toks x ops
 
 
 satisfy : (BTok -> Bool) -> String -> Parser String
 satisfy f msg = P $ \last toks com ops col =>
   case toks of
-    (t :: ts) => if f t then OK (value t) t.bounds ts True ops else Fail False (perror col.file toks "\{msg} at \{show t.val.kind}:\{value t}") last toks com ops
-    Nil => Fail False (perror col.file toks "\{msg} at EOF") last toks com ops
+    (t :: ts) => if f t then OK (value t) t.bounds ts True ops else Fail (perror col.file toks "\{msg} at \{show t.val.kind}:\{value t}") last toks com ops
+    Nil => Fail (perror col.file toks "\{msg} at EOF") last toks com ops
 
 
 some : ∀ a. Parser a -> Parser (List a)
@@ -155,13 +150,13 @@ bounded : ∀ a. Parser a → Parser (WithBounds a)
 bounded pa = P $ \last toks com ops indent =>
     case runP pa last toks com ops indent of
       (OK a last toks' com ops) => (OK (MkBounded a (tokStart toks + last)) last toks' com ops)
-      (Fail fatal err last toks x ops) => Fail fatal err last toks x ops
+      (Fail err last toks x ops) => Fail err last toks x ops
 
 withFC : ∀ a. Parser a → Parser (FC × a)
 withFC pa = P $ \last toks com ops indent =>
     case runP pa last toks com ops indent of
       (OK a last toks' com ops) => OK ((MkFC indent.file $ tokStart toks + last), a) last toks' com ops
-      (Fail fatal err last toks x ops) => Fail fatal err last toks x ops
+      (Fail err last toks x ops) => Fail err last toks x ops
 
 
 -- Start an indented block and run parser in it
@@ -185,8 +180,8 @@ sameLevel (P p) = P $ \last toks com ops indent => case toks of
     let (tl,tc) = getStart t in
     let (MkFC file (MkBounds line col _ _)) = indent in
     if tc == col then p last toks com ops (MkFC file t.bounds)
-    else if col < tc then Fail False (perror file toks "unexpected indent") last toks com ops
-    else Fail False (perror file toks "unexpected indent") last toks com ops
+    else if col < tc then Fail (perror file toks "unexpected indent") last toks com ops
+    else Fail (perror file toks "unexpected indent") last toks com ops
 
 someSame : ∀ a. Parser a -> Parser (List a)
 someSame pa = some $ sameLevel pa
@@ -203,7 +198,7 @@ indented (P p) = P $ \last toks com ops indent => case toks of
   (t :: _) =>
     let (tl,tc) = getStart t
     in if tc > fcCol indent || tl == fcLine indent then p last toks com ops indent
-    else Fail False (perror indent.file toks "unexpected outdent") last toks com ops
+    else Fail (perror indent.file toks "unexpected outdent") last toks com ops
 
 -- expect token of given kind
 
