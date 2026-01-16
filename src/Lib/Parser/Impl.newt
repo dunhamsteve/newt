@@ -63,7 +63,7 @@ partialParse fn pa ops toks = case runP pa emptyBounds toks False ops (emptyFC' 
 
 try : ∀ a. Parser a -> Parser a
 try (P pa) = P $ \last toks com ops col => case pa last toks com ops col of
-  (Fail x err last toks com ops) => Fail x err last toks False ops
+  (Fail x err last toks _ ops) => Fail x err last toks com ops
   res => res
 
 
@@ -71,8 +71,8 @@ fail : ∀ a. String -> Parser a
 fail msg = P $ \last toks com ops col => Fail False (perror col.file toks msg) last toks com ops
 
 
-fatal : ∀ a. String -> Parser a
-fatal msg = P $ \last toks com ops col => Fail True (perror col.file toks msg) last toks com ops
+-- fatal : ∀ a. String -> Parser a
+-- fatal msg = P $ \last toks com ops col => Fail True (perror col.file toks msg) last toks com ops
 
 
 getOps : Parser (Operators)
@@ -85,7 +85,7 @@ addOp nm prec fix = P $ \ last toks com ops col =>
   case parts of
     "" :: key :: rule => OK MkUnit last toks com (updateMap key (MkOp nm prec fix False rule) ops)
     key :: rule => OK MkUnit last toks com (updateMap key (MkOp nm prec fix True rule) ops)
-    Nil => Fail True (perror col.file toks "Internal error parsing mixfix") last toks com ops
+    Nil => Fail False (perror col.file toks "Internal error parsing mixfix") last toks com ops
 
 instance Functor Parser where
   map f (P pa) = P $ \ last toks com ops col => map f (pa last toks com ops col)
@@ -211,7 +211,7 @@ token' : Kind -> Parser String
 token' k = satisfy (\t => t.val.kind == k) "Expected a \{show k} token"
 
 keyword' : String -> Parser Unit
-keyword' kw = ignore $ satisfy (\t => t.val.text == kw && (t.val.kind == Keyword || t.val.kind == Symbol || t.val.kind == Number)) "Expected \{kw}"
+keyword' kw = ignore $ satisfy (\t => t.val.text == kw && (t.val.kind == Keyword || t.val.kind == Symbol || t.val.kind == Number)) "Expected '\{kw}'"
 
 -- expect indented token of given kind
 

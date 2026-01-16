@@ -442,9 +442,11 @@ quantity = fromMaybe Many <$> optional (Zero <$ keyword "0")
 ebind : Parser Telescope
 ebind = do
   -- don't commit until we see the ":"
-  symbol "("
-  quant <- quantity
-  names <- try (some (addPos varname) <* symbol ":")
+  (quant, names) <- try $ do
+    symbol "("
+    quant <- quantity
+    names <- some (addPos varname) <* symbol ":"
+    pure (quant,names)
   ty <- typeExpr
   symbol ")"
   pure $ map (makeBind quant ty) names
@@ -662,8 +664,10 @@ parseNorm = DCheck <$> getPos <* keyword "#check" <*> typeExpr <* keyword ":" <*
 
 parseDecl : Parser Decl
 parseDecl = parseMixfix <|> parsePType <|> parsePFunc
-  <|> parseNorm <|> parseData <|> parseShortData <|> parseSig <|> parseDef
+  <|> parseNorm <|> parseData <|> parseShortData
   <|> parseClass <|> parseInstance <|> parseRecord
+  -- We'll put the backtracing stuff last, but there is a commit issue in parseDef
+  <|> parseSig <|> parseDef
 
 
 
