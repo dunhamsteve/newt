@@ -202,8 +202,9 @@
 - [x] Fix string printing to be js instead of weird Idris strings
 - [x] make $ special
   - Makes inference easier, cleaner output, and allows `foo $ \ x => ...`
-  - [ ] `$` no longer works inside ≡⟨ ⟩ sort out how to support both that and `$ \ x => ...` (or don't bother)
+  - [ ] `$` no longer works inside ≡⟨ ⟩ - sort out how to support both that and `$ \ x => ...` (or don't bother)
     - We'd either need to blacklist all non-initial mixfix bits at the appropriate spots or always pass around a terminating token.
+    - I'm leaning towards _no_ here, because I may want to lift mixfix processing out of the parsing step in the future. This isn't
 - [x] **Translate newt to newt**
   - [x] Support @ on the LHS
   - [x] if / then / else sugar
@@ -231,18 +232,20 @@
 - [x] accepting DCon for another type (skipping case, but should be an error)
 - [ ] don't allow (or dot) duplicate names on LHS
 - [x] remove metas from context, M has TopContext
-- [ ] improve test driver
-  - maybe a file listing jobs, whether they are known broken, optional expected output, optional expected JS execution output.
+- [ ] add unit test framework
 - [x] forall / ∀ sugar (Maybe drop this, issues with `.` and `{A}` works fine)
 - [x] Bad module name error has FC 0,0 instead of the module or name
 - [ ] Revisit substitution in case building
 - [x] Check for shadowing when declaring dcon
   - Handles the forward decl in `Zoo1.newt`, but we'll need different syntax if
     we have different core terms for TCon/DCon/Function
-- [ ] Require infix decl before declaring mixfix names with `_` (helps find bugs) or implicitly define as infixl something if it is missing
+- [ ] Require infix decl before declaring mixfix names with `_` (helps find bugs) or implicitly define as infixl if it is missing
 - [x] sugar for typeclasses
 - [x] maybe add implicits in core to help resugar operators?
 - [ ] consider putting binders in environment, like Idris, to better mark `let` and to provide names
+  - I might want to distinguish `let` from pattern vars from user-`let`. The latter we probably want to exist
+    in emitted code, and the former inlined.  Currently they both live in context and the inlining occurs during
+    code-gen if the definition is simple enough (other vars or projections).
 - [x] move some top-level chattiness to `debug`
 - [ ] consider optionally compiling to eliminators for a second type-checking pass to help catch bugs.
 - [x] Allow unicode operators/names
@@ -311,13 +314,14 @@
 - [ ] remove erased top level arguments
   - maybe have something shaped like `List Bool` for `arity`
 - [x] top level at point in vscode
-- [ ] repl
+- [x] repl
 - [x] don't match forced constructors at runtime
   - I think we got this by not switching for single cases
 - [x] magic nat (codegen as number with appropriate pattern matching)
 - [ ] magic tuple? (codegen as array)
   - Seems like this would be tricky as soon as the user starts peeling off the tail or consing them
 - [ ] magic newtype? (drop them in codegen)
+  - Needed before we newtype IO, so the tail recursion still works
 - [x] vscode: syntax highlighting for String
 - [ ] add `poper` or variant of `pfunc` that maps to an operator, giving the js operator and precedence on RHS
   - This has now been hard-coded in codegen, but a syntax or something would be better.
