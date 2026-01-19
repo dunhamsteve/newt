@@ -1,0 +1,6 @@
+module ErrMsg2
+
+import Prelude
+
+foo : Nat → (Nat → Nat)
+foo x = \ x -> x

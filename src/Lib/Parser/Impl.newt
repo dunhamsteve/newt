@@ -101,7 +101,7 @@ instance Applicative Parser where
 instance Alternative Parser where
   (P pa) <|> (P pb) = P $ \last toks com ops col =>
     case pa last toks False ops col of
-      OK a last' toks' _ ops => OK a last' toks' com ops
+      OK a last' toks' com' ops => OK a last' toks' (com || com') ops
       -- Fail  err last' toks' com ops  => Fail err last' toks' com ops
       Fail err last' toks' True ops => Fail err last' toks' True ops
       Fail err last' toks' False ops => pb last toks com ops col

@@ -1,0 +1,6 @@
+*** Process tests/ErrMsg2.newt
+module Prelude
+module ErrMsg2
+ERROR at tests/ErrMsg2.newt:6:13--6:15: Expected '=>' at Keyword:->
+
+Compile failed

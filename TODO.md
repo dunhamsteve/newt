@@ -2,9 +2,10 @@
 ## TODO
 
 - [ ] maybe add fat arrows, I keep wanting to type them, `{{...}}` is a little ugly
-- [ ] get some names on add missing cases (if not too difficult)
+  - There may be ambiguity issues
+- [x] get some names on add missing cases (if not too difficult)
 - [x] add optional types to case `case xxx : Maybe Int of ...`
-- [ ] "Expected keyword" at `\ a ->` should be error at the `->`
+- [x] "Expected keyword" at `\ a ->` should be error at the `->`
 - [x] Show Either
 - [ ] `local` for `where`-like `let` clauses? (I want a `where` that closes over more stuff)
   - I can do `let f : ... = \ a b c => ...`. But it doesn't work for recursion and cases are awkward.
@@ -18,6 +19,7 @@
   - [ ] add missing cases should handle `_::_`
   - [ ] add missing cases should share code between vscode and playground
   - [ ] "Not in scope" should offer to import
+  - [ ] Case split
 - [ ] Delay checking
   - We have things like `foldr (\ x acc => case x : ...`, where the lambda doesn't have a good type, so we have to be explicit. If we could defer the checking of that expression until more things are solved, we might not need the annotation (e.g. checking the other arguments). Some `case` statements may have a similar situation.
   - One idea is to throw the checks onto some sort of TODO list and run whatever works. (I think Idris may have a heuristic where it checks arguments backwards in some cases.)
