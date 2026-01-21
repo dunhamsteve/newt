@@ -3,6 +3,7 @@ build/
 *~
 *.swp
 *.log
+*.bak
 *.agda
 *.agdai
 /*.js
@@ -12,3 +13,8 @@ mkday.py
 tmp
 min.js.gz
 src/Revision.newt
+.calva
+.clj-kondo
+.joyride
+.lsp
+.vscode

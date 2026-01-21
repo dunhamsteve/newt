@@ -36,6 +36,7 @@ test: newt.js
 
 aoctest: newt.js
 	scripts/aoc
+	scripts/aoc25
 
 # Misc
 
