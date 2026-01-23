@@ -1,0 +1,16 @@
+module DepRecord
+
+import Prelude
+
+infixr 6 _:-_
+data Vect : (0 n : Nat) → (0 a : U) → U where
+  VNil :  ∀ a. Vect Z a
+  _:-_ : ∀ k a. a → Vect k a → Vect (S k) a
+
+
+data Foo : U where
+    Bar : {n : Nat} → Vect n Int → Foo
+
+record DepPair where
+    n : Nat
+    stuff : Vect n Int
