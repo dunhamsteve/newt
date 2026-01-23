@@ -1,0 +1,230 @@
+module Data.DSortedMap
+
+import Prelude
+
+infixr 1 _**_
+
+data Sg : (A : U) -> (A -> U) -> U where
+  _**_ : {A : U} {B : A -> U} -> (a : A) -> B a -> Sg A B
+
+data T23 : Nat -> (a : U) -> (a -> U) -> U where
+  Leaf : ∀ k. {0 v : k → U} → (x : k) -> v x -> T23 Z k v
+  Node2 : ∀ h k v. T23 h k v -> k -> T23 h k v -> T23 (S h) k v
+  Node3 : ∀ h k v. T23 h k v -> k -> T23 h k v -> k -> T23 h k v -> T23 (S h) k v
+
+lookupT23 : ∀ h k v. (k → k → Ordering) -> (x : k) -> T23 h k v -> Maybe (Sg k v)
+lookupT23 compare key (Leaf k v)= case compare k key of
+  -- TODO - too smart for its own good...
+  -- um, we need to know compare/EQ works..
+    EQ => Just (k ** v)
+    _ => Nothing
+lookupT23 compare key (Node2 t1 k1 t2) =
+  case compare key k1 of
+    GT => lookupT23 compare key t2
+    _ => lookupT23 compare key t1
+lookupT23 compare key (Node3 t1 k1 t2 k2 t3) =
+  case compare key k1 of
+    GT => case compare key k2 of
+      GT => lookupT23 compare key t3
+      _ => lookupT23 compare key t2
+    _ => lookupT23 compare key t1
+
+insertT23 : ∀ h k. {0 v : k → U} → (k → k → Ordering) -> (x : k) -> v x -> T23 h k v -> Either (T23 h k v) (T23 h k v × k × T23 h k v)
+insertT23 compare key value (Leaf k v) = case compare key k of
+  EQ => Left (Leaf key value)
+  LT => Right (Leaf key value, key, Leaf k v)
+  GT => Right (Leaf k v, k, Leaf key value)
+insertT23 compare key value (Node2 t1 k1 t2) =
+  case compare key k1 of
+    GT => case insertT23 compare key value t2 of
+      Left t2' => Left (Node2 t1 k1 t2')
+      Right (a,b,c) => Left (Node3 t1 k1 a b c)
+    _ => case insertT23 compare key value t1 of
+      Left t1' => Left (Node2 t1' k1 t2)
+      Right (a,b,c) => Left (Node3 a b c k1 t2)
+insertT23 compare key value (Node3 t1 k1 t2 k2 t3) =
+  case compare key k1 of
+    GT => case compare key k2 of
+      GT => case insertT23 compare key value t3 of
+        Left t3' => Left (Node3 t1 k1 t2 k2 t3')
+        Right (a,b,c) => Right (Node2 t1 k1 t2, k2, Node2 a b c)
+      _ => case insertT23 compare key value t2 of
+        Left t2' => Left (Node3 t1 k1 t2' k2 t3)
+        Right (a,b,c) => Right (Node2 t1 k1 a, b, Node2 c k2 t3)
+    _ =>
+      case insertT23 compare key value t1 of
+        Left t1' => Left (Node3 t1' k1 t2 k2 t3)
+        Right (a,b,c) => Right (Node2 a b c, k1, Node2 t2 k2 t3)
+
+-- This is cribbed from Idris. Deleting nodes takes a bit of code.
+Hole : Nat → (a : U) → (a → U) → U
+Hole Z k v = Unit
+Hole (S n) k v = T23 n k v
+
+Node4 : ∀ k v h. T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → T23 (S (S h)) k v
+Node4 t1 k1 t2 k2 t3 k3 t4 = Node2 (Node2 t1 k1 t2) k2 (Node2 t3 k3 t4)
+
+Node5 : ∀ k v h. T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → T23 (S (S h)) k v
+Node5 a b c d e f g h i = Node2 (Node2 a b c) d (Node3 e f g h i)
+
+Node6 : ∀ k v h. T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → T23 (S (S h)) k v
+Node6 a b c d e f g h i j k = Node2 (Node3 a b c d e) f (Node3 g h i j k)
+
+Node7 : ∀ k v h. T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → k → T23 h k v → T23 (S (S h)) k v
+Node7 a b c d e f g h i j k l m = Node3 (Node3 a b c d e) f (Node2 g h i) j (Node2 k l m)
+
+merge1 : ∀ k v h. T23 h k v → k → T23 (S h) k v → k → T23 (S h) k v → T23 (S (S h)) k v
+merge1 a b (Node2 c d e) f (Node2 g h i) = Node5 a b c d e f g h i
+merge1 a b (Node2 c d e) f (Node3 g h i j k) = Node6 a b c d e f g h i j k
+merge1 a b (Node3 c d e f g) h (Node2 i j k) = Node6 a b c d e f g h i j k
+merge1 a b (Node3 c d e f g) h (Node3 i j k l m) = Node7 a b c d e f g h i j k l m
+
+merge2 : ∀ k v h. T23 (S h) k v → k → T23 h k v → k → T23 (S h) k v → T23 (S (S h)) k v
+merge2 (Node2 a b c) d e f (Node2 g h i) = Node5 a b c d e f g h i
+merge2 (Node2 a b c) d e f (Node3 g h i j k) = Node6 a b c d e f g h i j k
+merge2 (Node3 a b c d e) f g h (Node2 i j k) = Node6 a b c d e f g h i j k
+merge2 (Node3 a b c d e) f g h (Node3 i j k l m) = Node7 a b c d e f g h i j k l m
+
+merge3 : ∀ k v h. T23 (S h) k v → k → T23 (S h) k v → k → T23 h k v → T23 (S (S h)) k v
+merge3 (Node2 a b c) d (Node2 e f g) h i = Node5 a b c d e f g h i
+merge3 (Node2 a b c) d (Node3 e f g h i) j k = Node6 a b c d e f g h i j k
+merge3 (Node3 a b c d e) f (Node2 g h i) j k = Node6 a b c d e f g h i j k
+merge3 (Node3 a b c d e) f (Node3 g h i j k) l m = Node7 a b c d e f g h i j k l m
+
+-- height is erased in the data everywhere but the top, but needed for case
+-- I wonder if we could use a 1 + 1 + 1 type instead of Either Tree Hole and condense this
+deleteT23 : ∀ k v. (k → k → Ordering) → (h : Nat) -> k -> T23 h k v -> Either (T23 h k v) (Hole h k v)
+deleteT23 compare Z key (Leaf k v) = case compare k key of
+  EQ => Right MkUnit
+  _ => Left (Leaf k v)
+deleteT23 compare (S Z) key (Node2 t1 k1 t2) =
+  case compare key k1 of
+    GT => case deleteT23 compare Z key t2 of
+      Left t2 => Left (Node2 t1 k1 t2)
+      Right MkUnit => Right t1
+    _ => case deleteT23 compare Z key t1 of
+      Left t1 => Left (Node2 t1 k1 t2)
+      Right _ => Right t2
+deleteT23 compare (S Z) key (Node3 t1 k1 t2 k2 t3) =
+  case compare key k1 of
+    GT => case compare key k2 of
+      GT => case deleteT23 compare _ key t3 of
+        Left t3 => Left (Node3 t1 k1 t2 k2 t3)
+        Right _ => Left (Node2 t1 k1 t2)
+      _ => case deleteT23 compare _ key t2 of
+        Left t2 => Left (Node3 t1 k1 t2 k2 t3)
+        Right _ => Left (Node2 t1 k1 t3)
+    _ => case deleteT23 compare _ key t1 of
+      Left t1 => Left (Node3 t1 k1 t2 k2 t3)
+      Right MkUnit => Left (Node2 t2 k2 t3)
+deleteT23 compare (S (S h)) key (Node2 t1 k1 t2) =
+  case compare key k1 of
+    GT => case deleteT23 compare _ key t2 of
+      Left t2 => Left (Node2 t1 k1 t2)
+      Right t2 => case t1 of
+        Node2 a b c => Right (Node3 a b c k1 t2)
+        Node3 a b c d e => Left (Node4 a b c d e k1 t2)
+    _ => case deleteT23 compare (S h) key t1 of
+      Left t1 => Left (Node2 t1 k1 t2)
+      Right t1 => case t2 of
+        Node2 t2' k2' t3' => Right (Node3 t1 k1 t2' k2' t3')
+        Node3 t2 k2 t3 k3 t4 => Left $ Node4 t1 k1 t2 k2 t3 k3 t4
+
+deleteT23 compare (S (S h)) key (Node3 t1 k1 t2 k2 t3) =
+  case compare key k1 of
+    GT => case compare key k2 of
+      GT => case deleteT23 compare _ key t3 of
+        Left t3 => Left (Node3 t1 k1 t2 k2 t3)
+        Right t3 => Left (merge3 t1 k1 t2 k2 t3)
+      _ => case deleteT23 compare _ key t2 of
+        Left t2 => Left (Node3 t1 k1 t2 k2 t3)
+        Right t2 => Left (merge2 t1 k1 t2 k2 t3)
+    _ => case deleteT23 compare _ key t1 of
+      Left t1 => Left (Node3 t1 k1 t2 k2 t3)
+      Right t1 => Left (merge1 t1 k1 t2 k2 t3)
+
+treeLeft : ∀ h k v. T23 h k v → (Sg k v)
+treeLeft (Leaf k v) = (k ** v)
+treeLeft (Node2 t1 _ _) = treeLeft t1
+treeLeft (Node3 t1 _ _ _ _) = treeLeft t1
+
+treeRight : ∀ h k v. T23 h k v → (Sg k v)
+treeRight (Leaf k v) = (k ** v)
+treeRight (Node2 _ _ t2) = treeRight t2
+treeRight (Node3 _ _ _ _ t3) = treeRight t3
+
+data SortedMap : (a : U) -> (a -> U) -> U where
+  EmptyMap : ∀ k v. (k → k → Ordering) → SortedMap k v
+  -- h not erased so we know what happens in delete
+  MapOf : ∀ k v. {h : Nat} → (k → k → Ordering) → T23 h k v → SortedMap k v
+
+deleteMap : ∀ k v. k → SortedMap k v → SortedMap k v
+deleteMap key m@(EmptyMap _) = m
+-- REVIEW if I split h separately in a nested case, it doesn't sort out Hole
+deleteMap key (MapOf {k} {v} {Z} compare tree) = case deleteT23 compare Z key tree of
+  Left t => MapOf compare t
+  Right t => EmptyMap compare
+deleteMap key (MapOf {k} {v} {S n} compare tree) = case deleteT23 compare (S n) key tree of
+  Left t => MapOf compare t
+  Right t => MapOf compare t
+
+leftMost : ∀ k v. SortedMap k v → Maybe (Sg k v)
+leftMost (MapOf compare m) = Just (treeLeft m)
+leftMost _ = Nothing
+
+rightMost : ∀ k v. SortedMap k v → Maybe (Sg k v)
+rightMost (MapOf compare m) = Just (treeRight m)
+rightMost _ = Nothing
+
+-- TODO issue with metas and case if written as `do` block
+pop : ∀ k v. SortedMap k v → Maybe ((Sg k v) × SortedMap k v)
+pop m = case leftMost m of
+    Just (k ** v) => Just ((k ** v), deleteMap k m)
+    Nothing => Nothing
+
+lookupMap : ∀ k v. k -> SortedMap k v -> Maybe (Sg k v)
+lookupMap k (MapOf compare map) = lookupT23 compare k map
+lookupMap k _ = Nothing
+
+-- We're kind of in a corner here. The type checker knows EQ might not be right, so
+-- we have to hit up DecEq both to be sure and make the type checker happy.
+lookupMap' : ∀ k. {{DecEq k}} {0 v : k → U} → (x : k) -> SortedMap k v -> Maybe (v x)
+lookupMap' k (MapOf compare map) = case lookupT23 compare k map of
+  Nothing => Nothing
+  Just (k' ** b) => case decEq k k' of
+    Yes Refl => Just b
+    _ => Nothing
+lookupMap' k _ = Nothing
+
+updateMap : ∀ k. {0 v : k → U} → (x : k) -> v x -> SortedMap k v -> SortedMap k v
+updateMap k v (EmptyMap compare) = MapOf compare $ Leaf k v
+updateMap k v (MapOf compare map) = case insertT23 compare k v map of
+  Left map' => MapOf compare map'
+  Right (a, b, c) => MapOf compare (Node2 a b c)
+
+toList : ∀ k v. SortedMap k v → List (Sg k v)
+toList {k} {v} (MapOf compare smap) = reverse $ go smap Nil
+  where
+    go : ∀ h. T23 h k v → List (Sg k v) → List (Sg k v)
+    go (Leaf k v) acc = (k ** v) :: acc
+    go (Node2 t1 k1 t2) acc = go t2 (go t1 acc)
+    go (Node3 t1 k1 t2 k2 t3) acc = go t3 $ go t2 $ go t1 acc
+toList _ = Nil
+
+emptyMap :  ∀ k v. {{Ord k}} → SortedMap k v
+emptyMap = EmptyMap compare
+
+mapFromList : ∀ k v. {{Ord k}} → List (Sg k v) → SortedMap k v
+mapFromList {k} {v} stuff = foldl go emptyMap stuff
+  where
+    go : SortedMap k v → Sg k v → SortedMap k v
+    go map (k ** v) = updateMap k v map
+
+foldMap : ∀ a. {{DecEq a}} {0 b : a → U} → ((x : a) → b x → b x → b x) → SortedMap a b → List (Sg a b) → SortedMap a b
+foldMap f m Nil = m
+foldMap {k} {v} f m ((a ** b) :: xs) = case lookupMap' a m : Maybe $ v a of
+  Nothing => foldMap f (updateMap a b m) xs
+  Just b' => foldMap f (updateMap _ (f a b' b) m) xs
+
+-- listValues : ∀ k v. SortedMap k v → List v
+-- listValues sm = map snd $ toList sm
