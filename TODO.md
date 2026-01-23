@@ -12,8 +12,11 @@
 - [x] Erasure checking happens at compile time and isn't surfaced to editor..
 - [ ] Erasure issue during AoC from case building replacing a non-erased value with erased.
 - [ ] Add Foldable?
+- [ ] Maybe return constraints instead of solving metas during unification
+  - We already return non-meta constraints for work on the LHS.
+  - We might get into a situation where solving immediately would have gotten us more progress?
 - [ ] "Failed to unify %var0 and %var1" - get names in there
-  - Need fancier `Env` or the index...
+  - Need fancier `Env` or the index on the type of `Tm`
 - Editor support:
   - [ ] add missing cases should skip indented lines
   - [ ] add missing cases should handle `_::_`

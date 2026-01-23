@@ -1,0 +1,17 @@
+module UnifyPi
+
+Graph : U -> U
+Graph obj = obj -> obj -> U
+
+/-
+ERROR at tests/UnifyPi.newt:14:31--14:36: unification failure: non-linear pattern: [%var0, %var1, %var2, %var1]
+  failed to unify ?m:UnifyPi.$m2 k:2 a:1 b:0 a:1
+             with ( :ins : ?m:UnifyPi.$m3 k:2 a:1 b:0) -> ?m:UnifyPi.$m4 k:3 a:2 b:1 :ins:0
+
+Possibly just a case where we can postpone the constraints. I think the BCC k a b might solve k and the
+other bits work themselves out? But do I not do that? I certainly postpone ones with extra args.
+-/
+
+data BCC : Graph U -> Graph U where
+  -- newt can't infer the type of K, but Idris succeeds
+  Prim : {k : _} {a b : U} -> k a b -> BCC k a b

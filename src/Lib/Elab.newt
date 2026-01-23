@@ -395,7 +395,14 @@ solve env m sp t = do
       addConstraint env m sp t
   let l = length' env
   debug $ \ _ => "meta \{show meta}"
-  ren <- invert l sp
+
+  -- tests/UnifyPi.newt - Solution is non-linear, but is solved later
+  -- REVIEW We add constraints to be checked later (here and above) and assume the unification succeeds
+  -- Will this get is into trouble?
+  Right ren <- tryError $ invert l sp
+    | Left err => do
+        debug $ \ _ => "postpone constraint \{showError "" err}"
+        addConstraint env m sp t
   -- force unlet
   hack <- quote l t
   t <- eval env hack
