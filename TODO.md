@@ -1,7 +1,7 @@
 
 ## TODO
 
-- [ ] change "in prefix position" and "trailing operator" errors to do sections
+- [x] change "in prefix position" and "trailing operator" errors to do sections
 - [ ] maybe add fat arrows, I keep wanting to type them, `{{...}}` is a little ugly
   - There may be ambiguity issues at the parsing level, but we don't have typecase, so...
 - [x] get some names on add missing cases (if not too difficult)
@@ -211,7 +211,7 @@
   - Makes inference easier, cleaner output, and allows `foo $ \ x => ...`
   - [ ] `$` no longer works inside ≡⟨ ⟩ - sort out how to support both that and `$ \ x => ...` (or don't bother)
     - We'd either need to blacklist all non-initial mixfix bits at the appropriate spots or always pass around a terminating token.
-    - I'm leaning towards _no_ here, because I may want to lift mixfix processing out of the parsing step in the future. This isn't
+    - I'm leaning towards _no_ here, because I may want to lift mixfix processing out of the parsing step in the future.
 - [x] **Translate newt to newt**
   - [x] Support @ on the LHS
   - [x] if / then / else sugar

@@ -1,0 +1,20 @@
+module Section
+
+import Prelude
+
+-- got infix in prefix position
+add : Int → Int → Int
+add = (+)
+
+add2 : Int → Int
+add2 = (+ 2)
+
+-- trailing operator
+add2' : Int → Int
+add2' = (2 +)
+
+main : IO Unit
+main = do
+    printLn $ (+) 2 3
+    printLn $ (+ 3) 2
+    printLn $ (2 +) 3

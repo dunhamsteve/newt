@@ -30,7 +30,7 @@ for fn in tests/*.newt ; do
   fi
   # if there is a golden file, run the code and compare output
   if [ -f ${fn}.golden ]; then
-    bun run out.js > tmp/${bn}.out
+    node out.js > tmp/${bn}.out
     if [ $? != "0" ]; then
       echo Run failed for $fn
       failed=$((failed + 1))

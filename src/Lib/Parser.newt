@@ -219,7 +219,11 @@ pratt ops prec stop left spine = do
                 ((_, fc, right) :: rest) => do
                   (right, rest) <- pratt ops pr stop right rest
                   pratt ops prec stop (RApp (getFC left + getFC right) left right Explicit) rest
-                _ => fail "trailing operator"
+                _ =>
+                  -- Trailing operator section, like (2 +)
+                  pratt ops prec stop left Nil
+                  -- fail "trailing operator"
+
 
     runRule p fix stop (nm :: rule) left spine = do
       case spine of
@@ -240,8 +244,10 @@ pratt ops prec stop left spine = do
            -- TODO False should be an error here
          Just (MkOp name p fix True rule) => do
             runRule p fix stop rule (RVar fc name) spine
-         Just (MkOp name p fix False rule) => do
-            fail "got infix \{show name} in prefix position"
+         Just (MkOp name p fix False rule) =>
+            -- REVIEW We could also use a lambda with a fresh name
+            runRule p fix stop rule (RApp fc (RVar fc "flip") (RVar fc name) Explicit) spine
+            -- fail "got infix \{show name} in prefix position"
          _ =>
           pure (left, spine)
     runPrefix stop left spine = pure (left, spine)

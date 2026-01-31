@@ -1,0 +1,13 @@
+module TrailDollar
+
+import Prelude
+
+infixl 5 _$$_
+
+_$$_ : Nat → (Nat → Nat) → Nat
+a $$ b = a + b a
+
+-- Previously this didn't parse, but it does with operator section support.
+blah : Nat → Nat
+blah x = x $$ $ \ y => y
+
