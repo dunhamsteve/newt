@@ -1,0 +1,75 @@
+module WellTyped
+
+-- Idris2's "Well Typed Interpreter" example
+-- This is a little painful for lack of overloading.
+-- I can add idris/haskell style sections.
+-- This is revealing some issues. :/
+
+-- I had to put {0 ctxt : Vect n Ty} →  in manually, the `∀ ctxt` wasn't inferring the type.
+-- This may be because we have `n`, which becomes a parameter when do it manually.
+-- That would explain why Idris adds those...
+
+-- This also revealed an issue in case tree building where a bound name was accidentally made into a defined one.
+
+import Prelude
+import Data.Vect
+import Data.Fin
+
+data Ty = TyInt | TyBool | TyFun Ty Ty
+
+interpTy : Ty → U
+interpTy TyInt = Int
+interpTy TyBool = Bool
+interpTy (TyFun x y) = interpTy x → interpTy y
+
+data HasType : ∀ n. (i : Fin n) → Vect n Ty → Ty → U where
+  Stop : ∀ t n. {0 ctxt : Vect n Ty} → HasType FZ (t :- ctxt) t
+  Pop  : ∀ n t u. {0 ctxt : Vect n Ty} {0 k : Fin n} → HasType k ctxt t → HasType (FS k) (u :- ctxt) t
+
+data Expr : ∀ n. Vect n Ty → Ty → U where
+  Var : ∀ t n. {0 ctxt : Vect n Ty} {0 i : Fin n} → HasType i ctxt t → Expr ctxt t
+  Val : ∀ n. {0 ctxt : Vect n Ty} → (x : Int) → Expr ctxt TyInt
+  Lam : ∀ a n t. {0 ctxt : Vect n Ty} → Expr (a :- ctxt) t → Expr ctxt (TyFun a t)
+  App : ∀ n a t. {0 ctxt : Vect n Ty} → Expr ctxt (TyFun a t) → Expr ctxt a → Expr ctxt t
+  Op  : ∀ a b c n. {0 ctxt : Vect n Ty} → (interpTy a → interpTy b → interpTy c) →
+        Expr ctxt a → Expr ctxt b → Expr ctxt c
+  -- TODO Idris has Lazy on the arms, should work if we explicitly force
+  If  : ∀ n a. {0 ctxt : Vect n Ty} → Expr ctxt TyBool →
+        (Expr ctxt a) →
+        (Expr ctxt a) → Expr ctxt a
+
+infixr 4 _:::_
+data Env : ∀ n. Vect n Ty → U where
+  Empty  : Env VNil
+  _:::_ : ∀ a n. {0 ctxt : Vect n Ty} → interpTy a → Env ctxt → Env (a :- ctxt)
+
+lookup : ∀ n t. {0 ctxt : Vect n Ty} {0 i : Fin n} → HasType i ctxt t → Env ctxt → interpTy t
+lookup Stop (x ::: xs) = x
+lookup () Empty
+lookup (Pop k) (x ::: xs) = lookup k xs
+
+interp : ∀ n t. {0 ctxt : Vect n Ty} → Env ctxt → Expr ctxt t → interpTy t
+interp env (Var i)    = lookup i env
+interp env (Val x)    = x
+interp env (Lam x)    = \y => interp (y ::: env) x
+interp env (App x y)  = interp env x $ interp env y
+interp env (Op f x y) = f (interp env x) (interp env y)
+interp env (If x y z) = if interp env x then interp env y
+                                        else interp env z
+
+add : ∀ n. {0 ctxt : Vect n Ty} → Expr ctxt (TyFun TyInt (TyFun TyInt TyInt))
+add = Lam (Lam (Op _+_ (Var Stop) (Var (Pop Stop))))
+
+fact : ∀ n. {0 ctxt : Vect n Ty} → Expr ctxt (TyFun TyInt TyInt)
+-- TODO the `Bool =?= interpTy ...` is stuck on ?m14
+-- I think we may need to need to delay the constraint until m14 is solved?
+-- But I think I have code to do that already
+fact = Lam (If (Op {_} {_} {TyBool} _==_ (Var Stop) (Val 0))
+               (Val 1)
+               (Op _*_ (App fact (Op _-_ (Var Stop) (Val 1)))
+                       (Var Stop)))
+
+-- main : IO Unit
+-- main = do putStr "Enter a number: "
+--           Right x <- readLine | _ => putStrLn "EOF"
+--           printLn (interp Empty fact (stringToInt x))

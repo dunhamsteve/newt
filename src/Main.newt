@@ -179,9 +179,9 @@ processModule importFC base stk qn@(QN ns nm) = do
   let modules = updateMap modns mod top.modules
   modifyTop [modules := modules]
 
+  logMetas $ reverse $ listValues top.metaCtx.metas
   let (Nil) = top.errors
     | errors => exitFailure "Compile failed"
-  logMetas $ reverse $ listValues top.metaCtx.metas
   pure src
   where
     tryProcessDecl : String -> List String → Decl -> M Unit

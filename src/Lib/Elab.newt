@@ -283,7 +283,7 @@ addConstraint env ix sp tm = do
   let (CheckAll) = mc.mcmode | _ => pure MkUnit
   updateMeta ix $ \case
     (Unsolved pos k a b c cons) => do
-      debug $ \ _ => "Add constraint m\{show ix} \{show sp} =?= \{show tm}"
+      debug $ \ _ => "Add constraint \{show ix} \{show sp} =?= \{show tm}"
       pure (Unsolved pos k a b c (MkMc (getFC tm) env sp tm :: cons))
     (Solved fc k tm) => error fc "Meta \{show k} already solved [addConstraint]"
     (OutOfScope) => error' "Meta \{show ix} out of scope"
@@ -391,7 +391,7 @@ solve env m sp t = do
     | _ => do
       let l = length' env
       debug $ \ _ => "meta \{show m} (\{show ix}) applied to \{show $ snoclen sp} args instead of \{show size}"
-      debug $ \ _ => "CONSTRAINT m\{show ix} \{show sp} =?= \{show t}"
+      debug $ \ _ => "CONSTRAINT \{show ix} \{show sp} =?= \{show t}"
       addConstraint env m sp t
   let l = length' env
   debug $ \ _ => "meta \{show meta}"
@@ -435,12 +435,10 @@ solve env m sp t = do
     (\case
       Postpone fc ix msg => do
         -- let someone else solve this and then check again.
-        debug $ \ _ => "CONSTRAINT2 m\{show ix} \{show sp} =?= \{show t}"
+        debug $ \ _ => "CONSTRAINT2 \{show ix} \{show sp} =?= \{show t}"
         addConstraint env m sp t
-        -- I get legit errors after stuffing in solution
-        -- report for now, tests aren't hitting this branch
-      err => throwError err
-        -- debug $ \ _ => "CONSTRAINT3 m\{show ix} \{show sp} =?= \{show t}"
+      E fc msg => throwError (E fc "\{msg} for \{show ix} \{show sp} =?= \{show t}")
+        -- debug $ \ _ => "CONSTRAINT3 \{show ix} \{show sp} =?= \{show t}"
         -- debug $ \ _ => "because \{showError "" err}"
         -- addConstraint env m sp t
         )
@@ -628,7 +626,7 @@ freshMeta ctx fc ty kind = do
   debug $ \ _ => "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
   -- need the ns here
   -- we were fudging this for v1
-  let qn = QN top.ns "$m\{show mc.next}"
+  let qn = QN top.ns "\{show mc.next}"
   let newmeta = Unsolved fc qn ctx ty kind Nil
   let autos = case kind of
       AutoSolve => qn :: mc.autos
@@ -775,6 +773,9 @@ substVal k v tm = go tm
 updateContext : Context -> List (Int × Val) -> M Context
 updateContext ctx Nil = pure ctx
 updateContext ctx ((k, val) :: cs) =
+  -- We were turning Bound into Defined
+  if isSelf k val then updateContext ctx cs
+  else
   let ix = cast $ lvl2ix (length' ctx.env) k in
   case getAt ix ctx.env of
     (Just (VVar _ k' Lin)) =>
@@ -789,6 +790,10 @@ updateContext ctx ((k, val) :: cs) =
       updateContext ctx cs
     Nothing => error (getFC val) "INTERNAL ERROR: bad index in updateContext"
   where
+    isSelf : Int → Val → Bool
+    isSelf ix (VVar _ k Lin) = ix == k
+    isSelf ix _ = False
+
     replaceV : ∀ a. Nat -> a -> List a -> List a
     replaceV k x Nil = Nil
     replaceV Z x (y :: xs) = x :: xs
