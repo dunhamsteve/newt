@@ -1,9 +1,11 @@
 
 ## TODO
 
+- [ ] change "in prefix position" and "trailing operator" errors to do sections
 - [ ] maybe add fat arrows, I keep wanting to type them, `{{...}}` is a little ugly
-  - There may be ambiguity issues
+  - There may be ambiguity issues at the parsing level, but we don't have typecase, so...
 - [x] get some names on add missing cases (if not too difficult)
+- [ ] Implement "add missing cases" for playground
 - [x] add optional types to case `case xxx : Maybe Int of ...`
 - [x] "Expected keyword" at `\ a ->` should be error at the `->`
 - [x] Show Either

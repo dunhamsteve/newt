@@ -11,7 +11,9 @@ all: newt.js
 
 REV=$(shell git rev-parse --short HEAD)
 src/Revision.newt: .PHONY
-	echo "module Revision\nimport Prelude\ngitRevision : String\ngitRevision = \"${REV}\"" > src/Revision.newt
+	echo "module Revision\nimport Prelude\ngitRevision : String\ngitRevision = \"${REV}\"" > src/Revision.newt.new
+	cmp src/Revision.newt.new src/Revision.newt || cp src/Revision.newt.new src/Revision.newt
+	rm -f src/Revision.newt.new
 
 newt.js: ${SRCS} src/Revision.newt
 	-rm build/* >/dev/null

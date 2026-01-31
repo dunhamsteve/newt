@@ -716,6 +716,13 @@ instance Functor IO where
 uncurry : ∀ a b c. (a → b → c) → (a × b) → c
 uncurry f (a,b) = f a b
 
+curry : ∀ a b c. (a × b → c) → (a → b → c)
+curry f a b = f (a,b)
+
+-- TODO Belongs in prelude, but I need to rename a function in Lib.Compile (or let local win over imports)
+-- apply : ∀ a b. (a → b) → a → b
+-- apply f a = f a
+
 -- TODO Idris has a tail recursive version of this
 instance Applicative List where
   return a = a :: Nil

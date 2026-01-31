@@ -669,8 +669,6 @@ primType fc nm = do
       Just (MkEntry _ name ty (PrimTCon _) _) => pure $ VRef fc name Lin
       _ => error fc "Primitive type \{show nm} not in scope"
 
-infer : Context -> Raw  -> M (Tm × Val)
-
 data Bind = MkBind String Icit Val
 
 instance Show Bind where
@@ -1431,6 +1429,7 @@ updateRec ctx fc clauses arg ty = do
     getTele Nothing v = error (getFC v) "Expected a pi type, got \{show v}"
     getTele _ v = error (getFC v) "Expected a record type, got \{show v}"
 
+infer : Context -> Raw  -> M (Tm × Val)
 
 check ctx tm ty = do
   ty' <- forceType ctx.env ty
