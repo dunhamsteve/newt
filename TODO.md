@@ -13,7 +13,7 @@
   - I can do `let f : ... = \ a b c => ...`. But it doesn't work for recursion and cases are awkward.
 - [x] Erasure checking happens at compile time and isn't surfaced to editor..
 - [ ] Erasure issue during AoC from case building replacing a non-erased value with erased.
-- [ ] Add Foldable?
+- [x] Add Foldable
 - [ ] Maybe return constraints instead of solving metas during unification
   - We already return non-meta constraints for work on the LHS.
   - We might get into a situation where solving immediately would have gotten us more progress?

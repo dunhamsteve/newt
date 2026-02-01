@@ -220,3 +220,8 @@ foldMap f m ((a,b) :: xs) = case lookupMap a m of
 
 listValues : ∀ k v. SortedMap k v → List v
 listValues sm = map snd $ toList sm
+
+instance ∀ k. Foldable (SortedMap k) where
+  foldr f z m = foldr f z (listValues m)
+  foldl f z m = foldl f z (listValues m)
+

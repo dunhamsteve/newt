@@ -476,15 +476,23 @@ pfunc stringToInt : String → Int := `(s) => {
   return rval
 }`
 
--- TODO - add Foldable
+class Foldable (m : U → U) where
+  foldl : ∀ a b. (b → a → b) → b → m a → b
+  foldr : ∀ a b. (a → b → b) → b → m a → b
 
-foldl : ∀ A B. (B → A → B) → B → List A → B
-foldl f acc Nil = acc
-foldl f acc (x :: xs) = foldl f (f acc x) xs
+instance Foldable List where
+  foldl f acc Nil = acc
+  foldl f acc (x :: xs) = foldl f (f acc x) xs
 
-foldr : ∀ a b. (a → b → b) → b → List a → b
-foldr f b Nil = b
-foldr f b (x :: xs) = f x (foldr f b xs)
+  foldr f b Nil = b
+  foldr f b (x :: xs) = f x (foldr f b xs)
+
+instance Foldable SnocList where
+  foldl f acc Lin = acc
+  foldl f acc (xs :< x) = f (foldl f acc xs) x
+
+  foldr f b Lin = b
+  foldr f b (xs :< x) = foldr f (f x b) xs
 
 infixl 9 _∘_
 _∘_ : ∀ A B C. (B → C) → (A → B) → A → C
