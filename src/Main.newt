@@ -208,6 +208,9 @@ showErrors fn src = do
         exitFailure "Compile failed"
   pure MkUnit
 
+invalidateModule : QName -> M Unit
+invalidateModule (QN ns nm) = modifyTop [modules $= deleteMap (snoc ns nm)]
+
 -- processFile called on the top level file
 -- it sets up everything and then recurses into processModule
 processFile : String -> M Unit
@@ -238,6 +241,8 @@ processFile fn = do
   top <- getTop
   let modules = updateMap primNS (MkModCtx "" top.defs (MC emptyMap Nil 0 CheckAll) top.ops Nil) top.modules
   modifyTop (\ top => MkTop modules (primNS :: Nil) emptyMap Nil emptyMap top.metaCtx top.verbose top.errors top.ops)
+
+  invalidateModule qn
 
   src <- processModule emptyFC base Nil qn
   top <- getTop
@@ -305,16 +310,21 @@ runCommand (Verbose Nothing) = modifyTop [ verbose $= _+_ 1 ]
 runCommand (Verbose (Just v)) = modifyTop [ verbose := v ]
 runCommand (OutputJS fn) = writeSource fn
 
+-- Broken out to a separate function so I can hook it.
+runString : String → M Unit
+runString line = do
+  let (Right toks) = tokenise "<stdin>" line
+    | Left err => putStrLn (showError line err)
+  let (Right cmd) = parse "<stdin>" parseCommand toks
+    | Left err => putStrLn (showError line err)
+  catchError (runCommand cmd) (\ err => putStrLn $ showError line err)
+
 runRepl : M Unit
 runRepl = do
   liftIO $ putStr "> "
   Right line <- liftIO {M} $ readLine
     | Left err => pure MkUnit
-  let (Right toks) = tokenise "<stdin>" line
-    | Left err => putStrLn (showError line err) >> runRepl
-  let (Right cmd) = parse "<stdin>" parseCommand toks
-    | Left err => putStrLn (showError line err) >> runRepl
-  catchError (runCommand cmd) (\ err => putStrLn $ showError line err)
+  runString line
   runRepl
 
 -- TODO translate args into REPL commands?
