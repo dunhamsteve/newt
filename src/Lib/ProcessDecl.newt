@@ -229,7 +229,7 @@ processClass ns classFC nm tele decls = do
 
   log 1 $ \ _ => "tcon type \{render 90 $ pretty tcType}"
   log 1 $ \ _ => "dcon type \{render 90 $ pretty dcType}"
-  let decl = Data classFC nm tcType (TypeSig classFC (dcName :: Nil) dcType :: Nil)
+  let decl = Data classFC nm tcType (Just $ TypeSig classFC (dcName :: Nil) dcType :: Nil)
   log 1 $ \ _ => "Decl:"
   log 1 $ \ _ => render 90 $ pretty decl
   processDecl ns decl
@@ -381,7 +381,7 @@ processShortData ns fc lhs sigs = do
   (nm,args) <- getArgs lhs Nil
   let ty = foldr mkPi (RU fc) args
   cons <- traverse (mkDecl args Nil) sigs
-  let dataDecl = Data fc nm ty cons
+  let dataDecl = Data fc nm ty (Just cons)
   log 1 $ \ _ => "SHORTDATA"
   log 1 $ \ _ => "\{render 90 $ pretty dataDecl}"
   processDecl ns dataDecl
@@ -504,7 +504,7 @@ processRecord ns recordFC nm tele cname decls = do
 
   log 1 $ \ _ => "tcon type \{render 90 $ pretty tcType}"
   log 1 $ \ _ => "dcon type \{render 90 $ pretty dcType}"
-  let decl = Data recordFC nm tcType (TypeSig recordFC (dcName :: Nil) dcType :: Nil)
+  let decl = Data recordFC nm tcType (Just $ TypeSig recordFC (dcName :: Nil) dcType :: Nil)
   log 1 $ \ _ => "Decl:"
   log 1 $ \ _ => render 90 $ pretty decl
   processDecl ns decl
@@ -544,5 +544,7 @@ processDecl ns (DCheck fc tm ty) = processCheck ns fc tm ty
 processDecl ns (Class classFC nm tele decls) = processClass ns classFC nm tele decls
 processDecl ns (Instance instfc ty decls) = processInstance ns instfc ty decls
 processDecl ns (ShortData fc lhs sigs) = processShortData ns fc lhs sigs
-processDecl ns (Data fc nm ty cons) = processData ns fc nm ty cons
+processDecl ns (Data fc nm ty (Just cons)) = processData ns fc nm ty cons
+-- TODO distinguish from function signatures
+processDecl ns (Data fc nm ty Nothing) = processTypeSig ns fc (nm :: Nil) ty
 processDecl ns (Record recordFC nm tele cname decls) = processRecord ns recordFC nm tele cname decls

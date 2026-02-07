@@ -76,17 +76,15 @@ instance HasFC Raw where
 
 data Import = MkImport FC Name
 
-
-
 Telescope : U
 Telescope = List (BindInfo × Raw)
-
 
 data Decl
   = TypeSig FC (List Name) Raw
   | FunDef FC Name (List (Raw × Maybe Raw))
   | DCheck FC Raw Raw
-  | Data FC Name Raw (List Decl)
+  -- TODO maybe add Telescope (before `:`) and auto-add to constructors...
+  | Data FC Name Raw (Maybe $ List Decl)
   | ShortData FC Raw (List Raw)
   | PType FC Name (Maybe Raw)
   | PFunc FC Name (List String) Raw String
@@ -247,7 +245,8 @@ instance Pretty Decl where
       prettyPair : Raw × Maybe Raw → Doc
       prettyPair (a, Nothing) = pretty a
       prettyPair (a, Just b) = pretty a <+> text "=" <+> pretty b
-  pretty (Data _ nm x xs) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map pretty xs))
+  pretty (Data _ nm x Nothing) = text "data" <+> text nm <+> text ":" <+>  pretty x
+  pretty (Data _ nm x (Just xs)) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map pretty xs))
   pretty (DCheck _ x y) = text "#check" <+> pretty x <+> text ":" <+> pretty y
   pretty (PType _ nm ty) = text "ptype" <+> text nm <+> (maybe empty (\ty => text ":" <+> pretty ty) ty)
   pretty (PFunc _ nm Nil ty src) = text "pfunc" <+> text nm <+> text ":" <+> nest 2 (pretty ty <+> text ":=" <+/> text (show src))

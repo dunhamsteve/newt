@@ -615,9 +615,10 @@ parseData = do
   -- commit when we hit ":"
   name <- try $ (keyword "data" *> (uident <|> ident <|> token MixFix) <* keyword ":")
   ty <- typeExpr
-  keyword "where"
+  Just _ <- optional (keyword "where")
+    | _ => pure $ Data fc name ty Nothing
   decls <- startBlock $ manySame $ parseSig
-  pure $ Data fc name ty decls
+  pure $ Data fc name ty (Just decls)
 
 nakedBind : Parser Telescope
 nakedBind = do
