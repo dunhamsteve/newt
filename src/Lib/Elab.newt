@@ -1546,6 +1546,9 @@ infer ctx tm@(RUpdateRec fc _ _) = do
 
 infer ctx (RVar fc nm) = go 0 ctx.types
   where
+    entryNS : TopEntry → String
+    entryNS (MkEntry fc (QN ns _) _ _ _) = joinBy "." ns
+
     go : Int -> List (String × Val)  -> M (Tm × Val)
     go i Nil = do
       top <- getTop
@@ -1554,7 +1557,13 @@ infer ctx (RVar fc nm) = go 0 ctx.types
           debug $ \ _ => "lookup \{show name} as \{show def}"
           vty <- eval Nil ty
           pure (Ref fc name, vty)
-        Nothing => error fc "\{show nm} not in scope"
+        Nothing => do
+          let mods = map entryNS $ lookupAll nm top
+          let extra = case mods of
+            Nil => ""
+            -- For the benefit of the editor, but only sees transitive modules
+            _ => ", try importing: \{joinBy ", " mods}"
+          error fc "\{show nm} not in scope\{extra}"
     go i ((x, ty) :: xs) = if x == nm then pure (Bnd fc i, ty)
       else go (i + 1) xs
 

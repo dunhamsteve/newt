@@ -314,10 +314,35 @@ export function activate(context: vscode.ExtensionContext) {
                 fix.edit = new vscode.WorkspaceEdit();
                 // TODO - we should skip over subsequent lines that are indented more than the current.
                 const insertPos = new vscode.Position(line + 1, 0);
-                fix.edit.insert(document.uri, insertPos, lines.join('\n') + '\n');
+                let text = lines.join('\n') + '\n';
+                if (insertPos.line === document.lineCount) {
+                  text = "\n" + text;
+                }
+                fix.edit.insert(document.uri, insertPos, text);
                 fix.diagnostics = [diagnostic];
                 fix.isPreferred = true;
                 actions.push(fix);
+            }
+            m = message.match(/try importing: (.*)/);
+            if (m) {
+              let mods = m[1].split(', ')
+              let insertLine = 0;
+              for (let i = 0; i < document.lineCount; i++) {
+                const line = document.lineAt(i).text;
+                if (/^(import|module)\b/.test(line)) insertLine = i + 1;
+              }
+              const insertPos = new vscode.Position(insertLine, 0);
+              for (let mod of mods) {
+                const fix = new vscode.CodeAction(
+                  `Import ${mod}`,
+                  vscode.CodeActionKind.QuickFix
+                );
+                fix.edit = new vscode.WorkspaceEdit();
+                fix.edit.insert(document.uri, insertPos, `import ${mod}\n`);
+                fix.diagnostics = [diagnostic];
+                // fix.isPreferred = true;  // they're all preferred?
+                actions.push(fix);
+              }
             }
           }
           return actions;

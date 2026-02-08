@@ -19,9 +19,14 @@ lookup qn@(QN ns nm) top =
       Just mod => lookupMap' qn mod.modDefs
       Nothing => Nothing
 
+lookupImported : String → TopContext -> List TopEntry
+lookupImported raw top =
+  mapMaybe (flip lookup top) $ (QN top.ns raw) :: map (flip QN raw) top.imported
+
+-- For repl / out of scope errors
 lookupAll : String → TopContext -> List TopEntry
 lookupAll raw top =
-  mapMaybe (flip lookup top) $ (QN top.ns raw) :: map (flip QN raw) top.imported
+  mapMaybe (flip lookup top) $ (QN top.ns raw) :: map (flip QN raw) (map fst $ toList top.modules)
 
 lookupRaw : String -> TopContext -> Maybe TopEntry
 lookupRaw raw top =

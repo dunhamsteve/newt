@@ -35,7 +35,7 @@
   - [ ] add missing cases should skip indented lines
   - [ ] add missing cases should handle `_::_`
   - [ ] add missing cases should share code between vscode and playground
-  - [ ] "Not in scope" should offer to import
+  - [x] "Not in scope" should offer to import
   - [ ] Case split
 - [ ] Delay checking
   - We have things like `foldr (\ x acc => case x : ...`, where the lambda doesn't have a good type, so we have to be explicit. If we could defer the checking of that expression until more things are solved, we might not need the annotation (e.g. checking the other arguments). Some `case` statements may have a similar situation.
@@ -157,6 +157,7 @@
 
 
 - [ ] warn on unused imports?
+  - Probably have to mark on name lookup, maybe wait until we have query-based
 - [x] redo code to determine base path
 - [x] emit only one branch for default case when splitting inductives
 - [x] save/load results of processing a module
