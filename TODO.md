@@ -7,8 +7,8 @@
 - [ ] maybe allow "Main" module name for any file
 - [ ] Improve handling of names:
   - We need FC on names in a lot of places
-  - [ ] FC for duplicate data constructor name is wrong (points to `data`)
-  - [ ] FC on bad import should point to the name
+  - [x] FC for duplicate `data`, `record`, `class` name is wrong (points to `data`)
+  - [x] FC on bad import should point to the name
   - [x] Current module overrides imports
   - [ ] Allow Qualified names in surface syntax
   - Don't disambiguate on type for now

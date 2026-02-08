@@ -1,0 +1,2 @@
+*** Process tests/BadImport.newt
+ERROR at tests/BadImport.newt:4:8--4:22: error reading tests/Does/Not/Exist.newt: Error: ENOENT: no such file or directory, open 'tests/Does/Not/Exist.newt'

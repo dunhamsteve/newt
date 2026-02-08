@@ -74,7 +74,7 @@ instance HasFC Raw where
   getFC (RUpdateRec fc _ _) = fc
   getFC (RImpossible fc) = fc
 
-data Import = MkImport FC Name
+data Import = MkImport FC (FC × Name)
 
 Telescope : U
 Telescope = List (BindInfo × Raw)
@@ -84,14 +84,14 @@ data Decl
   | FunDef FC Name (List (Raw × Maybe Raw))
   | DCheck FC Raw Raw
   -- TODO maybe add Telescope (before `:`) and auto-add to constructors...
-  | Data FC Name Raw (Maybe $ List Decl)
+  | Data FC (FC × Name) Raw (Maybe $ List Decl)
   | ShortData FC Raw (List Raw)
   | PType FC Name (Maybe Raw)
   | PFunc FC Name (List String) Raw String
   | PMixFix FC (List Name) Int Fixity
-  | Class FC Name Telescope (List Decl)
+  | Class FC (FC × Name) Telescope (List Decl)
   | Instance FC Raw (Maybe (List Decl))
-  | Record FC Name Telescope (Maybe Name) (List Decl)
+  | Record FC (FC × Name) Telescope (Maybe $ FC × Name) (List Decl)
 
 
 instance HasFC Decl where
@@ -140,7 +140,7 @@ instance Show Decl where
   show (ShortData _ lhs sigs) = foo ("ShortData" :: show lhs :: show sigs :: Nil)
   show (PFunc _ nm used ty src) = foo ("PFunc" :: nm :: show used :: show ty :: show src :: Nil)
   show (PMixFix _ nms prec fix) = foo ("PMixFix" :: show nms :: show prec :: show fix :: Nil)
-  show (Class _ nm tele decls) = foo ("Class" ::  nm :: "..." :: (show $ map show decls) :: Nil)
+  show (Class _ (_,nm) tele decls) = foo ("Class" ::  nm :: "..." :: (show $ map show decls) :: Nil)
   show (Instance _ nm decls) = foo ("Instance" ::  show nm :: (show $ map show decls) :: Nil)
   show (Record _ nm tele nm1 decls) = foo ("Record" :: show nm :: show tele :: show nm1 :: show decls :: Nil)
 
@@ -245,16 +245,16 @@ instance Pretty Decl where
       prettyPair : Raw × Maybe Raw → Doc
       prettyPair (a, Nothing) = pretty a
       prettyPair (a, Just b) = pretty a <+> text "=" <+> pretty b
-  pretty (Data _ nm x Nothing) = text "data" <+> text nm <+> text ":" <+>  pretty x
-  pretty (Data _ nm x (Just xs)) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map pretty xs))
+  pretty (Data _ (_,nm) x Nothing) = text "data" <+> text nm <+> text ":" <+>  pretty x
+  pretty (Data _ (_,nm) x (Just xs)) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map pretty xs))
   pretty (DCheck _ x y) = text "#check" <+> pretty x <+> text ":" <+> pretty y
   pretty (PType _ nm ty) = text "ptype" <+> text nm <+> (maybe empty (\ty => text ":" <+> pretty ty) ty)
   pretty (PFunc _ nm Nil ty src) = text "pfunc" <+> text nm <+> text ":" <+> nest 2 (pretty ty <+> text ":=" <+/> text (show src))
   pretty (PFunc _ nm used ty src) = text "pfunc" <+> text nm <+> text "uses" <+> spread (map text used) <+> text ":" <+> nest 2 (pretty ty <+> text ":=" <+/> text (show src))
   pretty (PMixFix _ names prec fix) = text (show fix) <+> text (show prec) <+> spread (map text names)
-  pretty (Record _ nm tele cname decls) = text "record" <+> text nm <+> text ":" <+> spread (map prettyBind tele)
-    <+> (nest 2 $ text "where" </> stack (maybe empty (\ nm' => text "constructor" <+> text nm') cname :: map pretty decls))
-  pretty (Class _ nm tele decls) = text "class" <+> text nm <+> text ":" <+> spread (map prettyBind tele)
+  pretty (Record _ (_,nm) tele (cname) decls) = text "record" <+> text nm <+> text ":" <+> spread (map prettyBind tele)
+    <+> (nest 2 $ text "where" </> stack (maybe empty (\ nm' => text "constructor" <+> text (snd nm')) cname :: map pretty decls))
+  pretty (Class _ (_,nm) tele decls) = text "class" <+> text nm <+> text ":" <+> spread (map prettyBind tele)
     <+> (nest 2 $ text "where" </> stack (map pretty decls))
   pretty (Instance _ _ _) = text "TODO pretty Instance"
   pretty (ShortData _ lhs sigs) = text "data" <+> pretty lhs <+> text "=" <+> pipeSep (map pretty sigs)
@@ -328,5 +328,5 @@ instance Pretty Module where
       </> stack (map pretty decls)
       where
         doImport : Import -> Doc
-        doImport (MkImport _ nm) = text "import" <+> text nm ++ line
+        doImport (MkImport _ (_,nm)) = text "import" <+> text nm ++ line
 

@@ -1,0 +1,9 @@
+module ErrorDup
+
+data Nat = Z | S Nat
+
+data Nat = Z | S Nat
+
+record Nat where
+
+class Nat where

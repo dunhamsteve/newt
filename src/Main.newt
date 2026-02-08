@@ -94,7 +94,7 @@ importHints (entry :: entries) = do
   importHints entries
 
 importToQN : Import → QName
-importToQN  (MkImport fc name') = uncurry QN $ unsnoc $ split1 name' "."
+importToQN  (MkImport fc (_,name)) = uncurry QN $ unsnoc $ split1 name "."
 
 -- New style loader, one def at a time
 processModule : FC -> String -> List String -> QName -> M String
@@ -128,13 +128,11 @@ processModule importFC base stk qn@(QN ns nm) = do
   let importNames = map importToQN imports
 
   imported <- for imports $ \case
-    MkImport fc name' => do
+    MkImport fc (nameFC,name') => do
       let (a,b) = unsnoc $ split1 name' "."
       let qname = QN a b
-      -- we could use `fc` if it had a filename in it
-      when (elem name' stk) $ \ _ => error emptyFC "import loop \{show name} -> \{show name'}"
-
-      processModule fc base (name :: stk) qname
+      when (elem name' stk) $ \ _ => error nameFC "import loop \{show name} -> \{show name'}"
+      processModule nameFC base (name :: stk) qname
       pure $ split name' "."
   let imported = snoc imported primNS
   srcSum <- liftIO $ checksum src

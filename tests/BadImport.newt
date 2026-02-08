@@ -1,0 +1,4 @@
+module BadImport
+
+-- Error should point to name here
+import Does.Not.Exist

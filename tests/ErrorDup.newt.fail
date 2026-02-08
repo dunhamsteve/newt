@@ -1,0 +1,21 @@
+*** Process tests/ErrorDup.newt
+module ErrorDup
+ERROR at tests/ErrorDup.newt:5:6--5:9: Nat already declared
+  data Nat = Z | S Nat
+  
+  data Nat = Z | S Nat
+       ^^^
+
+ERROR at tests/ErrorDup.newt:7:8--7:11: Nat already declared
+  data Nat = Z | S Nat
+  
+  record Nat where
+         ^^^
+
+ERROR at tests/ErrorDup.newt:9:7--9:10: Nat already declared
+  record Nat where
+  
+  class Nat where
+        ^^^
+
+Compile failed

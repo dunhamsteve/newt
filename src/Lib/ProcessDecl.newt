@@ -209,8 +209,8 @@ processCheck ns fc tm ty = do
   putStrLn "  NF \{render 90 $ pprint Nil norm}"
 
 
-processClass : List String → FC → String → Telescope → List Decl → M Unit
-processClass ns classFC nm tele decls = do
+processClass : List String → FC → (FC × String) → Telescope → List Decl → M Unit
+processClass ns classFC (nameFC, nm) tele decls = do
   -- REVIEW maybe we can leverage Record for this
   -- a couple of catches, we don't want the dotted accessors and
   -- the self argument should be an auto-implicit
@@ -225,7 +225,7 @@ processClass ns classFC nm tele decls = do
 
   log 1 $ \ _ => "tcon type \{render 90 $ pretty tcType}"
   log 1 $ \ _ => "dcon type \{render 90 $ pretty dcType}"
-  let decl = Data classFC nm tcType (Just $ TypeSig classFC (dcName :: Nil) dcType :: Nil)
+  let decl = Data classFC (nameFC, nm) tcType (Just $ TypeSig classFC (dcName :: Nil) dcType :: Nil)
   log 1 $ \ _ => "Decl:"
   log 1 $ \ _ => render 90 $ pretty decl
   processDecl ns decl
@@ -374,10 +374,10 @@ processInstance ns instfc ty decls = do
 -- desugars to Data and processes it
 processShortData : List String → FC → Raw → List Raw → M Unit
 processShortData ns fc lhs sigs = do
-  (nm,args) <- getArgs lhs Nil
+  (nameFC, nm,args) <- getArgs lhs Nil
   let ty = foldr mkPi (RU fc) args
   cons <- traverse (mkDecl args Nil) sigs
-  let dataDecl = Data fc nm ty (Just cons)
+  let dataDecl = Data fc (nameFC, nm) ty (Just cons)
   log 1 $ \ _ => "SHORTDATA"
   log 1 $ \ _ => "\{render 90 $ pretty dataDecl}"
   processDecl ns dataDecl
@@ -385,8 +385,8 @@ processShortData ns fc lhs sigs = do
     mkPi : FC × Name → Raw → Raw
     mkPi (fc,n) a = RPi fc (BI fc n Explicit Zero) (RU fc) a
 
-    getArgs : Raw -> List (FC × String) -> M (String × List (FC × String))
-    getArgs (RVar fc1 nm) acc = pure (nm, acc)
+    getArgs : Raw -> List (FC × String) -> M (FC × String × List (FC × String))
+    getArgs (RVar fc1 nm) acc = pure (fc1, nm, acc)
     getArgs (RApp _ t (RVar fc' nm) _) acc = getArgs t ((fc', nm) :: acc)
     getArgs tm _ = error (getFC tm) "Expected contructor application, got: \{show tm}"
 
@@ -431,8 +431,8 @@ populateConInfo entries =
     isSucc (MkEntry fc nm dty@(Pi _ _ _ _ (Ref _ a) (Ref _ b)) (DCon _ _ (Many :: Nil) hn) _) = a == b
     isSucc _ = False
 
-processData : List String → FC → String → Raw → List Decl → M Unit
-processData ns fc nm ty cons = do
+processData : List String → FC → FC × String → Raw → List Decl → M Unit
+processData ns fc (nameFC, nm) ty cons = do
   log 1 $ \ _ => "-----"
   log 1 $ \ _ => "Data \{nm}"
   top <- getTop
@@ -443,7 +443,7 @@ processData ns fc nm ty cons = do
       tyty' <- eval Nil tyty
       type' <- eval Nil type
       unifyCatch fc (mkCtx fc) tyty' type'
-    Just _ => error fc "\{show nm} already declared"
+    Just _ => error nameFC "\{show nm} already declared"
     Nothing => setDef (QN ns nm) fc tyty Axiom Nil
   -- check cons, return list of type,con
   allCons <- join <$> (for cons $ \x => case x of
@@ -487,25 +487,25 @@ processData ns fc nm ty cons = do
     checkDeclType _ = error fc "data type doesn't return U"
 
 
-processRecord : List String → FC → String → Telescope → Maybe Name → List Decl → M Unit
-processRecord ns recordFC nm tele cname decls = do
+processRecord : List String → FC → FC × String → Telescope → Maybe (FC × Name) → List Decl → M Unit
+processRecord ns recordFC (nameFC, nm) tele cname decls = do
   log 1 $ \ _ => "-----"
   log 1 $ \ _ => "Record"
   let fields = getSigs decls
-  let dcName = fromMaybe "Mk\{show nm}" cname
+  let (dcFC,dcName) = fromMaybe (nameFC,"Mk\{show nm}") cname
   let tcType = teleToPi tele (RU recordFC)
-  let tail = foldl (\ acc bi => case bi : BindInfo × Raw of (BI fc nm icit _, _) => RApp fc acc (RVar fc nm) icit) (RVar recordFC nm) tele
+  let tail = foldl (\ acc bi => case bi : BindInfo × Raw of (BI fc nm icit _, _) => RApp fc acc (RVar fc nm) icit) (RVar nameFC nm) tele
   let dcType = teleToPi (impTele tele) $
     foldr (\ x acc => case x : FC × String × Raw of (fc, nm, ty) =>  RPi fc (BI fc nm Explicit Many) ty acc  ) tail fields
 
   log 1 $ \ _ => "tcon type \{render 90 $ pretty tcType}"
   log 1 $ \ _ => "dcon type \{render 90 $ pretty dcType}"
-  let decl = Data recordFC nm tcType (Just $ TypeSig recordFC (dcName :: Nil) dcType :: Nil)
+  let decl = Data recordFC (nameFC,nm) tcType (Just $ TypeSig recordFC (dcName :: Nil) dcType :: Nil)
   log 1 $ \ _ => "Decl:"
   log 1 $ \ _ => render 90 $ pretty decl
   processDecl ns decl
   -- pattern to peel out fields on LHS
-  let autoPat = foldl (\acc x => case x : FC × String × Raw of (fc,nm,ty) => RApp fc acc (RVar fc nm) Explicit) (RVar recordFC dcName) fields
+  let autoPat = foldl (\acc x => case x : FC × String × Raw of (fc,nm,ty) => RApp fc acc (RVar nameFC nm) Explicit) (RVar nameFC dcName) fields
   processFields autoPat tail Nil fields
   where
     processFields : Raw → Raw → List (String × Raw) → List (FC × String × Raw) → M Unit
@@ -542,5 +542,5 @@ processDecl ns (Instance instfc ty decls) = processInstance ns instfc ty decls
 processDecl ns (ShortData fc lhs sigs) = processShortData ns fc lhs sigs
 processDecl ns (Data fc nm ty (Just cons)) = processData ns fc nm ty cons
 -- TODO distinguish from function signatures
-processDecl ns (Data fc nm ty Nothing) = processTypeSig ns fc (nm :: Nil) ty
+processDecl ns (Data fc (_, nm) ty Nothing) = processTypeSig ns fc (nm :: Nil) ty
 processDecl ns (Record recordFC nm tele cname decls) = processRecord ns recordFC nm tele cname decls

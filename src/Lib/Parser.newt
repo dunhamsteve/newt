@@ -533,10 +533,11 @@ parseImport : Parser Import
 parseImport = do
   fc <- getPos
   keyword "import"
-  ident <- uident
-  rest <- many $ token Projection
+  -- TODO revisit when we have parser for qualified names in source
+  (nameFC, ident) <- withFC uident
+  (restFC,rest) <- withFC $ many $ token Projection
   let name = joinBy "" (ident :: rest)
-  pure $ MkImport fc name
+  pure $ MkImport fc (nameFC + restFC, name)
 
 -- Do we do pattern stuff now? or just name = lambda?
 -- TODO multiple names
@@ -613,7 +614,7 @@ parseData : Parser Decl
 parseData = do
   fc <- getPos
   -- commit when we hit ":"
-  name <- try $ (keyword "data" *> (uident <|> ident <|> token MixFix) <* keyword ":")
+  name <- try $ (keyword "data" *> withFC (uident <|> token MixFix) <* keyword ":")
   ty <- typeExpr
   Just _ <- optional (keyword "where")
     | _ => pure $ Data fc name ty Nothing
@@ -632,10 +633,10 @@ parseRecord : Parser Decl
 parseRecord = do
   fc <- getPos
   keyword "record"
-  name <- uident
+  name <- withFC uident
   teles <- many $ ebind <|> nakedBind
   keyword "where"
-  cname <- optional $ keyword "constructor" *> (uident <|> token MixFix)
+  cname <- optional $ keyword "constructor" *> withFC (uident <|> token MixFix)
   decls <- startBlock $ manySame $ parseSig
   pure $ Record fc name (join teles) cname decls
 
@@ -645,7 +646,7 @@ parseClass : Parser Decl
 parseClass = do
   fc <- getPos
   keyword "class"
-  name <- uident
+  name <- withFC uident
   teles <- many $ ebind <|> nakedBind
   keyword "where"
   decls <- startBlock $ manySame $ parseSig
