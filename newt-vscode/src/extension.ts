@@ -128,6 +128,7 @@ export function activate(context: vscode.ExtensionContext) {
             let range = new vscode.Range(start, end);
             if (file !== fileName) {
               range = new vscode.Range(new vscode.Position(0,0), new vscode.Position(0,0));
+              message = `Error in ${file}: ${message}`
             }
             // anything indented after the ERROR/INFO line are part of
             // the message

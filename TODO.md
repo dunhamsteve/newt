@@ -1,6 +1,7 @@
 
 ## TODO
 
+- [ ] For errors in other files, point to import
 - [x] Unsolved metas should be errors (user metas are fine)
 - [x] Better syntax for forward declared data (so we can distinguish from functions)
 - [ ] maybe allow "Main" module name for any file
