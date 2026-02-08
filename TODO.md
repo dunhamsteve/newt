@@ -1,9 +1,20 @@
 
 ## TODO
 
+- [x] Unsolved metas should be errors (user metas are fine)
+- [x] Better syntax for forward declared data (so we can distinguish from functions)
+- [ ] maybe allow "Main" module name for any file
+- [ ] Improve handling of names:
+  - We need FC on names in a lot of places
+  - [ ] FC for duplicate data constructor name is wrong (points to `data`)
+  - [ ] FC on bad import should point to the name
+  - [x] Current module overrides imports
+  - [ ] Allow Qualified names in surface syntax
+  - Don't disambiguate on type for now
 - [x] change "in prefix position" and "trailing operator" errors to do sections
 - [ ] maybe add fat arrows, I keep wanting to type them, `{{...}}` is a little ugly
-  - There may be ambiguity issues at the parsing level, but we don't have typecase, so...
+  - There may be ambiguity issues at the parsing level, but we don't have typecase, so.
+  - It's less to type, too.
 - [x] get some names on add missing cases (if not too difficult)
 - [ ] Implement "add missing cases" for playground
 - [x] add optional types to case `case xxx : Maybe Int of ...`
@@ -53,6 +64,7 @@
 - [ ] See if we can split up `Elab.newt`
   - Unify, checking, and case builder have circular references.
   - Perhaps unify should return constraints instead of calling solve directly.
+  - passing a pointer to `check` in the context may suffice
 - [ ] Add error for non-linear names in pattern matching (currently it picks one)
   - We probably should handle forced values. Idris requires them to have the same name.
 - [ ] Functions with erased-only arguments still get called with `()` - do we want this or should they be constants?
@@ -82,6 +94,7 @@
 - [ ] Look into descriptions, etc.
   - Can generating descriptions help with automatic "show" implementations
   - We lost debug printing when switching to numeric tags
+  - Where did I see the idea of generating descriptions for inductive types?
 - [ ] Add info to Ref/VRef (is dcon, arity, etc)
   - To save lookups during compilation and it might make eval faster
 - [x] number tags for data constructors

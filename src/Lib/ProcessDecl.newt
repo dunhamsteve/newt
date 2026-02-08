@@ -69,7 +69,8 @@ logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
           pure ("  \{show $ length' matches} Solutions: \{show matches}" :: Nil)
 
         _ => pure Nil
-      info fc $ unlines ((msg :: Nil) ++ msgs ++ sols)
+      -- info fc $ unlines ((msg :: Nil) ++ msgs ++ sols)
+      addError $ E fc $ unlines ((msg :: Nil) ++ msgs ++ sols)
       logMetas rest
 
 
