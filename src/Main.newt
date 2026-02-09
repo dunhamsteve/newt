@@ -54,8 +54,7 @@ writeSource fn = do
         :: Nil)
         ++ map (render 90 ∘ noAlt) docs
   (Right _) <- liftIO {M} $ writeFile fn src
-    | Left err => exitFailure (show err)
-  -- (Right _) <- chmodRaw fn 493 | Left err => exitFailure (show err)
+    | Left err => throwError $ E (MkFC fn $ MkBounds 0 0 0 0) err
   pure MkUnit
 
 
@@ -105,22 +104,22 @@ processModule importFC base stk qn@(QN ns nm) = do
   modifyTop [modules := updateMap modns (emptyModCtx "") top.modules]
   let fn = (joinBy "/" (base :: ns)) ++ "/" ++ nm ++ ".newt"
   (Right src) <- liftIO {M} $ readFile fn
-    | Left err => exitFailure "ERROR at \{show importFC}: error reading \{fn}: \{show err}"
+    | Left err => throwError $ E importFC "error reading \{fn}: \{show err}"
   let (Right toks) = tokenise fn src
-    | Left err => exitFailure (showError src err)
+    | Left err => throwError err
 
   let (Right ((nameFC, modName), ops, toks)) = partialParse fn parseModHeader top.ops toks
-    | Left (err, toks) => exitFailure (showError src err)
+    | Left (err, toks) => throwError err
 
   log 1 $ \ _ => "scan imports for module \{modName}"
   let ns = split modName "."
   let (path, modName') = unsnoc $ split1 modName "."
   -- let bparts = split base "/"
   let (True) = qn == QN path modName'
-    | _ => exitFailure "ERROR at \{show nameFC}: module name \{show modName} doesn't match file name \{show fn}"
+    | _ => throwError $ E nameFC "module name \{show modName} doesn't match file name \{show fn}"
 
   let (Right (imports, ops, toks)) = partialParse fn parseImports ops toks
-    | Left (err, toks) => exitFailure (showError src err)
+    | Left (err, toks) => throwError err
 
   let importNames = map importToQN imports
 
@@ -176,7 +175,7 @@ processModule importFC base stk qn@(QN ns nm) = do
 
   logMetas $ reverse $ listValues top.metaCtx.metas
   let (Nil) = top.errors
-    | errors => exitFailure "Compile failed"
+    | errors => throwError $ E importFC "Failed to compile module \{show qn}"
   pure src
   where
     tryProcessDecl : String -> List String → Decl -> M Unit
@@ -200,7 +199,7 @@ showErrors fn src = do
   let (Nil) = top.errors
     | errors => do
         traverse (putStrLn ∘ showError src) errors
-        exitFailure "Compile failed"
+        throwError $ E (MkFC fn $ MkBounds 0 0 0 0) "Compile failed"
   pure MkUnit
 
 invalidateModule : QName -> M Unit

@@ -18,4 +18,4 @@ ERROR at tests/ErrorDup.newt:9:7--9:10: Nat already declared
   class Nat where
         ^^^
 
-Compile failed
+ERROR at :1:1--1:2: Failed to compile module ErrorDup

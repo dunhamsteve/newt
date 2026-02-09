@@ -6,4 +6,4 @@ ERROR at tests/Duplicate.newt:4:1--4:5: Duplicate.Left is already defined at tes
   data Either : U -> U -> U where
   ^^^^
 
-Compile failed
+ERROR at :1:1--1:2: Failed to compile module Duplicate

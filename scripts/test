@@ -20,12 +20,16 @@ for fn in tests/*.newt ; do
         echo "Compile failure mismatch for $fn"
         diff ${fn}.fail tmp/${bn}.compile
         failed=$((failed + 1))
+        if [ $1 = "--fix" ]; then
+          cp tmp/${bn}.compile ${fn}.fail
+        fi
         continue
     fi
   elif [ $cerr != "0" ]; then
     echo Compile failed for $fn
     failed=$((failed + 1))
     cat tmp/${bn}.compile
+
     continue
   fi
   # if there is a golden file, run the code and compare output
@@ -40,6 +44,9 @@ for fn in tests/*.newt ; do
       echo "Output mismatch for $fn"
       diff ${fn}.golden tmp/${bn}.out
       failed=$((failed + 1))
+      if [ $1 = "--fix" ]; then
+        cp tmp/${bn}.out ${fn}.golden
+      fi
     fi
   fi
 done
