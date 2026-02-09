@@ -15,9 +15,15 @@ record Bounds where
 -- FIXME we should handle overlap and out of order..
 instance Add Bounds where
   a + b =
+    if empty a then b
+    else if empty b then a else
     let a' = if a.startLine < b.startLine  || a.startLine == b.startLine && a.startCol < b.startCol then a else b
         b' = if a.endLine < b.endLine || a.endLine == b.endLine && a.endCol < b.endCol then b else a
     in MkBounds a'.startLine a'.startCol b'.endLine b'.endCol
+    where
+      empty : Bounds → Bool
+      empty (MkBounds 0 0 0 0) = True
+      empty _ = False
 
 instance Eq Bounds where
   (MkBounds sl sc el ec) == (MkBounds sl' sc' el' ec') =
