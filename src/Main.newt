@@ -304,6 +304,9 @@ runCommand (GetDoc name) = getDoc name
 runCommand (Verbose Nothing) = modifyTop [ verbose $= _+_ 1 ]
 runCommand (Verbose (Just v)) = modifyTop [ verbose := v ]
 runCommand (OutputJS fn) = writeSource fn
+runCommand DumpTop = do
+  json <- jsonTopContext
+  putStrLn "TOP:\{renderJson json}"
 
 -- Broken out to a separate function so I can hook it.
 runString : String → M Unit

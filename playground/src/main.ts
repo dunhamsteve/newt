@@ -484,6 +484,7 @@ const processOutput = (
       let endLineNumber = +eline;
       let endColumn = +ecol
       // FIXME - pass the real path in
+      if (file.startsWith("./")) file = file.slice(2);
       if (fn && fn !== file) {
         startLineNumber = startColumn = 0;
       }

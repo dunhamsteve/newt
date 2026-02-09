@@ -47,6 +47,9 @@ export let shim: NodeShim = {
     writeFileSync(name: string, data: string, enc?: string) {
       shim.files[name] = new TextEncoder().encode(data)
     },
+    writeSync(fd: number, data: string) {
+      shim.stdout += data;
+    }
   },
   process: {
     argv: ["", ""],

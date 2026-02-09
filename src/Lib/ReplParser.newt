@@ -14,6 +14,7 @@ data ReplCommand
     | GetDoc String
     | BrowseCmd QName
     | HelpCmd
+    | DumpTop
 
 kw : String → Parser String
 kw s = satisfy (\t => t.val.text == s) "Expected \{show s}"
@@ -61,6 +62,7 @@ commands
     :: MkCmd ":d" "document function" ArgIdent GetDoc
     :: MkCmd ":doc" "document function" ArgIdent GetDoc
     :: MkCmd ":b" "browse namespace" ArgQName BrowseCmd
+    :: MkCmd ":top" "dump top context as json" ArgNone DumpTop
     -- type at point
     -- solve hole
     -- search by prefix (for autocomplete - ideally include types at point, but we'd need recovery)

@@ -389,7 +389,7 @@ instance HasIO IO where
   liftIO a = a
 
 pfunc primPutStrLn uses (MkIORes MkUnit) : String → IO Unit := `(s) => (w) => {
-  console.log(s)
+  require('fs').writeSync(1, s + '\n')
   return Prelude_MkIORes(Prelude_MkUnit,w)
 }`
 
