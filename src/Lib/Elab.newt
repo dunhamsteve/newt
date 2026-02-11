@@ -363,6 +363,8 @@ lams Z _ tm = tm
 lams (S k) Nil tm = Lam emptyFC "arg_\{show k}" Explicit Many (lams k Nil tm)
 lams (S k) (x :: xs) tm = Lam emptyFC x Explicit Many (lams k xs tm)
 
+
+
 unify : Env -> UnifyMode -> Val -> Val  -> M UnifyResult
 
 .boundNames : Context -> List String
@@ -626,7 +628,7 @@ freshMeta ctx fc ty kind = do
   debug $ \ _ => "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
   -- need the ns here
   -- we were fudging this for v1
-  let qn = QN top.ns "\{show mc.next}"
+  let qn = QN top.ns "$m\{show mc.next}"
   let newmeta = Unsolved fc qn ctx ty kind Nil
   let autos = case kind of
       AutoSolve => qn :: mc.autos
@@ -1525,6 +1527,7 @@ check ctx tm ty = do
 
     (tm,ty) => do
       (tm', ty') <- infer ctx tm
+      -- REVIEW - should we look at `tm` to know how many to insert? Is there a case where this helps?
       (tm', ty') <- insert ctx tm' ty'
 
       let names = map fst ctx.types
