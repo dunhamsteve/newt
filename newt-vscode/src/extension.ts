@@ -18,10 +18,15 @@ interface TopData {
   context: TopEntry[];
 }
 
+function getIndent(text: string) {
+  return text.match(/\S/)?.index ?? 0
+}
+
 export function activate(context: vscode.ExtensionContext) {
   let topData: undefined | TopData;
   const diagnosticCollection =
     vscode.languages.createDiagnosticCollection("newt");
+
 
   vscode.workspace.onDidChangeTextDocument((event) => {
     const editor = vscode.window.activeTextEditor;
@@ -294,8 +299,11 @@ export function activate(context: vscode.ExtensionContext) {
             if (m) {
               // A lot of this logic would also apply to case split.
               let cons = m[1].split(', ');
-              const line = range.start.line;
-              const lineText = document.lineAt(line).text;
+              let line = range.start.line;
+              let lineText = document.lineAt(line).text;
+              // this isn't going to work for let.
+              // and I think I relaxed the indent for `|`
+              const indent = getIndent(lineText)
               let m2 = lineText.match(/(.*=>?)/);
               if (!m2) continue;
               let s = range.start.character;
@@ -312,8 +320,13 @@ export function activate(context: vscode.ExtensionContext) {
                   vscode.CodeActionKind.QuickFix
                 );
                 fix.edit = new vscode.WorkspaceEdit();
-                // TODO - we should skip over subsequent lines that are indented more than the current.
-                const insertPos = new vscode.Position(line + 1, 0);
+                // skip indented lines
+                while (1) {
+                  line = line + 1
+                  lineText = document.lineAt(line).text
+                  if (!lineText.trim() || getIndent(lineText) <= indent) break
+                }
+                const insertPos = new vscode.Position(line, 0);
                 let text = lines.join('\n') + '\n';
                 if (insertPos.line === document.lineCount) {
                   text = "\n" + text;
