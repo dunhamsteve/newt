@@ -2,10 +2,12 @@
 	"compilerOptions": {
 		"module": "Node16",
 		"target": "ES2022",
-		"lib": [
-			"ES2022"
-		],
+		"lib": [ "ES2022" ],
 		"sourceMap": true,
+		// so node can run this stuff
+		"allowImportingTsExtensions": true,
+		// required by previous, but we use esbuild anyway
+		"noEmit": true,
 		"rootDir": "src",
 		"strict": true   /* enable all strict type-checking options */
 		/* Additional Checks */

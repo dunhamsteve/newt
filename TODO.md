@@ -1,7 +1,9 @@
 
 ## TODO
 
-- [ ] For errors in other files, point to import
+- [ ] Inject markdown highlighter into /- -/ comments in vscode
+- [ ] For errors in other files, point to the import
+  - put a try in there and remove exitFailure
 - [x] Unsolved metas should be errors (user metas are fine)
 - [x] Better syntax for forward declared data (so we can distinguish from functions)
 - [ ] maybe allow "Main" module name for any file
@@ -316,6 +318,8 @@
   - [x] top level
   - [x] case statements
 - [ ] Lean ⟨ ⟩ anonymous constructors
+  - This would only work for `check` and we might need to revisit how `,` is handled.
+- [ ] Lean-like `#eval`
 - [ ] Lean-like .map, etc? (resolve name in namespace of target type, etc)
 - [x] autos / typeclass resolution
   - [x] very primitive version in place, not higher order, search at end
