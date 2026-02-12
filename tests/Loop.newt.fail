@@ -1,0 +1,2 @@
+*** Process tests/Loop.newt
+ERROR at tests/Loop.newt:3:8--3:12: import loop Loop → Loop

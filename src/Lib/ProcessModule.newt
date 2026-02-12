@@ -63,11 +63,8 @@ importHints (entry :: entries) = do
 processModule : FC → FileSource → List String → List String → M String
 processModule importFC repo stk modns = do
   top <- getTop
-  -- let modns = (snoc ns nm)
   let name = joinBy "." modns
   let (Nothing) = lookupMap modns top.modules | _ => pure ""
-  -- dummy entry for processing
-  modifyTop [modules := updateMap modns (emptyModCtx "") top.modules]
 
   let fn = joinBy "/" modns ++ ".newt"
   -- TODO now we can pass in the module name...
