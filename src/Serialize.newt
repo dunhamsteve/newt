@@ -7,7 +7,7 @@ import Lib.Types
 import Data.SortedMap
 
 ModFile : U
-ModFile = (String × List TopEntry × List (String × OpDef) × List (QName × MetaEntry) × List QName)
+ModFile = (String × List TopEntry × List (String × OpDef) × List (QName × MetaEntry) × List (List String))
 
 pfunc checksum uses (MkIORes) : String → IO String := `(a) => (w) => {
   const arr = new TextEncoder().encode(a);
@@ -32,9 +32,9 @@ pfunc dumpModFile uses (MkIORes MkUnit): String → ModFile → IO Unit := `(fn,
 
 
 -- for now, include src and use that to see if something changed
-dumpModule : QName → String → ModContext → M Unit
+dumpModule : List String → String → ModContext → M Unit
 dumpModule qn src mod = do
-  let fn = "build/\{show qn}.newtmod"
+  let fn = "build/\{joinBy "." qn}.newtmod"
   let csum = mod.csum
   let defs = listValues mod.modDefs
   let ops = toList mod.ctxOps
@@ -54,9 +54,9 @@ pfunc readModFile uses (MkIORes Just Nothing): String → IO (Maybe ModFile) := 
   }
 }`
 
-loadModule : QName → String → M (Maybe ModContext)
+loadModule : List String → String → M (Maybe ModContext)
 loadModule qn src = do
-  let fn = "build/\{show qn}.newtmod"
+  let fn = "build/\{joinBy "." qn}.newtmod"
   (Just (csum, defs, ops, mctx, deps)) <- liftIO {M} $ readModFile fn
      | _ => pure Nothing
 

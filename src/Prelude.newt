@@ -953,3 +953,5 @@ pfunc fatalError : ∀ a. String → a := `(_, msg) => { throw new Error(msg) }`
 
 foldlM : ∀ m a e. {{Monad m}} → (a → e → m a) → a → List e → m a
 foldlM f a xs = foldl (\ ma b => ma >>= flip f b) (pure a) xs
+
+pfunc unsafePerformIO : ∀ a. IO a → a := `(a, f) => f().h1`

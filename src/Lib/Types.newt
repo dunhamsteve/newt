@@ -402,7 +402,7 @@ record ModContext where
   modMetaCtx : MetaContext
   -- longer term maybe drop this, put the operator decls in ctxDefs and collect them on import
   ctxOps : Operators
-  modDeps : List QName
+  modDeps : List (List String)
 
 -- Top level context.
 -- Most of the reason this is separate is to have a different type

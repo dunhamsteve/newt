@@ -32,27 +32,20 @@ splitTele = go Nil
     go ts (Pi fc nm icit quant t u) = go (MkBinder fc nm icit quant t :: ts) u
     go ts tm = (tm, reverse ts)
 
-
-
-getBaseDir : String → FC → String → M (String × QName)
+-- given a filename and split module name, return the base path or an error
+getBaseDir : String → FC → List String → M String
 getBaseDir fn fc modName = do
-  let (path, modName') = unsnoc $ split1 modName "."
-  let parts = split1 fn "/"
-  let (dirs,file) = unsnoc parts
-  let (name, ext) = splitFileName file
-
-  let parts = split1 fn "/"
-  let (dirs,file) = unsnoc parts
-  let (path, modName') = unsnoc $ split1 modName "."
-  unless (modName' == name) $ \ _ => error fc "module name \{modName'} doesn't match \{name}"
-  let (Right base) = baseDir (Lin <>< dirs) (Lin <>< path)
+  let path = fst $ splitFileName fn
+  let dirs = split path "/"
+  let (Right base) = baseDir (Lin <>< dirs) (Lin <>< modName)
     | Left err => error fc err
   let base = if base == "" then "." else base
-  pure (base, QN path modName')
+  pure base
   where
     baseDir : SnocList String -> SnocList String -> Either String String
     baseDir dirs Lin = Right $ joinBy "/" (dirs <>> Nil)
     baseDir (dirs :< d) (ns :< n) = if d == n
       then baseDir dirs ns
-      else Left "module path doesn't match directory"
-    baseDir Lin _ = Left "module path doesn't match directory"
+      else Left "module name \{joinBy "." modName} doesn't match path \{fn}"
+    baseDir Lin _ = Left "module name \{joinBy "." modName} doesn't match path \{fn}"
+

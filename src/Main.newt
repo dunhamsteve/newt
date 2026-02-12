@@ -11,6 +11,7 @@ import Lib.Util
 import Lib.Parser.Impl
 import Lib.Prettier
 import Lib.ProcessDecl
+import Lib.ProcessModule
 import Lib.Tokenizer
 import Lib.TopContext
 import Lib.Types
@@ -19,6 +20,13 @@ import Lib.ReplParser
 import Node
 import Serialize
 import Revision
+
+dirFileSource : String → FileSource
+dirFileSource base = MkFileSource $ \fc fn => do
+        let fn = base ++ "/" ++ fn
+        (Right src) <- liftIO {M} $ readFile fn
+            | Left err => throwError $ E fc "error reading \{fn}: \{show err}"
+        pure (fn,src)
 
 -- For editors, dump some information about the context (fc, name, type)
 jsonTopContext : M Json
@@ -35,16 +43,6 @@ jsonTopContext = do
       :: ("type", toJson (render 80 $ pprint Nil type) )
       :: Nil)
 
-dumpContext : TopContext -> M Unit
-dumpContext top = do
-    putStrLn "Context:"
-    go $ listValues top.defs
-    putStrLn "---"
-  where
-    go : List TopEntry -> M Unit
-    go Nil = pure MkUnit
-    go (x :: xs) = putStrLn "    \{show x}" >> go xs
-
 writeSource : String -> M Unit
 writeSource fn = do
   docs <- compile
@@ -56,139 +54,6 @@ writeSource fn = do
   (Right _) <- liftIO {M} $ writeFile fn src
     | Left err => throwError $ E (MkFC fn $ MkBounds 0 0 0 0) err
   pure MkUnit
-
-
-parseDecls : String -> Operators -> TokenList -> SnocList Decl -> M (List Decl × Operators)
-parseDecls fn ops Nil acc = pure (acc <>> Nil, ops)
-parseDecls fn ops toks@(first :: _) acc =
-  case partialParse fn (sameLevel parseDecl) ops toks of
-    Left (err, toks) => do
-      putStrLn $ showError "" err
-      addError err
-      parseDecls fn ops (recover toks) acc
-    Right (decl,ops,toks) => parseDecls fn ops toks (acc :< decl)
-  where
-    recover : TokenList -> TokenList
-    recover Nil = Nil
-    -- skip to top token, but make sure there is progress
-    recover (tok :: toks) = if tok.bounds.startCol == 0 && tok.bounds /= first.bounds
-      then (tok :: toks)
-      else recover toks
-
-moduleHash : String → List (List String) → M String
-moduleHash src imports = do
-  srcHash <- liftIO $ checksum src
-  top <- getTop
-  let mods = mapMaybe (\x => lookupMap' x top.modules) imports
-  let modHashes = map (\x => x.csum) mods
-  liftIO $ checksum $ fastConcat $ srcHash :: modHashes
-
-importHints : List TopEntry → M Unit
-importHints Nil = pure MkUnit
-importHints (entry :: entries) = do
-  when (elem Hint entry.eflags) $ \ _ => addHint entry.name
-  importHints entries
-
-importToQN : Import → QName
-importToQN  (MkImport fc (_,name)) = uncurry QN $ unsnoc $ split1 name "."
-
--- New style loader, one def at a time
-processModule : FC -> String -> List String -> QName -> M String
-processModule importFC base stk qn@(QN ns nm) = do
-  top <- getTop
-  -- TODO make top.loaded a List QName
-  let modns = (snoc ns nm)
-  let name = joinBy "." modns
-  let (Nothing) = lookupMap modns top.modules | _ => pure ""
-  -- dummy entry for processing
-  modifyTop [modules := updateMap modns (emptyModCtx "") top.modules]
-  let fn = (joinBy "/" (base :: ns)) ++ "/" ++ nm ++ ".newt"
-  (Right src) <- liftIO {M} $ readFile fn
-    | Left err => throwError $ E importFC "error reading \{fn}: \{show err}"
-  let (Right toks) = tokenise fn src
-    | Left err => throwError err
-
-  let (Right ((nameFC, modName), ops, toks)) = partialParse fn parseModHeader top.ops toks
-    | Left (err, toks) => throwError err
-
-  log 1 $ \ _ => "scan imports for module \{modName}"
-  let ns = split modName "."
-  let (path, modName') = unsnoc $ split1 modName "."
-  -- let bparts = split base "/"
-  let (True) = qn == QN path modName'
-    | _ => throwError $ E nameFC "module name \{show modName} doesn't match file name \{show fn}"
-
-  let (Right (imports, ops, toks)) = partialParse fn parseImports ops toks
-    | Left (err, toks) => throwError err
-
-  let importNames = map importToQN imports
-
-  imported <- for imports $ \case
-    MkImport fc (nameFC,name') => do
-      let (a,b) = unsnoc $ split1 name' "."
-      let qname = QN a b
-      when (elem name' stk) $ \ _ => error nameFC "import loop \{show name} -> \{show name'}"
-      processModule nameFC base (name :: stk) qname
-      pure $ split name' "."
-  let imported = snoc imported primNS
-  srcSum <- liftIO $ checksum src
-  csum <- moduleHash srcSum imported
-
-  putStrLn "module \{modName}"
-  top <- getTop
-  -- TODO we need a flag on this so `make newt3.js` properly tests self-compile
-  (Nothing) <- loadModule qn csum
-    | Just mod => do
-      let modules = updateMap modns mod top.modules
-
-      -- FIXME - we don't want stray operators in a module.
-      -- inject module ops into top
-      let ops = foldMap const top.ops $ toList mod.ctxOps
-      modifyTop [modules := modules; ops := ops ]
-      pure src  -- why am I returning this?
-
-  log 1 $ \ _ => "MODNS " ++ show modns
-  top <- getTop
-  (decls, ops) <- parseDecls fn top.ops toks Lin
-
-  top <- getTop
-  let freshMC = MC emptyMap Nil 0 CheckAll
-  -- set imported, mod, freshMC, ops  before processing
-  modifyTop [ imported := imported
-            ; hints := emptyMap
-            ; ns := modns
-            ; defs := emptyMap
-            ; metaCtx := freshMC
-            ; ops := ops
-            ]
-  for imported $ \ ns => do
-    let (Just mod) = lookupMap' ns top.modules | _ => error emptyFC "namespace \{show ns} missing"
-    importHints (listValues mod.modDefs)
-
-  log 1 $ \ _ => "process Decls"
-  traverse (tryProcessDecl src ns) (collectDecl decls)
-
-  -- update modules with result, leave the rest of context in case this is top file
-  top <- getTop
-
-  let mod = MkModCtx csum top.defs top.metaCtx top.ops importNames
-  if stk /= Nil && length' top.errors == 0
-    then dumpModule qn src mod
-    else pure MkUnit
-
-  let modules = updateMap modns mod top.modules
-  modifyTop [modules := modules]
-
-  logMetas $ reverse $ listValues top.metaCtx.metas
-  let (Nil) = top.errors
-    | errors => throwError $ E importFC "Failed to compile module \{show qn}"
-  pure src
-  where
-    tryProcessDecl : String -> List String → Decl -> M Unit
-    tryProcessDecl src ns decl = do
-      (Left err) <- tryError $ processDecl ns decl | _ => pure MkUnit
-      putStrLn $ showError src err
-      addError err
 
 -- unwind the module part of the path name
 baseDir : SnocList String -> SnocList String -> Either String String
@@ -208,8 +73,8 @@ showErrors fn src = do
         throwError $ E (MkFC fn $ MkBounds 0 0 0 0) "Compile failed"
   pure MkUnit
 
-invalidateModule : QName -> M Unit
-invalidateModule (QN ns nm) = modifyTop [modules $= deleteMap (snoc ns nm)]
+invalidateModule : List String -> M Unit
+invalidateModule modname = modifyTop [modules $= deleteMap modname]
 
 -- processFile called on the top level file
 -- it sets up everything and then recurses into processModule
@@ -229,14 +94,9 @@ processFile fn = do
   let (Right ((nameFC, modName), _, _)) = partialParse fn parseModHeader emptyMap toks
     | Left (err,toks) => throwError err
 
-  (base,qn) <- getBaseDir fn nameFC modName
-
-  -- declare internal primitives
-
-  processDecl primNS (PType emptyFC "Int" Nothing)
-  processDecl primNS (PType emptyFC "String" Nothing)
-  processDecl primNS (PType emptyFC "Char" Nothing)
-  setDef (QN primNS "PiType") emptyFC (Erased emptyFC) (PrimFn "(h0, h1) => ({ tag: \"PiType\", h0, h1 });" (S (S Z)) Nil) Nil
+  let modns = split modName "."
+  base <- getBaseDir fn nameFC modns
+  addPrimitives
 
   top <- getTop
   let modules = updateMap primNS (MkModCtx "" top.defs (MC emptyMap Nil 0 CheckAll) top.ops Nil) top.modules
@@ -247,9 +107,9 @@ processFile fn = do
             ; defs := emptyMap
             ]
 
-  invalidateModule qn
-
-  src <- processModule emptyFC base Nil qn
+  invalidateModule modns
+  let repo = dirFileSource base
+  src <- processModule emptyFC repo Nil modns
   top <- getTop
 
   showErrors fn src
