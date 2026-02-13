@@ -15,6 +15,7 @@ import {
   InitializeParams,
   InitializeResult,
   TextDocumentSyncKind,
+  Location,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 
@@ -69,16 +70,25 @@ connection.onHover((params): Hover | null => {
   const uri = params.textDocument.uri;
   const pos = params.position;
   console.log('HOVER', uri, pos)
-  let value = LSP_hoverInfo(uri, pos.line, pos.character)
-  if (!value) return null
-  console.log('HOVER is ', value)
-  return { contents: { kind: "plaintext", value } };
+  let res = LSP_hoverInfo(uri, pos.line, pos.character)
+  if (!res) return null
+  console.log('HOVER is ', res)
+  return { contents: { kind: "plaintext", value: res.info } };
 });
+
+connection.onDefinition((params): Location | null => {
+  const uri = params.textDocument.uri;
+  const pos = params.position;
+  let value = LSP_hoverInfo(uri, pos.line, pos.character)
+  if (!value) return null;
+  return value.location
+})
 
 connection.onInitialize((_params: InitializeParams): InitializeResult => ({
   capabilities: {
     textDocumentSync: TextDocumentSyncKind.Incremental,
     hoverProvider: true,
+    definitionProvider: true,
   },
 }));
 

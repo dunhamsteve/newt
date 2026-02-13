@@ -79,6 +79,14 @@ updateFile fn src = unsafePerformIO $ do
     -- modifyIORef state [ topContext := ctx ]
     modifyIORef state $ \a => [ topContext := ctx ] a
 
+
+fcToRange : FC → Json
+fcToRange (MkFC uri (MkBounds sr sc er ec)) =
+    JsonObj $ ("start", mkPosition sr sc) :: ("end", mkPosition er (ec + 1)) :: Nil
+    where
+        mkPosition : Int → Int → Json
+        mkPosition l c = JsonObj $ ("line", JsonInt l) :: ("character", JsonInt c) :: Nil
+
 hoverInfo : String → Int → Int → JSObject
 hoverInfo uri line col = unsafePerformIO $ do
     let (base,modns) = decomposeName uri
@@ -87,27 +95,24 @@ hoverInfo uri line col = unsafePerformIO $ do
     if (st.baseDir /= base)
         then resetState base
         else pure MkUnit
-    Right (_, Just msg) <- (getHoverInfo lspFileSource modns line col).runM st.topContext
+    Right (_, Just (msg, fc)) <- (getHoverInfo lspFileSource modns line col).runM st.topContext
         | Right _  => do
             putStrLn $ "Nothing to see here"
             pure $ jsonToJObject JsonNull
         | Left err => do
             putStrLn $ showError "" err
             pure $ jsonToJObject JsonNull
-    pure $ jsonToJObject $ JsonStr msg
+    let location = JsonObj $ ("uri", JsonStr fc.file) :: ("range", fcToRange fc) :: Nil
+    pure $ jsonToJObject $ JsonObj $ ("info", JsonStr msg) :: ("location", location) :: Nil
 
 errorToDiag : Error -> Json
-errorToDiag (E (MkFC fn (MkBounds sr sc er ec)) msg) =
+errorToDiag (E fc msg) =
   JsonObj
     $  ("severity", JsonInt 1)
-    -- PARSER `$` is winning over `,`, which is not what I'm expecting  Maybe `,` should be special...
-    :: ("range", (JsonObj $ ("start", range sr sc) :: ("end", range er (ec + 1)) :: Nil))
+    :: ("range", fcToRange fc)
     :: ("message", JsonStr msg)
     :: ("source", JsonStr "newt") -- what is this key for?
     :: Nil
-  where
-    range : Int → Int → Json
-    range l c = JsonObj $ ("line", JsonInt l) :: ("character", JsonInt c) :: Nil
 -- These shouldn't escape
 errorToDiag (Postpone fc qn msg) = errorToDiag $ E fc "Postpone \{show qn} \{msg}"
 

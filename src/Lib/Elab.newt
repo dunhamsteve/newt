@@ -440,10 +440,8 @@ solve env m sp t = do
         -- let someone else solve this and then check again.
         debug $ \ _ => "CONSTRAINT2 \{show ix} \{show sp} =?= \{show t}"
         addConstraint env m sp t
-      E fc msg => throwError (E fc "\{msg} for \{show ix} \{show sp} =?= \{show t}")
-        -- debug $ \ _ => "CONSTRAINT3 \{show ix} \{show sp} =?= \{show t}"
-        -- debug $ \ _ => "because \{showError "" err}"
-        -- addConstraint env m sp t
+      -- replace with wrapper
+      err => throwError (E (getFC err) "\{errorMsg err} for \{show ix} \{show sp} =?= \{show t}")
         )
 
 unifySpine : Env -> UnifyMode -> Bool -> SnocList Val -> SnocList Val  -> M UnifyResult

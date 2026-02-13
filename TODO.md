@@ -1,17 +1,20 @@
 
 ## TODO
 
-- [ ] Inject markdown highlighter into /- -/ comments in vscode
+- [ ] Importing Prelude twice should be an error (currently it causes double hints and breaks auto)
 - [ ] For errors in other files, point to the import
-  - put a try in there and remove exitFailure
 - [x] Unsolved metas should be errors (user metas are fine)
 - [x] Better syntax for forward declared data (so we can distinguish from functions)
 - [ ] maybe allow "Main" module name for any file
+- [ ] Restore "add missing cases" for LSP mode
+- [ ] Case split for LSP mode
+- [ ] Leverage LSP code for web playground
 - [ ] Improve handling of names:
   - We need FC on names in a lot of places
   - [x] FC for duplicate `data`, `record`, `class` name is wrong (points to `data`)
   - [x] FC on bad import should point to the name
   - [x] Current module overrides imports
+  - [ ] Duplicate data constructors point to `data`
   - [ ] Allow Qualified names in surface syntax
   - Don't disambiguate on type for now
 - [x] change "in prefix position" and "trailing operator" errors to do sections
@@ -33,6 +36,8 @@
   - We might get into a situation where solving immediately would have gotten us more progress?
 - [ ] "Failed to unify %var0 and %var1" - get names in there
   - Need fancier `Env` or the index on the type of `Tm`
+  - Or the name on the VVar?
+  - Also we should render %pi, etc more readably (bonus points for _×_)
 - Editor support:
   - [ ] add missing cases should skip indented lines
   - [ ] add missing cases should handle `_::_`

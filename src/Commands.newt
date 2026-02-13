@@ -24,7 +24,7 @@ decomposeName fn =
 
 -- The cheap version of type at point, find the token, lookup in global context
 -- Later we will either get good FC for entries or scan them all and build a cache.
-getHoverInfo : FileSource → List String → Int → Int → M (Maybe String)
+getHoverInfo : FileSource → List String → Int → Int → M (Maybe (String × FC))
 getHoverInfo repo modns row col = do
     mod <- processModule emptyFC repo Nil modns
     -- not necessarily loaded into top... (Maybe push this down into that branch of processModule)
@@ -39,7 +39,7 @@ getHoverInfo repo modns row col = do
 
     -- Lookup the name
     let (Just e) = lookupRaw name top   | _ => pure Nothing
-    pure $ Just "\{show e.name} : \{rpprint Nil e.type}"
+    pure $ Just ("\{show e.name} : \{rpprint Nil e.type}", e.fc)
 
     where
         getTok : List BTok → Maybe String
