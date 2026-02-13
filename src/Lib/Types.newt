@@ -402,7 +402,7 @@ record ModContext where
   modMetaCtx : MetaContext
   -- longer term maybe drop this, put the operator decls in ctxDefs and collect them on import
   ctxOps : Operators
-  modDeps : List (List String)
+  modDeps : List String
   modErrors : List Error
 
 -- Top level context.
@@ -421,15 +421,13 @@ HintTable = SortedMap QName (List (QName × Tm))
 
 record TopContext where
   constructor MkTop
-  -- maybe we use a String instead of List String for the left of QN
-  -- I'm putting a dummy entry in
-  modules : SortedMap (List String) ModContext
-  imported : List (List String)
+  modules : SortedMap String ModContext
+  imported : List String
   -- TCon name → function name × type
   hints : HintTable
 
   -- current module
-  ns : List String
+  ns : String
   defs : SortedMap QName TopEntry
   metaCtx : MetaContext
 

@@ -157,7 +157,7 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
     applySucc Nil = pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
     applySucc (t :: Nil) = pure $ CPrimOp "+" (CLit $ LInt 1) t
     applySucc _ = error emptyFC "overapplied Succ \{show tm}"
-compileTerm (UU _) = pure $ CRef (QN Nil "U")
+compileTerm (UU _) = pure $ CRef (QN "" "U")
 compileTerm (Pi _ nm icit rig t u) = do
   t' <- compileTerm t
   u' <- compileTerm u

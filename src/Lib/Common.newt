@@ -132,8 +132,8 @@ fcCol fc = fc.bnds.startCol
 class HasFC a where
   getFC : a -> FC
 
-primNS : List String
-primNS = ("Prim" :: Nil)
+primNS : String
+primNS = "Prim"
 
 emptyFC : FC
 emptyFC = MkFC "" (MkBounds 0 0 0 0)
@@ -141,10 +141,9 @@ emptyFC = MkFC "" (MkBounds 0 0 0 0)
 emptyFC' : String → FC
 emptyFC' fn = MkFC fn (MkBounds 0 0 0 0)
 
--- Error of a parse
-
+-- Using a String instead of List String for the module shaved about 16% of compile time...
 data QName : U where
-  QN : List String -> String -> QName
+  QN : String -> String -> QName
 
 .baseName : QName → String
 (QN _ name).baseName = name
@@ -154,8 +153,8 @@ instance Eq QName where
   QN ns n == QN ns' n' = if n == n' then ns == ns' else False
 
 instance Show QName where
-  show (QN Nil n) = n
-  show (QN ns n) = joinBy "." ns ++ "." ++ n
+  show (QN "" n) = n
+  show (QN ns n) = ns ++ "." ++ n
 
 instance Ord QName where
   compare (QN ns nm) (QN ns' nm') = if ns == ns' then compare nm nm' else compare ns ns'

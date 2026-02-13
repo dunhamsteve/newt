@@ -12,19 +12,19 @@ import Lib.Token
 import Lib.Elab
 
 -- For now we cheat and assume capitalized directories are a module component
-decomposeName : String → String × List String
+decomposeName : String → String × String
 decomposeName fn =
     go Nil $ Lin <>< split (fst $ splitFileName fn) "/"
     where
-        go : List String → SnocList String → String × List String
-        go acc Lin = (".", acc)
+        go : List String → SnocList String → String × String
+        go acc Lin = (".", joinBy "." acc)
         go acc (xs :< x) = if isUpper $ strIndex x 0
             then go (x :: acc) xs
-            else (joinBy "/" (xs :< x <>> Nil), acc)
+            else (joinBy "/" (xs :< x <>> Nil), joinBy "." acc)
 
 -- The cheap version of type at point, find the token, lookup in global context
 -- Later we will either get good FC for entries or scan them all and build a cache.
-getHoverInfo : FileSource → List String → Int → Int → M (Maybe (String × FC))
+getHoverInfo : FileSource → String → Int → Int → M (Maybe (String × FC))
 getHoverInfo repo modns row col = do
     mod <- processModule emptyFC repo Nil modns
     -- not necessarily loaded into top... (Maybe push this down into that branch of processModule)

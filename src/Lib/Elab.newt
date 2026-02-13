@@ -1549,7 +1549,7 @@ infer ctx tm@(RUpdateRec fc _ _) = do
 infer ctx (RVar fc nm) = go 0 ctx.types
   where
     entryNS : TopEntry → String
-    entryNS (MkEntry fc (QN ns _) _ _ _) = joinBy "." ns
+    entryNS (MkEntry fc (QN ns _) _ _ _) = ns
 
     go : Int -> List (String × Val)  -> M (Tm × Val)
     go i Nil = do

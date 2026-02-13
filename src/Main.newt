@@ -95,9 +95,9 @@ processFile fn = do
   let modns = split modName "."
   base <- getBaseDir fn nameFC modns
 
-  invalidateModule modns
+  invalidateModule modName
   let repo = dirFileSource base
-  mod <- processModule emptyFC repo Nil modns
+  mod <- processModule emptyFC repo Nil modName
   top <- getTop
 
   showErrors fn mod.modSource
@@ -122,7 +122,7 @@ cmdLine (fn :: args) = do
 browseTop : QName → M Unit
 browseTop qn@(QN ns x) = do
   top <- getTop
-  let ns = snoc ns x
+  let ns = ns ++ "." ++ x
   let (Just mod) = lookupMap' ns top.modules
     | _ => putStrLn "module \{show qn} not loaded"
   go $ listValues mod.modDefs

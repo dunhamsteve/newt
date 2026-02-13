@@ -73,7 +73,7 @@ updateFile fn src = unsafePerformIO $ do
     let (Right ((nameFC, modName), _, _)) = partialParse fn parseModHeader emptyMap toks
         | Left (err,toks) => writeIORef state st
 
-    Right (ctx,_) <- (invalidateModule $ split modName ".").runM st.topContext
+    Right (ctx,_) <- (invalidateModule modName).runM st.topContext
         | _ => writeIORef state st
     -- TODO It doesn't have record type, but eta expanding resolves this.  See if there is a quick fix.
     -- modifyIORef state [ topContext := ctx ]
@@ -90,7 +90,7 @@ fcToRange (MkFC uri (MkBounds sr sc er ec)) =
 hoverInfo : String → Int → Int → JSObject
 hoverInfo uri line col = unsafePerformIO $ do
     let (base,modns) = decomposeName uri
-    putStrLn "Hover \{uri} base \{base} mod \{joinBy "." modns}"
+    putStrLn "Hover \{uri} base \{base} mod \{modns}"
     st <- readIORef state
     if (st.baseDir /= base)
         then resetState base
@@ -119,8 +119,9 @@ errorToDiag (Postpone fc qn msg) = errorToDiag $ E fc "Postpone \{show qn} \{msg
 
 checkFile : String → JSObject
 checkFile fn = unsafePerformIO $ do
-    let (base,modns) = decomposeName fn
-    putStrLn "Checking \{fn} base \{base} mod \{joinBy "." modns}"
+    let (base,modName) = decomposeName fn
+
+    putStrLn "Checking \{fn} base \{base} mod \{modName}"
     st <- readIORef state
     if (st.baseDir /= base)
         then resetState base
@@ -128,7 +129,7 @@ checkFile fn = unsafePerformIO $ do
     (Right (top, json)) <- (do
         modifyTop [ errors := Nil ]
         putStrLn "processModule"
-        _ <- processModule emptyFC lspFileSource Nil modns
+        _ <- processModule emptyFC lspFileSource Nil modName
         pure MkUnit
         -- pull out errors and infos
         top <- getTop

@@ -36,7 +36,8 @@ replQN = do
   ident <- uident
   rest <- many $ token Projection
   let name = joinBy "" (ident :: rest)
-  pure $ uncurry QN $ unsnoc $ split1 name "."
+  let (ns,nm) = unsnoc $ split1 name "."
+  pure $ QN (joinBy "." ns) nm
 
 data ArgType = ArgNone | ArgString | ArgIdent | ArgOptInt | ArgQName
 

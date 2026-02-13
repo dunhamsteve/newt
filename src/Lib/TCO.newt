@@ -65,7 +65,7 @@ rewriteTailCalls nms tm = case tm of
 
 -- the name of our trampoline
 bouncer : QName
-bouncer = QN Nil "bouncer"
+bouncer = QN "" "bouncer"
 
 doOptimize : List (QName × CExp) → M (List (QName × CExp))
 doOptimize fns = do

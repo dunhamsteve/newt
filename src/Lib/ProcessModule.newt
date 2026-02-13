@@ -23,10 +23,11 @@ addPrimitives = do
   top <- getTop
   let mod = MkModCtx "" top.defs (MC emptyMap Nil 0 CheckAll) top.ops Nil top.errors
   let modules = updateMap primNS mod top.modules
+  -- TODO - do we clear this? Try just modules := modules, but wait until this refactor is done.
   modifyTop [ modules := modules
       ; imported := primNS :: Nil
       ; hints := emptyMap
-      ; ns := Nil
+      ; ns := ""
       ; defs := emptyMap
       ]
   pure mod
@@ -62,17 +63,17 @@ importHints (entry :: entries) = do
 -- HACK this is returning src to help render errors..
 -- Maybe return module, put src and errors in module, add error for import with error, callers can sort out what they want to do?
 -- The issue here is command line newt wants to report all errors (we can print that though?)  LSP wants something more subtle
-processModule : FC → FileSource → List String → (stack : List String) → M ModContext
+processModule : FC → FileSource → List String → String → M ModContext
 processModule importFC repo stk modns = do
   top <- getTop
-  let name = joinBy "." modns
+
   let (Nothing) = lookupMap' modns top.modules
     | Just mod => pure mod
 
   let (False) = modns == primNS
     | _ => addPrimitives
-
-  let fn = joinBy "/" modns ++ ".newt"
+  let parts = split modns "."
+  let fn = joinBy "/" parts ++ ".newt"
   -- TODO now we can pass in the module name...
   (fn,src) <- repo.getFile importFC fn
   let (Right toks) = tokenise fn src
@@ -82,21 +83,18 @@ processModule importFC repo stk modns = do
     | Left (err, toks) => throwError err
 
   log 1 $ \ _ => "scan imports for module \{modName}"
-  let (True) = modns == split modName "."
+  let (True) = modns == modName
     | _ => throwError $ E nameFC "module name \{show modName} doesn't match file name \{show fn}"
 
   let (Right (imports, ops, toks)) = partialParse fn parseImports ops toks
     | Left (err, toks) => throwError err
 
-  let importNames = map importToName imports
-
   imported <- for imports $ \case
     MkImport fc (nameFC, name') => do
-      let imp = split name' "."
-      when (elem name' stk) $ \ _ => error nameFC "import loop \{show name} → \{show name'}"
-      processModule nameFC repo (name :: stk) imp
-      pure $ imp
-  processModule nameFC repo (name :: stk) primNS
+      when (elem name' stk) $ \ _ => error nameFC "import loop \{modns} → \{name'}"
+      processModule nameFC repo (modns :: stk) name'
+      pure $ name'
+  processModule nameFC repo (modns :: stk) primNS
   let imported = snoc imported primNS
 
   putStrLn "module \{modName}"
@@ -107,6 +105,7 @@ processModule importFC repo stk modns = do
 
   top <- getTop
   let freshMC = MC emptyMap Nil 0 CheckAll
+  -- NOW Print and drop errors here
   -- set imported, mod, freshMC, ops  before processing
   modifyTop [ imported := imported
             ; hints := emptyMap
@@ -125,7 +124,7 @@ processModule importFC repo stk modns = do
   -- update modules with result, leave the rest of context in case this is top file
   top <- getTop
 
-  let mod = MkModCtx src top.defs top.metaCtx top.ops importNames top.errors
+  let mod = MkModCtx src top.defs top.metaCtx top.ops imported top.errors
 
   let modules = updateMap modns mod top.modules
   modifyTop [modules := modules]
@@ -134,11 +133,11 @@ processModule importFC repo stk modns = do
   -- FIXME module context should hold errors, to report in replay
   pure mod
   where
-    tryProcessDecl : String → List String → Decl → M Unit
+    tryProcessDecl : String → String → Decl → M Unit
     tryProcessDecl src ns decl = do
       (Left err) <- tryError $ processDecl ns decl | _ => pure MkUnit
       addError err
 
--- TODO clear dependents too.
-invalidateModule : List String -> M Unit
+-- NOW TODO clear dependents too.
+invalidateModule : String -> M Unit
 invalidateModule modname = modifyTop [modules $= deleteMap modname]
