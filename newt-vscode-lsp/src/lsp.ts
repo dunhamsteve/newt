@@ -22,33 +22,48 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
 
+// waiting for whomever to send accumulated changes
+const DELAY_AFTER_SEND = 200
+// waiting for typing to quiesce (and it seems accumulated changes have a delay between them)
+const DELAY_AFTER_CHANGE = 100
+
 // the last is the most important to the user, but we run FIFO
 // to ensure dependencies are seen in causal order
 let changes: TextDocument[] = []
 let running: NodeJS.Timeout | undefined
+let lastChange = 0
 function addChange(doc: TextDocument) {
   console.log('enqueue', doc.uri)
   // drop stale pending changes
   let before = changes.length
   changes = changes.filter(ch => ch.uri != doc.uri)
-  console.log('DROP', changes.length - before);
+  console.log('DROP', before - changes.length);
   changes.push(doc)
-  if (!running) running = setTimeout(runChange, 1)
+  lastChange = +new Date()
+  // I'm not sure if this timeout is a big deal
+  if (!running) running = setTimeout(runChange, DELAY_AFTER_CHANGE)
 }
 
+
 function runChange() {
+  let now = +new Date()
+  if ( now - lastChange < DELAY_AFTER_CHANGE) running = setTimeout(runChange, DELAY_AFTER_CHANGE);
   let doc = changes.shift()
   if (!doc) {
     running = undefined
     return
   }
   const uri = doc.uri
+  const start = +new Date()
   const diagnostics = LSP_checkFile(doc.uri)
+  const end = +new Date()
   connection.sendDiagnostics({uri,diagnostics})
-  console.log('SENT', doc.uri);
+  console.log('CHECK', doc.uri, 'in', end-start);
   running = undefined
-  // give more a chance to file in.
-  running = setTimeout(runChange,1)
+  // If we just sent one, it seems that we need to give vscode some time to send the rest
+  // Otherwise, for Elab.newt, we hit 1.8s for each character typed.
+  // 1 ms doesn't work, so I guess we don't have the changes accumulated locally.
+  running = setTimeout(runChange, DELAY_AFTER_SEND)
 }
 
 documents.onDidChangeContent(async (change) => {
