@@ -1,9 +1,9 @@
 *** Process tests/Duplicate.newt
 module Duplicate
-ERROR at tests/Duplicate.newt:4:1--4:5: Duplicate.Left is already defined at tests/Duplicate.newt:4:1--4:5
-  
+ERROR at tests/Duplicate.newt:5:1--5:5: Duplicate.Left is already defined at tests/Duplicate.newt:5:1--5:5
   -- duplicate name should fail
+  -- FIXME FC is wrong here
   data Either : U -> U -> U where
   ^^^^
 
-ERROR at :1:1--1:2: Failed to compile module Duplicate
+ERROR at tests/Duplicate.newt:1:1--1:2: Compile failed

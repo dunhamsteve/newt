@@ -19,3 +19,4 @@ src/Revision.newt
 .lsp
 .vscode
 bootstrap/serializer.js
+/newt-vscode-lsp/src/newt.js

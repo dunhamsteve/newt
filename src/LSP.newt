@@ -1,0 +1,144 @@
+module LSP
+
+import Prelude
+-- TODO pull this into its own file
+import Lib.Common
+import Lib.Types
+import Lib.TopContext
+import Lib.Tokenizer
+import Lib.Parser
+import Lib.Parser.Impl
+import Lib.ProcessModule
+import Data.SortedMap
+import Data.IORef
+import Node
+import Commands
+import Data.List1
+
+pfunc js_castArray : Array JSObject → JSObject := `x => x`
+pfunc js_castInt : Int → JSObject := `x => x`
+pfunc js_castBool : Bool → JSObject := `x => x`
+pfunc js_castStr : String → JSObject := `x => x`
+pfunc js_null : JSObject := `null`
+pfunc js_castObj : Array (String × JSObject) → JSObject := `(data) => {
+    let rval = {}
+    for (let x of data) rval[x.h2] = x.h3
+    return rval
+}`
+
+-- need case split
+jsonToJObject : Json → JSObject
+jsonToJObject (JsonInt x) = js_castInt x
+jsonToJObject (JsonNull) = js_null
+jsonToJObject (JsonArray xs) = js_castArray $ listToArray $ map jsonToJObject xs
+jsonToJObject (JsonBool x) = js_castBool x
+jsonToJObject (JsonStr x) = js_castStr x
+-- IMPERROR - if I leave off the `map` I get an error that is hard to sort out
+jsonToJObject (JsonObj xs) = js_castObj $ listToArray $ map (mapSnd jsonToJObject) xs
+
+record LSPState where
+    topContext : TopContext
+    baseDir : String
+    files : SortedMap String String
+
+state : IORef LSPState
+state = unsafePerformIO $ newIORef $ MkLSPState emptyTop "" emptyMap
+
+resetState : String → IO Unit
+resetState base = do
+    putStrLn "Reset base to \{base}"
+    writeIORef state $ MkLSPState emptyTop base emptyMap
+
+lspFileSource : FileSource
+lspFileSource = MkFileSource $ \fc fn => do
+    st <- readIORef state
+    let fn = st.baseDir ++ "/" ++ fn
+    let (Nothing) = lookupMap' fn st.files
+        | Just src => pure (fn,src)
+    let fn' = case split fn "file://" of
+        x :: fn :: _ => fn
+        _ => fn
+    (Right src) <- liftIO {M} $ readFile fn'
+        | Left err => throwError $ E fc "error reading \{fn}: \{show err}"
+    pure (fn,src)
+
+updateFile : String → String → Unit
+updateFile fn src = unsafePerformIO $ do
+    st <- readIORef state
+    modifyIORef state $ \a => [ files $= updateMap fn src ] a
+    let st = the LSPState $ [ files $= updateMap fn src ] st
+    -- module relative to base
+
+    let (Right toks) = tokenise fn src | Left err => writeIORef state st
+    let (Right ((nameFC, modName), _, _)) = partialParse fn parseModHeader emptyMap toks
+        | Left (err,toks) => writeIORef state st
+
+    Right (ctx,_) <- (invalidateModule $ split modName ".").runM st.topContext
+        | _ => writeIORef state st
+    -- TODO It doesn't have record type, but eta expanding resolves this.  See if there is a quick fix.
+    -- modifyIORef state [ topContext := ctx ]
+    modifyIORef state $ \a => [ topContext := ctx ] a
+
+hoverInfo : String → Int → Int → JSObject
+hoverInfo uri line col = unsafePerformIO $ do
+    let (base,modns) = decomposeName uri
+    putStrLn "Hover \{uri} base \{base} mod \{joinBy "." modns}"
+    st <- readIORef state
+    if (st.baseDir /= base)
+        then resetState base
+        else pure MkUnit
+    Right (_, Just msg) <- (getHoverInfo lspFileSource modns line col).runM st.topContext
+        | Right _  => do
+            putStrLn $ "Nothing to see here"
+            pure $ jsonToJObject JsonNull
+        | Left err => do
+            putStrLn $ showError "" err
+            pure $ jsonToJObject JsonNull
+    pure $ jsonToJObject $ JsonStr msg
+
+errorToDiag : Error -> Json
+errorToDiag (E (MkFC fn (MkBounds sr sc er ec)) msg) =
+  JsonObj
+    $  ("severity", JsonInt 1)
+    -- PARSER `$` is winning over `,`, which is not what I'm expecting  Maybe `,` should be special...
+    :: ("range", (JsonObj $ ("start", range sr sc) :: ("end", range er (ec + 1)) :: Nil))
+    :: ("message", JsonStr msg)
+    :: ("source", JsonStr "newt") -- what is this key for?
+    :: Nil
+  where
+    range : Int → Int → Json
+    range l c = JsonObj $ ("line", JsonInt l) :: ("character", JsonInt c) :: Nil
+-- These shouldn't escape
+errorToDiag (Postpone fc qn msg) = errorToDiag $ E fc "Postpone \{show qn} \{msg}"
+
+
+checkFile : String → JSObject
+checkFile fn = unsafePerformIO $ do
+    let (base,modns) = decomposeName fn
+    putStrLn "Checking \{fn} base \{base} mod \{joinBy "." modns}"
+    st <- readIORef state
+    if (st.baseDir /= base)
+        then resetState base
+        else pure MkUnit
+    (Right (top, json)) <- (do
+        modifyTop [ errors := Nil ]
+        putStrLn "add prim"
+        addPrimitives
+        putStrLn "processModule"
+        _ <- processModule emptyFC lspFileSource Nil modns
+        pure MkUnit
+        -- pull out errors and infos
+        top <- getTop
+        pure $ map (errorToDiag) top.errors
+        ).runM st.topContext
+        | Left err => do
+            putStrLn $ showError "" err
+            pure $ jsonToJObject $ JsonArray $ errorToDiag err :: Nil
+    -- Cache loaded modules
+    modifyIORef state $ \a => [ topContext := top ] a
+    pure $ jsonToJObject $ JsonArray json
+
+-- This seems like a hack, but it works.
+-- Dummy main function with references to force functions into ouput file.
+-- but we don't get `export` on it..
+pfunc main uses (updateFile checkFile hoverInfo) : IO Unit  := `() => {}`

@@ -81,6 +81,7 @@ data Json : U where
   JsonBool : Bool -> Json
   JsonInt : Int -> Json
   JsonArray : List Json -> Json
+  JsonNull : Json
 
 
 renderJson : Json -> String
@@ -88,6 +89,7 @@ renderJson (JsonObj xs) = "{" ++ joinBy "," (map renderPair xs) ++ "}"
   where
     renderPair : (String × Json) -> String
     renderPair (k,v) = quoteString k ++ ":" ++ renderJson v
+renderJson (JsonNull) = "null"
 renderJson (JsonStr str) = quoteString str
 renderJson (JsonBool x) = ite x "true" "false"
 renderJson (JsonInt i) = cast i

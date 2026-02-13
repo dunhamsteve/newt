@@ -1,7 +1,6 @@
 module Lib.ProcessModule
 
 import Prelude
-import Serialize
 import Lib.Types
 import Lib.Common
 import Lib.Syntax
@@ -21,7 +20,14 @@ addPrimitives = do
   processDecl primNS (PType emptyFC "String" Nothing)
   processDecl primNS (PType emptyFC "Char" Nothing)
   setDef (QN primNS "PiType") emptyFC (Erased emptyFC) (PrimFn "(h0, h1) => ({ tag: \"PiType\", h0, h1 });" (S (S Z)) Nil) Nil
-
+  top <- getTop
+  let modules = updateMap primNS (MkModCtx "" top.defs (MC emptyMap Nil 0 CheckAll) top.ops Nil) top.modules
+  modifyTop [ modules := modules
+      ; imported := primNS :: Nil
+      ; hints := emptyMap
+      ; ns := Nil
+      ; defs := emptyMap
+      ]
 
 record FileSource where
   getFile : FC → String → M (String × String)
@@ -31,7 +37,6 @@ parseDecls fn ops Nil acc = pure (acc <>> Nil, ops)
 parseDecls fn ops toks@(first :: _) acc =
   case partialParse fn (sameLevel parseDecl) ops toks of
     Left (err, toks) => do
-      putStrLn $ showError "" err
       addError err
       parseDecls fn ops (recover toks) acc
     Right (decl,ops,toks) => parseDecls fn ops toks (acc :< decl)
@@ -43,14 +48,6 @@ parseDecls fn ops toks@(first :: _) acc =
       then (tok :: toks)
       else recover toks
 
-moduleHash : String → List (List String) → M String
-moduleHash src imports = do
-  srcHash <- liftIO $ checksum src
-  top <- getTop
-  let mods = mapMaybe (\x => lookupMap' x top.modules) imports
-  let modHashes = map (\x => x.csum) mods
-  liftIO $ checksum $ fastConcat $ srcHash :: modHashes
-
 importToName : Import → List String
 importToName  (MkImport fc (_,name)) = split name "."
 
@@ -60,11 +57,14 @@ importHints (entry :: entries) = do
   when (elem Hint entry.eflags) $ \ _ => addHint entry.name
   importHints entries
 
-processModule : FC → FileSource → List String → List String → M String
+-- HACK this is returning src to help render errors..
+-- Maybe return module, put src and errors in module, add error for import with error, callers can sort out what they want to do?
+-- The issue here is command line newt wants to report all errors (we can print that though?)  LSP wants something more subtle
+processModule : FC → FileSource → List String → (stack : List String) → M ModContext
 processModule importFC repo stk modns = do
   top <- getTop
   let name = joinBy "." modns
-  let (Nothing) = lookupMap modns top.modules | _ => pure ""
+  let (Nothing) = lookupMap' modns top.modules | Just mod => pure mod
 
   let fn = joinBy "/" modns ++ ".newt"
   -- TODO now we can pass in the module name...
@@ -91,21 +91,8 @@ processModule importFC repo stk modns = do
       processModule nameFC repo (name :: stk) imp
       pure $ imp
   let imported = snoc imported primNS
-  srcSum <- liftIO $ checksum src
-  csum <- moduleHash srcSum imported
 
   putStrLn "module \{modName}"
-  top <- getTop
-  -- TODO we need a flag on this so `make newt3.js` properly tests self-compile
-  (Nothing) <- loadModule modns csum
-    | Just mod => do
-      let modules = updateMap modns mod top.modules
-
-      -- FIXME - we don't want stray operators in a module.
-      -- inject module ops into top
-      let ops = foldMap const top.ops $ toList mod.ctxOps
-      modifyTop [modules := modules; ops := ops ]
-      pure src  -- why am I returning this?
 
   log 1 $ \ _ => "MODNS " ++ show modns
   top <- getTop
@@ -131,21 +118,20 @@ processModule importFC repo stk modns = do
   -- update modules with result, leave the rest of context in case this is top file
   top <- getTop
 
-  let mod = MkModCtx csum top.defs top.metaCtx top.ops importNames
-  if stk /= Nil && length' top.errors == 0
-    then dumpModule modns src mod
-    else pure MkUnit
+  let mod = MkModCtx src top.defs top.metaCtx top.ops importNames
 
   let modules = updateMap modns mod top.modules
   modifyTop [modules := modules]
 
   logMetas $ reverse $ listValues top.metaCtx.metas
-  let (Nil) = top.errors
-    | errors => throwError $ E importFC "Failed to compile module \{joinBy "." modns}"
-  pure src
+  -- FIXME module context should hold errors, to report in replay
+  pure mod
   where
     tryProcessDecl : String → List String → Decl → M Unit
     tryProcessDecl src ns decl = do
       (Left err) <- tryError $ processDecl ns decl | _ => pure MkUnit
-      putStrLn $ showError src err
       addError err
+
+-- TODO clear dependents too.
+invalidateModule : List String -> M Unit
+invalidateModule modname = modifyTop [modules $= deleteMap modname]

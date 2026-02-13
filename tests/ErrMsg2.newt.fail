@@ -2,5 +2,9 @@
 module Prelude
 module ErrMsg2
 ERROR at tests/ErrMsg2.newt:6:13--6:15: Expected '=>' at Keyword:->
+  
+  foo : Nat → (Nat → Nat)
+  foo x = \ x -> x
+              ^^
 
-ERROR at :1:1--1:2: Failed to compile module ErrMsg2
+ERROR at tests/ErrMsg2.newt:1:1--1:2: Compile failed

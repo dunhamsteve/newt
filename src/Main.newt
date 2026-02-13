@@ -18,7 +18,6 @@ import Lib.Types
 import Lib.Syntax
 import Lib.ReplParser
 import Node
-import Serialize
 import Revision
 
 dirFileSource : String → FileSource
@@ -73,8 +72,7 @@ showErrors fn src = do
         throwError $ E (MkFC fn $ MkBounds 0 0 0 0) "Compile failed"
   pure MkUnit
 
-invalidateModule : List String -> M Unit
-invalidateModule modname = modifyTop [modules $= deleteMap modname]
+
 
 -- processFile called on the top level file
 -- it sets up everything and then recurses into processModule
@@ -98,21 +96,12 @@ processFile fn = do
   base <- getBaseDir fn nameFC modns
   addPrimitives
 
-  top <- getTop
-  let modules = updateMap primNS (MkModCtx "" top.defs (MC emptyMap Nil 0 CheckAll) top.ops Nil) top.modules
-  modifyTop [ modules := modules
-            ; imported := primNS :: Nil
-            ; hints := emptyMap
-            ; ns := Nil
-            ; defs := emptyMap
-            ]
-
   invalidateModule modns
   let repo = dirFileSource base
-  src <- processModule emptyFC repo Nil modns
+  mod <- processModule emptyFC repo Nil modns
   top <- getTop
 
-  showErrors fn src
+  showErrors fn mod.modSource
   pure MkUnit
 
 cmdLine : List String -> M (Maybe String × List String)
@@ -142,7 +131,7 @@ browseTop qn@(QN ns x) = do
     go : List TopEntry → M Unit
     go Nil = pure MkUnit
     go (e :: es) = do
-      putStrLn "\{show e.name} : \{rpprint Nil e.type}"
+      putStrLn "\{show e.fc} \{show e.name} : \{rpprint Nil e.type}"
       go es
 
 replHeader : M Unit
@@ -206,6 +195,7 @@ main' = do
             replHeader
             runRepl
   (out, files) <- cmdLine args
+
   traverse processFile files
 
   when (elem "--top" args) $ \ _ => do
@@ -218,8 +208,6 @@ main' = do
 
 main : IO Unit
 main = do
-  -- we'll need to reset for each file, etc.
-  ctx <- emptyTop
-  (Right _)  <- .runM main' ctx
+  (Right _)  <- .runM main' emptyTop
     | Left err => exitFailure "ERROR at \{show $ getFC err}: \{errorMsg err}"
   putStrLn "done"

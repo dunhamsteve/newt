@@ -1,10 +1,10 @@
 *** Process tests/ErrorDup.newt
 module ErrorDup
-ERROR at tests/ErrorDup.newt:5:6--5:9: Nat already declared
-  data Nat = Z | S Nat
+ERROR at tests/ErrorDup.newt:9:7--9:10: Nat already declared
+  record Nat where
   
-  data Nat = Z | S Nat
-       ^^^
+  class Nat where
+        ^^^
 
 ERROR at tests/ErrorDup.newt:7:8--7:11: Nat already declared
   data Nat = Z | S Nat
@@ -12,10 +12,10 @@ ERROR at tests/ErrorDup.newt:7:8--7:11: Nat already declared
   record Nat where
          ^^^
 
-ERROR at tests/ErrorDup.newt:9:7--9:10: Nat already declared
-  record Nat where
+ERROR at tests/ErrorDup.newt:5:6--5:9: Nat already declared
+  data Nat = Z | S Nat
   
-  class Nat where
-        ^^^
+  data Nat = Z | S Nat
+       ^^^
 
-ERROR at :1:1--1:2: Failed to compile module ErrorDup
+ERROR at tests/ErrorDup.newt:1:1--1:2: Compile failed

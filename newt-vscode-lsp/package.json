@@ -1,0 +1,105 @@
+{
+  "name": "newt-vscode",
+  "publisher": "dunhamsteve",
+  "displayName": "newt-vscode",
+  "description": "newt language support with LSP",
+  "version": "0.0.1",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dunhamsteve/newt"
+  },
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "newt",
+        "aliases": [
+          "newt"
+        ],
+        "extensions": [
+          "newt"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "newt",
+        "scopeName": "source.newt",
+        "path": "./syntaxes/newt.tmLanguage.json"
+      },
+      {
+        "path": "./syntaxes/inject.json",
+        "scopeName": "newt.injection",
+        "injectTo": [
+          "text.html.markdown"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.idris": "newt"
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "newt-vscode.check",
+        "title": "Check newt file"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Newt Configuration",
+      "properties": {
+        "newt.path": {
+          "type": "string",
+          "default": "node bootstrap/newt.js",
+          "description": "Command to run newt"
+        },
+        "newt.lspPath": {
+          "type": "string",
+          "default": null,
+          "description": "path to LSP script (run in node)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "esbuild": "node esbuild.js",
+    "package": "echo npm run check-types && npm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src --ext ts",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.7",
+    "@types/node": "25.x",
+    "@types/vscode": "^1.90.0",
+    "@typescript-eslint/eslint-plugin": "^7.14.1",
+    "@typescript-eslint/parser": "^7.11.0",
+    "@vscode/test-cli": "^0.0.9",
+    "@vscode/test-electron": "^2.4.0",
+    "esbuild": "^0.25.0",
+    "eslint": "^8.57.0",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  }
+}

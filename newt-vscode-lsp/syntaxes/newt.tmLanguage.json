@@ -1,0 +1,47 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "newt",
+  "scopeName": "source.newt",
+  "patterns": [
+    {
+      "name": "invalid.illegal.trace",
+      "match": "\\b(trace|strace|fatalError)\\b"
+    },
+    {
+      "name": "comment.block.newt",
+      "begin": "/-",
+      "end": "-/",
+      "contentName": "comment.block.newt"
+    },
+    {
+      "name": "comment.line.newt",
+      "begin": "--",
+      "end": "\\n"
+    },
+    {
+      "name": "keyword.newt",
+      "match": "\\b(λ|=>|<-|->|→|:=|\\$|data|record|constructor|where|do|class|uses|instance|case|of|let|if|then|else|forall|∀|in|U|module|import|ptype|pfunc|infix|infixl|infixr)\\b"
+    },
+    {
+      "name": "string.js",
+      "begin": "`",
+      "end": "`",
+      "patterns": [{ "include": "source.js" }]
+    },
+    {
+      "name": "character",
+      "match": "'\\\\?.'"
+    },
+    {
+      "name": "string.double.newt",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.newt",
+          "match": "\\\\[^{]"
+        }
+      ]
+    }
+  ]
+}

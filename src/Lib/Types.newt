@@ -396,7 +396,7 @@ instance Show TopEntry where
 
 record ModContext where
   constructor MkModCtx
-  csum : String
+  modSource : String
   modDefs : SortedMap QName TopEntry
   -- Do we need this if everything solved is zonked?
   modMetaCtx : MetaContext

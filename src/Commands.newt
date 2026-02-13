@@ -1,0 +1,49 @@
+-- For shared code between REPL and LSP
+module Commands
+
+import Prelude
+import Lib.ProcessModule
+import Lib.Types
+import Lib.TopContext
+import Lib.Common
+import Data.List1
+import Lib.Tokenizer
+import Lib.Token
+import Lib.Elab
+
+-- For now we cheat and assume capitalized directories are a module component
+decomposeName : String → String × List String
+decomposeName fn =
+    go Nil $ Lin <>< split (fst $ splitFileName fn) "/"
+    where
+        go : List String → SnocList String → String × List String
+        go acc Lin = (".", acc)
+        go acc (xs :< x) = if isUpper $ strIndex x 0
+            then go (x :: acc) xs
+            else (joinBy "/" (xs :< x <>> Nil), acc)
+
+-- The cheap version of type at point, find the token, lookup in global context
+-- Later we will either get good FC for entries or scan them all and build a cache.
+getHoverInfo : FileSource → List String → Int → Int → M (Maybe String)
+getHoverInfo repo modns row col = do
+    mod <- processModule emptyFC repo Nil modns
+    -- not necessarily loaded into top... (Maybe push this down into that branch of processModule)
+    modifyTop [ defs := mod.modDefs; metaCtx := mod.modMetaCtx; ops := mod.ctxOps; imported := mod.modDeps ]
+    top <- getTop
+
+    -- Find the token at the point
+    let lines = split mod.modSource "\n"
+    let line = fromMaybe "" (getAt' row lines)
+    let (Right toks) = tokenise "" line | Left _ => pure Nothing
+    let (Just name) = getTok toks       | _ => pure Nothing
+
+    -- Lookup the name
+    let (Just e) = lookupRaw name top   | _ => pure Nothing
+    pure $ Just "\{show e.name} : \{rpprint Nil e.type}"
+
+    where
+        getTok : List BTok → Maybe String
+        getTok Nil = Nothing
+        getTok (tok :: toks) =
+            if tok.bounds.startCol <= col && (col <= tok.bounds.endCol)
+            then Just $ value tok else getTok toks

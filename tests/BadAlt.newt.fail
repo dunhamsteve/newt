@@ -7,4 +7,4 @@ ERROR at tests/BadAlt.newt:6:6--6:13: Prelude._:<_ not a constructor for (Prelud
   foo (xs :< x) = x
        ^^^^^^^
 
-ERROR at :1:1--1:2: Failed to compile module BadAlt
+ERROR at tests/BadAlt.newt:1:1--1:2: Compile failed

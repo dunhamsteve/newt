@@ -27,6 +27,7 @@ collectDecl ((FunDef fc nm cl) :: rest@(FunDef _ nm' cl' :: xs)) =
   else (FunDef fc nm cl :: collectDecl rest)
 collectDecl (x :: xs) = x :: collectDecl xs
 
+-- TODO Move this, so we don't need to import all of Elab
 rpprint : List String → Tm → String
 rpprint names tm = render 90 $ pprint names tm
 

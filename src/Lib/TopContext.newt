@@ -46,11 +46,8 @@ lookupRaw raw top =
 instance Show TopContext where
   show top = "\nContext:\n [\{ joinBy "\n" $ map (show ∘ snd) $ toList top.defs}]"
 
--- TODO need to get class dependencies working
-emptyTop : ∀ io. {{Monad io}} {{HasIO io}} -> io TopContext
-emptyTop = do
-  let mcctx = MC emptyMap Nil 0 CheckAll
-  pure $ MkTop emptyMap Nil emptyMap Nil emptyMap mcctx 0 Nil emptyMap
+emptyTop : TopContext
+emptyTop = MkTop emptyMap Nil emptyMap Nil emptyMap (MC emptyMap Nil 0 CheckAll) 0 Nil emptyMap
 
 
 setFlag : QName → FC → EFlag → M Unit

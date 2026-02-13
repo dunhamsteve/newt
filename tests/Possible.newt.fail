@@ -7,4 +7,4 @@ ERROR at tests/Possible.newt:6:5--6:8: possible constructors: [Prelude.Z, Prelud
   foo ()
       ^^^
 
-ERROR at :1:1--1:2: Failed to compile module Possible
+ERROR at tests/Possible.newt:1:1--1:2: Compile failed
