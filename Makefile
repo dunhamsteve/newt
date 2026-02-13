@@ -16,15 +16,12 @@ src/Revision.newt: .PHONY
 	rm -f src/Revision.newt.new
 
 newt.js: ${SRCS} src/Revision.newt
-	-rm build/* >/dev/null
 	$(RUNJS) bootstrap/newt.js src/Main.newt -o newt.js
 
 newt2.js: newt.js
-	-rm build/*
 	$(RUNJS) newt.js src/Main.newt -o newt2.js
 
 newt3.js: newt2.js
-	-rm build/*
 	time $(RUNJS) newt2.js src/Main.newt -o newt3.js
 	cmp newt2.js newt3.js
 
