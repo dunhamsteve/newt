@@ -59,6 +59,7 @@ function runChange() {
   const end = +new Date()
   connection.sendDiagnostics({uri,diagnostics})
   console.log('CHECK', doc.uri, 'in', end-start);
+  console.log("GOT\n",JSON.stringify(diagnostics, null, '  '))
   running = undefined
   // If we just sent one, it seems that we need to give vscode some time to send the rest
   // Otherwise, for Elab.newt, we hit 1.8s for each character typed.

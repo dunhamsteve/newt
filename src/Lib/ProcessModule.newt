@@ -21,7 +21,7 @@ addPrimitives = do
   processDecl primNS (PType emptyFC "Char" Nothing)
   setDef (QN primNS "PiType") emptyFC (Erased emptyFC) (PrimFn "(h0, h1) => ({ tag: \"PiType\", h0, h1 });" (S (S Z)) Nil) Nil
   top <- getTop
-  let mod = MkModCtx "" top.defs (MC emptyMap Nil 0 CheckAll) top.ops Nil
+  let mod = MkModCtx "" top.defs (MC emptyMap Nil 0 CheckAll) top.ops Nil top.errors
   let modules = updateMap primNS mod top.modules
   modifyTop [ modules := modules
       ; imported := primNS :: Nil
@@ -91,7 +91,7 @@ processModule importFC repo stk modns = do
   let importNames = map importToName imports
 
   imported <- for imports $ \case
-    MkImport fc (nameFC,name') => do
+    MkImport fc (nameFC, name') => do
       let imp = split name' "."
       when (elem name' stk) $ \ _ => error nameFC "import loop \{show name} → \{show name'}"
       processModule nameFC repo (name :: stk) imp
@@ -125,7 +125,7 @@ processModule importFC repo stk modns = do
   -- update modules with result, leave the rest of context in case this is top file
   top <- getTop
 
-  let mod = MkModCtx src top.defs top.metaCtx top.ops importNames
+  let mod = MkModCtx src top.defs top.metaCtx top.ops importNames top.errors
 
   let modules = updateMap modns mod top.modules
   modifyTop [modules := modules]
