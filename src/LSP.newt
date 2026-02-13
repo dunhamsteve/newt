@@ -127,8 +127,6 @@ checkFile fn = unsafePerformIO $ do
         else pure MkUnit
     (Right (top, json)) <- (do
         modifyTop [ errors := Nil ]
-        putStrLn "add prim"
-        addPrimitives
         putStrLn "processModule"
         _ <- processModule emptyFC lspFileSource Nil modns
         pure MkUnit

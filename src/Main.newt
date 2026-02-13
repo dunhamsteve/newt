@@ -94,7 +94,6 @@ processFile fn = do
 
   let modns = split modName "."
   base <- getBaseDir fn nameFC modns
-  addPrimitives
 
   invalidateModule modns
   let repo = dirFileSource base

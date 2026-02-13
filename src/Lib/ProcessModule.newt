@@ -14,20 +14,22 @@ import Data.List1
 import Lib.Elab
 
 -- declare internal primitives
-addPrimitives : M Unit
+addPrimitives : M ModContext
 addPrimitives = do
   processDecl primNS (PType emptyFC "Int" Nothing)
   processDecl primNS (PType emptyFC "String" Nothing)
   processDecl primNS (PType emptyFC "Char" Nothing)
   setDef (QN primNS "PiType") emptyFC (Erased emptyFC) (PrimFn "(h0, h1) => ({ tag: \"PiType\", h0, h1 });" (S (S Z)) Nil) Nil
   top <- getTop
-  let modules = updateMap primNS (MkModCtx "" top.defs (MC emptyMap Nil 0 CheckAll) top.ops Nil) top.modules
+  let mod = MkModCtx "" top.defs (MC emptyMap Nil 0 CheckAll) top.ops Nil
+  let modules = updateMap primNS mod top.modules
   modifyTop [ modules := modules
       ; imported := primNS :: Nil
       ; hints := emptyMap
       ; ns := Nil
       ; defs := emptyMap
       ]
+  pure mod
 
 record FileSource where
   getFile : FC → String → M (String × String)
@@ -64,7 +66,11 @@ processModule : FC → FileSource → List String → (stack : List String) → 
 processModule importFC repo stk modns = do
   top <- getTop
   let name = joinBy "." modns
-  let (Nothing) = lookupMap' modns top.modules | Just mod => pure mod
+  let (Nothing) = lookupMap' modns top.modules
+    | Just mod => pure mod
+
+  let (False) = modns == primNS
+    | _ => addPrimitives
 
   let fn = joinBy "/" modns ++ ".newt"
   -- TODO now we can pass in the module name...
@@ -90,6 +96,7 @@ processModule importFC repo stk modns = do
       when (elem name' stk) $ \ _ => error nameFC "import loop \{show name} → \{show name'}"
       processModule nameFC repo (name :: stk) imp
       pure $ imp
+  processModule nameFC repo (name :: stk) primNS
   let imported = snoc imported primNS
 
   putStrLn "module \{modName}"
