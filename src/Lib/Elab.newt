@@ -1397,6 +1397,12 @@ updateRec ctx fc clauses arg ty = do
     Nothing => RLam fc (BI fc "$ru" Explicit Many) tm
   check ctx tm ty
   where
+    app : FC → Raw → Raw → Raw
+    -- A nested recored update ended up as an RApp of a bare update, essentially
+    -- a beta redux, and it hit `infer` on the RUpdateRec
+    app _ (RUpdateRec fc cl Nothing) u = RUpdateRec fc cl (Just u)
+    app fc t u = (RApp fc t u Explicit)
+
     doClause : List (String × Raw) → UpdateClause → M (List (String × Raw))
     doClause args (ModifyField fc nm tm) = go args
       where
@@ -1404,7 +1410,7 @@ updateRec ctx fc clauses arg ty = do
         go Nil = error fc "\{nm} is not a field of \{show ty}"
         go (x :: xs) = if fst x == nm
         -- need arg in here and apply tm to arg
-          then pure $ (nm, RApp fc tm (snd x) Explicit) :: xs
+          then pure $ (nm, app fc tm (snd x)) :: xs
           else _::_ x <$> go xs
     doClause args (AssignField fc nm tm) = go args
       where
@@ -1425,10 +1431,11 @@ updateRec ctx fc clauses arg ty = do
       let (Just (MkEntry _ _ ty (DCon _ _ _ _) _)) = lookup conname top
         | _ => error fc "\{show conname} not a dcon"
       pure (conname, collect arg ty)
-    --
-    getTele Nothing (VPi _ _ _ _ a b) = getTele (Just $ RVar fc "$ru") a
-    getTele Nothing v = error (getFC v) "Expected a pi type, got \{show v}"
-    getTele _ v = error (getFC v) "Expected a record type, got \{show v}"
+    getTele Nothing (VPi _ _ _ _ a b) = do
+      a <- forceType ctx.env a
+      getTele (Just $ RVar fc "$ru") a
+    getTele Nothing v = error fc "Expected a pi type, got \{show v}"
+    getTele (Just tm) v = error (getFC tm) "Expected a record type, got \{show v}"
 
 infer : Context -> Raw  -> M (Tm × Val)
 

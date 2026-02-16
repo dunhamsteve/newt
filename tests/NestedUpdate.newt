@@ -1,0 +1,12 @@
+module NestedUpdate
+
+import Prelude
+
+record Foo where
+    bar : Int
+
+record Bar where
+    foo : Foo
+
+blah : Bar → Bar
+blah x = [ foo $= [ bar := 1]] x

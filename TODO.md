@@ -135,8 +135,8 @@
 - [x] implement magic nat
 - [ ] Consider splitting desugar/check
   - We can only check physical syntax at the moment, which has been inconvenient in a couple of spots where we want to check generated code. E.g. solutions to auto implicits.
-- [ ] record update can't elaborate if type is unsolved meta
-  - need to postpone elab until meta is known. Create fresh meta for the term to return and have postponed elab fill it in later.
+- [x] record update can't elaborate if type is unsolved meta
+  - The issue actually was a solved meta that wasn't forced
 - [x] drop erased args on types and top level functions
 - [x] can I do some inlining without blowing up code size?
   - [x] Maybe tag some functions as inline

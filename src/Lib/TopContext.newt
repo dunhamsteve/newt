@@ -55,7 +55,7 @@ setFlag name fc flag = do
   top <- getTop
   let (Just (MkEntry fc nm ty def flags)) = lookupMap' name top.defs
     | Nothing => error fc "\{show name} not declared"
-  modifyTop $ \ top => [ defs := (updateMap name (MkEntry fc name ty def (flag :: flags)) top.defs) ] top
+  modifyTop [ defs $= (updateMap name (MkEntry fc name ty def (flag :: flags))) ]
 
 setDef : QName -> FC -> Tm -> Def → List EFlag -> M Unit
 setDef name fc ty def flags = do
