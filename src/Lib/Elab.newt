@@ -118,8 +118,8 @@ isCandidate ty (App fc t u) = isCandidate ty t
 isCandidate _ _ = False
 
 setMetaMode : MetaMode → M Unit
--- ideally we could do metaCtx.mcmode := CheckFirst
-setMetaMode mcmode = modifyTop $ \top => [ metaCtx := [mcmode := mcmode] (top.metaCtx) ] top
+-- ideally we would support dotted paths like metaCtx.mcmode := CheckFirst
+setMetaMode mcmode = modifyTop [ metaCtx $= [mcmode := mcmode] ]
 
 findMatches : Context -> Val -> List (QName × Tm) -> M (List QName)
 findMatches ctx ty Nil = pure Nil
@@ -632,7 +632,7 @@ freshMeta ctx fc ty kind = do
   let autos = case kind of
       AutoSolve => qn :: mc.autos
       _ => mc.autos
-  modifyTop $ \top => [metaCtx := MC (updateMap qn newmeta mc.metas) autos (1 + mc.next) mc.mcmode ] top
+  modifyTop [metaCtx := MC (updateMap qn newmeta mc.metas) autos (1 + mc.next) mc.mcmode ]
   -- I tried checking Auto immediately if CheckAll, but there isn't enough information yet.
   pure $ applyBDs 0 (Meta fc qn) ctx.bds
   where
@@ -1384,9 +1384,13 @@ undo prev ((DoArrow fc left right alts) :: xs) = do
     (RLam fc (BI fc nm Explicit Many) rest) Explicit
 
 
--- REVIEW do we want to let arg?
--- collect fields and default assignment
--- subst in real assignment
+-- REVIEW should `arg` be assigned to a variable with `RLet`?
+-- REVIEW a case statement to destruct the record instead of projections
+-- would make less work for the compiler / inliner.
+
+-- updateRec makes a list of fields and a term for the current value (collect), swaps in
+-- any updates present in the code (doClause), and generates an application of the
+-- constructor.
 updateRec : Context → FC → List UpdateClause → Maybe Raw → Val → M Tm
 updateRec ctx fc clauses arg ty = do
   ((QN _ conname), args) <- getTele arg ty

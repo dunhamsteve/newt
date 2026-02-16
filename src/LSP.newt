@@ -65,7 +65,7 @@ lspFileSource = MkFileSource $ \fc fn => do
 updateFile : String → String → Unit
 updateFile fn src = unsafePerformIO $ do
     st <- readIORef state
-    modifyIORef state $ \a => [ files $= updateMap fn src ] a
+    modifyIORef state [ files $= updateMap fn src ]
     let st = the LSPState $ [ files $= updateMap fn src ] st
     -- module relative to base
 
@@ -75,9 +75,7 @@ updateFile fn src = unsafePerformIO $ do
 
     Right (ctx,_) <- (invalidateModule modName).runM st.topContext
         | _ => writeIORef state st
-    -- TODO It doesn't have record type, but eta expanding resolves this.  See if there is a quick fix.
-    -- modifyIORef state [ topContext := ctx ]
-    modifyIORef state $ \a => [ topContext := ctx ] a
+    modifyIORef state [ topContext := ctx ]
 
 
 fcToRange : FC → Json
@@ -139,7 +137,7 @@ checkFile fn = unsafePerformIO $ do
             putStrLn $ showError "" err
             pure $ jsonToJObject $ JsonArray $ errorToDiag err :: Nil
     -- Cache loaded modules
-    modifyIORef state $ \a => [ topContext := top ] a
+    modifyIORef state $ [ topContext := top ]
     pure $ jsonToJObject $ JsonArray json
 
 -- This seems like a hack, but it works.
