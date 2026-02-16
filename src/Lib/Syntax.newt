@@ -35,6 +35,11 @@ data DoStmt : U where
   DoLet : (fc : FC) -> String -> Raw -> DoStmt
   DoArrow : (fc : FC) -> Raw -> Raw -> List RCaseAlt -> DoStmt
 
+instance HasFC DoStmt where
+  getFC (DoExpr fc _) = fc
+  getFC (DoArrow fc _ _ _) = fc
+  getFC (DoLet fc _ _) = fc
+
 Decl : U
 data Raw : U where
   RVar : (fc : FC) -> (nm : Name) -> Raw

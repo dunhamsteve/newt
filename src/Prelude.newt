@@ -3,7 +3,7 @@ module Prelude
 id : ∀ a. a → a
 id x = x
 
-the : (a : U) → a → a
+the : (0 a : U) → a → a
 the _ a = a
 
 const : ∀ a b. a → b → a

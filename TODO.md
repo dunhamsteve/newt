@@ -17,6 +17,7 @@
   - [ ] Duplicate data constructors point to `data`
   - [ ] Allow Qualified names in surface syntax
   - Don't disambiguate on type for now
+  - [ ] Could we disambiguate just Data constructors on type?
 - [x] change "in prefix position" and "trailing operator" errors to do sections
 - [ ] maybe add fat arrows, I keep wanting to type them, `{{...}}` is a little ugly
   - There may be ambiguity issues at the parsing level, but we don't have typecase, so.

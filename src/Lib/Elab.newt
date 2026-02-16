@@ -636,10 +636,8 @@ freshMeta ctx fc ty kind = do
   -- I tried checking Auto immediately if CheckAll, but there isn't enough information yet.
   pure $ applyBDs 0 (Meta fc qn) ctx.bds
   where
-    -- hope I got the right order here :)
     applyBDs : Int -> Tm -> List BD -> Tm
     applyBDs k t Nil = t
-    -- review the order here
     applyBDs k t (Bound :: xs) = App emptyFC (applyBDs (1 + k) t xs) (Bnd emptyFC k)
     applyBDs k t (Defined :: xs) = applyBDs (1 + k) t xs
 
@@ -1353,32 +1351,33 @@ showDef ctx names n v = do
   pure "= \{vv}"
 
 -- desugar do
-undo : FC -> List DoStmt -> M Raw
-undo prev Nil = error prev "do block must end in expression"
-undo prev ((DoExpr fc tm) :: Nil) = pure tm
--- TODO decide if we want to use >> or just >>=
-undo prev ((DoExpr fc tm) :: xs) = do
-  xs' <- undo fc xs
-  -- output is bigger, not sure if it helps inference or not
+undo : List DoStmt -> M Raw
+-- Should be unreachable in practice
+undo Nil = error emptyFC "do block must end in expression"
+undo ((DoExpr fc tm) :: Nil) = pure tm
+undo (tm :: Nil) = error (getFC tm) "do block must end in expression"
+undo ((DoExpr fc tm) :: xs) = do
+  xs' <- undo xs
+  -- Not sure if it helps inference or not (and now fails with erasure thing)
   -- pure $ RApp fc (RApp fc (RVar fc "_>>_") tm Explicit) xs' Explicit
-  pure $ RApp fc (RApp fc (RVar fc "_>>=_") tm Explicit) (RLam fc (BI fc "_" Explicit Many) xs') Explicit
-undo prev ((DoLet fc nm tm) :: xs) = RLet fc nm (RImplicit fc) tm <$> undo fc xs
-undo prev ((DoArrow fc left@(RVar fc' nm) right Nil) :: xs) = do
+  pure $ RApp fc (RApp fc (RVar fc "bind") tm Explicit) (RLam fc (BI fc "_" Explicit Many) xs') Explicit
+undo ((DoLet fc nm tm) :: xs) = RLet fc nm (RImplicit fc) tm <$> undo xs
+undo ((DoArrow fc left@(RVar fc' nm) right Nil) :: xs) = do
   top <- getTop
   case lookupRaw nm top of
     Just _ => do
       let nm = "$sc"
-      xs' <- undo fc xs
+      xs' <- undo xs
       rest <- pure $ RCase fc (RVar fc nm) Nothing (MkAlt left (Just xs') :: Nil)
       pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
         (RLam fc (BI fc nm Explicit Many) rest) Explicit
     Nothing => do
-      xs' <- undo fc xs
+      xs' <- undo xs
       pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
         (RLam fc (BI fc' nm Explicit Many) xs') Explicit
-undo prev ((DoArrow fc left right alts) :: xs) = do
+undo ((DoArrow fc left right alts) :: xs) = do
   let nm = "$sc"
-  xs' <- undo fc xs
+  xs' <- undo xs
   rest <- pure $ RCase fc (RVar fc nm) Nothing (MkAlt left (Just xs') :: alts)
   pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
     (RLam fc (BI fc nm Explicit Many) rest) Explicit
@@ -1453,8 +1452,8 @@ check ctx tm ty = do
       let tm' = RCase fc a Nothing (MkAlt (RVar (getFC b) "True") (Just b) :: MkAlt (RVar (getFC c) "False") (Just c)  :: Nil) in
       check ctx tm' ty
     (RDo fc stmts, ty) => do
-      stmts' <- undo fc stmts
-      check ctx stmts' ty
+      body <- undo stmts
+      check ctx body ty
     (RCase fc rsc mty alts, ty) => do
       (sc, scty) <- case mty of
         Nothing => infer ctx rsc
@@ -1535,9 +1534,8 @@ check ctx tm ty = do
       sc <- check (extend ctx nm' a) tm ty'
       pure $ Lam (getFC tm) nm' Auto rig sc
 
-    (tm,ty) => do
+    (tm, ty) => do
       (tm', ty') <- infer ctx tm
-      -- REVIEW - should we look at `tm` to know how many to insert? Is there a case where this helps?
       (tm', ty') <- insert ctx tm' ty'
 
       let names = map fst ctx.types

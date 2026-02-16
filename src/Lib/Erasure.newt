@@ -96,8 +96,7 @@ erase env t sp = case t of
   (Bnd fc k) => do
     case getAt (cast k) env of
       Nothing => error fc "bad index \{show k}"
-      -- This is working, but empty FC
-      Just (nm, Zero, ty) => error fc "used erased value \{show nm} (FIXME FC may be wrong here)"
+      Just (nm, Zero, ty) => error fc "used erased value \{show nm} (FIXME FC may be wrong here - see Elab.lookupName)"
       Just (nm, Many, ty) => eraseSpine env t sp ty
   (UU fc) => eraseSpine env t sp (Just $ UU fc)
   (Lit fc lit) => eraseSpine env t sp Nothing
