@@ -22,61 +22,66 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
 
-// waiting for whomever to send accumulated changes
-const DELAY_AFTER_SEND = 200
-// waiting for typing to quiesce (and it seems accumulated changes have a delay between them)
-const DELAY_AFTER_CHANGE = 100
-
 // the last is the most important to the user, but we run FIFO
 // to ensure dependencies are seen in causal order
 let changes: TextDocument[] = []
-let running: NodeJS.Timeout | undefined
+let running = false
 let lastChange = 0
 function addChange(doc: TextDocument) {
   console.log('enqueue', doc.uri)
   // drop stale pending changes
   let before = changes.length
   changes = changes.filter(ch => ch.uri != doc.uri)
-  console.log('DROP', before - changes.length);
+  console.log('DROPPED', before - changes.length);
   changes.push(doc)
   lastChange = +new Date()
-  // I'm not sure if this timeout is a big deal
-  if (!running) running = setTimeout(runChange, DELAY_AFTER_CHANGE)
+  if (!running) runChange()
 }
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-function runChange() {
-  let now = +new Date()
-  if ( now - lastChange < DELAY_AFTER_CHANGE) running = setTimeout(runChange, DELAY_AFTER_CHANGE);
-  let doc = changes.shift()
-  if (!doc) {
-    running = undefined
-    return
+async function runChange() {
+  try {
+    running = true;
+    while (changes.length) {
+      console.log('LOOP TOP')
+      // Wait until things stop changing
+      let prev = lastChange
+      while (1) {
+        await sleep(100)
+        if (prev == lastChange) break
+        prev = lastChange
+        console.log('DELAY')
+      }
+      let doc = changes.shift()
+      if (!doc) {
+        running = false
+        return
+      }
+      const uri = doc.uri
+      const start = +new Date()
+      const diagnostics = LSP_checkFile(doc.uri)
+      const end = +new Date()
+      console.log('CHECK', doc.uri, 'in', end - start);
+      await sleep(1);
+      if (!changes.find(ch => ch.uri === uri)) {
+        connection.sendDiagnostics({ uri, diagnostics })
+      } else {
+        console.log('STALE result not sent for', uri)
+      }
+    }
+  } finally {
+    running = false;
   }
-  const uri = doc.uri
-  const start = +new Date()
-  const diagnostics = LSP_checkFile(doc.uri)
-  const end = +new Date()
-  connection.sendDiagnostics({uri,diagnostics})
-  console.log('CHECK', doc.uri, 'in', end-start);
-  console.log("GOT\n",JSON.stringify(diagnostics, null, '  '))
-  running = undefined
-  // If we just sent one, it seems that we need to give vscode some time to send the rest
-  // Otherwise, for Elab.newt, we hit 1.8s for each character typed.
-  // 1 ms doesn't work, so I guess we don't have the changes accumulated locally.
-  running = setTimeout(runChange, DELAY_AFTER_SEND)
 }
 
 documents.onDidChangeContent(async (change) => {
   console.log('DIDCHANGE', change.document.uri)
   const uri = change.document.uri;
   const text = change.document.getText();
+  // update/invalidate happens now, check happens on quiesce.
   LSP_updateFile(uri, text);
-  // we defer the check to let all of the changes file in.
   addChange(change.document);
-  // const diagnostics = LSP_checkFile(uri);
-  // console.log(`Got ${JSON.stringify(diagnostics, null, '  ')}`)
-  // connection.sendDiagnostics({ uri, diagnostics })
 });
 
 connection.onHover((params): Hover | null => {
