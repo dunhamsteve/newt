@@ -26,7 +26,10 @@ decomposeName fn =
 -- Later we will either get good FC for entries or scan them all and build a cache.
 getHoverInfo : FileSource → String → Int → Int → M (Maybe (String × FC))
 getHoverInfo repo modns row col = do
+    -- REVIEW consider not running processModule and returning empty if it hasn't been processed yet
+    -- For Elab.newt, there would be a 1.5s delay...
     mod <- processModule emptyFC repo Nil modns
+
     -- not necessarily loaded into top... (Maybe push this down into that branch of processModule)
     modifyTop [ defs := mod.modDefs; metaCtx := mod.modMetaCtx; ops := mod.ctxOps; imported := mod.modDeps ]
     top <- getTop

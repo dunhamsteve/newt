@@ -96,13 +96,16 @@ hoverInfo uri line col = unsafePerformIO $ do
     if (st.baseDir /= base)
         then resetState base
         else pure MkUnit
-    Right (_, Just (msg, fc)) <- (getHoverInfo lspFileSource modns line col).runM st.topContext
-        | Right _  => do
+    -- We're proactively running check if there is no module information, make sure we save it
+    Right (top, Just (msg, fc)) <- (getHoverInfo lspFileSource modns line col).runM st.topContext
+        | Right (top, _)  => do
+            modifyIORef state $ [ topContext := top ]
             putStrLn $ "Nothing to see here"
             pure $ jsonToJObject JsonNull
         | Left err => do
             putStrLn $ showError "" err
             pure $ jsonToJObject JsonNull
+    modifyIORef state $ [ topContext := top ]
     let location = JsonObj $ ("uri", JsonStr fc.file) :: ("range", fcToRange fc) :: Nil
     pure $ jsonToJObject $ JsonObj $ ("info", JsonStr msg) :: ("location", location) :: Nil
 
