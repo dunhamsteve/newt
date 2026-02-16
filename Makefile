@@ -39,8 +39,13 @@ aoctest: newt.js
 
 # Misc
 
+# build / install old vscode extension
 vscode:
 	cd newt-vscode && vsce package && code --install-extension *.vsix
+
+# build / install new LSP vscode extension
+vscode-lsp:
+	cd newt-vscode-lsp && vsce package && code --install-extension *.vsix
 
 playground: .PHONY
 	cd playground && ./build
