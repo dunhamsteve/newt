@@ -138,6 +138,26 @@ processModule importFC repo stk modns = do
       (Left err) <- tryError $ processDecl ns decl | _ => pure MkUnit
       addError err
 
--- NOW TODO clear dependents too.
+-- invalidate Module and anyone who depends on it
 invalidateModule : String -> M Unit
-invalidateModule modname = modifyTop [modules $= deleteMap modname]
+invalidateModule modname = do
+  top <- getTop
+  let modules = join $ map getDeps $ toList top.modules
+  let revMap = map swap modules
+  let deps = foldl accumulate emptyMap revMap
+  go deps $ modname :: Nil
+  where
+    accumulate : SortedMap String (List String) → String × String → SortedMap String (List String)
+    accumulate deps (k,v) = let prev = fromMaybe Nil $ lookupMap' k deps
+      in updateMap k (v :: prev) deps
+
+    getDeps : String × ModContext → List (String × String)
+    getDeps (nm, mod) = map (nm , ) mod.modDeps
+
+    go : SortedMap String (List String) → List String → M Unit
+    go deps Nil = pure MkUnit
+    go deps (name :: names) = do
+      modifyTop [modules $= deleteMap name]
+      let ds = fromMaybe Nil $ lookupMap' name deps
+      putStrLn "Chase \{name} → \{show ds}"
+      go deps $ ds ++ names

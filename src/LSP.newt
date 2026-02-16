@@ -3,6 +3,7 @@ module LSP
 import Prelude
 -- TODO pull this into its own file
 import Lib.Common
+import Lib.Eval
 import Lib.Types
 import Lib.TopContext
 import Lib.Tokenizer
@@ -14,6 +15,8 @@ import Data.IORef
 import Node
 import Commands
 import Data.List1
+import Lib.Prettier
+import Lib.ProcessDecl
 
 pfunc js_castArray : Array JSObject → JSObject := `x => x`
 pfunc js_castInt : Int → JSObject := `x => x`
@@ -115,6 +118,28 @@ errorToDiag (E fc msg) =
 errorToDiag (Postpone fc qn msg) = errorToDiag $ E fc "Postpone \{show qn} \{msg}"
 
 
+getInfos : M (List Json)
+getInfos = do
+    top <- getTop
+    go Nil $ listValues $ top.metaCtx.metas
+    where
+        go : List Json → List MetaEntry → M (List Json)
+        go acc Nil = pure acc
+        go acc (Unsolved fc k ctx ty User cons :: rest) = do
+            ty' <- quote ctx.lvl ty
+            let names = map fst ctx.types
+            let dispType = render 90 $ pprint names ty'
+            dispEnv <- dumpEnv ctx
+            let msg = "\{dispEnv}\n--------\n\{dispType}"
+            let diag = JsonObj
+                  $  ("severity", JsonInt 3)
+                  :: ("range", fcToRange fc)
+                  :: ("message", JsonStr msg)
+                  :: ("source", JsonStr "newt") -- what is this key for?
+                  :: Nil
+            go (diag :: acc) rest
+        go acc (_ :: es) = go acc es
+
 checkFile : String → JSObject
 checkFile fn = unsafePerformIO $ do
     let (base,modName) = decomposeName fn
@@ -131,7 +156,9 @@ checkFile fn = unsafePerformIO $ do
         pure MkUnit
         -- pull out errors and infos
         top <- getTop
-        pure $ map (errorToDiag) top.errors
+        let errors = map (errorToDiag) top.errors
+        infos <- getInfos
+        pure $ infos ++ errors
         ).runM st.topContext
         | Left err => do
             putStrLn $ showError "" err
