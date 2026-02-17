@@ -302,7 +302,7 @@ invert lvl sp = go sp Nil
           -- when does this happen?
           error fc "non-linear pattern: \{show sp}"
         else go xs (k :: acc)
-    go (xs :< v) _ = error emptyFC "non-variable in pattern \{show v}"
+    go (xs :< v) _ = error (getFC v) "non-variable in pattern \{show v}"
 
 rename : QName -> List Int -> Int -> Val  -> M Tm
 
