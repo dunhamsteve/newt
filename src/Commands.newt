@@ -88,6 +88,19 @@ addParens _ (x :: Nil) = x
 addParens False s = unwords s
 addParens True s = "(\{unwords s})"
 
+-- resugar operator applications
+-- assumes the components are simple identifiers
+resugarOper : List String → List String
+resugarOper Nil = Nil
+resugarOper (x :: xs) = go Lin (split x "_") xs
+  where
+    go : SnocList String → List String → List String → List String
+    go acc Nil xs = acc <>> xs
+    go acc ("" :: rest) (x :: xs) = go (acc :< x) rest xs
+    -- If there are not enough parts, bail and fall back to `_+_ x`
+    go acc ("" :: rest) Nil = (x :: xs)
+    go acc (x :: xs) ys = go (acc :< x) xs ys
+
 -- REVIEW - maybe pass in QName and use applyDCon in here, especially if we want to get better names?
 makeEdits : FC → List QName → Bool → M (List FileEdit)
 makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
@@ -101,7 +114,7 @@ makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
   let tail = drop (S $ cast (ec - 1)) cs
   let (isEq, before, after) = splitEquals Lin tail
   let np = needParens (Lin <>< head) tail
-  let cons = map (addParens np) cons
+  let cons = map (addParens np ∘ resugarOper) cons
   let phead = pack head
 
   -- No init or first :: rest for add missing case
