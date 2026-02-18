@@ -245,8 +245,6 @@ solveAutos = do
       res <- trySolveAuto e
       if res then pure True else run es
 
--- We need to switch to SortedMap here
-
 updateMeta : QName -> (MetaEntry -> M MetaEntry) -> M Unit
 updateMeta ix f = do
   top <- getTop
@@ -713,6 +711,14 @@ findSplit (x@(PC nm (PatCon _ _ _ _ _) _) :: xs) = Just x
 findSplit (x@(PC nm (PatLit _ val) _) :: xs) = Just x
 findSplit (x :: xs) = findSplit xs
 
+lookupDCon : QName -> M (QName × Int × Tm)
+lookupDCon nm = do
+  top <- getTop
+  case lookup nm top of
+    (Just (MkEntry _ name type (DCon _ _ k str) _)) => pure (name, length' k, type)
+    Just _ => error emptyFC "Internal Error: \{show nm} is not a DCon"
+    Nothing => error emptyFC "Internal Error: DCon \{show nm} not found"
+
 -- Get the constructors for a type
 getConstructors : Context -> FC -> Val -> M (List (QName × Int × Tm))
 getConstructors ctx scfc (VRef fc nm _) = do
@@ -725,13 +731,7 @@ getConstructors ctx scfc (VRef fc nm _) = do
       case lookup nm top of
         (Just (MkEntry _ name type (TCon _ names) _)) => pure names
         _ => error scfc "Not a type constructor: \{show nm}"
-    lookupDCon : QName -> M (QName × Int × Tm)
-    lookupDCon nm = do
-      top <- getTop
-      case lookup nm top of
-        (Just (MkEntry _ name type (DCon _ _ k str) _)) => pure (name, length' k, type)
-        Just _ => error fc "Internal Error: \{show nm} is not a DCon"
-        Nothing => error fc "Internal Error: DCon \{show nm} not found"
+
 getConstructors ctx scfc tm = do
   tms <- vprint ctx tm
   error scfc "Can't split - not VRef: \{tms}"
@@ -1088,9 +1088,15 @@ checkDone fc ctx Nil (Just body) ty = do
   got <- check ctx body ty
   debug $ \ _ => "DONE<- got \{rpprint (names ctx) got}"
   pure got
-checkDone fc ctx (PC x (PatWild _ _) scty :: xs) body ty = checkDone fc ctx xs body ty
-checkDone fc ctx (PC nm (PatVar _ _ nm') scty :: xs) body ty =
-  let ctx = MkCtx ctx.lvl ctx.env (rename ctx.types) ctx.bds ctx.ctxFC in
+checkDone fc ctx (PC x (PatWild pvfc icit) scty :: xs) body ty = do
+  -- sometimes have the same FC as real arguments
+  when (icit == Explicit) $ \ _ => addInfo $ CaseSplit pvfc ctx "_" scty
+  checkDone fc ctx xs body ty
+checkDone fc ctx (PC nm (PatVar pvfc _ nm') scty :: xs) body ty = do
+  -- TIME 5.50 -> 5.62 (we can flag this if it's an issue)
+  addInfo $ CaseSplit pvfc ctx nm' scty
+
+  let ctx = MkCtx ctx.lvl ctx.env (rename ctx.types) ctx.bds ctx.ctxFC
   checkDone fc ctx xs body ty
   where
     rename : List (String × Val) -> List (String × Val)
@@ -1182,26 +1188,13 @@ buildLitCase ctx prob fc scnm scty lit = do
 buildDefault : Context → Problem → FC → String → List QName → M CaseAlt
 buildDefault ctx prob fc scnm missing = do
   let defclauses = filter (isDefaultCase scnm) prob.clauses
-  -- HACK - For missing cases, we leave enough details in the error message to enable
-  -- the editor to add them
-  -- We can't do this precisely without a better pretty printer.
-  when (length' defclauses == 0) $ \ _ => do
-      missing <- traverse applied missing
-      error fc "missing cases: \{show missing}"
-  CaseDefault <$> buildTree ctx (MkProb defclauses prob.ty)
-  where
-    -- apply a dcon to _ for each explicit argument
-    applied : QName → M String
-    applied qn = do
-      top <- getTop
-      case lookup qn top of
-        Just (MkEntry _ _ ty (DCon _ _ _ _) _) => pure $ go qn.baseName ty
-        _ => pure qn.baseName
-      where
-        go : String → Tm → String
-        go acc (Pi _ nm Explicit _ _ t) = go "\{acc} \{nm}" t
-        go acc (Pi _ _ _ _ _ t) = go acc t
-        go acc _ = acc
+  case defclauses of
+    Nil => do
+      addInfo $ MissingCases fc ctx missing
+      addError $ E fc "missing cases: \{show missing}"
+      hole <- freshMeta ctx fc prob.ty ErrorHole
+      pure $ CaseDefault hole
+    _ => CaseDefault <$> buildTree ctx (MkProb defclauses prob.ty)
 
 buildLitCases : Context -> Problem -> FC -> String -> Val -> M (List CaseAlt)
 buildLitCases ctx prob fc scnm scty = do
@@ -1543,17 +1536,7 @@ check ctx tm ty = do
       unifyCatch (getFC tm) ctx ty' ty
       pure tm'
 
--- We assume the types are the same here, which looses some flexibility
--- This does not work because the meta is unsolved when `updateRecord` tries to do
--- its thing. We would need to defer elab to get this to work - insert placeholder
--- and solve it later.
-infer ctx tm@(RUpdateRec fc _ _) = do
-  error fc "I can't infer record updates"
-  -- mvar <- freshMeta ctx fc (VU emptyFC) Normal
-  -- a <- eval ctx.env mvar
-  -- let ty = VPi fc ":ins" Explicit Many a (MkClosure ctx.env mvar)
-  -- tm <- check ctx tm ty
-  -- pure (tm, ty)
+infer ctx tm@(RUpdateRec fc _ _) = error fc "I can't infer record updates"
 
 infer ctx (RVar fc nm) = go 0 ctx.types
   where
@@ -1601,7 +1584,7 @@ infer ctx (RApp fc t u icit) = do
       -- If it's not a VPi, try to unify it with a VPi
       -- TODO test case to cover this.
       tty => do
-        debug $ \ _ => "unify PI for \{show tty}"
+        debug $ \ _ => "unify PI for \{show tty} at \{show $ getFC tty}"
         a <- freshMeta ctx fc (VU emptyFC) Normal >>= eval ctx.env
         b <- MkClosure ctx.env <$> freshMeta (extend ctx ":ins" a) fc (VU emptyFC) Normal
         -- FIXME - I had to guess Many here.  What are the side effects?

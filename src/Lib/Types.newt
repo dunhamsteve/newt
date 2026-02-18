@@ -294,17 +294,19 @@ showClosure (MkClosure xs t) = "(%cl [\{show $ length xs} env] \{show t})"
 
 Context : U
 
-data MetaKind = Normal | User | AutoSolve
+data MetaKind = Normal | User | AutoSolve | ErrorHole
 
 instance Show MetaKind where
   show Normal = "Normal"
   show User = "User"
   show AutoSolve = "Auto"
+  show ErrorHole = "ErrorHole"
 
 instance Eq MetaKind where
   Normal == Normal = True
   User == User = True
   AutoSolve == AutoSolve = True
+  ErrorHole == ErrorHole = True
   _ == _ = False
 
 -- constrain meta applied to val to be a val
@@ -394,6 +396,11 @@ record TopEntry where
 instance Show TopEntry where
   show (MkEntry fc name type def flags) = "\{show name} : \{show type} := \{show def} \{show flags}"
 
+data EditorInfo
+  = CaseSplit FC Context String Val
+  -- Not sure we need Context here?
+  | MissingCases FC Context (List QName)
+
 record ModContext where
   constructor MkModCtx
   modSource : String
@@ -404,6 +411,7 @@ record ModContext where
   ctxOps : Operators
   modDeps : List String
   modErrors : List Error
+  modInfos : List EditorInfo
 
 -- Top level context.
 -- Most of the reason this is separate is to have a different type
@@ -414,10 +422,17 @@ record ModContext where
 
 -- A placeholder while walking through dependencies of a module
 emptyModCtx : String → ModContext
-emptyModCtx csum = MkModCtx csum emptyMap (MC emptyMap Nil 0 NoCheck) emptyMap Nil Nil
+emptyModCtx source = MkModCtx source emptyMap (MC emptyMap Nil 0 NoCheck) emptyMap Nil Nil Nil
 
 HintTable : U
 HintTable = SortedMap QName (List (QName × Tm))
+
+
+-- DERIVE - HasFC would be an example of a user-defined derived
+instance HasFC EditorInfo where
+  getFC (CaseSplit fc _ _ _) = fc
+  getFC (MissingCases fc _ _) = fc
+
 
 record TopContext where
   constructor MkTop
@@ -425,6 +440,7 @@ record TopContext where
   imported : List String
   -- TCon name → function name × type
   hints : HintTable
+  infos : List EditorInfo
 
   -- current module
   ns : String

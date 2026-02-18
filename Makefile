@@ -67,7 +67,7 @@ lsp.js: ${SRCS}
 newt-vscode-lsp/src/newt.js: lsp.js .PHONY
 	echo "import fs from 'fs'\nlet mods = { fs }\nlet require = key => mods[key]\n" > $@
 	# HACK
-	perl -p -e "s/(const LSP_(?:updateFile|checkFile|hoverInfo))/export \$$1/" lsp.js >> $@
+	perl -p -e "s/(const LSP_(?:updateFile|checkFile|hoverInfo|codeActionInfo))/export \$$1/" lsp.js >> $@
 
 newt-vscode-lsp/dist/lsp.js: newt-vscode-lsp/src/lsp.ts newt-vscode-lsp/src/newt.js
 	(cd newt-vscode-lsp && node esbuild.js)

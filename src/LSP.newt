@@ -81,9 +81,14 @@ updateFile fn src = unsafePerformIO $ do
     modifyIORef state [ topContext := ctx ]
 
 
+-- FIXME - this is an issue - FC doesn't distinguish empty and length 1.
+-- Need to put the +1 on FC itself.
 fcToRange : FC → Json
 fcToRange (MkFC uri (MkBounds sr sc er ec)) =
-    JsonObj $ ("start", mkPosition sr sc) :: ("end", mkPosition er (ec + 1)) :: Nil
+    if sc == 0 && ec == 0
+      -- For the insert position in edits
+      then JsonObj $ ("start", mkPosition sr sc) :: ("end", mkPosition er (ec)) :: Nil
+      else JsonObj $ ("start", mkPosition sr sc) :: ("end", mkPosition er (ec + 1)) :: Nil
     where
         mkPosition : Int → Int → Json
         mkPosition l c = JsonObj $ ("line", JsonInt l) :: ("character", JsonInt c) :: Nil
@@ -96,6 +101,7 @@ hoverInfo uri line col = unsafePerformIO $ do
     if (st.baseDir /= base)
         then resetState base
         else pure MkUnit
+    st <- readIORef state
     -- We're proactively running check if there is no module information, make sure we save it
     Right (top, Just (msg, fc)) <- (getHoverInfo lspFileSource modns line col).runM st.topContext
         | Right (top, _)  => do
@@ -108,6 +114,45 @@ hoverInfo uri line col = unsafePerformIO $ do
     modifyIORef state $ [ topContext := top ]
     let location = JsonObj $ ("uri", JsonStr fc.file) :: ("range", fcToRange fc) :: Nil
     pure $ jsonToJObject $ JsonObj $ ("info", JsonStr msg) :: ("location", location) :: Nil
+
+codeActionInfo : String → Int → Int → JSObject
+codeActionInfo uri line col = unsafePerformIO $ do
+  let (base,modns) = decomposeName uri
+  putStrLn "Action \{uri} base \{base} mod \{modns}"
+  st <- readIORef state
+  if (st.baseDir /= base) then resetState base else pure MkUnit
+  st <- readIORef state
+  Right (top, actions) <- (do
+    actions <- getActions lspFileSource modns line col
+    putStrLn "\{show $ length' actions} actions"
+    pure actions).runM st.topContext
+    | Left err => do
+      putStrLn $ showError "" err
+      pure js_null
+  modifyIORef state $ [ topContext := top ]
+  pure $ jsonToJObject $ JsonArray $ map actionToJson actions
+  where
+    single : String → Json → Json
+    single k v = JsonObj $ (k,v) :: Nil
+
+    editToJson : FileEdit → Json
+    editToJson (MkEdit fc text) =
+      JsonObj
+        $ ("range", fcToRange fc)
+        :: ("newText", JsonStr text)
+        :: Nil
+
+    actionToJson : CodeAction → Json
+    actionToJson (CaseSplitAction edits) =
+      JsonObj
+        $ ("title", JsonStr "Case split")
+        :: ("edit", (single "changes" $ single uri $ JsonArray $ map editToJson edits))
+        :: Nil
+    actionToJson (AddMissingAction edits) =
+      JsonObj
+        $ ("title", JsonStr "Add missing cases")
+        :: ("edit", (single "changes" $ single uri $ JsonArray $ map editToJson edits))
+        :: Nil
 
 errorToDiag : Error -> Json
 errorToDiag (E fc msg) =
@@ -173,4 +218,5 @@ checkFile fn = unsafePerformIO $ do
 -- This seems like a hack, but it works.
 -- Dummy main function with references to force functions into ouput file.
 -- but we don't get `export` on it..
-pfunc main uses (updateFile checkFile hoverInfo) : IO Unit  := `() => {}`
+-- #export updateFile checkFile hoverInfo
+pfunc main uses (updateFile checkFile hoverInfo codeActionInfo) : IO Unit  := `() => {}`

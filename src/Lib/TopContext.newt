@@ -47,7 +47,7 @@ instance Show TopContext where
   show top = "\nContext:\n [\{ joinBy "\n" $ map (show ∘ snd) $ toList top.defs}]"
 
 emptyTop : TopContext
-emptyTop = MkTop emptyMap Nil emptyMap "" emptyMap (MC emptyMap Nil 0 CheckAll) 0 Nil emptyMap
+emptyTop = MkTop emptyMap Nil emptyMap Nil "" emptyMap (MC emptyMap Nil 0 CheckAll) 0 Nil emptyMap
 
 
 setFlag : QName → FC → EFlag → M Unit
@@ -94,4 +94,9 @@ addHint qn = do
 addError : Error -> M Unit
 addError err = do
   top <- getTop
-  modifyTop [ errors $= _::_ err ]
+  modifyTop [ errors $= (err ::) ]
+
+addInfo : EditorInfo → M Unit
+addInfo info = do
+  top <- getTop
+  modifyTop [ infos $= (info ::)]

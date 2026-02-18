@@ -21,7 +21,7 @@ addPrimitives = do
   processDecl primNS (PType emptyFC "Char" Nothing)
   setDef (QN primNS "PiType") emptyFC (Erased emptyFC) (PrimFn "(h0, h1) => ({ tag: \"PiType\", h0, h1 });" (S (S Z)) Nil) Nil
   top <- getTop
-  let mod = MkModCtx "" top.defs (MC emptyMap Nil 0 CheckAll) top.ops Nil top.errors
+  let mod = MkModCtx "" top.defs (MC emptyMap Nil 0 CheckAll) top.ops Nil top.errors Nil
   let modules = updateMap primNS mod top.modules
   -- TODO - do we clear this? Try just modules := modules, but wait until this refactor is done.
   modifyTop [ modules := modules
@@ -106,11 +106,12 @@ processModule importFC repo stk modns = do
   top <- getTop
   let freshMC = MC emptyMap Nil 0 CheckAll
   -- NOW Print and drop errors here
-  -- set imported, mod, freshMC, ops  before processing
+  -- clear per module fields before processing this module
   modifyTop [ imported := imported
             ; hints := emptyMap
             ; ns := modns
             ; defs := emptyMap
+            ; infos := Nil
             ; metaCtx := freshMC
             ; ops := ops
             ]
@@ -124,7 +125,7 @@ processModule importFC repo stk modns = do
   -- update modules with result, leave the rest of context in case this is top file
   top <- getTop
 
-  let mod = MkModCtx src top.defs top.metaCtx top.ops imported top.errors
+  let mod = MkModCtx src top.defs top.metaCtx top.ops imported top.errors top.infos
 
   let modules = updateMap modns mod top.modules
   modifyTop [modules := modules]
@@ -159,5 +160,4 @@ invalidateModule modname = do
     go deps (name :: names) = do
       modifyTop [modules $= deleteMap name]
       let ds = fromMaybe Nil $ lookupMap' name deps
-      putStrLn "Chase \{name} → \{show ds}"
       go deps $ ds ++ names

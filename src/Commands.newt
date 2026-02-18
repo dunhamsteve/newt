@@ -10,6 +10,9 @@ import Data.List1
 import Lib.Tokenizer
 import Lib.Token
 import Lib.Elab
+import Data.String
+import Lib.Eval
+import Data.SortedMap
 
 -- For now we cheat and assume capitalized directories are a module component
 decomposeName : String → String × String
@@ -31,7 +34,8 @@ getHoverInfo repo modns row col = do
     mod <- processModule emptyFC repo Nil modns
 
     -- not necessarily loaded into top... (Maybe push this down into that branch of processModule)
-    modifyTop [ defs := mod.modDefs; metaCtx := mod.modMetaCtx; ops := mod.ctxOps; imported := mod.modDeps ]
+    -- FIXME - fragile - this is why we don't want this stuff directly in TopContext
+    modifyTop [ defs := mod.modDefs; metaCtx := mod.modMetaCtx; ops := mod.ctxOps; imported := mod.modDeps; infos := mod.modInfos]
     top <- getTop
 
     -- Find the token at the point
@@ -50,3 +54,117 @@ getHoverInfo repo modns row col = do
         getTok (tok :: toks) =
             if tok.bounds.startCol <= col && (col <= tok.bounds.endCol)
             then Just $ value tok else getTok toks
+
+data FileEdit = MkEdit FC String
+data CodeAction
+  = CaseSplitAction (List FileEdit)
+  | AddMissingAction (List FileEdit)
+
+
+applyDCon : QName × Int × Tm → List String
+applyDCon (QN _ nm, _, tm) = go (Lin :< nm) tm
+  where
+    go : SnocList String → Tm → List String
+    go acc (Pi _ nm Explicit _ _ u) = go (acc :< nm) u
+    go acc (Pi _ _ _ _ _ u) = go acc u
+    go acc _ = acc <>> Nil
+
+-- Not quite right, we also need to check for let...
+-- But it's a first pass
+splitEquals : SnocList Char → List Char → (Bool × String × String)
+splitEquals acc Nil = (True, pack (acc <>> Nil), "")
+splitEquals acc xs@('=' :: _) = (True, pack (acc <>> Nil), pack xs)
+splitEquals acc xs@('<' :: '-' :: _) = (False, pack (acc <>> Nil), pack xs)
+splitEquals acc (x :: xs) = splitEquals (acc :< x) xs
+
+needParens : SnocList Char → List Char → Bool
+needParens (xs :< ' ') ys = needParens xs ys
+needParens xs (' ' :: ys) = needParens xs ys
+needParens (xs :< '(') (')' :: ys) = False
+needParens _ _ = True
+
+addParens : Bool → List String → String
+addParens _ (x :: Nil) = x
+addParens False s = unwords s
+addParens True s = "(\{unwords s})"
+
+-- REVIEW - maybe pass in QName and use applyDCon in here, especially if we want to get better names?
+makeEdits : FC → List QName → Bool → M (List FileEdit)
+makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
+  cons <- map applyDCon <$> traverse lookupDCon names
+  top <- getTop
+  let (Just mod) = lookupMap' top.ns top.modules | _ => pure Nil
+  let lines = split mod.modSource "\n"
+  let (Just line) = getAt' sr lines | _ => pure Nil
+  let cs = unpack line
+  let head = take (cast sc) cs
+  let tail = drop (S $ cast ec) cs
+  let (isEq, before, after) = splitEquals Lin tail
+  let np = needParens (Lin <>< head) tail
+  let cons = map (addParens np) cons
+  let phead = pack head
+
+  -- No init or first :: rest for add missing case
+  let (edits, rest) = doFirst inPlace cons
+
+  let phead = pack head
+  let fc' = MkFC uri (MkBounds (sr + 1) 0 (sr + 1) 0)
+  let srest =
+    if isEq
+      then joinBy "" $ map (\ap => phead ++ ap ++ before ++ "= ?\n") rest
+      else joinBy "" $ map (\ap => "  | \{pack head}\{ap}\{before}=> ?\n") rest
+
+  putStrLn "Split \{show line} HD '\{show head}' TL '\{show tail}'"
+  putStrLn srest
+  let edits = MkEdit fc' (srest) :: edits
+  putStrLn "edits \{debugStr edits}"
+  pure edits
+  where
+    doFirst : Bool → List String → (List FileEdit × List String)
+    doFirst True (first :: rest) = (MkEdit fc first :: Nil, rest)
+    doFirst _ cons = (Nil, cons)
+
+addMissingCases : Int → Int → FC → Context → List QName → M (Maybe CodeAction)
+addMissingCases _ _ fc@(MkFC uri (MkBounds sr sc er ec)) ctx names = do
+  top <- getTop
+  edits <- makeEdits fc names False
+  putStrLn "Add Missing \{show fc} \{show names}"
+  pure $ Just $ AddMissingAction edits
+
+getCaseSplit : Int → Int → FC → Context → String → Val → M (Maybe CodeAction)
+getCaseSplit row col fc@(MkFC uri (MkBounds sr sc er ec)) ctx nm scty = do
+  top <- getTop
+  -- It's getting vars for the type
+  scty <- unlet ctx.env scty
+  cons <- getConstructors ctx fc scty
+  ty <- quote (length' ctx.env) scty
+  cons <- filterM (checkCase ctx nm scty) cons
+  let names = map fst cons
+  edits <- makeEdits fc names True
+  pure $ Just $ CaseSplitAction edits
+
+posInFC : Int → Int → FC → Bool
+-- FIXME ec + 1 again...
+posInFC row col (MkFC _ (MkBounds sr sc er ec)) = (sr <= row && row <= er) && (sc <= col && col <= ec + 1)
+
+getActions : FileSource → String → Int → Int → M (List CodeAction)
+getActions repo modns row col = do
+  mod <- processModule emptyFC repo Nil modns
+  -- not necessarily loaded into top... (Maybe push this down into that branch of processModule)
+  modifyTop [ defs := mod.modDefs; metaCtx := mod.modMetaCtx; ops := mod.ctxOps; imported := mod.modDeps; infos := mod.modInfos]
+  top <- getTop
+  let xx = filter (posInFC row col ∘ getFC) top.infos
+  putStrLn "Filter got \{show $ length' xx}"
+  go Nil $ xx
+  where
+    getAction : EditorInfo → M (Maybe CodeAction)
+    getAction (CaseSplit fc ctx nm scty) = getCaseSplit row col fc ctx nm scty
+    getAction (MissingCases fc ctx names) = addMissingCases row col fc ctx names
+
+    go : List CodeAction → List EditorInfo → M (List CodeAction)
+    go acc Nil = pure acc
+    go acc (x :: xs) = do
+      Right (Just res) <- tryError $ getAction x
+        | _ => go acc xs
+      go (res :: acc) xs
+

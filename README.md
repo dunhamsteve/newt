@@ -24,7 +24,7 @@ The `Makefile` will build builds `./newt.js`. There is a bootstrap version of ne
 
 Newt can also be built by running `node bootstrap/newt.js src/Main.newt -o newt.js`.
 
-The source for the vscode extension is found in `newt-vscode`. Running `make vscode` will build and install it. The extension expects `build/exec/newt` to exist in the workspace. And `make test` will run a few black box tests. Currently it simply checks return codes, since the output format is in flux.
+The source for the vscode extension is found in `newt-vscode`. Running `make vscode` will build and install it. The extension expects `newt.js` to exist in the workspace. And `make test` will run a few black box tests. The tests have an expected succesful output in a `.golden` file or expected failure output in a `.fail` file.
 
 ## Playground
 
