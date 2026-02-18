@@ -6,4 +6,4 @@ ERROR at tests/LitConCase.newt:7:5--7:11: expected Prim.Int
   foo MkUnit = MkUnit
       ^^^^^^
 
-ERROR at tests/LitConCase.newt:1:1--1:2: Compile failed
+ERROR at tests/LitConCase.newt:1:1--1:1: Compile failed

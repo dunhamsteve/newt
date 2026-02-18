@@ -164,8 +164,7 @@ data Error
   | Postpone FC QName String
 
 instance Show FC where
-  -- We add one to the end column so it points after the end, which seems to be what Idris does
-  show (MkFC file (MkBounds l c el ec)) = "\{file}:\{show $ l + 1}:\{show $ c + 1}--\{show $ el + 1}:\{show $ ec + 2}"
+  show (MkFC file (MkBounds l c el ec)) = "\{file}:\{show $ l + 1}:\{show $ c + 1}--\{show $ el + 1}:\{show $ ec + 1}"
 
 showError : String -> Error -> String
 showError src (E fc msg) = "ERROR at \{show fc}: \{msg}\n" ++ go 0 (lines src)
@@ -174,7 +173,7 @@ showError src (E fc msg) = "ERROR at \{show fc}: \{msg}\n" ++ go 0 (lines src)
     go l Nil = ""
     go l (x :: xs) =
       if l == fcLine fc then
-        let width = fc.bnds.endCol - fc.bnds.startCol + 1 in
+        let width = fc.bnds.endCol - fc.bnds.startCol in
         "  \{x}\n  \{replicate (cast $ fcCol fc) ' '}\{replicate (cast width) '^'}\n"
       else if fcLine fc - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
       else go (l + 1) xs

@@ -63,7 +63,7 @@ quoteTokenise ts@(TS el ec toks chars) startl startc acc = case chars of
 
   where
     stok : BTok
-    stok = MkBounded (Tok StringKind (pack $ acc <>> Nil)) (MkBounds startl startc el ec)
+    stok = MkBounded (Tok StringKind (pack $ acc <>> Nil)) (MkBounds startl startc el (ec + 1))
 
 
 
@@ -79,7 +79,7 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
       Right (TS sl sc toks chars) => case chars of
         '"' :: cs => let tok = mktok False sl (sc + 1) EndQuote "\"" in
           rawTokenise (TS sl (sc + 1) (toks :< tok) cs)
-        cs => Left $ E (MkFC "" (MkBounds sl sc sl sc)) "Expected '\"'"
+        cs => Left $ E (MkFC "" (MkBounds sl sc sl (sc + 1))) "Expected '\"'"
 
   '{' :: '{' :: cs =>
     let tok = mktok False sl (sc + 2) Keyword "{{" in
@@ -88,7 +88,7 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
       Right (TS sl sc toks chars) => case chars of
         '}' :: '}' :: cs => let tok = mktok False sl (sc + 2) Keyword "}}" in
           rawTokenise (TS sl (sc + 2) (toks :< tok) cs)
-        cs => Left $ E (MkFC "" (MkBounds sl sc sl sc)) "Expected '}}'"
+        cs => Left $ E (MkFC "" (MkBounds sl sc sl (sc + 1))) "Expected '}}'"
 
   '}' :: cs => Right ts
   '{' :: cs =>
@@ -98,7 +98,7 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
       Right (TS sl sc toks chars) => case chars of
         '}' :: cs => let tok = mktok False sl (sc + 1) Symbol "}" in
           rawTokenise (TS sl (sc + 1) (toks :< tok) cs)
-        cs => Left $ E (MkFC "" (MkBounds sl sc sl sc)) "Expected '}'"
+        cs => Left $ E (MkFC "" (MkBounds sl sc sl (sc + 1))) "Expected '}'"
 
   ',' :: cs => rawTokenise (TS sl (sc + 1) (toks :< mktok False sl (sc + 1) Ident ",") cs)
   '_' :: ',' :: '_' :: cs => rawTokenise (TS sl (sc + 3) (toks :< mktok False sl (sc + 3) MixFix "_,_") cs)
@@ -131,7 +131,7 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
     doBacktick : TState -> SnocList Char -> Either Error TState
     doBacktick (TS l c toks Nil) acc = Left $ E (MkFC "" (MkBounds l c l c)) "EOF in backtick string"
     doBacktick (TS el ec toks ('`' :: cs)) acc =
-      let tok = MkBounded (Tok JSLit (pack $ acc <>> Nil)) (MkBounds sl sc el ec) in
+      let tok = MkBounded (Tok JSLit (pack $ acc <>> Nil)) (MkBounds sl sc el (ec + 1)) in
       rawTokenise (TS el (ec + 1) (toks :< tok) cs)
     doBacktick (TS l c toks ('\n' :: cs)) acc = doBacktick (TS (l + 1) 0 toks cs) (acc :< '\n')
     doBacktick (TS l c toks (ch :: cs)) acc = doBacktick (TS l (c + 1) toks cs) (acc :< ch)
@@ -140,7 +140,7 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
     -- temporary use same token as before
     mktok : Bool -> Int -> Int -> Kind -> String -> BTok
     mktok checkkw el ec kind text = let kind = if checkkw && elem text keywords then Keyword else kind in
-      MkBounded (Tok kind text) (MkBounds sl sc el ec)
+      MkBounded (Tok kind text) (MkBounds sl sc el (ec + 1))
 
     lineComment : TState -> Either Error TState
     lineComment (TS line col toks Nil) = rawTokenise (TS line col toks Nil)
@@ -171,7 +171,7 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
 tokenise : String -> String -> Either Error (List BTok)
 tokenise fn text = case rawTokenise (TS 0 0 Lin (unpack text)) of
   Right (TS trow tcol acc Nil) => Right $ acc <>> Nil
-  Right (TS trow tcol acc chars) => Left $ E (MkFC fn (MkBounds trow tcol trow tcol)) "Extra toks"
+  Right (TS trow tcol acc chars) => Left $ E (MkFC fn (MkBounds trow tcol trow (tcol + 1))) "Extra toks"
   Left (E (MkFC file start) str) => Left $ E (MkFC fn start) str
   Left err => Left err
 

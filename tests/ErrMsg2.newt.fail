@@ -7,4 +7,4 @@ ERROR at tests/ErrMsg2.newt:6:13--6:15: Expected '=>' at Keyword:->
   foo x = \ x -> x
               ^^
 
-ERROR at tests/ErrMsg2.newt:1:1--1:2: Compile failed
+ERROR at tests/ErrMsg2.newt:1:1--1:1: Compile failed

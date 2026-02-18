@@ -20,7 +20,7 @@ for fn in tests/*.newt ; do
         echo "Compile failure mismatch for $fn"
         diff ${fn}.fail tmp/${bn}.compile
         failed=$((failed + 1))
-        if [ $1 = "--fix" ]; then
+        if [ x$1 = "x--fix" ]; then
           cp tmp/${bn}.compile ${fn}.fail
         fi
         continue
@@ -44,7 +44,7 @@ for fn in tests/*.newt ; do
       echo "Output mismatch for $fn"
       diff ${fn}.golden tmp/${bn}.out
       failed=$((failed + 1))
-      if [ $1 = "--fix" ]; then
+      if [ x$1 = "x--fix" ]; then
         cp tmp/${bn}.out ${fn}.golden
       fi
     fi

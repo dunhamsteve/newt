@@ -7,4 +7,4 @@ ERROR at tests/Quantity.newt:11:15--11:16: used erased value x$0 (FIXME FC may b
   bar {x} = foo x
                 ^
 
-ERROR at tests/Quantity.newt:1:1--1:2: Compile failed
+ERROR at tests/Quantity.newt:1:1--1:1: Compile failed

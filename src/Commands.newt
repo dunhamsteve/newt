@@ -98,7 +98,7 @@ makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
   let (Just line) = getAt' sr lines | _ => pure Nil
   let cs = unpack line
   let head = take (cast sc) cs
-  let tail = drop (S $ cast ec) cs
+  let tail = drop (S $ cast (ec - 1)) cs
   let (isEq, before, after) = splitEquals Lin tail
   let np = needParens (Lin <>< head) tail
   let cons = map (addParens np) cons

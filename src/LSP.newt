@@ -88,7 +88,7 @@ fcToRange (MkFC uri (MkBounds sr sc er ec)) =
     if sc == 0 && ec == 0
       -- For the insert position in edits
       then JsonObj $ ("start", mkPosition sr sc) :: ("end", mkPosition er (ec)) :: Nil
-      else JsonObj $ ("start", mkPosition sr sc) :: ("end", mkPosition er (ec + 1)) :: Nil
+      else JsonObj $ ("start", mkPosition sr sc) :: ("end", mkPosition er (ec)) :: Nil
     where
         mkPosition : Int → Int → Json
         mkPosition l c = JsonObj $ ("line", JsonInt l) :: ("character", JsonInt c) :: Nil
