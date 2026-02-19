@@ -13,9 +13,9 @@ import Lib.Types
 
 lookup : QName -> TopContext -> Maybe TopEntry
 lookup qn@(QN ns nm) top =
-  case lookupMap' qn top.defs of
-    Just entry => Just entry
-    Nothing => case lookupMap' ns top.modules of
+  if ns == top.ns
+    then lookupMap' qn top.defs
+    else case lookupMap' ns top.modules of
       Just mod => lookupMap' qn mod.modDefs
       Nothing => Nothing
 
