@@ -1,24 +1,25 @@
 module DSL
 
+-- "A DSL for finite types and enumeration"
 -- https://www.youtube.com/watch?v=sFyy9sssK50
 
-data ℕ : U where
-  Z : ℕ
-  S : ℕ → ℕ
+data Nat : U where
+  Z : Nat
+  S : Nat → Nat
 
 infixl 7 _+_
 infixl 8 _*_
 
-_+_ : ℕ → ℕ → ℕ
+_+_ : Nat → Nat → Nat
 Z + m = m
 (S k) + m = S (k + m)
 
-_*_ : ℕ → ℕ → ℕ
+_*_ : Nat → Nat → Nat
 Z * m = Z
 (S k) * m = m + k * m
 
 infixr 4 _::_
-data Vec : U → ℕ → U where
+data Vec : U → Nat → U where
   Nil : {a} → Vec a Z
   _::_ : {a k} → a → Vec a k → Vec a (S k)
 
@@ -43,7 +44,7 @@ two = Add One One
 four : E
 four = Mul two two
 
-card : E → ℕ
+card : E → Nat
 card Zero = Z
 card One = S Z
 card (Add x y) = card x + card y
@@ -53,7 +54,7 @@ data Empty : U where
 
 data Unit : U where
   -- unit accepted but case building thinks its a var
-  unit : Unit
+  MkUnit : Unit
 
 data Either : U -> U -> U where
   Left : {A B} → A → Either A B
@@ -73,10 +74,10 @@ Bool : U
 Bool = typ two
 
 false : Bool
-false = Left unit
+false = Left MkUnit
 
 true : Bool
-true = Right unit
+true = Right MkUnit
 
 BothBoolBool : U
 BothBoolBool = typ four
