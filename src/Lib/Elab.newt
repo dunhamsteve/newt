@@ -659,13 +659,6 @@ insert ctx tm ty = do
       insert ctx (App (getFC tm) tm m) bapp
     va => pure (tm, va)
 
-primType : FC -> QName -> M Val
-primType fc nm = do
-  top <- getTop
-  case lookup nm top of
-      Just (MkEntry _ name ty (PrimTCon _) _) => pure $ VRef fc name Lin
-      _ => error fc "Primitive type \{show nm} not in scope"
-
 data Bind = MkBind String Icit Val
 
 instance Show Bind where
@@ -1625,14 +1618,8 @@ infer ctx (RImplicit fc) = do
   tm <- freshMeta ctx fc vty Normal
   pure (tm, vty)
 
-infer ctx (RLit fc (LString str)) = do
-  ty <- primType fc stringType
-  pure (Lit fc (LString str), ty)
-infer ctx (RLit fc (LInt i)) = do
-  ty <- primType fc intType
-  pure (Lit fc (LInt i), ty)
-infer ctx (RLit fc (LChar c)) = do
-  ty <- primType fc charType
-  pure (Lit fc (LChar c), ty)
+infer ctx (RLit fc (LString str)) = pure (Lit fc (LString str), VRef fc stringType Lin)
+infer ctx (RLit fc (LInt i)) = pure (Lit fc (LInt i), VRef fc intType Lin)
+infer ctx (RLit fc (LChar c)) = pure (Lit fc (LChar c), VRef fc charType Lin)
 infer ctx (RAs fc _ _) = error fc "@ can only be used in patterns"
 infer ctx tm = error (getFC tm) "Implement infer \{show tm}"

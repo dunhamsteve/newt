@@ -120,6 +120,7 @@ compileTerm t@(Ref fc nm@(QN _ tag)) = do
   defs <- getRef Defs
   case arity of
     Nil =>
+      -- Translate special constructors (Enum, Bool-like, Nat-like)
       case lookupMap' nm defs : Maybe Def of
         Just (DCon ix EnumCon _ _) => pure $ CLit $ LInt $ cast ix
         Just (DCon ix FalseCon _ _) => pure $ CLit $ LBool False
@@ -156,7 +157,8 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
     applySucc : List CExp → M CExp
     applySucc Nil = pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
     applySucc (t :: Nil) = pure $ CPrimOp "+" (CLit $ LInt 1) t
-    applySucc _ = error emptyFC "overapplied Succ \{show tm}"
+    applySucc _ = error (getFC tm) "overapplied Succ \{show tm}"
+
 compileTerm (UU _) = pure $ CRef (QN "" "U")
 compileTerm (Pi _ nm icit rig t u) = do
   t' <- compileTerm t
@@ -269,7 +271,7 @@ defToCExp (qn, Axiom)      = pure (qn, CErased)
 defToCExp (qn, (PrimOp _)) = (_,_ qn) <$> compilePop qn
 defToCExp (qn, DCon ix info arity _)   = pure (qn, compileDCon ix qn info arity)
 -- We're not using these are runtime at the moment, no typecase
--- we need to sort out tag number if we do that
+-- we need to sort out tag number if we do typecase
 defToCExp (qn, TCon arity conNames) = pure (qn, compileDCon Z qn NormalCon (replicate' (cast arity) Many))
 defToCExp (qn, PrimTCon arity) = pure (qn, compileDCon Z qn NormalCon (replicate' (cast arity) Many))
 defToCExp (qn, PrimFn src _ deps) = pure (qn, CRaw src deps)

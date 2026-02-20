@@ -46,7 +46,8 @@ getHoverInfo repo modns row col = do
 
     -- Lookup the name
     let (Just e) = lookupRaw name top   | _ => pure Nothing
-    pure $ Just ("\{show e.name} : \{rpprint Nil e.type}", e.fc)
+    ty <- nf Nil e.type
+    pure $ Just ("\{show e.name} : \{rpprint Nil ty}", e.fc)
 
     where
         getTok : List BTok → Maybe String

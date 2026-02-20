@@ -70,12 +70,7 @@ updateFile fn src = unsafePerformIO $ do
     st <- readIORef state
     modifyIORef state [ files $= updateMap fn src ]
     let st = the LSPState $ [ files $= updateMap fn src ] st
-    -- module relative to base
-
-    let (Right toks) = tokenise fn src | Left err => writeIORef state st
-    let (Right ((nameFC, modName), _, _)) = partialParse fn parseModHeader emptyMap toks
-        | Left (err,toks) => writeIORef state st
-
+    let (base,modName) = decomposeName fn
     Right (ctx,_) <- (invalidateModule modName).runM st.topContext
         | _ => writeIORef state st
     modifyIORef state [ topContext := ctx ]
@@ -209,6 +204,7 @@ checkFile fn = unsafePerformIO $ do
         pure $ infos ++ errors
         ).runM st.topContext
         | Left err => do
+            putStrLn "**** Error without updating top:"
             putStrLn $ showError "" err
             pure $ jsonToJObject $ JsonArray $ errorToDiag err :: Nil
     -- Cache loaded modules

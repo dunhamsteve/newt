@@ -18,6 +18,7 @@ getType : Tm -> M (Maybe Tm)
 getType (Ref fc nm) = do
   top <- getTop
   case lookup nm top of
+    -- Should not nappen.
     Nothing => error fc "\{show nm} not in scope"
     (Just (MkEntry _ name type def _)) => pure $ Just type
 getType tm = pure Nothing

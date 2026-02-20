@@ -122,15 +122,15 @@ processModule importFC repo stk modns = do
   log 1 $ \ _ => "process Decls"
   traverse (tryProcessDecl src modns) (collectDecl decls)
 
+  -- This has addErrors as a side-effect
+  logMetas $ reverse $ listValues top.metaCtx.metas
+
   -- update modules with result, leave the rest of context in case this is top file
   top <- getTop
-
   let mod = MkModCtx src top.defs top.metaCtx top.ops imported top.errors top.infos
-
   let modules = updateMap modns mod top.modules
   modifyTop [modules := modules]
 
-  logMetas $ reverse $ listValues top.metaCtx.metas
   -- FIXME module context should hold errors, to report in replay
   pure mod
   where
