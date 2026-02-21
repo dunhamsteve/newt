@@ -1001,7 +1001,10 @@ mkPat (tm, icit) = do
                 -- Just _ => error (getFC tm) "\{show nm} is not a data constructor"
                 _ => case b of
                     -- TODO maybe check case?
-                    Nil => pure $ PatVar fc icit nm
+                    Nil =>
+                      if isUpperName nm
+                        then error (getFC tm) "\{nm} not in scope"
+                        else pure $ PatVar fc icit nm
                     _ => error (getFC tm) "patvar applied to args"
     ((RImplicit fc), Nil) => pure $ PatWild fc icit
     ((RImplicit fc), _) => error fc "implicit pat can't be applied to arguments"

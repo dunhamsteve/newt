@@ -1,0 +1,6 @@
+module LowerPatVar
+
+import Prelude
+
+foo : Nat × Nat → Nat
+foo (ZZ , y) = Z

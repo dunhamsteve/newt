@@ -1,0 +1,10 @@
+*** Process tests/LowerPatVar.newt
+module Prelude
+module LowerPatVar
+ERROR at tests/LowerPatVar.newt:6:6--6:8: ZZ not in scope
+  
+  foo : Nat × Nat → Nat
+  foo (ZZ , y) = Z
+       ^^
+
+ERROR at tests/LowerPatVar.newt:1:1--1:1: Compile failed

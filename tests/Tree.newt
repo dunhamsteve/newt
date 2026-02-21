@@ -66,7 +66,7 @@ data Sg : (A : U) -> (A -> U) -> U where
   _,_ : {A : U} {B : A -> U} -> (a : A) -> B a -> Sg A B
 
 _*_ : U -> U -> U
-A * B = Sg A (\ _ => B)
+a * b = Sg a (\ _ => b)
 
 TooBig : Bnd -> Bnd -> Nat -> U
 TooBig l u h = Sg Nat (\ x => T23 l (N x) h * T23 (N x) u h)

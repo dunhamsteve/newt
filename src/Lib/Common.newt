@@ -212,3 +212,6 @@ record OpDef where
 
 Operators : U
 Operators = SortedMap String OpDef
+
+isUpperName : String → Bool
+isUpperName nm = isUpper $ strIndex nm 0
