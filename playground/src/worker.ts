@@ -1,9 +1,12 @@
 import { shim } from "./emul";
 import { API, Message, ResponseMSG } from "./ipc";
 import { archive, preload } from "./preload";
+import { Main_main } from './newt';
 
 const LOG = console.log
+
 console.log = (m) => {
+  LOG(m)
   shim.stdout += "\n" + m;
 };
 
@@ -47,4 +50,3 @@ const handleMessage = async function <K extends keyof API>(ev: { data: Message<K
 // hooks for worker.html to override
 let sendResponse: <K extends keyof API>(_: ResponseMSG) => void = postMessage;
 onmessage = handleMessage;
-importScripts("newt.js");

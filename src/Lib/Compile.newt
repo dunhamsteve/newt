@@ -414,10 +414,13 @@ we're visiting shallow or deep. We're trying to avoid hitting issues with indire
 - Shallow represents the declaration, so we filter to those at the end
 
 TODO this could be made faster by keeping a map of the done information
+REVIEW could I avoid most of this by using `function` instead of arrow functions?
+
 -/
 
-sortedNames : SortedMap QName CExp → QName → List QName
-sortedNames defs qn = map snd $ filter (not ∘ fst) $ go Nil Nil (True, qn)
+sortedNames : SortedMap QName CExp → List QName → List QName
+sortedNames defs names =
+  map snd $ filter (not ∘ fst) $ foldl (go Nil) Nil $ map (True,) names
   where
     getBody : CAlt → CExp
     getBody (CConAlt _ _ _ _ t) = t
@@ -483,10 +486,10 @@ eraseEntries = do
     go _ = pure MkUnit
 
 -- given a initial function, return a dependency-ordered list of javascript source
-process : QName → M (List Doc)
-process name = do
+process : List QName → M (List Doc)
+process names = do
   top <- getTop
-  entries <- getEntries emptyMap name
+  entries <- foldlM getEntries emptyMap names
 
   -- Maybe move this dance into liftWhere
   ref <- newIORef entries
@@ -500,18 +503,35 @@ process name = do
   cexpMap <- tailCallOpt cexpMap
   -- Not needed for JS, uncomment to test
   -- cexpMap <- liftLambda cexpMap
-  let names = sortedNames cexpMap name
-  pure $ map cexpToDoc $ mapMaybe (\x => lookupMap x cexpMap) names
+  let names = sortedNames cexpMap names
+  pure $ mapMaybe (go cexpMap) names
+  where
+    go : ExpMap → QName → Maybe Doc
+    go cexpMap name = do
+      cexp <- lookupMap name cexpMap
+      if elem name names
+        then Just $ text "export" <+> cexpToDoc cexp
+        else Just $ cexpToDoc cexp
 
 compile : M (List Doc)
 compile = do
   top <- getTop
-  case lookupRaw "main" top of
-    Just (MkEntry fc name type def _) => do
-      tmp <- process name
-      -- tack on call to main function
-      let exec = stmtToDoc $ JPlain $ Apply (Var $ show name) Nil
-      pure $ reverse (exec :: tmp)
-    Nothing =>
-      -- TODO maybe emit everything if there is no main
-      error emptyFC "No main function found"
+  let exports = getExports Nil $ listValues top.defs
+  let mainName = (QN top.ns "main")
+  let main = lookup mainName top
+  let todo = case main of
+    Nothing => exports
+    Just _ => mainName :: exports
+  defs <- process todo
+  case lookup mainName top of
+    Just _ => -- tack on call to main function
+      let exec = stmtToDoc $ JPlain $ Apply (Var $ show mainName) Nil
+      in pure $ reverse (exec :: defs)
+    Nothing => pure $ reverse defs
+  where
+    getExports : List QName → List TopEntry → List QName
+    getExports acc Nil = acc
+    getExports acc ((MkEntry fc name@(QN ns nm) type def eflags) :: rest) =
+      let acc = if elem Export eflags then name :: acc else acc
+      in getExports acc rest
+

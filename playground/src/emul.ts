@@ -7,6 +7,8 @@ export interface Handle {
   buf: Uint8Array;
 }
 
+// Some of this was written for Idris and is not used by newt
+
 interface Process {
   argv: string[];
   platform: string;
@@ -49,6 +51,9 @@ export let shim: NodeShim = {
     },
     writeSync(fd: number, data: string) {
       shim.stdout += data;
+    },
+    readSync() {
+      return 0;
     }
   },
   process: {

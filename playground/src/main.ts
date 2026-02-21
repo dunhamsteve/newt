@@ -39,6 +39,12 @@ function mdline2nodes(s: string) {
   return cs
 }
 
+function bundle(js: string) {
+  js = js.replace(/^import.*\n/g, '');
+  js = js.replace(/\nexport /g, '\n');
+  return js;
+}
+
 function md2nodes(md: string)  {
   let rval: VNode[] = []
   let list: VNode[] | undefined
@@ -77,7 +83,7 @@ if (!state.javascript.value) {
     // maybe send fileName, src?
     await ipc.sendMessage("save", [fileName, src]);
     let js = await ipc.sendMessage("compile", [fileName]);
-    state.javascript.value = js;
+    state.javascript.value = bundle(js);
   }
 }
 
@@ -248,7 +254,7 @@ const language: EditorDelegate = {
         });
       }
       // less flashy version
-      ipc.sendMessage("compile", [fileName]).then(js => state.javascript.value = js);
+      ipc.sendMessage("compile", [fileName]).then(js => state.javascript.value = bundle(js));
       return diags;
     } catch (e) {
       console.log("ERR", e);

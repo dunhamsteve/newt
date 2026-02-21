@@ -669,11 +669,18 @@ parseInstance = do
 parseNorm : Parser Decl
 parseNorm = DCheck <$> getPos <* keyword "#check" <*> typeExpr <* keyword ":" <*> typeExpr
 
+parseExport : Parser Decl
+parseExport = do
+  loc <- getPos
+  keyword "#export"
+  names <- many $ withFC ident
+  pure $ Exports loc names
 
 parseDecl : Parser Decl
 parseDecl = parseMixfix <|> parsePType <|> parsePFunc
   <|> parseNorm <|> parseData <|> parseShortData
   <|> parseClass <|> parseInstance <|> parseRecord
+  <|> parseExport
   -- We'll put the backtracing stuff last, but there is a commit issue in parseDef
   <|> parseSig <|> parseDef
 

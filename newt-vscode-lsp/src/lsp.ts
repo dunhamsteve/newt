@@ -65,6 +65,7 @@ async function runChange() {
       console.log('CHECK', doc.uri, 'in', end - start);
       await sleep(1);
       if (!changes.find(ch => ch.uri === uri)) {
+        console.log('SEND', diagnostics.length, 'for', uri)
         connection.sendDiagnostics({ uri, diagnostics })
       } else {
         console.log('STALE result not sent for', uri)

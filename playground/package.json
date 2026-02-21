@@ -8,6 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
+  "browser": {
+    "fs": "./src/fs.ts"
+  },
   "devDependencies": {
     "@codemirror/theme-one-dark": "^6.1.2",
     "esbuild": "^0.25.0",

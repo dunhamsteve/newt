@@ -221,18 +221,11 @@ data VCaseAlt : U where
   VCaseCons : (name : QName) -> (args : List String) -> Env -> Tm ->  VCaseAlt
   VCaseLit : Literal -> Val -> VCaseAlt
   VCaseDefault : Val -> VCaseAlt
-  -- VCaseCons : (name : QName) -> (args : List String) -> Tm ->  VCaseAlt
-  -- VCaseLit : Literal -> Tm -> VCaseAlt
-  -- VCaseDefault : Tm -> VCaseAlt
-
 
 data Val : U where
-  -- This will be local / flex with spine.
   VVar : FC -> (k : Int) -> (sp : SnocList Val) -> Val
   VRef : FC -> (nm : QName) -> (sp : SnocList Val) -> Val
-  -- neutral case
   VCase : FC -> (sc : Val) -> List VCaseAlt -> Val
-  -- we'll need to look this up in ctx with IO
   VMeta : FC -> QName -> (sp : SnocList Val) -> Val
   VLam : FC -> Name -> Icit -> Quant -> Closure -> Val
   VPi : FC -> Name -> Icit -> Quant -> (a : Val) -> (b : Closure) -> Val
@@ -374,15 +367,17 @@ instance Show Def where
 
 -- entry in the top level context
 
-data EFlag = Hint | Inline
+data EFlag = Hint | Inline | Export
 
 instance Show EFlag where
   show Hint = "hint"
   show Inline = "inline"
+  show Export = "export"
 
 instance Eq EFlag where
   Hint == Hint = True
   Inline == Inline = True
+  Export == Export = True
   _ == _ = False
 
 record TopEntry where
@@ -601,7 +596,7 @@ lookupMeta ix@(QN ns nm) = do
     Just meta => pure meta
     Nothing => case lookupMap' ns top.modules of
       Nothing =>
-          error emptyFC "missing module: \{show ns}"
+          error emptyFC "missing module: \{show ns} looking up meta \{show ix}"
       Just mod => case lookupMap' ix mod.modMetaCtx.metas of
         Nothing =>
           error emptyFC "missing meta: \{show ix}"
@@ -641,3 +636,13 @@ instance Show Pattern where
 data Constraint = PC String Pattern Val
 instance Show Constraint where
   show (PC nm pat ty) = show (nm,pat,ty)
+
+-- Lazy because `let` would do work at the top of a `M a`
+prof : ∀ a. String → Lazy (M a) → M a
+prof desc work = do
+  start <- getTime
+  res <- force work
+  end <- getTime
+  putStrLn "PROF \{desc} \{show $ end - start} ms"
+  pure res
+

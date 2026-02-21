@@ -389,7 +389,9 @@ instance HasIO IO where
   liftIO a = a
 
 pfunc primPutStrLn uses (MkIORes MkUnit) : String → IO Unit := `(s) => (w) => {
-  require('fs').writeSync(1, s + '\n')
+  // https://nodejs.org/api/process.html#a-note-on-process-io
+  // Previously console.log, but that is _not_ always synchronous
+  fs.writeSync(1, s + '\n')
   return Prelude_MkIORes(Prelude_MkUnit,w)
 }`
 
@@ -956,3 +958,7 @@ foldlM f a xs = foldl (\ ma b => ma >>= flip f b) (pure a) xs
 
 pfunc unsafePerformIO : ∀ a. IO a → a := `(a, f) => f().h1 `
 
+pfunc prim_getTime uses (MkIORes): IO Int := `w => Prelude_MkIORes(+new Date(),w)`
+
+getTime : ∀ io. {{HasIO io}} → io Int
+getTime = liftIO prim_getTime

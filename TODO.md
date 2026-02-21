@@ -1,13 +1,19 @@
 
 ## TODO
 
+- [ ] Use looping for TCO
+  - For single functions at least - I think this would be a performance win. I've learned that the slowness on `bun` goes away if I drop the TCO transform.
 - [ ] Importing Prelude twice should be an error (currently it causes double hints and breaks auto)
 - [ ] For errors in other files, point to the import
 - [x] Unsolved metas should be errors (user metas are fine)
 - [x] Better syntax for forward declared data (so we can distinguish from functions)
 - [ ] maybe allow "Main" module name for any file
-- [ ] Restore "add missing cases" for LSP mode
-- [ ] Case split for LSP mode
+- [ ] Put `Def` on `Ref`
+  - It may be Axiom for forward/recursive functions, but it would get us DCon and TCon info without lookup - and may save passing around the Ref2 (+lookup) during Compilation.
+- [x] Restore "add missing cases" for LSP mode
+- [x] Case split for LSP mode
+- [x] Require lowercase pattern variables
+  - I accidentally misspell a constructor and end up with a wildcard.
 - [ ] Leverage LSP code for web playground
 - [ ] Improve handling of names:
   - We need FC on names in a lot of places
@@ -354,6 +360,7 @@
   - Seems like this would be tricky as soon as the user starts peeling off the tail or consing them
 - [ ] magic newtype? (drop them in codegen)
   - Needed before we newtype IO, so the tail recursion still works
+  - Without handling erased values, there are only two instances in the compiler code.
 - [x] vscode: syntax highlighting for String
 - [ ] add `poper` or variant of `pfunc` that maps to an operator, giving the js operator and precedence on RHS
   - This has now been hard-coded in codegen, but a syntax or something would be better.

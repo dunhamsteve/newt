@@ -97,10 +97,12 @@ data Decl
   | Class FC (FC × Name) Telescope (List Decl)
   | Instance FC Raw (Maybe (List Decl))
   | Record FC (FC × Name) Telescope (Maybe $ FC × Name) (List Decl)
+  | Exports FC (List $ FC × Name)
 
 
 instance HasFC Decl where
   getFC (TypeSig x strs tm) = x
+  getFC (Exports x _) = x
   getFC (FunDef x str xs) = x
   getFC (DCheck x tm tm1) = x
   getFC (Data x str tm xs) = x
@@ -148,6 +150,7 @@ instance Show Decl where
   show (Class _ (_,nm) tele decls) = foo ("Class" ::  nm :: "..." :: (show $ map show decls) :: Nil)
   show (Instance _ nm decls) = foo ("Instance" ::  show nm :: (show $ map show decls) :: Nil)
   show (Record _ nm tele nm1 decls) = foo ("Record" :: show nm :: show tele :: show nm1 :: show decls :: Nil)
+  show (Exports _ nms) = foo ("Exports" :: show nms :: Nil)
 
 
 instance Show Module where
@@ -263,6 +266,7 @@ instance Pretty Decl where
     <+> (nest 2 $ text "where" </> stack (map pretty decls))
   pretty (Instance _ _ _) = text "TODO pretty Instance"
   pretty (ShortData _ lhs sigs) = text "data" <+> pretty lhs <+> text "=" <+> pipeSep (map pretty sigs)
+  pretty (Exports _ nms) = text "#export" <+> spread (map (text ∘ show ∘ snd) nms)
 
 lhsNames : Raw → List String
 lhsNames tm = case tm of

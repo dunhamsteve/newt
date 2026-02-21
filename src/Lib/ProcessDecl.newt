@@ -529,6 +529,16 @@ processRecord ns recordFC (nameFC, nm) tele cname decls = do
       let deps = ((name, RApp fc (RVar fc pname) (RVar fc "$self") Explicit) :: deps)
       processFields autoPat tail deps rest
 
+processExports : String → FC → List (FC × String) → M Unit
+processExports ns fc names = do
+  top <- getTop
+  traverse_ (setExport top) names
+  where
+    setExport : TopContext → FC × String → M Unit
+    setExport top (fc, name) = do
+      let (Just entry) = lookupRaw name top | _ => error fc "\{name} not in scope"
+      setFlag entry.name fc Export
+
 -- currently mixfix registration is handled in the parser
 -- since we now run a decl at a time we could do it here.
 processDecl ns (PMixFix _ _ _ _)  = pure MkUnit
@@ -544,3 +554,4 @@ processDecl ns (Data fc nm ty (Just cons)) = processData ns fc nm ty cons
 -- TODO distinguish from function signatures
 processDecl ns (Data fc (_, nm) ty Nothing) = processTypeSig ns fc (nm :: Nil) ty
 processDecl ns (Record recordFC nm tele cname decls) = processRecord ns recordFC nm tele cname decls
+processDecl ns (Exports fc names) = processExports ns fc names

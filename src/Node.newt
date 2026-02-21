@@ -4,7 +4,6 @@ import Prelude
 
 pfunc getArgs uses (arrayToList MkIORes) :  IO (List String) := `(w) => Prelude_MkIORes( Prelude_arrayToList(null, process.argv.slice(1)), w)`
 pfunc readFile uses (MkIORes Left Right) : (fn : String) -> IO (Either String String) := `(fn) => (w) => {
-  let fs = require('fs')
   let result
   try {
     let content = fs.readFileSync(fn, 'utf8')
@@ -17,7 +16,6 @@ pfunc readFile uses (MkIORes Left Right) : (fn : String) -> IO (Either String St
 
 -- I wonder if I should automatically `uses` the constructors in the types
 pfunc writeFile uses (MkIORes MkUnit) : String → String → IO (Either String Unit) := `(fn, content) => (w) => {
-  let fs = require('fs')
   let result
   try {
     fs.writeFileSync(fn, content, 'utf8')
@@ -35,20 +33,20 @@ pfunc exitFailure : ∀ a. String → a := `(_, msg) => {
 }`
 
 pfunc putStr uses (MkIORes MkUnit): String → IO Unit := `(s) => (w) => {
-  let {writeSync} = require('fs');
+  let {writeSync} = fs;
   let buf = new TextEncoder().encode(s);
   writeSync(1, buf);
   return Prelude_MkIORes(Prelude_MkUnit, w);
 }`
 
 pfunc readLine uses (MkIORes Left Right) : IO (Either String String) := `(w) => {
-    let {readSync} = require('fs');
-    let buf = Buffer.alloc(1024);
+    let {readSync} = fs;
+    let buf = new Uint8Array(1024);
     let p = 0
     while (readSync(0, buf, p, 1, null)) {
         if (buf[p++] == 10) return Prelude_MkIORes(Prelude_Right(new TextDecoder().decode(buf.slice(0,p))),w);
         if (p + 10 > buf.length) {
-            let tmp = Buffer.alloc(buf.length * 1.5);
+            let tmp = new Uint8Array(buf.length * 1.5);
             tmp.set(buf);
             buf = tmp;
         }

@@ -1,9 +1,9 @@
 #!/bin/sh
 mkdir -p public
 echo build newt worker
-esbuild src/worker.ts --bundle --format=esm > public/worker.js
-esbuild src/frame.ts --bundle --format=esm > public/frame.js
+esbuild src/worker.ts --bundle --format=esm --platform=browser > public/worker.js
+esbuild src/frame.ts --bundle --format=esm --platform=browser > public/frame.js
 echo copy newt
-cp ../newt.js public
+cp ../newt.js src/newt.js
 cp -r static/* public
 (cd samples && zip -r ../public/files.zip .)

@@ -122,6 +122,7 @@ codeActionInfo uri line col = unsafePerformIO $ do
     putStrLn "\{show $ length' actions} actions"
     pure actions).runM st.topContext
     | Left err => do
+      putStrLn "ACTIONS ERROR"
       putStrLn $ showError "" err
       pure js_null
   modifyIORef state $ [ topContext := top ]
@@ -195,8 +196,8 @@ checkFile fn = unsafePerformIO $ do
     (Right (top, json)) <- (do
         modifyTop [ errors := Nil ]
         putStrLn "processModule"
-        _ <- processModule emptyFC lspFileSource Nil modName
-        pure MkUnit
+        _ <- switchModule lspFileSource modName
+
         -- pull out errors and infos
         top <- getTop
         let errors = map (errorToDiag) top.errors
@@ -215,4 +216,7 @@ checkFile fn = unsafePerformIO $ do
 -- Dummy main function with references to force functions into ouput file.
 -- but we don't get `export` on it..
 -- #export updateFile checkFile hoverInfo
-pfunc main uses (updateFile checkFile hoverInfo codeActionInfo) : IO Unit  := `() => {}`
+
+#export updateFile checkFile hoverInfo codeActionInfo
+
+-- pfunc main uses (updateFile checkFile hoverInfo codeActionInfo) : IO Unit  := `() => {}`

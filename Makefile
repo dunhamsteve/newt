@@ -25,11 +25,6 @@ newt3.js: newt2.js
 	time $(RUNJS) newt2.js src/Main.newt -o newt3.js
 	cmp newt2.js newt3.js
 
-min.js: newt3.js scripts/pack
-	scripts/pack
-	gzip -kf min.js
-	ls -l min.js min.js.gz
-
 test: newt.js
 	scripts/test
 
@@ -60,14 +55,13 @@ clean:
 audit: .PHONY
 	(cd playground && npm audit)
 	(cd newt-vscode && npm audit)
+	(cd newt-vscode-lsp && npm audit)
 
 lsp.js: ${SRCS}
 	node newt.js src/LSP.newt -o lsp.js
 
-newt-vscode-lsp/src/newt.js: lsp.js .PHONY
-	echo "import fs from 'fs'\nlet mods = { fs }\nlet require = key => mods[key]\n" > $@
-	# HACK
-	perl -p -e "s/(const LSP_(?:updateFile|checkFile|hoverInfo|codeActionInfo))/export \$$1/" lsp.js >> $@
+newt-vscode-lsp/src/newt.js: ${SRCS}
+	node newt.js src/LSP.newt -o $@
 
 newt-vscode-lsp/dist/lsp.js: newt-vscode-lsp/src/lsp.ts newt-vscode-lsp/src/newt.js
 	(cd newt-vscode-lsp && node esbuild.js)

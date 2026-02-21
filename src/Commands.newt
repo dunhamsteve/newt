@@ -25,17 +25,22 @@ decomposeName fn =
             then go (x :: acc) xs
             else (joinBy "/" (xs :< x <>> Nil), joinBy "." acc)
 
+
+switchModule : FileSource → String → M ModContext
+switchModule repo modns = do
+    addPrimitives
+    modifyTop [ metaCtx := MC emptyMap Nil 0 CheckAll ]
+    mod <- processModule emptyFC repo Nil modns
+    -- FIXME keep these in ModContext, drop from TopContext
+    modifyTop [ defs := mod.modDefs; metaCtx := mod.modMetaCtx; ops := mod.ctxOps; imported := mod.modDeps; infos := mod.modInfos; ns := modns; errors := mod.modErrors ]
+    top <- getTop
+    pure mod
+
 -- The cheap version of type at point, find the token, lookup in global context
 -- Later we will either get good FC for entries or scan them all and build a cache.
 getHoverInfo : FileSource → String → Int → Int → M (Maybe (String × FC))
 getHoverInfo repo modns row col = do
-    -- REVIEW consider not running processModule and returning empty if it hasn't been processed yet
-    -- For Elab.newt, there would be a 1.5s delay...
-    mod <- processModule emptyFC repo Nil modns
-
-    -- not necessarily loaded into top... (Maybe push this down into that branch of processModule)
-    -- FIXME - fragile - this is why we don't want this stuff directly in TopContext
-    modifyTop [ defs := mod.modDefs; metaCtx := mod.modMetaCtx; ops := mod.ctxOps; imported := mod.modDeps; infos := mod.modInfos]
+    mod <- switchModule repo modns
     top <- getTop
 
     -- Find the token at the point
@@ -154,6 +159,7 @@ getCaseSplit row col fc@(MkFC uri (MkBounds sr sc er ec)) ctx nm scty = do
   ty <- quote (length' ctx.env) scty
   cons <- filterM (checkCase ctx nm scty) cons
   let names = map fst cons
+  putStrLn "Make splits for \{show names}"
   edits <- makeEdits fc names True
   pure $ Just $ CaseSplitAction edits
 
@@ -163,9 +169,7 @@ posInFC row col (MkFC _ (MkBounds sr sc er ec)) = (sr <= row && row <= er) && (s
 
 getActions : FileSource → String → Int → Int → M (List CodeAction)
 getActions repo modns row col = do
-  mod <- processModule emptyFC repo Nil modns
-  -- not necessarily loaded into top... (Maybe push this down into that branch of processModule)
-  modifyTop [ defs := mod.modDefs; metaCtx := mod.modMetaCtx; ops := mod.ctxOps; imported := mod.modDeps; infos := mod.modInfos]
+  mod <- switchModule repo modns
   top <- getTop
   let xx = filter (posInFC row col ∘ getFC) top.infos
   putStrLn "Filter got \{show $ length' xx}"

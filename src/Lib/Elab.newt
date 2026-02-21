@@ -493,22 +493,18 @@ unify env mode t u = do
     unifyRest t' u' = error (getFC t') "unify failed \{show t'} =?= \{show u'} \n  env is \{show env}"
 
     unifyRef : Val -> Val -> M UnifyResult
-    unifyRef t'@(VRef fc k sp)  u'@(VRef fc' k' sp') =
+    unifyRef t'@(VRef fc k sp)  u'@(VRef fc' k' sp') = do
       -- unifySpine is a problem for cmp (S x) (S y) =?= cmp x y
-        do
-        -- catchError(unifySpine env mode (k == k') sp sp') $ \ err => do
-            Nothing <- tryEval env t'
-              | Just v => do
-                  debug $ \ _ => "tryEval \{show t'} to \{show v}"
-                  unify env mode v u'
-            Nothing <- tryEval env u'
-              | Just v => unify env mode t' v
-            if k == k'
-              then unifySpine env mode (k == k') sp sp'
-              else error fc "vref mismatch \{show t'} =?= \{show u'}"
+      Nothing <- tryEval env t'
+        | Just v => do
+            debug $ \ _ => "tryEval \{show t'} to \{show v}"
+            unify env mode v u'
+      Nothing <- tryEval env u'
+        | Just v => unify env mode t' v
+      if k == k'
+        then unifySpine env mode (k == k') sp sp'
+        else error fc "vref mismatch \{show t'} =?= \{show u'}"
 
-    -- Lennart.newt cursed type references itself
-    -- We _could_ look up the ref, eval against Nil and vappSpine...
     unifyRef t         u@(VRef fc' k' sp') = do
       debug $ \ _ => "expand \{show t} =?= %ref \{show k'}"
       top <- getTop
@@ -1488,7 +1484,7 @@ check ctx tm ty = do
                 error fc "Icity issue checking \{show t} at \{show ty}"
     (t@(RLam _ (BI fc nm icit quant) tm), ty) => do
               pty <- prvalCtx ty
-              error fc "Expected pi type, got \{pty}"
+              error fc "Expected \{pty}, got pi type"
 
     (RLet fc nm ty v sc, rty) => do
       ty' <- check ctx ty (VU emptyFC)

@@ -14,15 +14,18 @@ const shim = {
         throw new Error(`${fn} not found`);
       }
     },
+    writeSync: (fd: number, msg: string) => console.log(msg)
   },
 };
 // we intercept require to return our fake node modules
 declare global {
   interface Window {
     require: (x: string) => any;
+    fs: any;
   }
 }
 const requireStub: any = (x: string) => (shim as any)[x];
+self.fs = shim.fs;
 self.require = requireStub;
 self.process = {
   platform: "linux",
