@@ -901,7 +901,7 @@ isDigit '9' = True
 isDigit _ = False
 
 isUpper : Char → Bool
-isUpper c = let o = ord c in 64 < o && o < 91
+isUpper c = let o = ord c in (64 < o && o < 91) || (912 < o && o < 938)
 
 isAlphaNum : Char → Bool
 isAlphaNum c = let o = ord c in
