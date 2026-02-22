@@ -516,8 +516,8 @@ process names = do
 compile : M (List Doc)
 compile = do
   top <- getTop
-  let exports = getExports Nil $ listValues top.defs
-  let mainName = (QN top.ns "main")
+  let exports = getExports Nil $ listValues top.currentMod.modDefs
+  let mainName = (QN top.currentMod.modName "main")
   let main = lookup mainName top
   let todo = case main of
     Nothing => exports

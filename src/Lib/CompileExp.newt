@@ -267,7 +267,7 @@ compileDCon ix (QN _ nm) info arity =
 
 -- probably want to drop the Ref2 when we can
 defToCExp : {{Ref2 Defs St}} → (QName × Def) -> M (QName × CExp)
-defToCExp (qn, Axiom)      = pure (qn, CErased)
+defToCExp (qn, Axiom)      = error emptyFC "\{show qn} is Axiom" -- pure (qn, CErased)
 defToCExp (qn, (PrimOp _)) = (_,_ qn) <$> compilePop qn
 defToCExp (qn, DCon ix info arity _)   = pure (qn, compileDCon ix qn info arity)
 -- We're not using these are runtime at the moment, no typecase

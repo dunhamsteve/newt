@@ -51,7 +51,6 @@ logMetas (Unsolved fc k ctx ty User cons :: rest) = do
 logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
       ty' <- forceMeta ty
       tm <- quote ctx.lvl ty'
-      -- FIXME in Combinatory.newt, the val doesn't match environment?
       let msg = "Unsolved meta \{show k} \{show kind} type \{render 90 $ pprint (names ctx) tm} \{show $ length' cons} constraints"
       msgs <- for cons $ \case
         (MkMc fc env sp val) => do
@@ -69,7 +68,7 @@ logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
           pure ("  \{show $ length' matches} Solutions: \{show matches}" :: Nil)
 
         _ => pure Nil
-      -- info fc $ unlines ((msg :: Nil) ++ msgs ++ sols)
+
       addError $ E fc $ unlines ((msg :: Nil) ++ msgs ++ sols)
       logMetas rest
 
@@ -95,7 +94,7 @@ impTele tele = map foo tele
 checkAlreadyDef : FC → Name → M Unit
 checkAlreadyDef fc nm = do
   top <- getTop
-  case lookup (QN top.ns nm) top of
+  case lookup (QN top.currentMod.modName nm) top of
     Nothing => pure MkUnit
     Just entry => error fc "\{show nm} is already defined at \{show entry.fc}"
 
@@ -158,7 +157,7 @@ processDef ns fc nm clauses = do
   log 1 $ \ _ => "-----"
   log 1 $ \ _ => "Def \{show nm}"
   top <- getTop
-  let mc = top.metaCtx
+  let mc = top.currentMod.modMetaCtx
   let (Just entry) = lookup (QN ns nm) top
     | Nothing => throwError $ E fc "No declaration for \{nm}"
   let (MkEntry fc name ty Axiom _) = entry
@@ -436,7 +435,7 @@ processData ns fc (nameFC, nm) ty cons = do
   log 1 $ \ _ => "-----"
   log 1 $ \ _ => "Data \{nm}"
   top <- getTop
-  let mc = top.metaCtx
+  let mc = top.currentMod.modMetaCtx
   tyty <- check (mkCtx fc) ty (VU fc)
   case lookup (QN ns nm) top of
     Just (MkEntry _ name type Axiom _) => do

@@ -7,32 +7,31 @@ import Prelude
 import Lib.Common
 import Lib.Types
 
--- I want unique ids, to be able to lookup, update, and a Ref so
--- I don't need good Context discipline. (I seem to have made mistakes already.)
-
+-- TODO move the def in here (along with M) or merge this into types
+-- The Monad can be its own file if we pull all of the monad update functions there.
 
 lookup : QName -> TopContext -> Maybe TopEntry
 lookup qn@(QN ns nm) top =
-  if ns == top.ns
-    then lookupMap' qn top.defs
+  if ns == top.currentMod.modName
+    then lookupMap' qn top.currentMod.modDefs
     else case lookupMap' ns top.modules of
       Just mod => lookupMap' qn mod.modDefs
       Nothing => Nothing
 
 lookupImported : String → TopContext -> List TopEntry
 lookupImported raw top =
-  mapMaybe (flip lookup top) $ (QN top.ns raw) :: map (flip QN raw) top.imported
+  mapMaybe (flip lookup top) $ (QN top.currentMod.modName raw) :: map (flip QN raw) top.currentMod.modDeps
 
 -- For repl / out of scope errors
 lookupAll : String → TopContext -> List TopEntry
 lookupAll raw top =
-  mapMaybe (flip lookup top) $ (QN top.ns raw) :: map (flip QN raw) (map fst $ toList top.modules)
+  mapMaybe (flip lookup top) $ (QN top.currentMod.modName raw) :: map (flip QN raw) (map fst $ toList top.modules)
 
 lookupRaw : String -> TopContext -> Maybe TopEntry
 lookupRaw raw top =
-  case lookupMap' (QN top.ns raw) top.defs of
+  case lookupMap' (QN top.currentMod.modName raw) top.currentMod.modDefs of
     Just entry => Just entry
-    Nothing => go top.imported
+    Nothing => go top.currentMod.modDeps
   where
     go : List String → Maybe TopEntry
     go Nil = Nothing
@@ -42,35 +41,33 @@ lookupRaw raw top =
         Just entry => Just entry
         Nothing => go nss
 
-
 instance Show TopContext where
-  show top = "\nContext:\n [\{ joinBy "\n" $ map (show ∘ snd) $ toList top.defs}]"
+  show top = "\nContext:\n [\{ joinBy "\n" $ map (show ∘ snd) $ toList top.currentMod.modDefs}]"
 
 emptyTop : TopContext
-emptyTop = MkTop emptyMap Nil emptyMap Nil "" emptyMap (MC emptyMap Nil 0 CheckAll) 0 Nil emptyMap
-
+emptyTop = MkTop emptyMap emptyMap (emptyModCtx "" "") 0 emptyMap
 
 setFlag : QName → FC → EFlag → M Unit
 setFlag name fc flag = do
   top <- getTop
-  let (Just (MkEntry fc nm ty def flags)) = lookupMap' name top.defs
+  let (Just (MkEntry fc nm ty def flags)) = lookupMap' name top.currentMod.modDefs
     | Nothing => error fc "\{show name} not declared"
-  modifyTop [ defs $= (updateMap name (MkEntry fc name ty def (flag :: flags))) ]
+  modifyTop [ currentMod $= [ modDefs $= (updateMap name (MkEntry fc name ty def (flag :: flags)))] ]
 
 setDef : QName -> FC -> Tm -> Def → List EFlag -> M Unit
 setDef name fc ty def flags = do
   top <- getTop
-  let (Nothing) = lookupMap' name top.defs
+  let (Nothing) = lookupMap' name top.currentMod.modDefs
     | Just (MkEntry fc' nm' ty' def' _) => error fc "\{show name} is already defined at \{show fc'}"
-  modifyTop $ \top =>
-    [ defs := (updateMap name (MkEntry fc name ty def flags) top.defs)] top
+
+  modifyTop [currentMod $= [ modDefs $= (updateMap name (MkEntry fc name ty def flags))] ]
 
 updateDef : QName -> FC -> Tm -> Def -> M Unit
 updateDef name fc ty def = do
   top <- getTop
-  let (Just (MkEntry fc' nm' ty' def' flags)) = lookupMap' name top.defs
+  let (Just (MkEntry fc' nm' ty' def' flags)) = lookupMap' name top.currentMod.modDefs
     | Nothing => error fc "\{show name} not declared"
-  putTop $ [ defs := updateMap name (MkEntry fc' name ty def flags) top.defs ] top
+  modifyTop [ currentMod $= [ modDefs := updateMap name (MkEntry fc' name ty def flags) top.currentMod.modDefs ] ]
 
 typeName : Tm → Maybe QName
 typeName (Pi fc nm Explicit rig t u) = Nothing
@@ -88,15 +85,11 @@ addHint qn = do
         | Nothing => error entry.fc "can't find tcon name for \{show qn}"
       let xs = fromMaybe Nil $ lookupMap' tyname top.hints
       let hints = updateMap tyname ((qn, entry.type) :: xs) top.hints
-      putTop $ [ hints := hints ] top
+      modifyTop [ hints := hints ]
     Nothing => pure MkUnit
 
 addError : Error -> M Unit
-addError err = do
-  top <- getTop
-  modifyTop [ errors $= (err ::) ]
+addError err = modifyTop [ currentMod $= [ modErrors $= (err ::) ] ]
 
 addInfo : EditorInfo → M Unit
-addInfo info = do
-  top <- getTop
-  modifyTop [ infos $= (info ::)]
+addInfo info = modifyTop [ currentMod $= [modInfos $= (info ::) ] ]

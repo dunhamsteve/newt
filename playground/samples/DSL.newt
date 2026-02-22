@@ -95,7 +95,7 @@ enumMul (x :: xs) ys = map (_,_ x) ys ++ enumMul xs ys
 
 enumerate : (t : E) → Vec (typ t) (card t)
 enumerate Zero = Nil
-enumerate One = unit :: Nil
+enumerate One = MkUnit :: Nil
 enumerate (Add x y) = enumAdd (enumerate x) (enumerate y)
 enumerate (Mul x y) = enumMul (enumerate x) (enumerate y)
 

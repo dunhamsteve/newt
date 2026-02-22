@@ -119,7 +119,10 @@ isCandidate _ _ = False
 
 setMetaMode : MetaMode → M Unit
 -- ideally we would support dotted paths like metaCtx.mcmode := CheckFirst
-setMetaMode mcmode = modifyTop [ metaCtx $= [mcmode := mcmode] ]
+setMetaMode mcmode = modifyTop [ currentMod $= [modMetaCtx $= [mcmode := mcmode] ] ]
+
+setMetaContext : MetaContext → M Unit
+setMetaContext mc = modifyTop [ currentMod $= [ modMetaCtx := mc ]]
 
 findMatches : Context -> Val -> List (QName × Tm) -> M (List QName)
 findMatches ctx ty Nil = pure Nil
@@ -129,7 +132,7 @@ findMatches ctx ty ((name, type) :: xs) = do
 
   top <- getTop
   -- save context
-  let mc = top.metaCtx
+  let mc = top.currentMod.modMetaCtx
   catchError (do
       -- TODO sort out the FC here
       let fc = getFC ty
@@ -140,11 +143,11 @@ findMatches ctx ty ((name, type) :: xs) = do
       setMetaMode CheckFirst
       tm <- check ctx (RVar fc nm) ty
       debug $ \ _ => "Found \{rpprint Nil tm} for \{show ty}"
-      modifyTop [ metaCtx := mc ]
+      setMetaContext mc
       (_::_ name) <$> findMatches ctx ty xs)
     (\ err => do
       debug $ \ _ => "No match \{show ty} \{rpprint Nil type} \{showError "" err}"
-      modifyTop [ metaCtx := mc ]
+      setMetaContext mc
       findMatches ctx ty xs)
 
 contextMatches : Context -> Val -> M (List (Tm × Val))
@@ -156,17 +159,17 @@ contextMatches ctx ty = go (zip ctx.env ctx.types)
       type <- quote ctx.lvl vty
       let (True) = isCandidate ty type | False => go xs
       top <- getTop
-      let mc = top.metaCtx
+      let mc = top.currentMod.modMetaCtx
       catchError(do
           debug $ \ _ => "TRY context \{nm} : \{rpprint (names ctx) type} for \{show ty}"
           unifyCatch (getFC ty) ctx ty vty
-          let mc' = top.metaCtx
-          modifyTop [ metaCtx := mc]
+          let mc' = top.currentMod.modMetaCtx
+          setMetaContext mc
           tm <- quote ctx.lvl tm
           (_::_ (tm, vty)) <$> go xs)
         (\ err => do
           debug $ \ _ => "No match \{show ty} \{rpprint (names ctx) type} \{showError "" err}"
-          modifyTop [ metaCtx := mc]
+          setMetaContext mc
           go xs)
 
 getArity : Tm -> List Quant
@@ -229,7 +232,7 @@ trySolveAuto _ = pure False
 solveAutos : M Unit
 solveAutos = do
   top <- getTop
-  let mc = top.metaCtx
+  let mc = top.currentMod.modMetaCtx
   let autos = filter isAuto $ mapMaybe (flip lookupMap' mc.metas) mc.autos
   res <- run autos
   -- If anything is solved, we try again from the top
@@ -248,13 +251,13 @@ solveAutos = do
 updateMeta : QName -> (MetaEntry -> M MetaEntry) -> M Unit
 updateMeta ix f = do
   top <- getTop
-  let mc = top.metaCtx
+  let mc = top.currentMod.modMetaCtx
   let (Just me) = lookupMap' ix mc.metas | Nothing => pure MkUnit
   me <- f me
   let autos = case me of
     Solved _ _ _ => filter (_/=_ ix) mc.autos
     _ => mc.autos
-  modifyTop [ metaCtx := MC (updateMap ix me mc.metas) autos mc.next mc.mcmode ]
+  setMetaContext $ [metas $= updateMap ix me; autos := autos] mc
 
 -- Try to solve autos that reference the meta ix
 checkAutos : QName -> List QName -> M Unit
@@ -278,7 +281,7 @@ checkAutos ix (_ :: rest) = checkAutos ix rest
 addConstraint : Env -> QName -> SnocList Val -> Val -> M Unit
 addConstraint env ix sp tm = do
   top <- getTop
-  let mc = top.metaCtx
+  let mc = top.currentMod.modMetaCtx
   let (CheckAll) = mc.mcmode | _ => pure MkUnit
   updateMeta ix $ \case
     (Unsolved pos k a b c cons) => do
@@ -373,7 +376,7 @@ ctx.boundNames = map snd $ filter (\x => fst x == Bound) $ zip ctx.bds (map fst 
 maybeCheck : M Unit -> M Unit
 maybeCheck action = do
   top <- getTop
-  let mc = top.metaCtx
+  let mc = top.currentMod.modMetaCtx
   case mc.mcmode of
     CheckAll => action
     CheckFirst => do
@@ -426,7 +429,7 @@ solve env m sp t = do
           unify env UNormal val rhs
       -- check any autos
       top <- getTop
-      let mc = top.metaCtx
+      let mc = top.currentMod.modMetaCtx
       let (CheckAll) = mc.mcmode | _ => pure MkUnit
       debug $ \ _ => "check autos depending on \{show ix} \{debugStr mc.mcmode}"
       checkAutos ix mc.autos
@@ -617,16 +620,17 @@ unifyCatch fc ctx ty' ty = do
 freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
 freshMeta ctx fc ty kind = do
   top <- getTop
-  let mc = top.metaCtx
+  let mc = top.currentMod.modMetaCtx
   debug $ \ _ => "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
   -- need the ns here
   -- we were fudging this for v1
-  let qn = QN top.ns "$m\{show mc.next}"
+  let qn = QN top.currentMod.modName "$m\{show mc.next}"
   let newmeta = Unsolved fc qn ctx ty kind Nil
   let autos = case kind of
       AutoSolve => qn :: mc.autos
       _ => mc.autos
-  modifyTop [metaCtx := MC (updateMap qn newmeta mc.metas) autos (1 + mc.next) mc.mcmode ]
+  setMetaContext $ [ metas $= updateMap qn newmeta; autos := autos; next $= 1 +] mc
+
   -- I tried checking Auto immediately if CheckAll, but there isn't enough information yet.
   pure $ applyBDs 0 (Meta fc qn) ctx.bds
   where

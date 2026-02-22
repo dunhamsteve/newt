@@ -398,12 +398,13 @@ data EditorInfo
 
 record ModContext where
   constructor MkModCtx
+  modName : String
   modSource : String
   modDefs : SortedMap QName TopEntry
   -- Do we need this if everything solved is zonked?
   modMetaCtx : MetaContext
   -- longer term maybe drop this, put the operator decls in ctxDefs and collect them on import
-  ctxOps : Operators
+  modOps : Operators
   modDeps : List String
   modErrors : List Error
   modInfos : List EditorInfo
@@ -416,8 +417,8 @@ record ModContext where
 -- expand these during normalization?
 
 -- A placeholder while walking through dependencies of a module
-emptyModCtx : String → ModContext
-emptyModCtx source = MkModCtx source emptyMap (MC emptyMap Nil 0 NoCheck) emptyMap Nil Nil Nil
+emptyModCtx : String → String → ModContext
+emptyModCtx modName source = MkModCtx modName source emptyMap (MC emptyMap Nil 0 NoCheck) emptyMap Nil Nil Nil
 
 HintTable : U
 HintTable = SortedMap QName (List (QName × Tm))
@@ -428,23 +429,17 @@ instance HasFC EditorInfo where
   getFC (CaseSplit fc _ _ _) = fc
   getFC (MissingCases fc _ _) = fc
 
-
+-- modules are "modules"
+-- currentMod represents the current module
+-- when we switch modules, load imports into ops and hints
+-- as we process the decls, update ops and currentMod.ops
 record TopContext where
   constructor MkTop
   modules : SortedMap String ModContext
-  imported : List String
-  -- TCon name → function name × type
   hints : HintTable
-  infos : List EditorInfo
-
   -- current module
-  ns : String
-  defs : SortedMap QName TopEntry
-  metaCtx : MetaContext
-
-  -- Global values
-  verbose : Int -- command line flag
-  errors : List Error
+  currentMod : ModContext
+  verbose : Int -- command line flag increments this
   ops : Operators
 
 -- we'll use this for typechecking, but need to keep a TopContext around too.
@@ -592,7 +587,7 @@ error' msg = throwError $ E emptyFC msg
 lookupMeta : QName -> M MetaEntry
 lookupMeta ix@(QN ns nm) = do
   top <- getTop
-  case lookupMap' ix top.metaCtx.metas of
+  case lookupMap' ix top.currentMod.modMetaCtx.metas of
     Just meta => pure meta
     Nothing => case lookupMap' ns top.modules of
       Nothing =>

@@ -16,21 +16,14 @@ import Lib.Elab
 -- declare internal primitives
 addPrimitives : M ModContext
 addPrimitives = do
+  modifyTop [ currentMod := emptyModCtx "Prim" ""; hints := emptyMap; ops := emptyMap ]
   processDecl primNS (PType emptyFC "Int" Nothing)
   processDecl primNS (PType emptyFC "String" Nothing)
   processDecl primNS (PType emptyFC "Char" Nothing)
   setDef (QN primNS "PiType") emptyFC (Erased emptyFC) (PrimFn "(h0, h1) => ({ tag: \"PiType\", h0, h1 });" (S (S Z)) Nil) Nil
   top <- getTop
-  let mod = MkModCtx "" top.defs (MC emptyMap Nil 0 CheckAll) top.ops Nil top.errors Nil
-  let modules = updateMap primNS mod top.modules
-  -- TODO - do we clear this? Try just modules := modules, but wait until this refactor is done.
-  modifyTop [ modules := modules
-      ; imported := primNS :: Nil
-      ; hints := emptyMap
-      ; ns := ""
-      ; defs := emptyMap
-      ]
-  pure mod
+  modifyTop [ modules $= updateMap primNS top.currentMod ]
+  pure top.currentMod
 
 record FileSource where
   getFile : FC → String → M (String × String)
@@ -60,9 +53,11 @@ importHints (entry :: entries) = do
   when (elem Hint entry.eflags) $ \ _ => addHint entry.name
   importHints entries
 
--- HACK this is returning src to help render errors..
--- Maybe return module, put src and errors in module, add error for import with error, callers can sort out what they want to do?
--- The issue here is command line newt wants to report all errors (we can print that though?)  LSP wants something more subtle
+mergeOps : Operators → Operators → Operators
+mergeOps mod top = foldMap (flip const) top $ toList mod
+
+-- processModule might reset the currentModule in the topContext
+-- do not rely on topContext state afterwards - it may or may not contain the module
 processModule : FC → FileSource → List String → String → M ModContext
 processModule importFC repo stk modns = do
   top <- getTop
@@ -70,8 +65,8 @@ processModule importFC repo stk modns = do
   let (Nothing) = lookupMap' modns top.modules
     | Just mod => pure mod
 
-  let (False) = modns == primNS
-    | _ => addPrimitives
+  let (False) = modns == primNS | _ => addPrimitives
+
   let parts = split modns "."
   let fn = joinBy "/" parts ++ ".newt"
   -- TODO now we can pass in the module name...
@@ -92,47 +87,60 @@ processModule importFC repo stk modns = do
   imported <- for imports $ \case
     MkImport fc (nameFC, name') => do
       when (elem name' stk) $ \ _ => error nameFC "import loop \{modns} → \{name'}"
-      processModule nameFC repo (modns :: stk) name'
+      mod <- processModule nameFC repo (modns :: stk) name'
       pure $ name'
+
   processModule nameFC repo (modns :: stk) primNS
   let imported = snoc imported primNS
 
   putStrLn "module \{modName}"
+  top <- getTop
+  let freshMC = MC emptyMap Nil 0 CheckAll
+  let mod = MkModCtx modns src emptyMap freshMC emptyMap imported Nil Nil
+  modifyTop [ currentMod := mod
+            ; hints := emptyMap
+            ; ops := ops
+            ]
 
-  log 1 $ \ _ => "MODNS " ++ show modns
+  -- top hints / ops include all directly imported modules
+  for_ imports $ \case
+    (MkImport fc (nameFC, ns)) => do
+      let (Just mod) = lookupMap' ns top.modules | _ => error emptyFC "namespace \{show ns} missing"
+      importHints (listValues mod.modDefs)
+      modifyTop [ ops $= mergeOps mod.modOps ]
+
+      -- add error if an import contains an error
+      -- maybe move this to after reporting
+      case mod.modErrors of
+        Nil => pure MkUnit
+        _ => addError $ E nameFC "Error in import \{ns}"
+
+  log 1 $ \ _ => "parse Decls"
   top <- getTop
   (decls, ops) <- parseDecls fn top.ops toks Lin
 
-  top <- getTop
-  let freshMC = MC emptyMap Nil 0 CheckAll
-  -- NOW Print and drop errors here
-  -- clear per module fields before processing this module
-  modifyTop [ imported := imported
-            ; hints := emptyMap
-            ; ns := modns
-            ; defs := emptyMap
-            ; infos := Nil
-            ; metaCtx := freshMC
-            ; ops := ops
-            ]
-  for imported $ \ ns => do
-    let (Just mod) = lookupMap' ns top.modules | _ => error emptyFC "namespace \{show ns} missing"
-    importHints (listValues mod.modDefs)
+  -- TODO only include this module's ops
+  -- aside from reworking parsing, we could filter
+  -- other options are removing updates from parsing (so we must use incremental parsing)
+  -- or removing pratt from parsing (so it happens in elaboration)
+  modifyTop [ currentMod $= [ modOps := ops ] ]
 
   log 1 $ \ _ => "process Decls"
   traverse (tryProcessDecl src modns) (collectDecl decls)
+  top <- getTop
 
   -- This has addErrors as a side-effect
-  logMetas $ reverse $ listValues top.metaCtx.metas
+  logMetas $ reverse $ listValues top.currentMod.modMetaCtx.metas
+
+  -- print errors (for batch processing case)
+  for_ top.currentMod.modErrors $ \ err => putStrLn $ showError src err
 
   -- update modules with result, leave the rest of context in case this is top file
   top <- getTop
-  let mod = MkModCtx src top.defs top.metaCtx top.ops imported top.errors top.infos
-  let modules = updateMap modns mod top.modules
+  let modules = updateMap modns top.currentMod top.modules
   modifyTop [modules := modules]
 
-  -- FIXME module context should hold errors, to report in replay
-  pure mod
+  pure top.currentMod
   where
     tryProcessDecl : String → String → Decl → M Unit
     tryProcessDecl src ns decl = do

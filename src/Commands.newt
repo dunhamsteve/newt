@@ -28,12 +28,8 @@ decomposeName fn =
 
 switchModule : FileSource → String → M ModContext
 switchModule repo modns = do
-    addPrimitives
-    modifyTop [ metaCtx := MC emptyMap Nil 0 CheckAll ]
     mod <- processModule emptyFC repo Nil modns
-    -- FIXME keep these in ModContext, drop from TopContext
-    modifyTop [ defs := mod.modDefs; metaCtx := mod.modMetaCtx; ops := mod.ctxOps; imported := mod.modDeps; infos := mod.modInfos; ns := modns; errors := mod.modErrors ]
-    top <- getTop
+    modifyTop [ currentMod := mod; ops := mod.modOps ]
     pure mod
 
 -- The cheap version of type at point, find the token, lookup in global context
@@ -112,7 +108,7 @@ makeEdits : FC → List QName → Bool → M (List FileEdit)
 makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
   cons <- map applyDCon <$> traverse lookupDCon names
   top <- getTop
-  let (Just mod) = lookupMap' top.ns top.modules | _ => pure Nil
+  let (Just mod) = lookupMap' top.currentMod.modName top.modules | _ => pure Nil
   let lines = split mod.modSource "\n"
   let (Just line) = getAt' sr lines | _ => pure Nil
   let cs = unpack line
@@ -171,7 +167,7 @@ getActions : FileSource → String → Int → Int → M (List CodeAction)
 getActions repo modns row col = do
   mod <- switchModule repo modns
   top <- getTop
-  let xx = filter (posInFC row col ∘ getFC) top.infos
+  let xx = filter (posInFC row col ∘ getFC) top.currentMod.modInfos
   putStrLn "Filter got \{show $ length' xx}"
   go Nil $ xx
   where

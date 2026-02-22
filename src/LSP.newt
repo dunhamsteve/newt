@@ -1,7 +1,6 @@
 module LSP
 
 import Prelude
--- TODO pull this into its own file
 import Lib.Common
 import Lib.Eval
 import Lib.Types
@@ -165,7 +164,7 @@ errorToDiag (Postpone fc qn msg) = errorToDiag $ E fc "Postpone \{show qn} \{msg
 getInfos : M (List Json)
 getInfos = do
     top <- getTop
-    go Nil $ listValues $ top.metaCtx.metas
+    go Nil $ listValues $ top.currentMod.modMetaCtx.metas
     where
         go : List Json → List MetaEntry → M (List Json)
         go acc Nil = pure acc
@@ -194,13 +193,12 @@ checkFile fn = unsafePerformIO $ do
         then resetState base
         else pure MkUnit
     (Right (top, json)) <- (do
-        modifyTop [ errors := Nil ]
         putStrLn "processModule"
         _ <- switchModule lspFileSource modName
 
         -- pull out errors and infos
         top <- getTop
-        let errors = map (errorToDiag) top.errors
+        let errors = map (errorToDiag) top.currentMod.modErrors
         infos <- getInfos
         pure $ infos ++ errors
         ).runM st.topContext

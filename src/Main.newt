@@ -65,11 +65,8 @@ baseDir Lin _ = Left "module path doesn't match directory"
 showErrors : String -> String -> M Unit
 showErrors fn src = do
   top <- getTop
-  -- TODO {M} needed to sort out scrutinee
-  let (Nil) = top.errors
-    | errors => do
-        traverse (putStrLn ∘ showError src) errors
-        throwError $ E (MkFC fn $ MkBounds 0 0 0 0) "Compile failed"
+  let (Nil) = top.currentMod.modErrors
+    | _ => throwError $ E (MkFC fn $ MkBounds 0 0 0 0) "Compile failed"
   pure MkUnit
 
 
