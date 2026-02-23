@@ -999,13 +999,12 @@ mkPat (tm, icit) = do
                   pure $ PatCon (getFC tm) icit name bpat Nothing
                 -- This fires when a global is shadowed by a pattern var
                 -- Just _ => error (getFC tm) "\{show nm} is not a data constructor"
-                _ => case b of
-                    -- TODO maybe check case?
-                    Nil =>
-                      if isUpperName nm
+                _ => if isUpperName nm
+                        -- This is not entirely accurate - it could be a function def
                         then error (getFC tm) "\{nm} not in scope"
-                        else pure $ PatVar fc icit nm
-                    _ => error (getFC tm) "patvar applied to args"
+                        else case b of
+                          Nil => pure $ PatVar fc icit nm
+                          _ => error (getFC tm) "patvar applied to args"
     ((RImplicit fc), Nil) => pure $ PatWild fc icit
     ((RImplicit fc), _) => error fc "implicit pat can't be applied to arguments"
     ((RLit fc lit), Nil) => pure $ PatLit fc lit
@@ -1486,9 +1485,10 @@ check ctx tm ty = do
                 pure $ Lam fc nm' icit rig sc
               else
                 error fc "Icity issue checking \{show t} at \{show ty}"
-    (t@(RLam _ (BI fc nm icit quant) tm), ty) => do
+    (t@(RLam fc (BI _ nm icit quant) tm), ty) => do
               pty <- prvalCtx ty
-              error fc "Expected \{pty}, got pi type"
+              -- TODO I'm hitting this with an unsolved meta
+              error fc "Expected \{pty}, got a function"
 
     (RLet fc nm ty v sc, rty) => do
       ty' <- check ctx ty (VU emptyFC)
@@ -1513,7 +1513,6 @@ check ctx tm ty = do
       pure $ Lam (getFC tm) nm' Implicit rig sc
 
     (tm, ty@(VPi fc nm' Auto rig a b)) => do
-      let names = map fst ctx.types
       debug $ \ _ => "XXX edge case add auto lambda {\{nm'} : \{show a}} to \{show tm} "
       let var = VVar fc (length' ctx.env) Lin
       ty' <- b $$ var

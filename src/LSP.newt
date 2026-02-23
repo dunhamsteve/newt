@@ -143,6 +143,11 @@ codeActionInfo uri line col = unsafePerformIO $ do
         $ ("title", JsonStr "Case split")
         :: ("edit", (single "changes" $ single uri $ JsonArray $ map editToJson edits))
         :: Nil
+    actionToJson (Intro name edit) =
+      JsonObj
+        $ ("title", JsonStr "Intro \{name}")
+        :: ("edit", (single "changes" $ single uri $ JsonArray $ editToJson edit :: Nil))
+        :: Nil
     actionToJson (AddMissingAction edits) =
       JsonObj
         $ ("title", JsonStr "Add missing cases")

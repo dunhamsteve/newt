@@ -61,6 +61,7 @@ data FileEdit = MkEdit FC String
 data CodeAction
   = CaseSplitAction (List FileEdit)
   | AddMissingAction (List FileEdit)
+  | Intro String FileEdit
 
 
 applyDCon : QName × Int × Tm → List String
@@ -163,13 +164,63 @@ posInFC : Int → Int → FC → Bool
 -- FIXME ec + 1 again...
 posInFC row col (MkFC _ (MkBounds sr sc er ec)) = (sr <= row && row <= er) && (sc <= col && col <= ec + 1)
 
+getHole : ModContext → Int → Int → Maybe MetaEntry
+getHole mod row col =
+  find isUserMeta $ listValues mod.modMetaCtx.metas
+  where
+    isUserMeta : MetaEntry → Bool
+    isUserMeta (Unsolved fc _ _ _ User _) = posInFC row col fc
+    isUserMeta _ = False
+
+introActions : Maybe MetaEntry → M (List CodeAction)
+introActions (Just $ Unsolved fc qn ctx vty User constraints) =
+  catchError (do
+    -- Are there ever any constraints?
+    top <- getTop
+    vty <- forceMeta vty
+    putStrLn "intros for \{show vty}"
+    case vty of
+      VPi _ nm Explicit _ a b => do
+        let str = "(\\ \{nm} => ?)"
+        pure $ Intro str (MkEdit fc str) :: Nil
+      _ => do
+        -- Prelude.Nat not a vref?
+        -- also need to handle pi types
+        cons <- getConstructors ctx fc vty
+        putStrLn "constructors \{show cons}"
+        pure $ map makeEdit cons
+  ) $ \ err => do
+      putStrLn "Got error in introActions:"
+      putStrLn $ showError "" err
+      pure Nil
+  where
+
+    introDCon : QName × Int × Tm → List String
+    introDCon (QN _ nm, _, tm) = go (Lin :< nm) tm
+      where
+        go : SnocList String → Tm → List String
+        go acc (Pi _ nm Explicit _ _ u) = go (acc :< "?") u
+        go acc (Pi _ _ _ _ _ u) = go acc u
+        go acc _ = acc <>> Nil
+
+    makeEdit : (QName × Int × Tm) → CodeAction
+    makeEdit con@(QN _ nm, _, _) =
+      let str = unwords $ resugarOper $ introDCon con
+      in Intro str $ MkEdit fc $ str
+
+introActions _ = pure Nil
+
 getActions : FileSource → String → Int → Int → M (List CodeAction)
 getActions repo modns row col = do
   mod <- switchModule repo modns
   top <- getTop
-  let xx = filter (posInFC row col ∘ getFC) top.currentMod.modInfos
-  putStrLn "Filter got \{show $ length' xx}"
-  go Nil $ xx
+  let infos = filter (posInFC row col ∘ getFC) top.currentMod.modInfos
+  putStrLn "Filter got \{show $ length' infos}"
+  actions <- go Nil $ infos
+  let hole = getHole mod row col
+  putStrLn "Hole \{debugStr hole}"
+  intros <- introActions $ getHole mod row col
+  pure $ actions ++ intros
   where
     getAction : EditorInfo → M (Maybe CodeAction)
     getAction (CaseSplit fc ctx nm scty) = getCaseSplit row col fc ctx nm scty

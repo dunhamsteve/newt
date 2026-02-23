@@ -311,14 +311,16 @@ pLamArg = impArg <|> autoArg <|> expArg
 lamExpr : Parser Raw
 lamExpr = do
   pos <- getPos
-  keyword "\\" <|> keyword "λ"
-  args <- some $ addPos pLamArg
-  keyword "=>"
-  scope <- typeExpr
-  pure $ foldr mkLam scope args
+  (fc, args, scope) <- withFC $ do
+    keyword "\\" <|> keyword "λ"
+    args <- some $ addPos pLamArg
+    keyword "=>"
+    scope <- typeExpr
+    pure (args, scope)
+  pure $ foldr (mkLam fc) scope args
   where
-    mkLam : FC × Icit × Name × Maybe Raw → Raw → Raw
-    mkLam (fc, icit, name, ty) sc = RLam fc (BI fc name icit Many) sc
+    mkLam : FC → FC × Icit × Name × Maybe Raw → Raw → Raw
+    mkLam fc (nfc, icit, name, ty) sc = RLam fc (BI nfc name icit Many) sc
 
 
 caseAlt : Parser RCaseAlt
@@ -566,10 +568,11 @@ parseDef = do
   nm <- getName t
   Just _ <- optional $ keyword "="
     -- impossible clause
+    -- TODO we should require outdent
     | Nothing => pure $ FunDef fc nm ((t,Nothing) :: Nil)
+  -- TODO could we recover and keep the LHS?
   body <- typeExpr
-  wfc <- getPos
-  w <- optional $ do
+  (wfc, w) <- withFC $ optional $ do
     keyword "where"
     startBlock $ manySame $ (parseSig <|> parseDef)
   let body = maybe body (\ decls => RWhere wfc decls body) w
