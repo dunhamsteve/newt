@@ -19,6 +19,7 @@ import Lib.Syntax
 import Lib.ReplParser
 import Node
 import Revision
+import Lib.Error
 
 dirFileSource : String → FileSource
 dirFileSource base = MkFileSource base $ \fc fn => do

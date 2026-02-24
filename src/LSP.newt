@@ -15,6 +15,7 @@ import Node
 import Commands
 import Lib.ProcessDecl
 import Lib.Prettier
+import Lib.Error
 
 pfunc js_castArray : Array JSObject → JSObject := `x => x`
 pfunc js_castInt : Int → JSObject := `x => x`

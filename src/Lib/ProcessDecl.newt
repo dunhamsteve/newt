@@ -6,6 +6,7 @@ import Data.String
 
 import Lib.Common
 import Lib.Elab
+import Lib.Error
 import Lib.Parser
 import Lib.Syntax
 import Data.SortedMap

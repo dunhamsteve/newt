@@ -3,6 +3,7 @@ module Lib.Types
 import Prelude
 import Lib.Common
 import Lib.Prettier
+import Lib.Error
 
 import Data.IORef
 import Data.SnocList

@@ -16,6 +16,7 @@ import Data.SortedMap
 import Lib.Parser
 import Lib.Syntax
 import Lib.Parser.Impl
+import Lib.Error
 
 -- For now we cheat and assume capitalized directories are a module component
 decomposeName : String → String × String
@@ -31,8 +32,12 @@ decomposeName fn =
 
 switchModule : FileSource → String → M (Maybe ModContext)
 switchModule repo modns = do
+    -- TODO processing on hover is expensive, but info is not always there
+    -- I suspect this picks up the case where a file has been invalidated by a change to
+    -- another file and we switch editors. Handle that (enqueue a check) and switch this back.
     top <- getTop
-    let (Just mod) = lookupMap' modns top.modules | Nothing => pure Nothing
+    mod <- processModule emptyFC repo Nil modns
+    -- let (Just mod) = lookupMap' modns top.modules | Nothing => pure Nothing
     modifyTop [ currentMod := mod; ops := mod.modOps ]
     pure $ Just mod
 

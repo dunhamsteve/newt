@@ -13,6 +13,7 @@ import Lib.Util
 import Lib.TopContext
 import Lib.Syntax
 import Lib.Types
+import Lib.Error
 
 vprint : Context -> Val -> M String
 vprint ctx v = do

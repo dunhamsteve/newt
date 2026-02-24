@@ -12,6 +12,7 @@ import Lib.Token
 import Lib.Common
 import Data.String
 import Data.SnocList
+import Lib.Error
 
 standalone : List Char
 standalone = unpack "()\\{}[],.@;"

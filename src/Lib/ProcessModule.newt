@@ -4,6 +4,7 @@ import Prelude
 import Lib.Types
 import Lib.Common
 import Lib.Syntax
+import Lib.Error
 import Lib.ProcessDecl
 import Lib.TopContext
 import Lib.Tokenizer
