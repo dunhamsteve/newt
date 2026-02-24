@@ -123,12 +123,14 @@ makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
   let np = needParens (Lin <>< head) tail
   let cons = map (addParens np ∘ resugarOper) cons
   let phead = pack head
+  let indent = getIndent 0 head
+  let nextrow = scan indent lines (sr + 1)
 
   -- No init or first :: rest for add missing case
   let (edits, rest) = doFirst inPlace cons
 
   let phead = pack head
-  let fc' = MkFC uri (MkBounds (sr + 1) 0 (sr + 1) 0)
+  let fc' = MkFC uri (MkBounds nextrow 0 nextrow 0)
   let srest =
     case splitKind of
       EqSplit => joinBy "" $ map (\ap => phead ++ ap ++ before ++ "= ?\n") rest
@@ -141,6 +143,15 @@ makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
   putStrLn "edits \{debugStr edits}"
   pure edits
   where
+    getIndent : Int → List Char → Int
+    getIndent acc (' ' :: rest) = getIndent (1 + acc) rest
+    getIndent acc _ = acc
+
+    scan : Int → List String → Int → Int
+    scan indent lines row =
+      let x = getIndent 0 $ unpack $ fromMaybe "" $ getAt' row lines in
+      if x <= indent then row else scan indent lines (row + 1)
+
     doFirst : Bool → List String → (List FileEdit × List String)
     doFirst True (first :: rest) = (MkEdit fc first :: Nil, rest)
     doFirst _ cons = (Nil, cons)
