@@ -63,6 +63,7 @@ data CodeAction
   = CaseSplitAction (List FileEdit)
   | AddMissingAction (List FileEdit)
   | Intro String FileEdit
+  | ImportAction String FileEdit
 
 
 applyDCon : QName × Int × Tm → List String
@@ -210,7 +211,6 @@ introActions (Just $ Unsolved fc qn ctx vty User constraints) =
       putStrLn $ showError "" err
       pure Nil
   where
-
     introDCon : QName × Int × Tm → List String
     introDCon (QN _ nm, _, tm) = go (Lin :< nm) tm
       where
@@ -226,6 +226,26 @@ introActions (Just $ Unsolved fc qn ctx vty User constraints) =
 
 introActions _ = pure Nil
 
+errorActions : Int → Int → Error → M (List CodeAction)
+errorActions row col err = do
+  let (ENotFound fc nm) = err | _ => pure Nil
+  let (True) = posInFC row col fc | _ => pure Nil
+  top <- getTop
+  let mods = map (\e => e.name.qns) $ lookupAll nm top
+  case mods of
+    Nil => pure Nil
+    _ => do
+      top <- getTop
+      let row = getInsertRow 0 1 $ split top.currentMod.modSource "\n"
+      let fc = MkFC fc.file (MkBounds row 0 row 0)
+      pure $ map (\nm => ImportAction nm (MkEdit fc "import \{nm}\n")) mods
+  where
+    getInsertRow : Int → Int → List String → Int
+    getInsertRow row cur Nil = row
+    getInsertRow row cur (l :: ls) =
+      let row =  ite (isPrefixOf "module" l || isPrefixOf "import" l) cur row
+      in getInsertRow row (cur + 1) ls
+
 getActions : FileSource → String → Int → Int → M (List CodeAction)
 getActions repo modns row col = do
   Just mod <- switchModule repo modns | _ => pure Nil
@@ -236,7 +256,8 @@ getActions repo modns row col = do
   let hole = getHole mod row col
   putStrLn "Hole \{debugStr hole}"
   intros <- introActions $ getHole mod row col
-  pure $ actions ++ intros
+  eactions <- join <$> traverse (errorActions row col) mod.modErrors
+  pure $ actions ++ intros ++ eactions
   where
     getAction : EditorInfo → M (Maybe CodeAction)
     getAction (CaseSplit fc ctx nm scty) = getCaseSplit row col fc ctx nm scty

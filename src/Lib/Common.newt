@@ -142,11 +142,10 @@ emptyFC' : String → FC
 emptyFC' fn = MkFC fn (MkBounds 0 0 0 0)
 
 -- Using a String instead of List String for the module shaved about 16% of compile time...
-data QName : U where
-  QN : String -> String -> QName
-
-.baseName : QName → String
-(QN _ name).baseName = name
+record QName where
+  constructor QN
+  qns : String
+  baseName : String
 
 instance Eq QName where
   -- `if` gets us short circuit behavior, idris has a lazy `&&`
@@ -159,34 +158,39 @@ instance Show QName where
 instance Ord QName where
   compare (QN ns nm) (QN ns' nm') = if ns == ns' then compare nm nm' else compare ns ns'
 
+-- I'll want to get Context / Val in some of these
+-- and a pretty printer in the monad
 data Error
   = E FC String
+  | ENotFound FC String
   | Postpone FC QName String
 
 instance Show FC where
   show (MkFC file (MkBounds l c el ec)) = "\{file}:\{show $ l + 1}:\{show $ c + 1}--\{show $ el + 1}:\{show $ ec + 1}"
 
-showError : String -> Error -> String
-showError src (E fc msg) = "ERROR at \{show fc}: \{msg}\n" ++ go 0 (lines src)
+instance HasFC Error where
+  getFC (E x str) = x
+  getFC (ENotFound x _) = x
+  getFC (Postpone x k str) = x
+
+errorMsg : Error -> String
+errorMsg (E x str) = str
+errorMsg (ENotFound x nm) = "\{nm} not in scope"
+errorMsg (Postpone x k str) = str
+
+showError : (src : String) -> Error -> String
+showError src err =
+  let fc = getFC err
+  in "ERROR at \{show $ getFC err}: \{errorMsg err}\n" ++ go fc 0 (lines src)
   where
-    go : Int -> List String -> String
-    go l Nil = ""
-    go l (x :: xs) =
+    go : FC → Int → List String → String
+    go fc l Nil = ""
+    go fc l (x :: xs) =
       if l == fcLine fc then
         let width = fc.bnds.endCol - fc.bnds.startCol in
         "  \{x}\n  \{replicate (cast $ fcCol fc) ' '}\{replicate (cast width) '^'}\n"
-      else if fcLine fc - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
-      else go (l + 1) xs
-showError src (Postpone fc ix msg) = "ERROR at \{show fc}: Postpone \{show ix} \{msg}\n" ++ go 0 (lines src)
-  where
-    go : Int -> List String -> String
-    go l Nil = ""
-    go l (x :: xs) =
-      if l == fcLine fc then
-        "  \{x}\n  \{replicate (cast $ fcCol fc) ' '}^\n"
-      else if fcLine fc - 3 < l then "  " ++ x ++ "\n" ++ go (l + 1) xs
-      else go (l + 1) xs
-
+      else if fcLine fc - 3 < l then "  " ++ x ++ "\n" ++ go fc (l + 1) xs
+      else go fc (l + 1) xs
 
 data Fixity = InfixL | InfixR | Infix
 

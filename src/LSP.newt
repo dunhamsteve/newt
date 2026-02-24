@@ -13,8 +13,6 @@ import Data.SortedMap
 import Data.IORef
 import Node
 import Commands
-import Data.List1
-import Lib.Prettier
 import Lib.ProcessDecl
 
 pfunc js_castArray : Array JSObject → JSObject := `x => x`
@@ -148,6 +146,11 @@ codeActionInfo uri line col = unsafePerformIO $ do
         $ ("title", JsonStr "Intro \{name}")
         :: ("edit", (single "changes" $ single uri $ JsonArray $ editToJson edit :: Nil))
         :: Nil
+    actionToJson (ImportAction name edit) =
+      JsonObj
+        $ ("title", JsonStr "Import \{name}")
+        :: ("edit", (single "changes" $ single uri $ JsonArray $ editToJson edit :: Nil))
+        :: Nil
     actionToJson (AddMissingAction edits) =
       JsonObj
         $ ("title", JsonStr "Add missing cases")
@@ -155,11 +158,11 @@ codeActionInfo uri line col = unsafePerformIO $ do
         :: Nil
 
 errorToDiag : Error -> Json
-errorToDiag (E fc msg) =
+errorToDiag err =
   JsonObj
     $  ("severity", JsonInt 1)
-    :: ("range", fcToRange fc)
-    :: ("message", JsonStr msg)
+    :: ("range", fcToRange (getFC err))
+    :: ("message", JsonStr (errorMsg err))
     :: ("source", JsonStr "newt") -- what is this key for?
     :: Nil
 -- These shouldn't escape
