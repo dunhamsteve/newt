@@ -199,7 +199,8 @@ checkFile fn = unsafePerformIO $ do
         else pure MkUnit
     (Right (top, json)) <- (do
         putStrLn "processModule"
-        _ <- switchModule lspFileSource modName
+        mod <- processModule emptyFC lspFileSource Nil modName
+        modifyTop [ currentMod := mod; ops := mod.modOps ]
 
         -- pull out errors and infos
         top <- getTop

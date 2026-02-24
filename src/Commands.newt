@@ -26,17 +26,18 @@ decomposeName fn =
             else (joinBy "/" (xs :< x <>> Nil), joinBy "." acc)
 
 
-switchModule : FileSource → String → M ModContext
+switchModule : FileSource → String → M (Maybe ModContext)
 switchModule repo modns = do
-    mod <- processModule emptyFC repo Nil modns
+    top <- getTop
+    let (Just mod) = lookupMap' modns top.modules | Nothing => pure Nothing
     modifyTop [ currentMod := mod; ops := mod.modOps ]
-    pure mod
+    pure $ Just mod
 
 -- The cheap version of type at point, find the token, lookup in global context
 -- Later we will either get good FC for entries or scan them all and build a cache.
 getHoverInfo : FileSource → String → Int → Int → M (Maybe (String × FC))
 getHoverInfo repo modns row col = do
-    mod <- switchModule repo modns
+    Just mod <- switchModule repo modns | _ => pure Nothing
     top <- getTop
 
     -- Find the token at the point
@@ -72,12 +73,15 @@ applyDCon (QN _ nm, _, tm) = go (Lin :< nm) tm
     go acc (Pi _ _ _ _ _ u) = go acc u
     go acc _ = acc <>> Nil
 
+data Flavor = EqSplit | FatArrowSplit | MonadSplit
+
 -- Not quite right, we also need to check for let...
 -- But it's a first pass
-splitEquals : SnocList Char → List Char → (Bool × String × String)
-splitEquals acc Nil = (True, pack (acc <>> Nil), "")
-splitEquals acc xs@('=' :: _) = (True, pack (acc <>> Nil), pack xs)
-splitEquals acc xs@('<' :: '-' :: _) = (False, pack (acc <>> Nil), pack xs)
+splitEquals : SnocList Char → List Char → (Flavor × String × String)
+splitEquals acc Nil = (EqSplit, pack (acc <>> Nil), "")
+splitEquals acc xs@('=' :: '>' :: _) = (FatArrowSplit, pack (acc <>> Nil), pack xs)
+splitEquals acc xs@('=' :: _) = (EqSplit, pack (acc <>> Nil), pack xs)
+splitEquals acc xs@('<' :: '-' :: _) = (MonadSplit, pack (acc <>> Nil), pack xs)
 splitEquals acc (x :: xs) = splitEquals (acc :< x) xs
 
 needParens : SnocList Char → List Char → Bool
@@ -115,7 +119,7 @@ makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
   let cs = unpack line
   let head = take (cast sc) cs
   let tail = drop (S $ cast (ec - 1)) cs
-  let (isEq, before, after) = splitEquals Lin tail
+  let (splitKind, before, after) = splitEquals Lin tail
   let np = needParens (Lin <>< head) tail
   let cons = map (addParens np ∘ resugarOper) cons
   let phead = pack head
@@ -126,9 +130,10 @@ makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
   let phead = pack head
   let fc' = MkFC uri (MkBounds (sr + 1) 0 (sr + 1) 0)
   let srest =
-    if isEq
-      then joinBy "" $ map (\ap => phead ++ ap ++ before ++ "= ?\n") rest
-      else joinBy "" $ map (\ap => "  | \{pack head}\{ap}\{before}=> ?\n") rest
+    case splitKind of
+      EqSplit => joinBy "" $ map (\ap => phead ++ ap ++ before ++ "= ?\n") rest
+      FatArrowSplit => joinBy "" $ map (\ap => phead ++ ap ++ before ++ "=> ?\n") rest
+      MonadSplit => joinBy "" $ map (\ap => "  | \{pack head}\{ap}\{before}=> ?\n") rest
 
   putStrLn "Split \{show line} HD '\{show head}' TL '\{show tail}'"
   putStrLn srest
@@ -212,7 +217,7 @@ introActions _ = pure Nil
 
 getActions : FileSource → String → Int → Int → M (List CodeAction)
 getActions repo modns row col = do
-  mod <- switchModule repo modns
+  Just mod <- switchModule repo modns | _ => pure Nil
   top <- getTop
   let infos = filter (posInFC row col ∘ getFC) top.currentMod.modInfos
   putStrLn "Filter got \{show $ length' infos}"

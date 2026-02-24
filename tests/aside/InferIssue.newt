@@ -1,0 +1,11 @@
+module InferIssue
+
+-- inline prelude to reduce log size
+infixr 8 _×_
+infixr 2 _,_
+data a × b = (a,b)
+data Nat = Z | S Nat
+
+-- unification error because meta isn't solved yet
+foo : Nat → (Nat × (Nat → Nat))
+foo x = (Z , (\ x => 10))

@@ -1503,7 +1503,7 @@ check ctx tm ty = do
 
     (tm, ty@(VPi fc nm' Implicit rig a b)) => do
       let names = map fst ctx.types
-      debug $ \ _ => "XXX edge case add implicit lambda {\{nm'} : \{show a}} to \{show tm} "
+      debug $ \ _ => "elab.insert: Add implicit lambda {\{nm'} : \{show a}} to \{show tm} "
       let var = VVar fc (length' ctx.env) Lin
       ty' <- b $$ var
       debugM $ do
@@ -1513,12 +1513,12 @@ check ctx tm ty = do
       pure $ Lam (getFC tm) nm' Implicit rig sc
 
     (tm, ty@(VPi fc nm' Auto rig a b)) => do
-      debug $ \ _ => "XXX edge case add auto lambda {\{nm'} : \{show a}} to \{show tm} "
+      debug $ \ _ => "elab.insert: Add auto lambda {\{nm'} : \{show a}} to \{show tm}"
       let var = VVar fc (length' ctx.env) Lin
       ty' <- b $$ var
       debugM $ do
         pty' <- prvalCtx {{(extend ctx nm' a)}} ty'
-        pure "XXX ty' is \{pty'}"
+        pure "elab.insert: ty' is \{pty'}"
       sc <- check (extend ctx nm' a) tm ty'
       pure $ Lam (getFC tm) nm' Auto rig sc
 

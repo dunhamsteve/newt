@@ -268,28 +268,18 @@ prvalCtx {{ctx}} v = do
   tm <- quote ctx.lvl v
   pure $ render 90 $ pprint (map fst ctx.types) tm
 
--- REVIEW - might be easier if we inserted the meta without a bunch of explicit App
--- I believe Kovacs is doing that.
 
--- we need to walk the whole thing
--- meta in Tm have a bunch of args, which should be the relevant
--- parts of the scope. So, meta has a bunch of lambdas, we've got a bunch of
--- args and we need to beta reduce, which seems like a lot of work for nothing
--- Could we put the "good bits" of the Meta in there and write it to Bnd directly
--- off of scope? I guess this might get dicey when a meta is another meta applied
--- to something.
+-- 'zonk' is substituting metas _and_ doing inlining
 
--- ok, so we're doing something that looks lot like eval, having to collect args,
--- pull the def, and apply spine. Eval is trying for WHNF, so it doesn't walk the
--- whole thing. (We'd like to insert metas inside lambdas.)
+-- It is a flavor of eval, maybe we could combine them with some flags
+-- to control what gets reduced.
 
 zonk : TopContext -> Int -> Env -> Tm -> M Tm
 
 zonkBind : TopContext -> Int -> Env -> Tm -> M Tm
 zonkBind top l env tm = zonk top (1 + l) (VVar (getFC tm) l Lin :: env) tm
 
--- I don't know if app needs an FC...
-
+-- REVIEW FC might be dicey here
 appSpine : Tm -> List Tm -> Tm
 appSpine t Nil = t
 appSpine t (x :: xs) = appSpine (App (getFC t) t x) xs
