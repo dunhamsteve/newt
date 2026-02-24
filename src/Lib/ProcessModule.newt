@@ -26,6 +26,7 @@ addPrimitives = do
   pure top.currentMod
 
 record FileSource where
+  baseDir : String
   getFile : FC → String → M (String × String)
 
 parseDecls : String → Operators → TokenList → SnocList Decl → M (List Decl × Operators)

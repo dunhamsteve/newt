@@ -13,6 +13,9 @@ import Lib.Elab
 import Data.String
 import Lib.Eval
 import Data.SortedMap
+import Lib.Parser
+import Lib.Syntax
+import Lib.Parser.Impl
 
 -- For now we cheat and assume capitalized directories are a module component
 decomposeName : String → String × String
@@ -45,6 +48,12 @@ getHoverInfo repo modns row col = do
     let line = fromMaybe "" (getAt' row lines)
     let (Right toks) = tokenise "" line | Left _ => pure Nothing
     let (Just name) = getTok toks       | _ => pure Nothing
+
+    let (Left _) = partialParse "" parseImport emptyMap toks
+      | Right ((MkImport _ (fc, nm)), _, _) => do
+        let (baseDir, _) = splitFileName fc.file
+        let fc = MkFC (repo.baseDir ++ "/" ++ joinBy "/" (split nm ".")) (MkBounds 0 0 0 0)
+        pure $ Just ("module \{nm}", fc)
 
     -- Lookup the name
     let (Just e) = lookupRaw name top   | _ => pure Nothing
@@ -175,6 +184,7 @@ getCaseSplit row col fc@(MkFC uri (MkBounds sr sc er ec)) ctx nm scty = do
   let names = map fst cons
   putStrLn "Make splits for \{show names}"
   edits <- makeEdits fc names True
+  -- TODO if constructor is not in scope, add import too.
   pure $ Just $ CaseSplitAction edits
 
 posInFC : Int → Int → FC → Bool

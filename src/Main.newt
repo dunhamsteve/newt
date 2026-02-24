@@ -21,7 +21,7 @@ import Node
 import Revision
 
 dirFileSource : String → FileSource
-dirFileSource base = MkFileSource $ \fc fn => do
+dirFileSource base = MkFileSource base $ \fc fn => do
         let fn = base ++ "/" ++ fn
         (Right src) <- liftIO {M} $ readFile fn
             | Left err => throwError $ E fc "error reading \{fn}: \{show err}"
