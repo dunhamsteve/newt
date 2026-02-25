@@ -94,11 +94,15 @@ hoverInfo uri line col = unsafePerformIO $ do
     st <- readIORef state
     repo <- lspFileSource
     -- We're proactively running check if there is no module information, make sure we save it
-    Right (top, Just (msg, fc)) <- (getHoverInfo repo modns line col).runM st.topContext
-        | Right (top, _)  => do
+    Right (top, HasHover fc msg) <- (getHoverInfo repo modns line col).runM st.topContext
+        | Right (top, NeedCheck)  => do
+            modifyIORef state $ [ topContext := top ]
+            putStrLn $ "NeedsCheck"
+            pure $ js_castBool True
+        | Right (top, NoHoverInfo)  => do
             modifyIORef state $ [ topContext := top ]
             putStrLn $ "Nothing to see here"
-            pure $ jsonToJObject JsonNull
+            pure $ js_castBool True
         | Left err => do
             putStrLn $ showError "" err
             pure $ jsonToJObject JsonNull

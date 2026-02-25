@@ -1,0 +1,2 @@
+*** Process tests/ImportError.newt
+ERROR at tests/ImportError.newt:5:8--5:12: error reading tests/Blah.newt: Error: ENOENT: no such file or directory, open 'tests/Blah.newt'

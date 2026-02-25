@@ -1,0 +1,151 @@
+module Lib.Derive
+
+import Prelude
+import Lib.Common
+import Lib.Types
+import Lib.Syntax
+import Lib.TopContext
+import Lib.Error
+import Lib.Elab -- (lookupDCon)
+import Lib.Prettier
+
+-- describe type
+
+data Desc : U
+
+data DConst : U where
+  MkConst : (name : String) → List (String × Desc) → DConst
+
+
+data Desc : U where
+  DInd : List DConst → Desc
+
+-- So I guess we do a few of these and then figure out how to make it easier
+
+deriveEq : FC → String → M (List Decl)
+deriveEq fc name = do
+  top <- getTop
+  let (Just (MkEntry fc qname type (TCon _ names) eflags)) = lookupRaw name top
+    | Just _ => throwError $ E fc "\{name} is not a type constructor"
+    | _ => throwError $ ENotInScope fc name
+  dcons <- traverse lookupDCon names
+  clauses <- traverse makeClause dcons
+  let fallback = (buildApp "_==_" (rvar "_" :: rvar "_" :: Nil), Just (rvar "False"))
+  let eqDecl = FunDef fc "_==_" (snoc clauses fallback)
+  let inst = Instance fc (buildApp "Eq" (rvar name :: Nil)) (Just $ eqDecl :: Nil)
+  pure $ inst :: Nil
+
+  where
+    arr : Raw → Raw → Raw
+    arr a b = RPi emptyFC (BI fc "_" Explicit Many) a b
+
+    rvar : String → Raw
+    rvar nm = RVar emptyFC nm
+
+    getExplictNames : SnocList String → Tm → List String
+    getExplictNames acc (Pi fc nm Explicit quant a b) = getExplictNames (acc :< nm) b
+    getExplictNames acc (Pi fc nm Implicit quant a b) = getExplictNames acc b
+    getExplictNames acc (Pi fc nm Auto quant a b) = getExplictNames acc b
+    getExplictNames acc _ = acc <>> Nil
+
+    buildApp : String → List Raw → Raw
+    buildApp nm nms = foldl (\ t u => RApp emptyFC t u Explicit) (rvar nm) $  nms
+
+    equate : (Raw × Raw) → Raw
+    equate (a,b) = buildApp "_==_" (a :: b :: Nil)
+
+    makeClause : (QName × Int × Tm) → M (Raw × Maybe Raw)
+    makeClause ((QN ns nm), _, ty) = do
+      -- We're only looking at explicit args for now.
+      -- TODO check quantity
+      let names = getExplictNames Lin ty
+      anames <- map rvar <$> traverse freshName names
+      bnames <- map rvar <$> traverse freshName names
+      let a = buildApp nm anames
+      let b = buildApp nm bnames
+
+      let left = equate (a,b)
+      let right = case map equate $ zip anames bnames of
+        Nil => rvar "True"
+        (hd :: tl) => foldr (\a b => buildApp "_&&_" (a :: b :: Nil)) hd tl
+
+      pure (left, Just right)
+
+
+-- This is a little more of a pain, we'll generate a number for each constructor
+-- and use that as the fallback. Eventually we'll want something like quasi-quote
+deriveShow : FC → String → M (List Decl)
+deriveShow fc name = do
+  top <- getTop
+  let (Just (MkEntry fc qname type (TCon _ names) eflags)) = lookupRaw name top
+    | Just _ => throwError $ E fc "\{name} is not a type constructor"
+    | _ => throwError $ ENotInScope fc name
+  dcons <- traverse lookupDCon names
+  clauses <- traverse makeClause dcons
+
+  let eqDecl = FunDef fc "show" clauses
+  let inst = Instance fc (buildApp "Show" (rvar name :: Nil)) (Just $ eqDecl :: Nil)
+  pure $ inst :: Nil
+
+  where
+    arr : Raw → Raw → Raw
+    arr a b = RPi emptyFC (BI fc "_" Explicit Many) a b
+
+    rvar : String → Raw
+    rvar nm = RVar emptyFC nm
+
+    lstring : String → Raw
+    lstring s = RLit emptyFC (LString s)
+
+    getExplictNames : SnocList String → Tm → List String
+    getExplictNames acc (Pi fc nm Explicit quant a b) = getExplictNames (acc :< nm) b
+    getExplictNames acc (Pi fc nm Implicit quant a b) = getExplictNames acc b
+    getExplictNames acc (Pi fc nm Auto quant a b) = getExplictNames acc b
+    getExplictNames acc _ = acc <>> Nil
+
+    buildApp : String → List Raw → Raw
+    buildApp nm nms = foldl (\ t u => RApp emptyFC t u Explicit) (rvar nm) $  nms
+
+    equate : (Raw × Raw) → Raw
+    equate (a,b) = buildApp "_==_" (a :: b :: Nil)
+
+    makeList : List Raw → Raw
+    makeList Nil = rvar "Nil"
+    makeList (x :: xs) = buildApp "_::_" (x :: makeList xs :: Nil)
+
+    makeClause : (QName × Int × Tm) → M (Raw × Maybe Raw)
+    makeClause ((QN ns nm), _, ty) = do
+      let names = getExplictNames Lin ty
+      anames <- map rvar <$> traverse freshName names
+      let left = buildApp "show" $ buildApp nm anames :: Nil
+      let shows = map (\ nm => RApp emptyFC (rvar "show") nm Explicit) anames
+      let right = case anames of
+        Nil => lstring nm
+        _ =>
+          let parts = makeList $ lstring ("(" ++ nm) :: shows in
+          buildApp "_++_" $ buildApp "joinBy" (lstring " " :: parts :: Nil)  :: lstring ")" :: Nil
+
+      pure (left, Just right)
+
+
+
+-- -- A description would be nice.
+-- deriveShow : FC → QName → M Raw
+-- deriveShow fc qn = do
+--     top <- getTop
+--     case lookup qn top : Maybe TopEntry of
+--         Nothing => error {Raw} fc "Can't find \{show qn} in derive Show"
+--         -- I want case split too... I need to tie the editor into the repl.
+--         (Just (MkEntry fc name type (TCon _ conNames) eflags) ) => ?
+--         (Just (MkEntry fc name type (Axiom) eflags) ) => ?
+--         (Just (MkEntry fc name type (DCon _ _ _ _) eflags) ) => ?
+--         (Just (MkEntry fc name type (Fn _) eflags) ) => ?
+--         (Just (MkEntry fc name type (PrimTCon _) eflags) ) => ?
+--         (Just (MkEntry fc name type (PrimFn _ _ _) eflags) ) => ?
+--         (Just (MkEntry fc name type (PrimOp _) eflags) ) => ?
+
+--     error fc "TODO"
+
+
+-- HasFC as example of user-defined derivation (when we get to that)
+-- SetFC would be nice, too.

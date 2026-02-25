@@ -46,7 +46,7 @@ instance Show TopContext where
   show top = "\nContext:\n [\{ joinBy "\n" $ map (show ∘ snd) $ toList top.currentMod.modDefs}]"
 
 emptyTop : TopContext
-emptyTop = MkTop emptyMap emptyMap (emptyModCtx "" "") 0 emptyMap
+emptyTop = MkTop emptyMap emptyMap (emptyModCtx "" "") 0 emptyMap 0
 
 setFlag : QName → FC → EFlag → M Unit
 setFlag name fc flag = do
@@ -94,3 +94,10 @@ addError err = modifyTop [ currentMod $= [ modErrors $= (err ::) ] ]
 
 addInfo : EditorInfo → M Unit
 addInfo info = modifyTop [ currentMod $= [modInfos $= (info ::) ] ]
+
+-- temporary? used in derive for now
+freshName : String → M String
+freshName nm = do
+  top <- getTop
+  modifyTop [ freshIx $= 1 + ]
+  pure $ "f$" ++ nm ++ show top.freshIx

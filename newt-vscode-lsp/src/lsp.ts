@@ -16,6 +16,7 @@ import {
   InitializeResult,
   TextDocumentSyncKind,
   Location,
+  TextDocumentIdentifier,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 
@@ -24,10 +25,10 @@ const documents = new TextDocuments(TextDocument);
 
 // the last is the most important to the user, but we run FIFO
 // to ensure dependencies are seen in causal order
-let changes: TextDocument[] = []
+let changes: (TextDocument|TextDocumentIdentifier)[] = []
 let running = false
 let lastChange = 0
-function addChange(doc: TextDocument) {
+function addChange(doc: TextDocument | TextDocumentIdentifier) {
   console.log('enqueue', doc.uri)
   // drop stale pending changes
   let before = changes.length
@@ -94,15 +95,20 @@ connection.onHover((params): Hover | null => {
   console.log('HOVER', uri, pos)
   let res = LSP_hoverInfo(uri, pos.line, pos.character)
   if (!res) return null
-  console.log('HOVER is ', res)
-  return { contents: { kind: "plaintext", value: res.info } };
+  if (res == true) {
+    addChange(params.textDocument)
+    return null
+  } else {
+    console.log('HOVER is ', res)
+    return { contents: { kind: "plaintext", value: res.info } };
+  }
 });
 
 connection.onDefinition((params): Location | null => {
   const uri = params.textDocument.uri;
   const pos = params.position;
   let value = LSP_hoverInfo(uri, pos.line, pos.character)
-  if (!value) return null;
+  if (!value || value == true) return null;
   return value.location
 })
 

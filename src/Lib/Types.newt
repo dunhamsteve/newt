@@ -81,7 +81,7 @@ data Tm : U where
   Lam : FC -> Name -> Icit -> Quant -> Tm -> Tm
   App : FC -> Tm -> Tm -> Tm
   UU   : FC -> Tm
-  Pi  : FC -> Name -> Icit -> Quant -> Tm -> Tm -> Tm
+  Pi  : (fc : FC) -> (nm : Name) -> Icit -> Quant -> (a : Tm) -> (b : Tm) -> Tm
   Case : FC -> Tm -> List CaseAlt -> Tm
   -- need type?
   Let : FC -> Name -> Tm -> Tm -> Tm
@@ -442,6 +442,7 @@ record TopContext where
   currentMod : ModContext
   verbose : Int -- command line flag increments this
   ops : Operators
+  freshIx : Int
 
 -- we'll use this for typechecking, but need to keep a TopContext around too.
 
@@ -594,6 +595,8 @@ lookupMeta ix@(QN ns nm) = do
 mkCtx : FC -> Context
 mkCtx fc = MkCtx 0 Nil Nil Nil fc
 
+-- Used by Syntax and Elab
+
 data Pattern
   = PatVar FC Icit Name
   | PatCon FC Icit QName (List Pattern) (Maybe Name)
@@ -627,8 +630,8 @@ instance Show Constraint where
   show (PC nm pat ty) = show (nm,pat,ty)
 
 -- Lazy because `let` would do work at the top of a `M a`
-prof : ∀ a. String → Lazy (M a) → M a
-prof desc work = do
+profile : ∀ a. String → Lazy (M a) → M a
+profile desc work = do
   start <- getTime
   res <- force work
   end <- getTime

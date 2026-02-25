@@ -6,5 +6,5 @@ interface HoverResult {
     info: string
     location: Location
 }
-export function LSP_hoverInfo(name: string, row: number, col: number): HoverResult|null;
+export function LSP_hoverInfo(name: string, row: number, col: number): HoverResult|boolean|null;
 export function LSP_codeActionInfo(name: string, row: number, col: number): CodeAction[]|null;

@@ -35,35 +35,38 @@ switchModule repo modns = do
     -- TODO processing on hover is expensive, but info is not always there
     -- I suspect this picks up the case where a file has been invalidated by a change to
     -- another file and we switch editors. Handle that (enqueue a check) and switch this back.
+    -- this is also broken, because diagnostics don't get updated..
     top <- getTop
-    mod <- processModule emptyFC repo Nil modns
-    -- let (Just mod) = lookupMap' modns top.modules | Nothing => pure Nothing
+    -- mod <- processModule emptyFC repo Nil modns
+    let (Just mod) = lookupMap' modns top.modules | Nothing => pure Nothing
     modifyTop [ currentMod := mod; ops := mod.modOps ]
     pure $ Just mod
 
+data HoverInfo = NoHoverInfo | NeedCheck | HasHover FC String
+
 -- The cheap version of type at point, find the token, lookup in global context
 -- Later we will either get good FC for entries or scan them all and build a cache.
-getHoverInfo : FileSource → String → Int → Int → M (Maybe (String × FC))
+getHoverInfo : FileSource → String → Int → Int → M HoverInfo
 getHoverInfo repo modns row col = do
-    Just mod <- switchModule repo modns | _ => pure Nothing
+    Just mod <- switchModule repo modns | _ => pure NeedCheck
     top <- getTop
 
     -- Find the token at the point
     let lines = split mod.modSource "\n"
     let line = fromMaybe "" (getAt' row lines)
-    let (Right toks) = tokenise "" line | Left _ => pure Nothing
-    let (Just name) = getTok toks       | _ => pure Nothing
+    let (Right toks) = tokenise "" line | Left _ => pure NoHoverInfo
+    let (Just name) = getTok toks       | _ => pure NoHoverInfo
 
     let (Left _) = partialParse "" parseImport emptyMap toks
       | Right ((MkImport _ (fc, nm)), _, _) => do
         let (baseDir, _) = splitFileName fc.file
-        let fc = MkFC (repo.baseDir ++ "/" ++ joinBy "/" (split nm ".")) (MkBounds 0 0 0 0)
-        pure $ Just ("module \{nm}", fc)
-
+        let fc = MkFC ("\{repo.baseDir}/\{joinBy "/" (split nm ".")}.newt") (MkBounds 0 0 0 0)
+        pure $ HasHover fc "module \{nm}"
+    putStrLn "Hover name is \{show name}"
     -- Lookup the name
-    let (Just e) = lookupRaw name top   | _ => pure Nothing
+    let (Just e) = lookupRaw name top   | _ => pure NoHoverInfo
     ty <- nf Nil e.type
-    pure $ Just ("\{show e.name} : \{rpprint Nil ty}", e.fc)
+    pure $ HasHover e.fc ("\{show e.name} : \{rpprint Nil ty}")
 
     where
         getTok : List BTok → Maybe String
@@ -140,7 +143,9 @@ makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
   let phead = pack head
   let indent = getIndent 0 head
   let nextrow = scan indent lines (sr + 1)
-
+  -- FIXME - doesn't handle `let`, but that's a little messy
+  -- need to remove let and add `|`, but also indent.
+  -- Existing `|` would have their own indent, indent of let matters. etc.
   -- No init or first :: rest for add missing case
   let (edits, rest) = doFirst inPlace cons
 
@@ -193,8 +198,8 @@ getCaseSplit row col fc@(MkFC uri (MkBounds sr sc er ec)) ctx nm scty = do
   pure $ Just $ CaseSplitAction edits
 
 posInFC : Int → Int → FC → Bool
--- FIXME ec + 1 again...
-posInFC row col (MkFC _ (MkBounds sr sc er ec)) = (sr <= row && row <= er) && (sc <= col && col <= ec + 1)
+posInFC row col (MkFC _ (MkBounds 0 0 0 0)) = False
+posInFC row col (MkFC _ (MkBounds sr sc er ec)) = (sr <= row && row <= er) && (sc <= col && col <= ec)
 
 getHole : ModContext → Int → Int → Maybe MetaEntry
 getHole mod row col =
@@ -243,7 +248,7 @@ introActions _ = pure Nil
 
 errorActions : Int → Int → Error → M (List CodeAction)
 errorActions row col err = do
-  let (ENotFound fc nm) = err | _ => pure Nil
+  let (ENotInScope fc nm) = err | _ => pure Nil
   let (True) = posInFC row col fc | _ => pure Nil
   top <- getTop
   let mods = map (\e => e.name.qns) $ lookupAll nm top

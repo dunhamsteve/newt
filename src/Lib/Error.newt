@@ -7,18 +7,18 @@ import Lib.Common
 -- and a pretty printer in the monad
 data Error
   = E FC String
-  | ENotFound FC String
+  | ENotInScope FC String
   | Postpone FC QName String
 
 
 instance HasFC Error where
   getFC (E x str) = x
-  getFC (ENotFound x _) = x
+  getFC (ENotInScope x _) = x
   getFC (Postpone x k str) = x
 
 errorMsg : Error -> String
 errorMsg (E x str) = str
-errorMsg (ENotFound x nm) = "\{nm} not in scope"
+errorMsg (ENotInScope x nm) = "\{nm} not in scope"
 errorMsg (Postpone x k str) = str
 
 showError : (src : String) -> Error -> String

@@ -538,8 +538,11 @@ parseImport = do
   -- TODO revisit when we have parser for qualified names in source
   (nameFC, ident) <- withFC uident
   (restFC,rest) <- withFC $ many $ token Projection
+  let nameFC = case rest of
+    Nil => nameFC
+    (_ :: _) => nameFC + restFC
   let name = joinBy "" (ident :: rest)
-  pure $ MkImport fc (nameFC + restFC, name)
+  pure $ MkImport fc (nameFC, name)
 
 -- Do we do pattern stuff now? or just name = lambda?
 -- TODO multiple names
@@ -679,11 +682,19 @@ parseExport = do
   names <- many $ withFC ident
   pure $ Exports loc names
 
+parseDerive : Parser Decl
+parseDerive = do
+  loc <- getPos
+  keyword "derive"
+  className <- withFC uident
+  name <- withFC uident
+  pure $ DDerive loc className name
+
 parseDecl : Parser Decl
 parseDecl = parseMixfix <|> parsePType <|> parsePFunc
   <|> parseNorm <|> parseData <|> parseShortData
   <|> parseClass <|> parseInstance <|> parseRecord
-  <|> parseExport
+  <|> parseExport <|> parseDerive
   -- We'll put the backtracing stuff last, but there is a commit issue in parseDef
   <|> parseSig <|> parseDef
 

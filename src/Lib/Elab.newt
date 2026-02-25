@@ -1544,8 +1544,10 @@ infer ctx (RVar fc nm) = go 0 ctx.types
           debug $ \ _ => "lookup \{show name} as \{show def}"
           vty <- eval Nil ty
           pure (Ref fc name, vty)
-        -- Can we soften this without introducing a meta?
-        Nothing => throwError $ ENotFound fc nm
+        -- Can we soften this without introducing a meta for the type
+        -- it might be additional errors, but also could lead to narrowing of possible names...
+        -- especially when we hit this for .foo
+        Nothing => throwError $ ENotInScope fc nm
     go i ((x, ty) :: xs) = if x == nm then pure (Bnd fc i, ty)
       else go (i + 1) xs
 

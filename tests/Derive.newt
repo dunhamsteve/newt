@@ -1,0 +1,14 @@
+module Derive
+
+import Prelude
+
+data Blah = Foo Int | Bar | Baz String
+
+derive Eq Blah
+derive Show Blah
+
+main : IO Unit
+main = do
+  printLn $ Foo 42
+  printLn $ Bar
+  printLn $ Baz "woo"

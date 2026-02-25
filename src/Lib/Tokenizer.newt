@@ -20,7 +20,7 @@ standalone = unpack "()\\{}[],.@;"
 keywords : List String
 keywords = ("let" :: "in" :: "where" :: "case" :: "of" :: "data" :: "U" :: "do" ::
             "ptype" :: "pfunc" :: "module" :: "infixl" :: "infixr" :: "infix" ::
-            "∀" :: "forall" :: "import" :: "uses" ::
+            "∀" :: "forall" :: "import" :: "uses" :: "derive" ::
             "class" :: "instance" :: "record" :: "constructor" ::
             "if" :: "then" :: "else" ::
             -- it would be nice to find a way to unkeyword "." so it could be

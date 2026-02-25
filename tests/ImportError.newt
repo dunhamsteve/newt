@@ -1,0 +1,7 @@
+module ImportError
+
+-- test the FC are right and don't include next line
+-- TODO continue on and hit the next one.
+import Blah
+import Foo.Bar
+import Prelude

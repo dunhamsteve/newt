@@ -88,6 +88,7 @@ data Decl
   = TypeSig FC (List Name) Raw
   | FunDef FC Name (List (Raw × Maybe Raw))
   | DCheck FC Raw Raw
+  | DDerive FC (FC × String) (FC × String)
   -- TODO maybe add Telescope (before `:`) and auto-add to constructors...
   | Data FC (FC × Name) Raw (Maybe $ List Decl)
   | ShortData FC Raw (List Raw)
@@ -113,6 +114,7 @@ instance HasFC Decl where
   getFC (Class x str xs ys) = x
   getFC (Instance x tm xs) = x
   getFC (Record x str tm str1 xs) = x
+  getFC (DDerive x _ _) = x
 
 
 record Module where
@@ -125,7 +127,6 @@ foo : List String -> String
 foo ts = "(" ++ unwords ts ++ ")"
 
 instance Show Raw
-
 
 instance Show Clause where
   show (MkClause fc cons pats expr) = show (fc, cons, pats, expr)
@@ -140,6 +141,7 @@ instance Show BindInfo where
 
 instance Show Decl where
   show (TypeSig _ str x) = foo ("TypeSig" :: show str :: show x :: Nil)
+  show (DDerive _ x y) = foo ("DDerive" :: show x :: show y :: Nil)
   show (FunDef _ str clauses) = foo ("FunDef" :: show str :: show clauses :: Nil)
   show (Data _ str xs ys) = foo ("Data" :: show str :: show xs :: show ys :: Nil)
   show (DCheck _ x y) = foo ("DCheck" :: show x :: show y :: Nil)
@@ -248,6 +250,7 @@ pipeSep = folddoc (\a b => a <+/> text "|" <+> b)
 
 instance Pretty Decl where
   pretty (TypeSig _ nm ty) = spread (map text nm) <+> text ":" <+> nest 2 (pretty ty)
+  pretty (DDerive _ x y) = text "derive" <+> text (snd x) <+> text (snd y)
   pretty (FunDef _ nm clauses) = stack $ map prettyPair clauses
     where
       prettyPair : Raw × Maybe Raw → Doc
@@ -264,7 +267,8 @@ instance Pretty Decl where
     <+> (nest 2 $ text "where" </> stack (maybe empty (\ nm' => text "constructor" <+> text (snd nm')) cname :: map pretty decls))
   pretty (Class _ (_,nm) tele decls) = text "class" <+> text nm <+> text ":" <+> spread (map prettyBind tele)
     <+> (nest 2 $ text "where" </> stack (map pretty decls))
-  pretty (Instance _ _ _) = text "TODO pretty Instance"
+  pretty (Instance fc top Nothing) = text "instance" <+> pretty top
+  pretty (Instance fc top (Just decls)) = text "instance" <+> pretty top <+> nest 2 (text "where" </> stack (map pretty decls))
   pretty (ShortData _ lhs sigs) = text "data" <+> pretty lhs <+> text "=" <+> pipeSep (map pretty sigs)
   pretty (Exports _ nms) = text "#export" <+> spread (map (text ∘ show ∘ snd) nms)
 

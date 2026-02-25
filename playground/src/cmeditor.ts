@@ -26,6 +26,7 @@ const keywords = [
   "case",
   "of",
   "data",
+  "derive",
   "U",
   "do",
   "ptype",

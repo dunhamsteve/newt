@@ -1,0 +1,8 @@
+module UnsafeIO
+
+import Prelude
+
+main : IO Unit
+main = do
+  let x = unsafePerformIO $ putStrLn "Hello, World!"
+  pure MkUnit
