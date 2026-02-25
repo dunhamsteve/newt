@@ -241,7 +241,7 @@ introActions (Just $ Unsolved fc qn ctx vty User constraints) =
 
     makeEdit : (QName × Int × Tm) → CodeAction
     makeEdit con@(QN _ nm, _, _) =
-      let str = unwords $ resugarOper $ introDCon con
+      let str = addParens True $ resugarOper $ introDCon con
       in Intro str $ MkEdit fc $ str
 
 introActions _ = pure Nil
