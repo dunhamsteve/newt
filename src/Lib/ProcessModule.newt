@@ -68,23 +68,31 @@ processModule importFC repo stk modns = do
     | Just mod => pure mod
 
   let (False) = modns == primNS | _ => addPrimitives
-
+  let freshMC = MC emptyMap Nil 0 CheckAll
   let parts = split modns "."
   let fn = joinBy "/" parts ++ ".newt"
+
+  -- Dummy for initial load/parse
+  let mod = MkModCtx modns "" emptyMap freshMC emptyMap Nil Nil Nil
+  modifyTop [ currentMod := mod; hints := emptyMap; ops := emptyMap ]
+
   -- TODO now we can pass in the module name...
-  (fn,src) <- repo.getFile importFC fn
+  Right (fn,src) <- tryError $ repo.getFile importFC fn
+    | Left err => reportError err  -- TODO maybe want a better FC.
+  modifyTop [ currentMod $= [ modSource := src ]]
+
   let (Right toks) = tokenise fn src
-    | Left err => throwError err
+    | Left err => reportError err
 
   let (Right ((nameFC, modName), ops, toks)) = partialParse fn parseModHeader top.ops toks
-    | Left (err, toks) => throwError err
+    | Left (err, toks) => reportError err
 
   log 1 $ \ _ => "scan imports for module \{modName}"
   let (True) = modns == modName
-    | _ => throwError $ E nameFC "module name \{show modName} doesn't match file name \{show fn}"
+    | _ => reportError $ E nameFC "module name \{show modName} doesn't match file name \{show fn}"
 
   let (Right (imports, ops, toks)) = partialParse fn parseImports ops toks
-    | Left (err, toks) => throwError err
+    | Left (err, toks) => reportError err
 
   imported <- for imports $ \case
     MkImport fc (nameFC, name') => do
@@ -96,7 +104,8 @@ processModule importFC repo stk modns = do
   let imported = snoc imported primNS
 
   putStrLn "module \{modName}"
-  top <- getTop
+
+  -- currentMod has been wiped by imports..
   let freshMC = MC emptyMap Nil 0 CheckAll
   let mod = MkModCtx modns src emptyMap freshMC emptyMap imported Nil Nil
   modifyTop [ currentMod := mod
@@ -105,6 +114,7 @@ processModule importFC repo stk modns = do
             ]
 
   -- top hints / ops include all directly imported modules
+  top <- getTop
   for_ imports $ \case
     (MkImport fc (nameFC, ns)) => do
       let (Just mod) = lookupMap' ns top.modules | _ => error emptyFC "namespace \{show ns} missing"
@@ -135,7 +145,7 @@ processModule importFC repo stk modns = do
   logMetas $ reverse $ listValues top.currentMod.modMetaCtx.metas
 
   -- print errors (for batch processing case)
-  for_ top.currentMod.modErrors $ \ err => putStrLn $ showError src err
+  for_ (reverse top.currentMod.modErrors) $ \ err => putStrLn $ showError src err
 
   -- update modules with result, leave the rest of context in case this is top file
   top <- getTop
@@ -144,6 +154,13 @@ processModule importFC repo stk modns = do
 
   pure top.currentMod
   where
+    reportError : Error → M ModContext
+    reportError err = do
+      addError err
+      top <- getTop
+      modifyTop [modules $= updateMap modns top.currentMod ]
+      pure top.currentMod
+
     tryProcessDecl : String → String → Decl → M Unit
     tryProcessDecl src ns decl = do
       (Left err) <- tryError $ processDecl ns decl | _ => pure MkUnit

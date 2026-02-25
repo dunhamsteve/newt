@@ -1,2 +1,16 @@
 *** Process tests/ImportError.newt
-ERROR at tests/ImportError.newt:5:8--5:12: error reading tests/Blah.newt: Error: ENOENT: no such file or directory, open 'tests/Blah.newt'
+module Prelude
+module ImportError
+ERROR at tests/ImportError.newt:5:8--5:12: Error in import Blah
+  -- test the FC are right and don't include next line
+  -- TODO continue on and hit the next one.
+  import Blah
+         ^^^^
+
+ERROR at tests/ImportError.newt:6:8--6:15: Error in import Foo.Bar
+  -- TODO continue on and hit the next one.
+  import Blah
+  import Foo.Bar
+         ^^^^^^^
+
+ERROR at tests/ImportError.newt:1:1--1:1: Compile failed
