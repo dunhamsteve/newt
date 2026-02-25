@@ -744,11 +744,7 @@ tail Nil = Nil
 tail (x :: xs) = xs
 
 data Ordering = LT | EQ | GT
-instance Eq Ordering where
-  LT == LT = True
-  EQ == EQ = True
-  GT == GT = True
-  _ == _ = False
+derive Eq Ordering
 
 pfunc jsCompare uses (EQ LT GT) : ∀ a. a → a → Ordering := `(_, a, b) => a == b ? Prelude_EQ : a < b ? Prelude_LT : Prelude_GT`
 

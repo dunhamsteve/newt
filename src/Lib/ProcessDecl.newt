@@ -306,7 +306,7 @@ processInstance ns instfc ty decls = do
   debug $ \ _ => "dcty \{render 90 $ pprint Nil dcty}"
   let (_,args) = funArgs codomain
 
-  debug $ \ _ => "traverse \{show $ map showTm args}"
+  debug $ \ _ => "traverse \{show $ map show args}"
   -- This is a little painful because we're reverse engineering the
   -- individual types back out from the composite type
   args' <- traverse (eval env) args

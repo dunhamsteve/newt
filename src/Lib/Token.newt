@@ -13,44 +13,14 @@ data Kind
   | StringKind
   | JSLit
   | Symbol
-  | Space
-  | Comment
   | Pragma
   | Projection
-  -- not doing Layout.idr
-  | LBrace
-  | Semi
-  | RBrace
-  | EOI
   | StartQuote
   | EndQuote
   | StartInterp
   | EndInterp
 
-
-instance Show Kind where
-  show Ident   = "Ident"
-  show UIdent   = "UIdent"
-  show Keyword = "Keyword"
-  show MixFix = "MixFix"
-  show Number  = "Number"
-  show Character  = "Character"
-  show Symbol  = "Symbol"
-  show Space  = "Space"
-  show LBrace  = "LBrace"
-  show Semi    = "Semi"
-  show RBrace  = "RBrace"
-  show Comment = "Comment"
-  show EOI     = "EOI"
-  show Pragma  = "Pragma"
-  show StringKind = "String"
-  show JSLit = "JSLit"
-  show Projection = "Projection"
-  show StartQuote = "StartQuote"
-  show EndQuote = "EndQuote"
-  show StartInterp = "StartInterp"
-  show EndInterp = "EndInterp"
-
+derive Show Kind
 
 instance Eq Kind where
   a == b = show a == show b
@@ -61,22 +31,18 @@ record Token where
   kind : Kind
   text : String
 
-
-
 instance Show Token where
   show (Tok k v) = "<\{show k}:\{show v}>"
-
 
 BTok : U
 BTok = WithBounds Token
 
-
-value : BTok -> String
+value : BTok → String
 value (MkBounded (Tok _ s) _) = s
 
 
-getStart : BTok -> (Int × Int)
+getStart : BTok → (Int × Int)
 getStart (MkBounded _ (MkBounds l c _ _)) = (l,c)
 
-getEnd : BTok -> (Int × Int)
+getEnd : BTok → (Int × Int)
 getEnd (MkBounded _ (MkBounds _ _ el ec)) = (el,ec)

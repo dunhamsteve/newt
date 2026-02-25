@@ -105,7 +105,7 @@ evalCase env sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
   top <- getTop
   if nm == name
     then do
-      debug $ \ _ =>  "ECase \{show nm} \{show sp} \{show nms} \{showTm t}"
+      debug $ \ _ =>  "ECase \{show nm} \{show sp} \{show nms} \{show t}"
       pushArgs env (sp <>> Nil) nms
     else case lookup nm top of
       (Just (MkEntry _ str type (DCon _ _ k str1) _)) => evalCase env sc xs

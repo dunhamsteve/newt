@@ -20,8 +20,6 @@ funArgs tm = go tm Nil
 data Binder : U where
   MkBinder : FC -> String -> Icit -> Quant -> Tm -> Binder
 
--- I don't have a show for terms without a name list
-
 instance Show Binder where
   show (MkBinder _ nm icit quant t) = "[\{show quant}\{nm} \{show icit} : ...]"
 

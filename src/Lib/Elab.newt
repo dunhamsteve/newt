@@ -100,9 +100,7 @@ instance Monoid UnifyResult where
   neutral = MkResult Nil
 
 data UnifyMode = UNormal | UPattern
-instance Show UnifyMode where
-  show UNormal = "UNormal"
-  show UPattern = "UPattern"
+derive Show UnifyMode
 
 check : Context -> Raw -> Val -> M Tm
 

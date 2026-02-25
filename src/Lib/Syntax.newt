@@ -123,68 +123,17 @@ record Module where
   imports : List Import
   decls : List Decl
 
-foo : List String -> String
-foo ts = "(" ++ unwords ts ++ ")"
-
 instance Show Raw
 
-instance Show Clause where
-  show (MkClause fc cons pats expr) = show (fc, cons, pats, expr)
-
-instance Show Import where
-  show (MkImport _ str) = foo ("MkImport" :: show str :: Nil)
-
-instance Show BindInfo where
-  show (BI _ nm icit quant) = foo ("BI" :: show nm :: show icit :: show quant :: Nil)
-
--- this is for debugging, use pretty when possible
-
-instance Show Decl where
-  show (TypeSig _ str x) = foo ("TypeSig" :: show str :: show x :: Nil)
-  show (DDerive _ x y) = foo ("DDerive" :: show x :: show y :: Nil)
-  show (FunDef _ str clauses) = foo ("FunDef" :: show str :: show clauses :: Nil)
-  show (Data _ str xs ys) = foo ("Data" :: show str :: show xs :: show ys :: Nil)
-  show (DCheck _ x y) = foo ("DCheck" :: show x :: show y :: Nil)
-  show (PType _ name ty) = foo ("PType" :: name :: show ty :: Nil)
-  show (ShortData _ lhs sigs) = foo ("ShortData" :: show lhs :: show sigs :: Nil)
-  show (PFunc _ nm used ty src) = foo ("PFunc" :: nm :: show used :: show ty :: show src :: Nil)
-  show (PMixFix _ nms prec fix) = foo ("PMixFix" :: show nms :: show prec :: show fix :: Nil)
-  show (Class _ (_,nm) tele decls) = foo ("Class" ::  nm :: "..." :: (show $ map show decls) :: Nil)
-  show (Instance _ nm decls) = foo ("Instance" ::  show nm :: (show $ map show decls) :: Nil)
-  show (Record _ nm tele nm1 decls) = foo ("Record" :: show nm :: show tele :: show nm1 :: show decls :: Nil)
-  show (Exports _ nms) = foo ("Exports" :: show nms :: Nil)
-
-
-instance Show Module where
-  show (MkModule name imports decls) = foo ("MkModule" :: show name :: show imports :: show decls :: Nil)
-
-
-instance Show RCaseAlt where
-  show (MkAlt x y)= foo ("MkAlt" :: show x :: show y :: Nil)
-
-instance Show UpdateClause where
-  show (ModifyField _ nm tm) = foo ("ModifyField" :: nm :: show tm :: Nil)
-  show (AssignField _ nm tm) = foo ("AssignField" :: nm :: show tm :: Nil)
-
-instance Show Raw where
-  show (RImplicit _) = "_"
-  show (RImpossible _) = "()"
-  show (RHole _) = "?"
-  show (RUpdateRec _ clauses tm) = foo ("RUpdateRec" :: show clauses :: show tm :: Nil)
-  show (RVar _ name) = foo ("RVar" :: show name :: Nil)
-  show (RLit _ x) = foo ( "RLit" :: show x :: Nil)
-  show (RLet _ x ty v scope) = foo ( "Let" :: show x :: " : " :: show ty :: " = " :: show v :: " in " :: show scope :: Nil)
-  show (RPi _ bi y z) = foo ( "Pi" :: show bi :: show y :: show z :: Nil)
-  show (RApp _ x y z) = foo ( "App" :: show x :: show y :: show z :: Nil)
-  show (RLam _ bi y) = foo ( "Lam" :: show bi :: show y :: Nil)
-  show (RCase _ x Nothing xs) = foo ( "Case" :: show x :: " of " :: show xs :: Nil)
-  show (RCase _ x (Just ty) xs) = foo ( "Case" :: show x :: " : " :: show ty :: " of " :: show xs :: Nil)
-  show (RDo _ stmts) = foo ( "DO" :: "FIXME" :: Nil)
-  show (RU _) = "U"
-  show (RIf _ x y z) = foo ( "If" :: show x :: show y :: show z :: Nil)
-  show (RWhere _ _ _) = foo ( "Where" :: "FIXME" :: Nil)
-  show (RAs _ nm x) = foo ( "RAs" :: nm :: show x :: Nil)
-
+derive Show Clause
+derive Show Import
+derive Show BindInfo
+derive Show DoStmt
+derive Show Decl
+derive Show Module
+derive Show RCaseAlt
+derive Show UpdateClause
+derive Show Raw
 
 instance Pretty Literal where
   pretty (LString t) = text t

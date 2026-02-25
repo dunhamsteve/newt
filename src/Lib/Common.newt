@@ -25,12 +25,7 @@ instance Add Bounds where
       empty (MkBounds 0 0 0 0) = True
       empty _ = False
 
-instance Eq Bounds where
-  (MkBounds sl sc el ec) == (MkBounds sl' sc' el' ec') =
-      sl == sl'
-   && sc == sc'
-   && el == el'
-   && ec == ec'
+derive Eq Bounds
 
 record WithBounds ty where
   constructor MkBounded

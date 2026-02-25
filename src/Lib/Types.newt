@@ -14,33 +14,16 @@ Name : U
 Name = String
 
 data Icit = Implicit | Explicit | Auto
-
-instance Show Icit where
-  show Implicit = "Implicit"
-  show Explicit = "Explicit"
-  show Auto = "Auto"
+derive Show Icit
+derive Eq Icit
 
 data BD = Bound | Defined
-
-instance Eq BD where
-  Bound == Bound = True
-  Defined == Defined = True
-  _ == _ = False
-
-instance Show BD where
-  show Bound = "bnd"
-  show Defined = "def"
+derive Eq BD
+derive Show BD
 
 data Quant = Zero | Many
-
-instance Show Quant where
-  show Zero = "0 "
-  show Many = ""
-
-instance Eq Quant where
-  Zero == Zero = True
-  Many == Many = True
-  _ == _ = False
+derive Eq Quant
+derive Show Quant
 
 -- We could make this polymorphic and use for environment...
 
@@ -129,37 +112,6 @@ showCaseAlt (CaseLit lit tm) = "\{show lit} => \{show tm}"
 
 instance Show CaseAlt where
   show = showCaseAlt
-
-
-showTm : Tm -> String
-showTm = show
-
--- I can't really show val because it's HOAS...
-
--- TODO derive
-
-instance Eq Icit where
-  Implicit == Implicit = True
-  Explicit == Explicit = True
-  Auto == Auto = True
-  _ == _ = False
-
--- Eq on Tm. We've got deBruijn indices, so I'm not comparing names
-
-instance Eq (Tm) where
-  -- (Local x) == (Local y) = x == y
-  (Bnd _ x) == (Bnd _ y) = x == y
-  (Ref _ x) == Ref _ y = x == y
-  (Lam _ n _ _ t) == Lam _ n' _ _ t' = t == t'
-  (App _ t u) == App _ t' u' = t == t' && u == u'
-  (UU _) == (UU _) = True
-  (Pi _ n icit rig t u) == (Pi _ n' icit' rig' t' u') = icit == icit' && rig == rig' && t == t' && u == u'
-  _ == _ = False
-
--- TODO App and Lam should have <+/> but we need to fix
--- INFO pprint to `nest 2 ...`
--- maybe return Doc and have an Interpolation..
--- If we need to flatten, case is going to get in the way.
 
 pprint' : Int -> List String -> Tm -> Doc
 pprintAlt : Int -> List String -> CaseAlt -> Doc
@@ -283,25 +235,12 @@ instance Show Val where
 
 showClosure (MkClosure xs t) = "(%cl [\{show $ length xs} env] \{show t})"
 
--- instance Show Closure where
---   show = showClosure
-
 Context : U
 
 data MetaKind = Normal | User | AutoSolve | ErrorHole
 
-instance Show MetaKind where
-  show Normal = "Normal"
-  show User = "User"
-  show AutoSolve = "Auto"
-  show ErrorHole = "ErrorHole"
-
-instance Eq MetaKind where
-  Normal == Normal = True
-  User == User = True
-  AutoSolve == AutoSolve = True
-  ErrorHole == ErrorHole = True
-  _ == _ = False
+derive Show MetaKind
+derive Eq MetaKind
 
 -- constrain meta applied to val to be a val
 
@@ -328,22 +267,11 @@ record MetaContext where
   next : Int
   mcmode : MetaMode
 
-instance Eq MetaMode where
-  CheckAll == CheckAll = True
-  CheckFirst == CheckFirst = True
-  NoCheck == NoCheck = True
-  _ == _ = False
+derive Eq MetaMode
 
 data ConInfo = NormalCon | SuccCon | ZeroCon | EnumCon | TrueCon | FalseCon
 
-instance Eq ConInfo where
-  NormalCon == NormalCon = True
-  SuccCon == SuccCon = True
-  ZeroCon == ZeroCon = True
-  EnumCon == EnumCon = True
-  TrueCon == TrueCon = True
-  FalseCon == FalseCon = True
-  _ == _ = False
+derive Eq ConInfo
 
 instance Show ConInfo where
   show NormalCon = ""
@@ -356,30 +284,11 @@ instance Show ConInfo where
 data Def = Axiom | TCon Int (List QName) | DCon Nat ConInfo (List Quant) QName | Fn Tm | PrimTCon Int
          | PrimFn String Nat (List QName)
          | PrimOp String
-
-instance Show Def where
-  show Axiom = "axiom"
-  show (PrimOp op) = "PrimOp \{show op}"
-  show (TCon _ strs) = "TCon \{show strs}"
-  show (DCon ix ci k tyname) = "DCon \{show ix} \{show k} \{show tyname} \{show ci}"
-  show (Fn t) = "Fn \{show t}"
-  show (PrimTCon _) = "PrimTCon"
-  show (PrimFn src arity used) = "PrimFn \{show src} \{show arity} \{show used}"
-
--- entry in the top level context
+derive Show Def
 
 data EFlag = Hint | Inline | Export
-
-instance Show EFlag where
-  show Hint = "hint"
-  show Inline = "inline"
-  show Export = "export"
-
-instance Eq EFlag where
-  Hint == Hint = True
-  Inline == Inline = True
-  Export == Export = True
-  _ == _ = False
+derive Show EFlag
+derive Eq EFlag
 
 record TopEntry where
   constructor MkEntry
@@ -410,14 +319,6 @@ record ModContext where
   modErrors : List Error
   modInfos : List EditorInfo
 
--- Top level context.
--- Most of the reason this is separate is to have a different type
--- `Def` for the entries.
---
--- The price is that we have names in addition to levels. Do we want to
--- expand these during normalization?
-
--- A placeholder while walking through dependencies of a module
 emptyModCtx : String → String → ModContext
 emptyModCtx modName source = MkModCtx modName source emptyMap (MC emptyMap Nil 0 NoCheck) emptyMap Nil Nil Nil
 

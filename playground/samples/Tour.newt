@@ -127,19 +127,22 @@ isVowel _ = False
 
 -- And primitive functions have a type and a javascript definition:
 
-pfunc plusInt : Int -> Int -> Int := `(x,y) => x + y`
-pfunc plusString : String -> String -> String := `(x,y) => x + y`
+pfunc addInt : Int -> Int -> Int := `(x,y) => x + y`
+pfunc addString : String -> String -> String := `(x,y) => x + y`
 
--- We can make them Plus instances:
 
 instance Add Int where
-  _+_ = plusInt
+  _+_ = addInt
 
-instance Add String where
-  _+_ = plusString
 
-concat : String -> String -> String
-concat a b = a + b
+infixr 7 _++_
+class Concat a where
+  _++_ : a → a → a
+
+instance Concat String where
+  _++_ = addString
+
+
 
 -- Now we define Monad
 class Monad (m : U -> U) where
@@ -172,40 +175,32 @@ _>>=_ ma amb = bind ma amb
 _>>_ :  ∀ m a b. {{Monad m}} -> m a -> m b -> m b
 ma >> mb = ma >>= (λ _ => mb)
 
--- Now we define list and show it is a monad. At the moment, I don't
--- have sugar for Lists,
+-- Now we define list and show it is a monad.
 
 infixr 3 _::_
 data List : U -> U where
   Nil : ∀ A.  List A
   _::_ : ∀ A. A -> List A -> List A
 
-infixr 7 _++_
-_++_ : ∀ a.  List a -> List a -> List a
-Nil ++ ys = ys
-(x :: xs) ++ ys = x :: (xs ++ ys)
-
 instance Monad List where
   pure a = a :: Nil
   bind Nil f = Nil
   bind (x :: xs) f = f x ++ bind xs f
 
-/-
-This desugars to: (the names in guillemots are not user-accessible)
+-- and has the _++_ operator
 
-«Monad List,pure» : { a : U } -> a:0 -> List a:1
-pure a = _::_ a Nil
+instance ∀ a. Concat (List a) where
+  Nil ++ ys = ys
+  (x :: xs) ++ ys = x :: (xs ++ ys)
 
-«Monad List,bind» : { a : U } -> { b : U } -> (List a) -> (a -> List b) -> List b
-bind Nil f = Nil bind (_::_ x xs) f = _++_ (f x) (bind xs f)
+-- A utility function used in generating Show instances below:
 
-«Monad List» : Monad List
-«Monad List» = MkMonad «Monad List,pure» «Monad List,bind»
+joinBy : String → List String → String
+joinBy _ Nil = ""
+joinBy _ (x :: Nil) = x
+joinBy s (x :: y :: xs) = joinBy s ((x ++ s ++ y) :: xs)
 
--/
-
--- We'll want Pair below.  `,` has been left for use as an operator.
--- Also we see that → can be used in lieu of ->
+-- We define a product of two types (→ can be used in lieu of ->)
 infixr 1 _,_ _×_
 data _×_ : U → U → U where
   _,_ : ∀ A B. A → B → A × B
@@ -218,6 +213,18 @@ prod xs ys = do
   y <- ys
   pure (x, y)
 
+-- The prelude defines Eq and Show, which can be derived
+
+infixl 6 _==_
+class Eq a where
+  _==_ : a → a → Bool
+
+derive Eq Nat
+
+class Show a where
+  show : a → String
+
+derive Show Nat
 
 data Unit = MkUnit
 
@@ -235,8 +242,10 @@ instance Monad IO where
 
 pfunc putStrLn uses (MkIORes MkUnit) : String -> IO Unit := `(s) => (w) => {
   console.log(s)
-  return Prelude_MkIORes(null,Prelude_MkUnit,w)
+  return Tour_MkIORes(Tour_MkUnit, w)
 }`
 
 main : IO Unit
-main = putStrLn "Hello, World!"
+main = do
+  putStrLn "Hello, World!"
+  putStrLn $ show (S (S Z))
