@@ -14,7 +14,7 @@ import {
 import { CMEditor } from "./cmeditor.ts";
 import { deflate } from "./deflate.ts";
 import { inflate } from "./inflate.ts";
-import { IPC } from "./ipc.ts";
+import { IPC, Position } from "./ipc.ts";
 import helpText from "./help.md?raw";
 import { basicSetup, EditorView } from "codemirror";
 import {Compartment, EditorState} from "@codemirror/state";
@@ -81,7 +81,7 @@ if (!state.javascript.value) {
     console.log("SEND TO", iframe.contentWindow);
     const fileName = state.currentFile.value;
     // maybe send fileName, src?
-    await ipc.sendMessage("save", [fileName, src]);
+    await ipc.sendMessage("updateFile", [fileName, src]);
     let js = await ipc.sendMessage("compile", [fileName]);
     state.javascript.value = bundle(js);
   }
@@ -210,8 +210,12 @@ interface EditorProps {
   initialValue: string;
 }
 const language: EditorDelegate = {
-  getEntry(word, _row, _col) {
-    return topData?.context.find((entry) => entry.name === word);
+  async getEntry(word, row, col) {
+    let fileName = state.currentFile.value
+    let res = await ipc.sendMessage("hoverInfo", [fileName, row, col])
+    console.log('HOVER', res, 'for', row, col)
+    if (res == true) return null
+    return res || null
   },
   onChange(_value) {
     // we're using lint() now
@@ -228,31 +232,37 @@ const language: EditorDelegate = {
     let module = src.match(/module\s+([^\s]+)/)?.[1];
     if (module) {
       // This causes problems with stuff like aoc/...
-      state.currentFile.value = module.replace(".", "/") + ".newt";
+      state.currentFile.value = './' + module.replace(".", "/") + ".newt";
     }
     // This is a little flashy
     // state.javascript.value = ''
     let fileName = state.currentFile.value;
     console.log("FN", fileName);
     try {
-      await ipc.sendMessage("save", [fileName, src]);
-      let out = await ipc.sendMessage("typeCheck", [fileName]);
-      setOutput(out);
-      let markers = processOutput(out);
+      await ipc.sendMessage("updateFile", [fileName, src]);
+      let res = await ipc.sendMessage("typeCheck", [fileName]);
       let diags: Diagnostic[] = [];
-      for (let marker of markers) {
-        let col = marker.startColumn;
+      for (let marker of res.diags) {
+        let {start,end} = marker.range
+        let xlate = (pos: Position): number =>
+          view.state.doc.line(pos.line + 1).from + pos.character
 
-        let line = view.state.doc.line(marker.startLineNumber);
-        const pos = line.from + col - 1;
-        let word = view.state.wordAt(pos);
+        // TODO double check the last two are right
+        const SEVERITY: Diagnostic["severity"][] = [ "error", "error", "warning", "info", "hint"]
+        console.error({
+          from: xlate(start),
+          to: xlate(end),
+          severity: SEVERITY[marker.severity ?? 1],
+          message: marker.message,
+        })
         diags.push({
-          from: word?.from ?? pos,
-          to: word?.to ?? pos + 1,
-          severity: marker.severity,
+          from: xlate(start),
+          to: xlate(end),
+          severity: SEVERITY[marker.severity ?? 1],
           message: marker.message,
         });
       }
+      setOutput(res.output)
       // less flashy version
       ipc.sendMessage("compile", [fileName]).then(js => state.javascript.value = bundle(js));
       return diags;

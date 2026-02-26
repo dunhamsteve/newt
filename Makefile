@@ -60,11 +60,14 @@ audit: .PHONY
 lsp.js: ${SRCS}
 	node newt.js src/LSP.newt -o lsp.js
 
-newt-vscode-lsp/src/newt.js: ${SRCS}
-	node newt.js src/LSP.newt -o $@
+newt-vscode-lsp/src/newt.js: lsp.js
+	cp lsp.js $@
+
+playground/src/newt.js: lsp.js
+	cp lsp.js $@
 
 newt-vscode-lsp/dist/lsp.js: newt-vscode-lsp/src/lsp.ts newt-vscode-lsp/src/newt.js
 	(cd newt-vscode-lsp && node esbuild.js)
 
-lsp: newt-vscode-lsp/dist/lsp.js
+lsp: newt-vscode-lsp/dist/lsp.js playground/src/newt.js
 

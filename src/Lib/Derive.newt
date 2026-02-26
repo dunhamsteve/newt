@@ -37,10 +37,10 @@ deriveEq fc name = do
 
   where
     arr : Raw → Raw → Raw
-    arr a b = RPi emptyFC (BI fc "_" Explicit Many) a b
+    arr a b = RPi fc (BI fc "_" Explicit Many) a b
 
     rvar : String → Raw
-    rvar nm = RVar emptyFC nm
+    rvar nm = RVar fc nm
 
     getExplictNames : SnocList String → Tm → List String
     getExplictNames acc (Pi fc nm Explicit quant a b) = getExplictNames (acc :< nm) b
@@ -49,7 +49,7 @@ deriveEq fc name = do
     getExplictNames acc _ = acc <>> Nil
 
     buildApp : String → List Raw → Raw
-    buildApp nm nms = foldl (\ t u => RApp emptyFC t u Explicit) (rvar nm) $  nms
+    buildApp nm nms = foldl (\ t u => RApp fc t u Explicit) (rvar nm) $  nms
 
     equate : (Raw × Raw) → Raw
     equate (a,b) = buildApp "_==_" (a :: b :: Nil)
@@ -89,13 +89,13 @@ deriveShow fc name = do
 
   where
     arr : Raw → Raw → Raw
-    arr a b = RPi emptyFC (BI fc "_" Explicit Many) a b
+    arr a b = RPi fc (BI fc "_" Explicit Many) a b
 
     rvar : String → Raw
-    rvar nm = RVar emptyFC nm
+    rvar nm = RVar fc nm
 
     lstring : String → Raw
-    lstring s = RLit emptyFC (LString s)
+    lstring s = RLit fc (LString s)
 
     getExplictNames : SnocList String → Tm → List String
     getExplictNames acc (Pi fc nm Explicit quant a b) = getExplictNames (acc :< nm) b
@@ -104,7 +104,7 @@ deriveShow fc name = do
     getExplictNames acc _ = acc <>> Nil
 
     buildApp : String → List Raw → Raw
-    buildApp nm nms = foldl (\ t u => RApp emptyFC t u Explicit) (rvar nm) $  nms
+    buildApp nm nms = foldl (\ t u => RApp fc t u Explicit) (rvar nm) $  nms
 
     equate : (Raw × Raw) → Raw
     equate (a,b) = buildApp "_==_" (a :: b :: Nil)
@@ -118,7 +118,7 @@ deriveShow fc name = do
       let names = getExplictNames Lin ty
       anames <- map rvar <$> traverse freshName names
       let left = buildApp "show" $ buildApp nm anames :: Nil
-      let shows = map (\ nm => RApp emptyFC (rvar "show") nm Explicit) anames
+      let shows = map (\ nm => RApp fc (rvar "show") nm Explicit) anames
       let right = case anames of
         Nil => lstring nm
         _ =>

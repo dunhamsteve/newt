@@ -29,7 +29,6 @@ decomposeName fn =
             then go (x :: acc) xs
             else (joinBy "/" (xs :< x <>> Nil), joinBy "." acc)
 
-
 switchModule : FileSource → String → M (Maybe ModContext)
 switchModule repo modns = do
     -- TODO processing on hover is expensive, but info is not always there
@@ -69,10 +68,18 @@ getHoverInfo repo modns row col = do
     pure $ HasHover e.fc ("\{show e.name} : \{rpprint Nil ty}")
 
     where
+        -- We don't want to pick up the paren token when on the border
+        isIdent : BTok → Bool
+        isIdent (MkBounded (Tok Ident _) _) = True
+        isIdent (MkBounded (Tok UIdent _) _) = True
+        isIdent (MkBounded (Tok MixFix _) _) = True
+        isIdent (MkBounded (Tok Projection _) _) = True
+        isIdent _ = False
+
         getTok : List BTok → Maybe String
         getTok Nil = Nothing
         getTok (tok :: toks) =
-            if tok.bounds.startCol <= col && (col <= tok.bounds.endCol)
+            if tok.bounds.startCol <= col && col <= tok.bounds.endCol && isIdent tok
             then Just $ value tok else getTok toks
 
 data FileEdit = MkEdit FC String

@@ -1,11 +1,55 @@
+
+//// Copy of LSP types
+
+export interface Location { uri: string; range: Range; }
+export interface Position { line: number; character: number; }
+export interface Range { start: Position; end: Position; }
+export interface HoverResult { info: string; location: Location; }
+export interface TextEdit { range: Range; newText: string; }
+export type DiagnosticSeverity = 1 | 2 | 3 | 4
+export interface DiagnosticRelatedInformation { location: Location; message: string; }
+export interface Diagnostic {
+    range: Range
+    message: string
+    severity?: DiagnosticSeverity
+    source?: string
+    // we don't emit this yet, but I think we will
+    relatedInformation?: DiagnosticRelatedInformation[]
+}
+
+export interface WorkspaceEdit {
+  changes?: {
+    [uri: string]: TextEdit[];
+  }
+}
+
+export interface CodeAction {
+  title: string;
+  edit?: WorkspaceEdit;
+}
+
+export interface BuildResult {
+  diags: Diagnostic[]
+  output: string
+}
+
+//// IPC Thinger
+
 export type Result<A> =
   | { status: "ok"; value: A }
   | { status: "err"; error: string };
 
 export interface API {
-  save(fileName: string, content: string): string;
-  typeCheck(fileName: string): string;
-  compile(fileName: string): string;
+  // Invalidates stuff and writes to an internal cache that overlays the "filesystem"
+  updateFile(fileName: string, content: string): unknown;
+  // Run checking, return diagnostics
+  typeCheck(fileName: string): BuildResult;
+  // returns True if we need to recheck - usually for files invalidating other files
+  // The playground rarely hits this situation at the moment
+  hoverInfo(fileName: string, row: number, col: number): HoverResult | boolean | null;
+  codeActionInfo(fileName: string, row: number, col: number): CodeAction[] | null;
+  // we need to add this to the LSP build
+  compile(fileName: string):  string;
 }
 
 export interface Message<K extends keyof API> {
@@ -14,9 +58,9 @@ export interface Message<K extends keyof API> {
   args: Parameters<API[K]>;
 }
 
-export interface ResponseMSG {
+export interface ResponseMSG<K extends keyof API> {
   id: number;
-  result: string;
+  result: Awaited<ReturnType<API[K]>>;
 }
 
 type Suspense = {
@@ -33,7 +77,8 @@ export class IPC {
     this._postMessage = <K extends keyof API>(msg: Message<K>) =>
       newtWorker.postMessage(msg);
     // Safari/MobileSafari have small stacks in webworkers.
-    if (navigator.vendor.includes("Apple")) {
+    // But support for the frame needs to be fixed
+    if (navigator.vendor.includes("Apple") && false) {
       const workerFrame = document.createElement("iframe");
       workerFrame.src = "worker.html";
       workerFrame.style.display = "none";
@@ -46,7 +91,7 @@ export class IPC {
     }
     // Need to handle messages from the other iframe too? Or at least ignore them.
   }
-  onmessage = (ev: MessageEvent<ResponseMSG>) => {
+  onmessage = <K extends keyof API>(ev: MessageEvent<ResponseMSG<K>>) => {
     console.log("GET", ev.data);
     // Maybe key off of type
     if (ev.data.id) {

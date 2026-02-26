@@ -16,6 +16,7 @@ import Commands
 import Lib.ProcessDecl
 import Lib.Prettier
 import Lib.Error
+import Lib.Compile
 
 pfunc js_castArray : Array JSObject → JSObject := `x => x`
 pfunc js_castInt : Int → JSObject := `x => x`
@@ -224,4 +225,25 @@ checkFile fn = unsafePerformIO $ do
     modifyIORef state $ [ topContext := top ]
     pure $ jsonToJObject $ JsonArray json
 
-#export updateFile checkFile hoverInfo codeActionInfo
+compileJS : String → JSObject
+compileJS fn = unsafePerformIO $ do
+  let (base, modName) = decomposeName fn
+  st <- readIORef state
+  when (st.baseDir /= base) $ \ _ => resetState base
+  repo <- lspFileSource
+  (Right (top, src)) <- (do
+    putStrLn "woo"
+    mod <- processModule emptyFC repo Nil modName
+    docs <- compile
+    let src = unlines $
+          ( "const bouncer = (f,ini) => { let obj = ini; while (obj.tag) obj = f(obj); return obj.h0 };"
+          :: Nil)
+          ++ map (render 90 ∘ noAlt) docs
+    pure src).runM st.topContext
+    | Left err => pure $ js_castStr "// \{errorMsg err}"
+  modifyIORef state [ topContext := top ]
+  pure $ js_castStr src
+
+
+
+#export updateFile checkFile hoverInfo codeActionInfo compileJS

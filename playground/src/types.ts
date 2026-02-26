@@ -1,7 +1,6 @@
 import { EditorView } from "codemirror";
-import { linter, Diagnostic } from "@codemirror/lint";
-
-
+import { Diagnostic } from "@codemirror/lint";
+import { HoverResult } from "./ipc";
 
 export interface CompileReq {
   id: string
@@ -55,7 +54,7 @@ export interface TopData {
   context: TopEntry[];
 }
 export interface EditorDelegate {
-  getEntry(word: string, row: number, col: number): TopEntry | undefined
+  getEntry(word: string, row: number, col: number): Promise<HoverResult | null>
   onChange(value: string): unknown
   getFileName(): string
   lint(view: EditorView): Promise<Diagnostic[]> | Diagnostic[]

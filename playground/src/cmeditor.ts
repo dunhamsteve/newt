@@ -234,32 +234,29 @@ export class CMEditor implements AbstractEditor {
           });
         }),
           this.theme.of(EditorView.baseTheme({})),
-          hoverTooltip((view, pos) => {
+          hoverTooltip(async (view, pos) => {
             let cursor = this.view.state.doc.lineAt(pos);
-            let line = cursor.number;
-            let range = this.view.state.wordAt(pos);
-            console.log(range);
-            if (range) {
-              let col = range.from - cursor.from;
-              let word = this.view.state.doc.sliceString(range.from, range.to);
-              let entry = this.delegate.getEntry(word, line, col);
-              if (!entry)
-                entry = this.delegate.getEntry("_" + word + "_", line, col);
-              console.log("entry for", word, "is", entry);
-              if (entry) {
-                let rval: Tooltip = {
-                  pos: range.head,
-                  above: true,
-                  create: () => {
-                    let dom = document.createElement("div");
-                    dom.className = "tooltip";
-                    dom.textContent = entry.type;
-                    return { dom };
-                  },
-                };
-                return rval;
-              }
+            let line = cursor.number - 1;
+            let col = pos - cursor.from;
+            // let range = this.view.state.wordAt(pos);
+            console.log('getting hover for ',line, col);
+            let entry = await this.delegate.getEntry('', line, col)
+
+            if (entry) {
+              let rval: Tooltip = {
+                // TODO pull in position from LSP (currently it only has the jump-to FC)
+                pos,
+                above: true,
+                create: () => {
+                  let dom = document.createElement("div");
+                  dom.className = "tooltip";
+                  dom.textContent = entry.info;
+                  return { dom };
+                },
+              };
+              return rval;
             }
+
             // we'll iterate the syntax tree for word.
             // let entry = delegate.getEntry(word, line, col)
             return null;
