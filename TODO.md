@@ -3,8 +3,9 @@
 
 - [ ] Use looping for TCO
   - For single functions at least - I think this would be a performance win. I've learned that the slowness on `bun` goes away if I drop the TCO transform.
+  - Doing this manually for `lookupT23` got 3% speedup.
 - [ ] Importing Prelude twice should be an error (currently it causes double hints and breaks auto)
-- [ ] For errors in other files, point to the import
+- [x] For errors in other files, point to the import
 - [x] Unsolved metas should be errors (user metas are fine)
 - [x] Better syntax for forward declared data (so we can distinguish from functions)
 - [ ] maybe allow "Main" module name for any file
@@ -14,7 +15,7 @@
 - [x] Case split for LSP mode
 - [x] Require lowercase pattern variables
   - I accidentally misspell a constructor and end up with a wildcard.
-- [ ] Leverage LSP code for web playground
+- [x] Leverage LSP code for web playground
 - [ ] Improve handling of names:
   - We need FC on names in a lot of places
   - [x] FC for duplicate `data`, `record`, `class` name is wrong (points to `data`)
@@ -46,16 +47,16 @@
   - Or the name on the VVar?
   - Also we should render %pi, etc more readably (bonus points for _×_)
 - Editor support:
-  - [ ] add missing cases should skip indented lines
-  - [ ] add missing cases should handle `_::_`
-  - [ ] add missing cases should share code between vscode and playground
+  - [x] add missing cases should skip indented lines
+  - [x] add missing cases should handle `_::_`
+  - [x] add missing cases should share code between vscode and playground
   - [x] "Not in scope" should offer to import
-  - [ ] Case split
+  - [x] Case split
 - [ ] Delay checking
   - We have things like `foldr (\ x acc => case x : ...`, where the lambda doesn't have a good type, so we have to be explicit. If we could defer the checking of that expression until more things are solved, we might not need the annotation (e.g. checking the other arguments). Some `case` statements may have a similar situation.
   - One idea is to throw the checks onto some sort of TODO list and run whatever works. (I think Idris may have a heuristic where it checks arguments backwards in some cases.)
 - [x] Dependent records (I guess I missed that bit)
-- [ ] Arguments on records
+- [x] Arguments on records
 - [ ] Add sugar for type aliases (maybe infer arguments)
   - Lean has this, we maybe could run infer on the RHS and call it a day? We would need a simple LHS, though.
 - [ ] see if we can get a better error if `for` is used instead of `for_` in do blocks
@@ -89,27 +90,23 @@
 - [ ] Look into using holes for errors (https://types.pl/@AndrasKovacs/115401455046442009)
   - This would let us hit more cases in a function when we hit an error.
   - I've been wanting to try holes for parse errors too.
+  - Does softening up check errors break `auto`?
   - [ ] Missing `∀ k` in type is error -> no declaration for, if we insert a hole, we can get the declaration.
 - [ ] in-scope type at point in vscode
   - So the idea here is that the references will be via FC, we remember the type at declaration and then point the usage back to the declaration (FC -> FC). We could dump all of this. (If we're still doing json.)
   - This information _could_ support renaming, too (but there may be indentation issues).
   - Do we want to (maybe later) keep the scope as a FC? We could do scope at point then.
-  - But ideally we'd switch to a server/repl, so we don't have to mess around with serializing stuff.
 - [ ] LSP and/or more editor support
   - [ ] refactor to query based?  E.g. importing a module
-  - [ ] would be nice to have "add missing cases" and "case split"
+  - [x] would be nice to have "add missing cases" and "case split"
   - [x] Probably need ranges for FC
-  - [ ] leave an interactive process running
+  - [x] leave an interactive process running
   - [ ] restart mid file (we could save state per top level decl)
   - [ ] rename in editor (need to accumulate all names and what they reference)
   - [ ] who calls X?  We can only do this scoped to the current context for now. Someday whole source dir. #lsp
 - [ ] Pretty print
   - Can we format code? Maybe pull nearby comments or attach them like FC to tokens?
   - We would need to address stack and laziness issues in prettier printer (or make it merely pretty)
-- [ ] Look into descriptions, etc.
-  - Can generating descriptions help with automatic "show" implementations
-  - We lost debug printing when switching to numeric tags
-  - Where did I see the idea of generating descriptions for inductive types?
 - [ ] Add info to Ref/VRef (is dcon, arity, etc)
   - To save lookups during compilation and it might make eval faster
 - [x] number tags for data constructors
@@ -123,7 +120,7 @@
   - [ ] Maybe add qualified names to surface syntax and allow / detect conflicts on reference
   - [ ] Add `export` keywords
 - [x] vscode - run newt when switching editors
-- [ ] case split
+- [x] case split
   - We could fake this up:
     - given a name and a point in the editor
     - walk through the function looking for the binder
@@ -131,8 +128,11 @@
     - enumerate valid constructors (and their arity)
     - Repeat the line with each, applied to args
     - For `<-` or `let` we'd want to fudge some `|` lines
+    - [ ] `let` has issues for multiline split / add missing
+    - [ ] `derive` has phantom splits in it
 - [x] Support "Add missing cases"
   - This has been hakced together
+  - LSP version now.
   - We could possibly fake up missing cases, too. Since they're listed and  have an FC pointing at the first one
 - [x] inline struct getters during code generation (We'd like  `x.h1.h2`)
 - [ ] Better FC for parse errors (both EOF and the ones that show up just after the error)
@@ -149,11 +149,13 @@
   - [x] Maybe tag some functions as inline
   - [x] Eq Nat is not tail recursive because of the call to `==`
 - [ ] Eq Nat does things the hard way, can we turn it into `==`?
+  - We could have a compile time substitution for the function
+  - Maybe this could reify how we're hard coding functions to js operators
 - [x] use hint table for auto solving. (I think walking the `toList` is a big chunk of performance in `Elab.newt`.)
 - [x] implement string enum (or number, but I'm using strings for tags at the moment)
 - [x] use monaco input method instead of lean's
 - [x] `Def` is shadowed between Types and Syntax (TCon vs DCon), detect this
-- [ ] constructor magic for Bool?
+- [x] constructor magic for Bool?
   - We'd have to make assumptions about order.
   - we could special case some translations
   - extra code.
@@ -161,15 +163,13 @@
   - Two issues
     - I'm rewriting stuff in the context, leaving it in a bad state (forward references). I think I can avoid this.
     - The variables at the end of pattern matching have types with references in the wrong order. I think we can reorder them on dependencies.
-    - should w
+    - In some cases Idris stuffs Erased into types.
 - Improve `auto`
   - [ ] Improve cases where the auto isn't solved because of a type error
   - [ ] Handle `Foo Blah`, `Foo a => Bar a` vs `Bar Blah`
 - [ ] Add some optimizations
-  - [ ] see if we can make the typeclass stuff a little leaner, e.g. inline a projection of a static record.
+  - [ ] see if we can make the typeclass stuff a little leaner, e.g. inline a projection of a static record. (Maybe done now with the inlining, but verify.)
   - It would be nice if IO looked like imperative JS, but that might be a bit of a stretch.
-
-
 - [ ] warn on unused imports?
   - Probably have to mark on name lookup, maybe wait until we have query-based
 - [x] redo code to determine base path
@@ -185,10 +185,11 @@
 - [x] get port to run
   - [x] something goes terribly wrong with traverse_ and for_ (related to erasure, I think)
 - [x] ~~don't use `take` - it's not stack safe~~ The newt version is stack safe
-- [ ] show user hole info even in case of error
+- [x] show user hole info even in case of error
 - [x] tokenizer that can be ported to newt
 - [ ] Add default path for library, so we don't need symlinks everywhere and can write tests for the library
   - We need this to work for tests / dev and for installed newt.
+  - The new `FileSource` mechanism might help here.
 - [x] string interpolation?
   - The tricky part here is the `}` - I need to run the normal tokenizer in a way that treats `}` specially.
   - Idris handles `putStrLn "done \{ show $ add {x=1} 2}"` - it recurses for `{` `}` pairs.  Do we want that complexity?
@@ -202,6 +203,7 @@
 - [x] record update sugar
 - [x] Change `Ord` to be more like Idris - LT / EQ / GT (and entail equality)
 - [ ] Consider making `<` independent of `Ord`, so we get the `<` oper in the javascript.
+  - Maybe a "default implementation" deal.
 - [x] Keep a `compare` function on `SortedMap` (like lean)
   - `emptyMap` helper defaults to `compare` from `Ord a`
 - [x] keymap for monaco
@@ -258,7 +260,8 @@
   - Probably fixed by trying to solve auto immediately
 - [x] Can't skip an auto. We need `{{_}}` to be auto or have a `%search` syntax.
 - [x] add filenames to FC
-- [ ] Add full ranges to FC
+- [x] Add full ranges to FC
+  - [ ] Done, but we need to fix a bunch of FC in the parser
 - [x] maybe use backtick for javascript so we don't highlight strings as JS
 - [x] dead code elimination
 - [x] imported files leak info messages everywhere
