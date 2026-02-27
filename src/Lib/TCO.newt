@@ -20,6 +20,9 @@ import Data.SortedMap
 -- Find names of applications in tail position
 tailNames : CExp → List QName
 tailNames (CAppRef nm args n) = nm :: Nil
+-- these two shouldn't exist yet
+tailNames (CLoop _ _) = Nil
+tailNames (CLetLoop _ _) = Nil
 tailNames (CCase _ alts) = join $ map altTailNames alts
   where
     altTailNames : CAlt → List QName
@@ -40,7 +43,8 @@ tailNames (CMeta _) = Nil
 tailNames (CRaw _ _) = Nil
 tailNames (CPrimOp _ _ _) = Nil
 
--- rewrite tail calls to return an object
+-- rewrite tail calls to return an object to a trampoline
+-- takes a list of the names in the group and the function body
 rewriteTailCalls : List QName → CExp → CExp
 rewriteTailCalls nms tm = case tm of
   CAppRef nm args qs =>
@@ -63,11 +67,34 @@ rewriteTailCalls nms tm = case tm of
       rewriteAlt (CDefAlt t) = CDefAlt $ rewriteTailCalls nms t
       rewriteAlt (CLitAlt lit t) = CLitAlt lit $ rewriteTailCalls nms t
 
+-- A looping version of TCO, specialized for single function calls
+-- takes a list of the name of the function and the function body
+rewriteLoop : QName → CExp → CExp
+rewriteLoop qn tm = case tm of
+    (CAppRef nm args qs) =>
+      if length' args == length' qs && nm == qn
+        then CLoop args qs
+        else tm
+    (CLetRec nm t u) => CLetRec nm t $ rewriteLoop qn u
+    (CLet nm t u) => CLet nm t $ rewriteLoop qn u
+    (CCase sc alts) => CCase sc $ map rewriteAlt alts
+    tm => tm
+  where
+    rewriteAlt : CAlt → CAlt
+    rewriteAlt (CConAlt ix nm info args t) = CConAlt ix nm info args $ rewriteLoop qn t
+    rewriteAlt (CDefAlt t) = CDefAlt $ rewriteLoop qn t
+    rewriteAlt (CLitAlt lit t) = CLitAlt lit $ rewriteLoop qn t
+
 -- the name of our trampoline
 bouncer : QName
 bouncer = QN "" "bouncer"
 
 doOptimize : List (QName × CExp) → M (List (QName × CExp))
+doOptimize ((qn, exp) :: Nil) = do
+  let (CFun args body) = exp | _ => error emptyFC "doOptimize \{show qn} not a CFun"
+  let body = rewriteLoop qn body
+  pure $ (qn, CFun args (CLetLoop args body)) :: Nil
+
 doOptimize fns = do
   splitFuns <- traverse splitFun fns
   let nms = map fst fns
@@ -112,6 +139,8 @@ tailCallOpt expMap = do
 
     processGroup : ExpMap → List QName → M ExpMap
     processGroup expMap names = do
+      -- Looks like only two are > 1
+      debug $ \ _ => "compile.tco: group \{show $ length' names} \{show names}"
       let pairs = mapMaybe (flip lookupMap expMap) names
       updates <- doOptimize pairs
       pure $ foldl doUpdate expMap updates

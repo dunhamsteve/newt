@@ -36,6 +36,11 @@ data CExp : U where
   CLit : Literal -> CExp
   CLet : Name -> CExp -> CExp -> CExp
   CLetRec : Name -> CExp -> CExp -> CExp
+  -- Might be able to use a bunch of flagged lets or something
+  CLetLoop : List (Quant × Name) → CExp → CExp
+  -- This is like a CAppRef, self-call
+  -- If we know it's a tail call fn, we could handle all of this in codegen...
+  CLoop : List CExp → List Quant → CExp
   CErased : CExp
   -- Data / type constructor
   CConstr : Nat → Name → List CExp → List Quant → CExp
