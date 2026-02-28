@@ -285,28 +285,16 @@ letExpr = do
       pure (name,fc,ty,t)
 
 pLamArg : Parser (Icit × String × Maybe Raw)
-pLamArg = impArg <|> autoArg <|> expArg
+pLamArg = impArg <|> expArg
        <|> (\ x => (Explicit, x, Nothing)) <$> (ident <|> uident)
        <|> keyword "_" *> pure (Explicit, "_", Nothing)
   where
+    -- TODO - we're moving away from uppercase variables, but a test uses them
     impArg : Parser (Icit × String × Maybe Raw)
-    impArg = do
-      nm <- braces (ident <|> uident)
-      ty <- optional (symbol ":" >> typeExpr)
-      pure (Implicit, nm, ty)
-
-    autoArg : Parser (Icit × String × Maybe Raw)
-    autoArg = do
-      nm <- dbraces (ident <|> uident)
-      ty <- optional (symbol ":" >> typeExpr)
-      pure (Auto, nm, ty)
+    impArg = (Implicit, ) <$> braces (_,_ <$> (ident <|> uident) <*> optional (symbol ":" >> typeExpr))
 
     expArg : Parser (Icit × String × Maybe Raw)
-    expArg = do
-      nm <- parenWrap (ident <|> uident)
-      -- FIXME - this is broken, outside parenWrap, guess I never used it?
-      ty <- optional (symbol ":" >> typeExpr)
-      pure (Explicit, nm, ty)
+    expArg = (Explicit , ) <$> parenWrap (_,_ <$> ident <*> optional (symbol ":" >> typeExpr))
 
 lamExpr : Parser Raw
 lamExpr = do

@@ -1,0 +1,7 @@
+module LambdaArg
+
+import Prelude
+
+-- Parsing of typed arguments on lambda
+foo : Nat -> ({_ : U} -> Nat -> Nat)
+foo x = \ {x : U} (x : Nat) => x
