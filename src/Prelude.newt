@@ -388,10 +388,12 @@ class HasIO (m : U → U) where
 instance HasIO IO where
   liftIO a = a
 
+-- NB console.log is _not_ always synchronous
+-- https://nodejs.org/api/process.html#a-note-on-process-io
+-- But writeSync(1, ...) adds noise to LSP on linux
 pfunc primPutStrLn uses (MkIORes MkUnit) : String → IO Unit := `(s) => (w) => {
-  // https://nodejs.org/api/process.html#a-note-on-process-io
-  // Previously console.log, but that is _not_ always synchronous
-  fs.writeSync(1, s + '\n')
+  //fs.writeSync(1, s + '\n')
+  console.log(s)
   return Prelude_MkIORes(Prelude_MkUnit,w)
 }`
 
