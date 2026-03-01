@@ -1,0 +1,12 @@
+#!/bin/sh -e
+REV=$(git rev-parse --short HEAD)
+cat >> src/Revision.newt.new <<EOF
+module Revision
+
+import Prelude
+
+gitRevision : String
+gitRevision = "$REV"
+EOF
+cmp src/Revision.newt.new src/Revision.newt || cp src/Revision.newt.new src/Revision.newt
+rm -f src/Revision.newt.new

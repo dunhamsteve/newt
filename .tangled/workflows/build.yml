@@ -1,0 +1,17 @@
+when:
+  - event: ["push", "manual"]
+    branch: ["main"]
+engine: "nixery"
+dependencies:
+  nixpkgs:
+    - nodejs
+    - gnumake
+    - diffutils
+    - findutils
+    - git
+    - time
+steps:
+  - name: "build newt"
+    command: "make newt3.js"
+  - name: "test"
+    command: "make test"

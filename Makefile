@@ -9,11 +9,8 @@ RUNJS=node
 all: newt.js
 
 
-REV=$(shell git rev-parse --short HEAD)
 src/Revision.newt: .PHONY
-	echo "module Revision\nimport Prelude\ngitRevision : String\ngitRevision = \"${REV}\"" > src/Revision.newt.new
-	cmp src/Revision.newt.new src/Revision.newt || cp src/Revision.newt.new src/Revision.newt
-	rm -f src/Revision.newt.new
+	sh ./scripts/mkrevision
 
 newt.js: ${SRCS} src/Revision.newt
 	$(RUNJS) bootstrap/newt.js src/Main.newt -o newt.js
