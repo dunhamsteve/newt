@@ -304,8 +304,6 @@ pfunc arrayToList uses (Nil _::_) : ∀ a. Array a → List a := `(a,arr) => {
   return rval
 }`
 
-
-
 -- for now I'll run this in JS
 pfunc lines uses (arrayToList) : String → List String := `(s) => Prelude_arrayToList(null,s.split('\n'))`
 
@@ -724,6 +722,10 @@ instance Bifunctor _×_ where
 
 instance Functor IO where
   map f a = bind a $ \ a => pure (f a)
+
+instance ∀ a. Functor (Either a) where
+  map f (Left x) = Left x
+  map f (Right y) = Right (f y)
 
 uncurry : ∀ a b c. (a → b → c) → (a × b) → c
 uncurry f (a,b) = f a b
