@@ -314,7 +314,7 @@ lamExpr = do
 caseAlt : Parser RCaseAlt
 caseAlt = do
   pure MkUnit
-  pat <- typeExpr
+  pat <- term
   t <- optional (keyword "=>" >> term)
   pure $ MkAlt pat t
 
@@ -364,6 +364,7 @@ doCaseLet = do
   keyword "="
   sc <- typeExpr
   alts <- startBlock $ manySame $ symbol "|" *> caseAlt
+  -- REVIEW why am I collecting the rest here?
   bodyFC <- getPos
   body <- RDo <$> getPos <*> someSame doStmt
   pure $ DoExpr fc (RCase fc sc Nothing (MkAlt pat (Just body) :: alts))
@@ -457,9 +458,9 @@ ibind = do
   symbol "{"
   quant <- quantity
   names <- (some (addPos varname))
-  ty <- optional (symbol ":" *> typeExpr)
+  ty <- symbol ":" *> typeExpr
   symbol "}"
-  pure $ map (makeBind quant ty) names
+  pure $ map (makeBind quant (Just ty)) names
   where
     makeBind : Quant → Maybe Raw → FC × String → BindInfo × Raw
     makeBind quant ty (pos, name) = (BI pos name Implicit quant, fromMaybe (RImplicit pos) ty)

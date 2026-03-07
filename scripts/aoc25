@@ -25,7 +25,7 @@ for fn in  aoc2025/Day*.newt; do
     if ! diff -q tmp/${bn}.out ${fn}.golden; then
       echo "Output mismatch for $fn"
       failed=$((failed + 1))
-      if [ $1 = "--fix" ]; then
+      if [ "$1" = "--fix" ]; then
         cp tmp/${bn}.out ${fn}.golden
       fi
     fi

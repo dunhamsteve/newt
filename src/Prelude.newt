@@ -146,7 +146,7 @@ class Functor (m : U → U) where
   map : ∀ a b. (a → b) → m a → m b
 
 infixr 4 _<$>_ _<$_
-_<$>_ : ∀ f. {{Functor f}} {0 a b} → (a → b) → f a → f b
+_<$>_ : ∀ f. {{Functor f}} {0 a b : _} → (a → b) → f a → f b
 f <$> ma = map f ma
 
 _<$_ : ∀ f a b. {{Functor f}} → b → f a → f b
@@ -214,7 +214,7 @@ instance Applicative Maybe where
 
 infixr 2 _<|>_
 class Alternative (m : U → U) where
-  _<|>_ : {0 a} → m a → m a → m a
+  _<|>_ : ∀ a. m a → m a → m a
 
 instance Alternative Maybe where
   Nothing <|> x = x
@@ -368,12 +368,12 @@ instance Monad List where
 
 
 -- This is traverse, but we haven't defined Traversable yet
-mapA : ∀ m. {{Applicative m}} {0 a b} → (a → m b) → List a → m (List b)
+mapA : ∀ m. {{Applicative m}} {0 a b : _} → (a → m b) → List a → m (List b)
 mapA f Nil = return Nil
 mapA f (x :: xs) = return _::_ <*> f x <*> mapA f xs
 
 
-mapM : ∀ m. {{Monad m}} {0 a b} → (a → m b) → List a → m (List b)
+mapM : ∀ m. {{Monad m}} {0 a b : _} → (a → m b) → List a → m (List b)
 mapM f Nil = pure Nil
 mapM f (x :: xs) = do
   b <- f x
@@ -433,6 +433,9 @@ pfunc pack : List Char → String := `(cs) => {
 }
 `
 
+-- FIXME this no longer works with numeric tags
+-- we could take the best of both worlds and have a debug flag to add extra information
+-- but also we could derive Show...
 pfunc debugStr uses (natToInt listToArray) : ∀ a. a → String := `(_, obj) => {
   const go = (obj) => {
     if (obj === null) return "_"

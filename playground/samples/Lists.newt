@@ -87,7 +87,7 @@ reverse-++-distrib (x :: xs) ys =
 -- same thing, but using `replace` in the proof
 reverse-++-distrib' : ∀ A. (xs ys : List A) -> reverse (xs ++ ys) ≡ reverse ys ++ reverse xs
 reverse-++-distrib' Nil ys = sym (++-identity (reverse ys))
-reverse-++-distrib' {A} (x :: xs) ys =
+reverse-++-distrib' {a} (x :: xs) ys =
   replace (\ z => (reverse (xs ++ ys) ++ (x :: Nil)) ≡ z)
           (sym (++-associative (reverse ys) (reverse xs) (x :: Nil)))
           (replace (\ z => (reverse (xs ++ ys)) ++ (x :: Nil) ≡ z ++ (x :: Nil)) (reverse-++-distrib' xs ys) Refl)

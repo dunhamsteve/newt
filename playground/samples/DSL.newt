@@ -20,15 +20,15 @@ Z * m = Z
 
 infixr 4 _::_
 data Vec : U → Nat → U where
-  Nil : {a} → Vec a Z
-  _::_ : {a k} → a → Vec a k → Vec a (S k)
+  Nil : ∀ a. Vec a Z
+  _::_ : ∀ a k. a → Vec a k → Vec a (S k)
 
 infixl 5 _++_
-_++_ : {a n m} → Vec a n → Vec a m → Vec a (n + m)
+_++_ : ∀ a n m. Vec a n → Vec a m → Vec a (n + m)
 Nil ++ ys = ys
 (x :: xs) ++ ys = x :: (xs ++ ys)
 
-map : {a b n} → (a → b) → Vec a n → Vec b n
+map : ∀ a b n. (a → b) → Vec a n → Vec b n
 map f Nil = Nil
 map f (x :: xs) = f x :: map f xs
 
@@ -57,12 +57,12 @@ data Unit : U where
   MkUnit : Unit
 
 data Either : U -> U -> U where
-  Left : {A B} → A → Either A B
-  Right : {A B} → B → Either A B
+  Left : ∀ a b. a → Either a b
+  Right :  ∀ a b. b → Either a b
 
 infixr 4 _,_
 data Both : U → U → U where
-  _,_ : {A B} → A → B → Both A B
+  _,_ :  ∀ a b. a → b → Both a b
 
 typ : E → U
 typ Zero = Empty
@@ -85,11 +85,11 @@ BothBoolBool = typ four
 ex1 : BothBoolBool
 ex1 = (false, true)
 
-enumAdd : {a b m n} → Vec a m → Vec b n → Vec (Either a b) (m + n)
+enumAdd : ∀ a b m n. Vec a m → Vec b n → Vec (Either a b) (m + n)
 enumAdd xs ys = map Left xs ++ map Right ys
 
 -- for this I followed the shape of _*_, the lecture was slightly different
-enumMul : {a b m n} → Vec a m → Vec b n → Vec (Both a b) (m * n)
+enumMul : ∀ a b m n. Vec a m → Vec b n → Vec (Both a b) (m * n)
 enumMul Nil ys = Nil
 enumMul (x :: xs) ys = map (_,_ x) ys ++ enumMul xs ys
 
@@ -111,8 +111,8 @@ test4 = enumerate four
 -- for now, I'll define ≡ to check
 
 infixl 2 _≡_
-data _≡_ : {A} → A → A → U where
-  Refl : {A} {a : A} → a ≡ a
+data _≡_ : ∀ a. a → a → U where
+  Refl : ∀ a. {x : a} → x ≡ x
 
 test2' : test2 ≡ false :: true :: Nil
 test2' = Refl
