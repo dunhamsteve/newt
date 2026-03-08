@@ -28,15 +28,19 @@ dumpEnv ctx =
 
     go : List String -> Int -> List (Val × String × Val) -> List String -> M (List String)
     go _ _ Nil acc = pure acc
-    go names k ((v, n, ty) :: xs) acc = if isVar k v
-      -- TODO - use Doc and add <+/> as appropriate to printing
-      then do
+    -- don't show the = bit for now. Lean folds it.
+    go names k ((v, n, ty) :: xs) acc = do
         ty' <- quote ctx.lvl ty
         go names (1 + k) xs ("  \{n} : \{render 90 $ pprint names ty'}":: acc)
-      else do
-        v' <- quote ctx.lvl v
-        ty' <- quote ctx.lvl ty
-        go names (1 + k) xs ("  \{n} = \{render 90 $ pprint names v'} : \{render 90 $ pprint names ty'}":: acc)
+
+    -- go names k ((v, n, ty) :: xs) acc = if isVar k v
+    --   then do
+    --     ty' <- quote ctx.lvl ty
+    --     go names (1 + k) xs ("  \{n} : \{render 90 $ pprint names ty'}":: acc)
+    --   else do
+    --     v' <- quote ctx.lvl v
+    --     ty' <- quote ctx.lvl ty
+    --     go names (1 + k) xs ("  \{n} = \{render 90 $ pprint names v'} : \{render 90 $ pprint names ty'}":: acc)
 
 
 logMetas : List MetaEntry -> M Unit

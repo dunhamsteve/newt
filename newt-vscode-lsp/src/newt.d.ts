@@ -1,4 +1,4 @@
-import { CodeAction, Diagnostic, Location } from "vscode-languageserver";
+import { CodeAction, Diagnostic, DocumentSymbol, Location } from "vscode-languageserver";
 
 export function LSP_updateFile(name: string, content: string): (eta: any) => any;
 export function LSP_checkFile(name: string): Diagnostic[];
@@ -8,3 +8,5 @@ interface HoverResult {
 }
 export function LSP_hoverInfo(name: string, row: number, col: number): HoverResult|boolean|null;
 export function LSP_codeActionInfo(name: string, row: number, col: number): CodeAction[]|null;
+export function LSP_docSymbols(name: string): DocumentSymbol[] | null;
+

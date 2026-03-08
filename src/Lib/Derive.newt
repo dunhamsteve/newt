@@ -127,25 +127,3 @@ deriveShow fc name = do
 
       pure (left, Just right)
 
-
-
--- -- A description would be nice.
--- deriveShow : FC → QName → M Raw
--- deriveShow fc qn = do
---     top <- getTop
---     case lookup qn top : Maybe TopEntry of
---         Nothing => error {Raw} fc "Can't find \{show qn} in derive Show"
---         -- I want case split too... I need to tie the editor into the repl.
---         (Just (MkEntry fc name type (TCon _ conNames) eflags) ) => ?
---         (Just (MkEntry fc name type (Axiom) eflags) ) => ?
---         (Just (MkEntry fc name type (DCon _ _ _ _) eflags) ) => ?
---         (Just (MkEntry fc name type (Fn _) eflags) ) => ?
---         (Just (MkEntry fc name type (PrimTCon _) eflags) ) => ?
---         (Just (MkEntry fc name type (PrimFn _ _ _) eflags) ) => ?
---         (Just (MkEntry fc name type (PrimOp _) eflags) ) => ?
-
---     error fc "TODO"
-
-
--- HasFC as example of user-defined derivation (when we get to that)
--- SetFC would be nice, too.

@@ -5,7 +5,7 @@
  * vscode LSP server module.
  */
 
-import { LSP_checkFile, LSP_updateFile, LSP_hoverInfo, LSP_codeActionInfo } from './newt.js'
+import { LSP_checkFile, LSP_updateFile, LSP_hoverInfo, LSP_codeActionInfo, LSP_docSymbols } from './newt.js'
 
 import {
   createConnection,
@@ -118,12 +118,20 @@ connection.onCodeAction(({textDocument, range}) => {
   return actions
 })
 
+connection.onDocumentSymbol((params) => {
+  const uri = params.textDocument.uri;
+  let symbols = LSP_docSymbols(uri);
+  console.log("docs got", symbols)
+  return symbols;
+})
+
 connection.onInitialize((_params: InitializeParams): InitializeResult => ({
   capabilities: {
     textDocumentSync: TextDocumentSyncKind.Incremental,
     hoverProvider: true,
     definitionProvider: true,
     codeActionProvider: true,
+    documentSymbolProvider: true,
   },
 }));
 
