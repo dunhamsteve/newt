@@ -22,6 +22,12 @@ newt3.js: newt2.js
 	time $(RUNJS) newt2.js src/Main.newt -o newt3.js
 	cmp newt2.js newt3.js
 
+newt.ss: newt.js
+	$(RUNJS) newt.js src/Main.newt -o newt.ss
+
+newt.so: newt.ss
+	chez --script scripts/compile-chez.ss
+
 test: newt.js
 	scripts/test
 
@@ -32,11 +38,11 @@ aoctest: newt.js
 # Misc
 
 # build / install old vscode extension
-vscode:
-	cd newt-vscode && vsce package && code --install-extension *.vsix
+# vscode:
+	# cd newt-vscode && vsce package && code --install-extension *.vsix
 
 # build / install new LSP vscode extension
-vscode-lsp:
+vscode-lsp vscode: lsp
 	cd newt-vscode-lsp && vsce package && code --install-extension *.vsix
 
 playground: .PHONY
@@ -65,6 +71,7 @@ playground/src/newt.js: lsp.js
 
 newt-vscode-lsp/dist/lsp.js: newt-vscode-lsp/src/lsp.ts newt-vscode-lsp/src/newt.js
 	(cd newt-vscode-lsp && node esbuild.js)
+	chmod +x $@
 
 lsp: newt-vscode-lsp/dist/lsp.js playground/src/newt.js
 

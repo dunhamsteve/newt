@@ -265,18 +265,22 @@ instance Concat String where
   _++_ = addString
 
 
-pfunc jsEq uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a == b ? Prelude_True : Prelude_False`
-pfunc jsLT uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a < b ? Prelude_True : Prelude_False`
+pfunc ltInt : Int → Int → Bool := `(a,b) => a < b`
+pfunc eqInt : Int → Int → Bool := `(a,b) => a == b`
+pfunc ltChar : Char → Char → Bool := `(a,b) => a < b`
+pfunc eqChar : Char → Char → Bool := `(a,b) => a == b`
+pfunc ltString : String → String → Bool := `(a,b) => a < b`
+pfunc eqString : String → String → Bool := `(a,b) => a == b`
 
 pfunc jsShow : ∀ a . a → String := `(_,a) => ''+a`
 instance Eq Int where
-  a == b = jsEq a b
+  a == b = eqInt a b
 
 instance Eq String where
-  a == b = jsEq a b
+  a == b = eqString a b
 
 instance Eq Char where
-  a == b = jsEq a b
+  a == b = eqChar a b
 
 
 
@@ -304,9 +308,6 @@ pfunc arrayToList uses (Nil _::_) : ∀ a. Array a → List a := `(a,arr) => {
   return rval
 }`
 
--- for now I'll run this in JS
-pfunc lines uses (arrayToList) : String → List String := `(s) => Prelude_arrayToList(null,s.split('\n'))`
-
 pfunc p_strHead : (s : String) → Char := `(s) => s[0]`
 pfunc p_strTail : (s : String) → String := `(s) => s[0]`
 
@@ -326,11 +327,9 @@ pfunc natToInt : Nat → Int := `(n) => n`
 pfunc intToNat : Int → Nat := `(n) => n>0?n:0`
 
 pfunc fastConcat uses (listToArray) : List String → String := `(xs) => Prelude_listToArray(null, xs).join('')`
-pfunc replicate uses (natToInt) : Nat → Char → String := `(n,c) => c.repeat(Prelude_natToInt(n))`
 
--- TODO this should be replicate and the chars thing should have a different name
-replicate' : ∀ a. Nat → a → List a
-replicate' {a} n x = go n Nil
+replicate : ∀ a. Nat → a → List a
+replicate {a} n x = go n Nil
   where
     go : Nat → List a → List a
     go Z xs = xs
@@ -433,43 +432,23 @@ pfunc pack : List Char → String := `(cs) => {
 }
 `
 
--- FIXME this no longer works with numeric tags
--- we could take the best of both worlds and have a debug flag to add extra information
--- but also we could derive Show...
-pfunc debugStr uses (natToInt listToArray) : ∀ a. a → String := `(_, obj) => {
-  const go = (obj) => {
-    if (obj === null) return "_"
-    if (typeof obj == 'bigint') return ''+obj
-    if (obj.tag === '_,_') {
-      let rval = '('
-      while (obj?.tag === '_,_') {
-        rval += go(obj.h2) + ', '
-        obj = obj.h3
-      }
-      return rval + go(obj) + ')'
-    }
-    if (obj?.tag === '_::_' || obj?.tag === 'Nil') {
-      let stuff = Prelude_listToArray(null,obj)
-      return '['+(stuff.map(go).join(', '))+']'
-    }
-    if (obj instanceof Array) {
-      return 'io['+(obj.map(go).join(', '))+']'
-    }
-    if (obj?.tag === 'S' || obj?.tag === 'Z') {
-      return ''+Prelude_natToInt(obj)
-    } else if (obj?.tag) {
-      let rval = '('+obj.tag
-      for(let i=0;;i++) {
-        let key = 'h'+i
-        if (!(key in obj)) break
-        rval += ' ' + go(obj[key])
-      }
-      return rval+')'
-    } else {
-      return JSON.stringify(obj)
-    }
-  }
-  return go(obj)
+
+splitBy : String → Char → List String
+splitBy str ch = go Lin Lin (unpack str)
+  where
+    go : SnocList String → SnocList Char → List Char → List String
+    go strs chs Nil = strs <>> (pack (chs <>> Nil) :: Nil)
+    go strs chs (c :: rest) =
+      if c == ch then go (strs :< pack (chs <>> Nil)) Lin rest
+      else go strs (chs :< c) rest
+
+lines : String → List String
+lines str = splitBy str '\n'
+
+
+-- Not as useful as it used to be, we no longer have constructor names
+pfunc debugStr : ∀ a. a → String := `(_, obj) => {
+ return JSON.stringify(obj)
 }`
 
 debugLog : ∀ a. a → IO Unit
@@ -508,7 +487,6 @@ pfunc addInt : Int → Int → Int := `(x,y) => x + y`
 pfunc mulInt : Int → Int → Int := `(x,y) => x * y`
 pfunc divInt : Int → Int → Int := `(x,y) => x / y | 0`
 pfunc subInt : Int → Int → Int := `(x,y) => x - y`
-pfunc ltInt uses (True False) : Int → Int → Bool := `(x,y) => x < y ? Prelude_True : Prelude_False`
 
 instance Mul Int where
   x * y = mulInt x y
@@ -753,8 +731,6 @@ tail (x :: xs) = xs
 data Ordering = LT | EQ | GT
 derive Eq Ordering
 
-pfunc jsCompare uses (EQ LT GT) : ∀ a. a → a → Ordering := `(_, a, b) => a == b ? Prelude_EQ : a < b ? Prelude_LT : Prelude_GT`
-
 infixl 6 _<_ _<=_ _>_
 class Ord a where
   compare : a → a → Ordering
@@ -776,10 +752,10 @@ instance Ord Nat where
   compare (S n) (S m) = compare n m
 
 instance Ord Int where
-  compare a b = jsCompare a b
+  compare a b = if eqInt a b then EQ else if ltInt a b then LT else GT
 
 instance Ord Char where
-  compare a b = jsCompare a b
+  compare a b = if eqChar a b then EQ else if ltChar a b then LT else GT
 
 flip : ∀ a b c. (a → b → c) → (b → a → c)
 flip f b a = f a b
@@ -813,13 +789,13 @@ ite : ∀ a. Bool → a → a → a
 ite c t e = if c then t else e
 
 instance Ord String where
-  compare a b = jsCompare a b
+  compare a b = if eqString a b then EQ else if ltString a b then LT else GT
 
 instance Cast Int Nat where
   cast n = intToNat n
 
 instance Show Char where
-  show c = "'\{jsShow c}'"
+  show c = pack $ '\'' :: c :: '\'' :: Nil
 
 swap : ∀ a b. a × b → b × a
 swap (a,b) = (b,a)
@@ -846,8 +822,7 @@ find : ∀ a. (a → Bool) → List a → Maybe a
 find f Nil = Nothing
 find f (x :: xs) = if f x then Just x else find f xs
 
--- TODO this would be faster, but less pure as a primitive
--- fastConcat might be a good compromise
+-- TODO maybe use fastConcat
 joinBy : String → List String → String
 joinBy _ Nil = ""
 joinBy _ (x :: Nil) = x

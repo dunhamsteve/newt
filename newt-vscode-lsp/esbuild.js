@@ -35,6 +35,9 @@ async function main() {
 		sourcemap: !production,
 		sourcesContent: false,
 		platform: 'node',
+		banner: {
+			js: "#!/usr/bin/env node",
+		},
 		// outfile: 'dist/extension.js',
 		outdir: 'dist',
 		external: ['vscode'],

@@ -2,6 +2,7 @@
 -- https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf
 module Lib.Prettier
 import Prelude
+import Lib.Common
 import Data.Int
 
 -- TODO I broke this when I converted from Nat to Int, and we're disabling it
@@ -44,7 +45,7 @@ group x = Alt (flatten x) x
 -- TODO - we can accumulate snoc and cat all at once
 layout : List Item -> SnocList String -> String
 layout Nil acc = fastConcat $ acc <>> Nil
-layout (LINE k :: x) acc = layout x (acc :< "\n" :< replicate (cast k) ' ')
+layout (LINE k :: x) acc = layout x (acc :< "\n" :< padding k ' ')
 layout (TEXT str :: x) acc = layout x (acc :< str)
 
 -- Whether a documents first line fits.

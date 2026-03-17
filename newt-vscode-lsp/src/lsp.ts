@@ -1,6 +1,4 @@
 /**
- * WIP
- *
  * Wraps newt.js (compiled from src/LSP.newt with some tweaks to `export`) with the
  * vscode LSP server module.
  */
@@ -119,10 +117,15 @@ connection.onCodeAction(({textDocument, range}) => {
 })
 
 connection.onDocumentSymbol((params) => {
+  try {
+
   const uri = params.textDocument.uri;
   let symbols = LSP_docSymbols(uri);
   console.log("docs got", symbols)
   return symbols;
+  } catch (e) {
+    console.error('ERROR in onDocumentSymbol', e);
+  }
 })
 
 connection.onInitialize((_params: InitializeParams): InitializeResult => ({

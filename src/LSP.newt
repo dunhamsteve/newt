@@ -16,7 +16,7 @@ import Commands
 import Lib.ProcessDecl
 import Lib.Prettier
 import Lib.Error
-import Lib.Compile
+import Lib.CompileJS
 
 pfunc js_castArray : Array JSObject → JSObject := `x => x`
 pfunc js_castInt : Int → JSObject := `x => x`
@@ -290,7 +290,5 @@ compileJS fn = unsafePerformIO $ do
     | Left err => pure $ js_castStr "// \{errorMsg err}"
   modifyIORef state [ topContext := top ]
   pure $ js_castStr src
-
-
 
 #export updateFile checkFile hoverInfo codeActionInfo compileJS docSymbols

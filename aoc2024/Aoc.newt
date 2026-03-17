@@ -34,3 +34,8 @@ instance Sub Point where
 
 -- instance Eq Point where
 --   (a,b) == (c,d) = a == c && b == d
+
+-- Doesn't play well with scheme and was removed from prelude, a couple of days depend on it for BigInt
+pfunc jsCompare uses (EQ LT GT) : ∀ a. a → a → Ordering := `(_, a, b) => a == b ? Prelude_EQ : a < b ? Prelude_LT : Prelude_GT`
+pfunc jsEq uses (True False) : ∀ a. a → a → Bool := `(_, a, b) => a == b ? Prelude_True : Prelude_False`
+

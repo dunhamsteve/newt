@@ -9,8 +9,8 @@ record List1 a where
   head1 : a
   tail1 : List a
 
-split1 : String → String → List1 String
-split1 str by = case split str by of
+splitBy1 : String → Char → List1 String
+splitBy1 str by = case splitBy str by of
   Nil => str ::: Nil
   x :: xs => x ::: xs
 
@@ -22,6 +22,6 @@ unsnoc {a} (x ::: xs) = go x xs
     go x (y :: ys) = let (as, a) = go y ys in (x :: as, a)
 
 splitFileName : String → String × String
-splitFileName fn = case split1 fn "." of
+splitFileName fn = case splitBy1 fn '.' of
     part ::: Nil => (part, "")
     xs => mapFst (joinBy ".") $ unsnoc xs

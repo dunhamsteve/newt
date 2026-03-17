@@ -13,6 +13,8 @@ mkday.py
 tmp
 min.js.gz
 src/Revision.newt
+newt.ss
+newt.so
 .calva
 .clj-kondo
 .joyride

@@ -34,7 +34,7 @@ splitTele = go Nil
 getBaseDir : String → FC → List String → M String
 getBaseDir fn fc modName = do
   let path = fst $ splitFileName fn
-  let dirs = split path "/"
+  let dirs = splitBy path '/'
   let (Right base) = baseDir (Lin <>< dirs) (Lin <>< modName)
     | Left err => error fc err
   let base = if base == "" then "." else base

@@ -31,7 +31,7 @@ showError src err =
     go fc l (x :: xs) =
       if l == fcLine fc then
         let width = fc.bnds.endCol - fc.bnds.startCol in
-        "  \{x}\n  \{replicate (cast $ fcCol fc) ' '}\{replicate (cast width) '^'}\n"
+        "  \{x}\n  \{padding (fcCol fc) ' '}\{padding width '^'}\n"
       else if fcLine fc - 3 < l then "  " ++ x ++ "\n" ++ go fc (l + 1) xs
       else go fc (l + 1) xs
 

@@ -1,14 +1,24 @@
 
 ## TODO
 
-- [ ] Use looping for TCO
+- [x] Scheme backend
+- [ ] Smart encoding of lists (and cons cells?) in scheme
+- [ ] Unsolved meta in Lib.Types doesn't print when building newt.
+  - delete Show Char to test, it does surface in the LSP, we need to dump these when processing dependent modules
+- [ ] maybe `let case` instead of `let ()` (which is a little subtle)
+  - Or simply put a term in there and treat as a variable iff it is lowercase and non-app
+- [x] Use looping for TCO
   - For single functions at least - I think this would be a performance win. I've learned that the slowness on `bun` goes away if I drop the TCO transform.
   - Doing this manually for `lookupT23` got 3% speedup.
+  - got 12% speedup overall from this, not doing it for mutual recursion
 - [ ] Importing Prelude twice should be an error (currently it causes double hints and breaks auto)
 - [x] For errors in other files, point to the import
 - [x] Unsolved metas should be errors (user metas are fine)
 - [x] Better syntax for forward declared data (so we can distinguish from functions)
 - [ ] maybe allow "Main" module name for any file
+- [ ] preserve information on record / class / instance for LSP "document symbols" kind
+  - We will want some of this for default implementations in class
+  - It may help avoid reverse-engineering the class when processing implementation
 - [ ] Put `Def` on `Ref`
   - It may be Axiom for forward/recursive functions, but it would get us DCon and TCon info without lookup - and may save passing around the Ref2 (+lookup) during Compilation.
 - [x] Restore "add missing cases" for LSP mode
@@ -24,7 +34,7 @@
   - [ ] Duplicate data constructors point to `data`
   - [ ] Allow Qualified names in surface syntax
   - Don't disambiguate on type for now
-  - [ ] Could we disambiguate just Data constructors on type?
+- [ ] Could we disambiguate just Data constructors on type?
 - [x] change "in prefix position" and "trailing operator" errors to do sections
 - [ ] maybe add fat arrows, I keep wanting to type them, `{{...}}` is a little ugly
   - There may be ambiguity issues at the parsing level, but we don't have typecase, so.

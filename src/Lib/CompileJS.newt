@@ -1,7 +1,4 @@
--- TODO Audit how much "outside" stuff could pile up in the continuation. (How much might be repeated in case branches.)
--- TODO consider inlining constructors here (a future inline process might do this anyway).
--- TODO consider not emitting null in `LitObject` (after inlining constructors)
-module Lib.Compile
+module Lib.CompileJS
 
 import Prelude
 import Lib.Common
@@ -147,6 +144,25 @@ getEnv ix env = case getAt' ix env of
   Just e => e
   Nothing => fatalError "Bad bounds \{show ix}"
 
+-- It would be nice to be able to declare these
+compilePrimOp : String → List CExp → Maybe CExp
+compilePrimOp "Prelude.addString" (x :: y :: Nil) = Just (CPrimOp "+" x y)
+compilePrimOp "Prelude.addInt" (x :: y :: Nil) = Just (CPrimOp "+" x y)
+compilePrimOp "Prelude.mulInt" (x :: y :: Nil) = Just (CPrimOp "*" x y)
+compilePrimOp "Prelude.subInt" (x :: y :: Nil) = Just (CPrimOp "-" x y)
+compilePrimOp "Prelude._&&_" (x :: y :: Nil) = Just (CPrimOp "&&" x y)
+compilePrimOp "Prelude._||_" (x :: y :: Nil) = Just (CPrimOp "||" x y)
+-- Assumes Bool is in the right order!
+compilePrimOp "Prelude.jsEq" (_ :: x :: y :: Nil) = Just (CPrimOp "==" x y)
+compilePrimOp "Prelude.eqChar" (_ :: x :: y :: Nil) = Just (CPrimOp "==" x y)
+compilePrimOp "Prelude.ltChar" (_ :: x :: y :: Nil) = Just (CPrimOp "<" x y)
+compilePrimOp "Prelude.eqInt" (_ :: x :: y :: Nil) = Just (CPrimOp "==" x y)
+compilePrimOp "Prelude.ltInt" (_ :: x :: y :: Nil) = Just (CPrimOp "<" x y)
+compilePrimOp "Prelude.eqString" (_ :: x :: y :: Nil) = Just (CPrimOp "==" x y)
+compilePrimOp "Prelude.ltString" (_ :: x :: y :: Nil) = Just (CPrimOp "<" x y)
+compilePrimOp "Prelude.divInt" (x :: y :: Nil) = Just (CPrimOp "|" (CPrimOp "/" x y) (CLit $ LInt 0))
+compilePrimOp _ _ = Nothing
+
 -- This is inspired by A-normalization, look into the continuation monad
 -- There is an index on JSStmt, adopted from Stefan Hoeck's code.
 --
@@ -224,7 +240,10 @@ termToJS {e} env (CLoop args quants) f = runArgs (reverse env.jsenv) args quants
     runArgs (JUndefined :: rest) (arg :: args) (q :: qs) = runArgs rest args qs
     runArgs (wat :: rest) (arg :: args) (q :: qs) = fatalError "bad env for quant \{show q}"
     runArgs a b c = fatalError "FALLBACK \{show $ length' a} \{show $ length' b} \{show $ length' c}"
-termToJS env (CAppRef nm args quants) f = termToJS env (CRef nm) (\ t' => (argsToJS env t' args quants Lin f))
+termToJS env (CAppRef nm args quants) f =
+  case compilePrimOp (show nm) args of
+    Just cexp => termToJS env cexp f
+    Nothing => termToJS env (CRef nm) (\ t' => (argsToJS env t' args quants Lin f))
   where
     etaExpand : JSEnv -> List Quant -> SnocList JSExp -> JSExp -> JSExp
     etaExpand env Nil args tm = Apply tm (args <>> Nil)
@@ -261,11 +280,16 @@ termToJS {e} env (CCase t alts) f =
       -- TODO with inlining, we hit cases where the let gets pulled forward more than once
       -- two cases as separate args, se we need actual unique names. For now, we're calling
       -- incr when processing App, as a stopgap, we probably need a fresh names state monad
+      -- also TODO find out when the case builder pulls out sc$ for us and when we do
+      -- _sc here.  It seems like nm doesn't get used in the CDefAlt case.
+      -- possibly from inlining?
+      -- Lib.Parser.pratt has two (hence the incr)
+      -- and record updates hit _sc$
       let nm = "_sc$\{show env.depth}"
           -- increment the bit that goes into the name
           env' = incr env
       in if simpleJSExp t'
-        then (maybeCaseStmt env' t' alts)
+        then (maybeCaseStmt env t' alts)
         else JSnoc (JConst nm t') (maybeCaseStmt env' (Var nm) alts)
   where
     tertiary : JSExp → JSStmt e → JSStmt e → Cont e → JSStmt e
@@ -290,15 +314,18 @@ termToJS {e} env (CCase t alts) f =
     maybeCaseStmt env sc alts@(CLitAlt _ _  :: _) =
         (JCase sc (map (termToJSAlt env sc) alts))
     maybeCaseStmt env sc alts = case alts of
+        -- Bool alt becomes tertiary operator
         CLitAlt (LBool b) rhs :: alt :: Nil =>
           let t' = termToJS env rhs f
               e' = termToJS env (getBody alt) f
           in if b then tertiary sc t' e' f else tertiary sc e' t' f
+        -- two branch alt becomes tertiary operator
         CConAlt ix name info args t :: alt :: Nil =>
           let cond = (JPrimOp "==" (Dot sc "tag") (LitInt $ cast ix))
               t' = termToJS (conAltEnv sc 0 env args) t f
               u' = termToJS (conAltEnv sc 0 env $ getArgs alt) (getBody alt) f
           in tertiary cond t' u' f
+        -- fall back to switch statement
         alts => JCase (Dot sc "tag") (map (termToJSAlt env sc) alts)
 
 jsKeywords : List String

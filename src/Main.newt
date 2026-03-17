@@ -4,7 +4,8 @@ import Prelude
 import Data.List1
 import Data.SortedMap
 import Lib.Common
-import Lib.Compile
+import Lib.CompileJS
+import Lib.CompileScheme
 import Lib.Parser
 import Lib.Elab
 import Lib.Util
@@ -43,6 +44,14 @@ jsonTopContext = do
       :: ("type", toJson (render 80 $ pprint Nil type) )
       :: Nil)
 
+writeScheme : String → M Unit
+writeScheme fn = do
+  lines <- compileScheme
+  let src = unlines lines
+  (Right _) <- liftIO {M} $ writeFile fn src
+    | Left err => throwError $ E (MkFC fn $ MkBounds 0 0 0 0) err
+  pure MkUnit
+
 writeSource : String -> M Unit
 writeSource fn = do
   docs <- compile
@@ -77,7 +86,7 @@ showErrors fn src = do
 processFile : String -> M Unit
 processFile fn = do
   putStrLn "*** Process \{fn}"
-  let parts = split1 fn "/"
+  let parts = splitBy1 fn '/'
   let (dirs,file) = unsnoc parts
   let dir = if dirs == Nil then "." else joinBy "/" dirs
   let (name, ext) = splitFileName file
@@ -90,7 +99,7 @@ processFile fn = do
   let (Right ((nameFC, modName), _, _)) = partialParse fn parseModHeader emptyMap toks
     | Left (err,toks) => throwError err
 
-  let modns = split modName "."
+  let modns = splitBy modName '.'
   base <- getBaseDir fn nameFC modns
 
   invalidateModule modName
@@ -201,7 +210,10 @@ main' = do
 
   case out of
     Nothing => pure MkUnit
-    Just name => writeSource name
+    Just name =>
+      if isSuffixOf ".ss" name then writeScheme name
+      else if isSuffixOf ".js" name then writeSource name
+      else exitFailure "Unknown extension for output file \{show name} - I only know .js and .ss"
 
 main : IO Unit
 main = do

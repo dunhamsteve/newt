@@ -57,18 +57,6 @@ lamArity : Tm -> List Quant
 lamArity (Lam _ _ _ quant t) = quant :: (lamArity t)
 lamArity _ = Nil
 
--- It would be nice to be able to declare these
-compilePrimOp : String → List CExp → Maybe CExp
-compilePrimOp "Prelude.addString" (x :: y :: Nil) = Just (CPrimOp "+" x y)
-compilePrimOp "Prelude.addInt" (x :: y :: Nil) = Just (CPrimOp "+" x y)
-compilePrimOp "Prelude.mulInt" (x :: y :: Nil) = Just (CPrimOp "*" x y)
-compilePrimOp "Prelude.subInt" (x :: y :: Nil) = Just (CPrimOp "-" x y)
-compilePrimOp "Prelude._&&_" (x :: y :: Nil) = Just (CPrimOp "&&" x y)
-compilePrimOp "Prelude._||_" (x :: y :: Nil) = Just (CPrimOp "||" x y)
--- Assumes Bool is in the right order!
-compilePrimOp "Prelude.jsEq" (_ :: x :: y :: Nil) = Just (CPrimOp "==" x y)
-compilePrimOp "Prelude.divInt" (x :: y :: Nil) = Just (CPrimOp "|" (CPrimOp "/" x y) (CLit $ LInt 0))
-compilePrimOp _ _ = Nothing
 
 -- This is how much we want to curry at top level
 -- leading lambda Arity is used for function defs and metas
@@ -80,11 +68,11 @@ arityForName fc nm = do
     Nothing => error fc "Name \{show nm} not in scope"
     (Just Axiom) => pure Nil
     (Just (PrimOp _)) => pure $ Many :: Many :: Nil
-    (Just (TCon arity strs)) => pure $ replicate' (cast arity) Many
+    (Just (TCon arity strs)) => pure $ replicate (cast arity) Many
     (Just (DCon _ _ arity str)) => pure arity
     (Just (Fn t)) => pure $ lamArity t
-    (Just (PrimTCon arity)) => pure $ replicate' (cast arity) Many
-    (Just (PrimFn t arity used)) => pure $ replicate' arity Many
+    (Just (PrimTCon arity)) => pure $ replicate (cast arity) Many
+    (Just (PrimFn t arity used)) => pure $ replicate arity Many
   where
 
 
@@ -147,8 +135,6 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
         defs <- getRef Defs
         args' <- traverse compileTerm args
         arity <- arityForName fc nm
-        let (Nothing) = compilePrimOp (show nm) args'
-          | Just cexp => pure cexp
         case lookupMap' nm defs : Maybe Def of
           Just (DCon _ SuccCon _ _) => applySucc args'
           _ => apply nm args' arity
@@ -277,7 +263,7 @@ defToCExp (qn, (PrimOp _)) = (_,_ qn) <$> compilePop qn
 defToCExp (qn, DCon ix info arity _)   = pure (qn, compileDCon ix qn info arity)
 -- We're not using these are runtime at the moment, no typecase
 -- we need to sort out tag number if we do typecase
-defToCExp (qn, TCon arity conNames) = pure (qn, compileDCon Z qn NormalCon (replicate' (cast arity) Many))
-defToCExp (qn, PrimTCon arity) = pure (qn, compileDCon Z qn NormalCon (replicate' (cast arity) Many))
+defToCExp (qn, TCon arity conNames) = pure (qn, compileDCon Z qn NormalCon (replicate (cast arity) Many))
+defToCExp (qn, PrimTCon arity) = pure (qn, compileDCon Z qn NormalCon (replicate (cast arity) Many))
 defToCExp (qn, PrimFn src _ deps) = pure (qn, CRaw src deps)
 defToCExp (qn, Fn tm)          = (_,_ qn) <$> compileFun tm
