@@ -309,6 +309,8 @@ termToJS {e} env (CCase t alts) f =
     getArgs (CConAlt _ _ _ args _) = args
 
     maybeCaseStmt : JSEnv -> JSExp -> List CAlt -> JSStmt e
+    -- deleteT23 does this...
+    maybeCaseStmt env sc (CDefAlt u :: Nil) = (termToJS env u f)
     -- If there is a single alt, assume it matched
     maybeCaseStmt env sc ((CConAlt _ _ info args u) :: Nil) = (termToJS (conAltEnv sc 0 env args) u f)
     maybeCaseStmt env sc alts@(CLitAlt _ _  :: _) =

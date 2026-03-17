@@ -65,8 +65,8 @@ scmName qn = scmIdent $ show qn
 cexpToScm : SCEnv → CExp → String
 
 withVar : SCEnv → CExp → (String → String) → String
--- withVar env (CBnd _) f = ?
--- withVar env (CLit _) f = ?
+-- don't rebind a variable
+withVar env (CBnd n) f = f $ getEnv n env
 withVar env t f = let nm = "wv$\{show $ length' env}"
   in "(let ((\{nm} \{cexpToScm env t})) \{f nm})"
 
@@ -123,6 +123,9 @@ cexpToScm env (CCase sc alts) = do
     doAlt nm (CLitAlt lit body) = "((\{scmLit lit}) \{cexpToScm env body})"
 
     doCase : String → List CAlt → String
+    -- I'm not sure the case tree should be generating this, c.f. deleteT23
+    doCase nm (CDefAlt body :: Nil) = cexpToScm env body
+    doCase nm (CConAlt tag cname _ args body :: Nil) = conAlt env nm Lin args body
     doCase nm alts@(CLitAlt _ _ :: _) = "(case \{nm} \{joinBy " " $ map (doAlt nm) alts})"
     doCase nm alts = "(case (vector-ref \{cexpToScm env sc} 0) \{joinBy " " $ map (doAlt nm) alts})"
 
