@@ -174,7 +174,7 @@ invalidateModule modname = do
   let modules = join $ map getDeps $ toList top.modules
   let revMap = map swap modules
   let deps = foldl accumulate emptyMap revMap
-  go deps $ modname :: Nil
+  modifyTop [ modules $= go deps (modname :: Nil) ]
   where
     accumulate : SortedMap String (List String) → String × String → SortedMap String (List String)
     accumulate deps (k,v) = let prev = fromMaybe Nil $ lookupMap' k deps
@@ -183,9 +183,8 @@ invalidateModule modname = do
     getDeps : String × ModContext → List (String × String)
     getDeps (nm, mod) = map (nm , ) mod.modDeps
 
-    go : SortedMap String (List String) → List String → M Unit
-    go deps Nil = pure MkUnit
-    go deps (name :: names) = do
-      modifyTop [modules $= deleteMap name]
-      let ds = fromMaybe Nil $ lookupMap' name deps
-      go deps $ ds ++ names
+    go : SortedMap String (List String) → List String → SortedMap String ModContext → SortedMap String ModContext
+    go deps Nil mods = mods
+    go deps (name :: names) mods =
+      let ds = fromMaybe Nil $ lookupMap' name deps in
+      go deps (ds ++ names) (deleteMap name mods)

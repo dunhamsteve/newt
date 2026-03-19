@@ -17,7 +17,7 @@ import Data.SortedMap
 CExp : U
 
 data CAlt : U where
-  CConAlt : Nat → String → ConInfo → List String → CExp → CAlt
+  CConAlt : Nat → String → ConInfo → List String → List Quant → CExp → CAlt
   -- REVIEW keep var name?
   CDefAlt : CExp -> CAlt
   -- literal
@@ -43,7 +43,7 @@ data CExp : U where
   CLoop : List CExp → List Quant → CExp
   CErased : CExp
   -- Data / type constructor
-  CConstr : Nat → Name → List CExp → List Quant → CExp
+  CConstr : Nat → Name → List CExp → List Quant → ConInfo → CExp
   -- Raw javascript for `pfunc`
   CRaw : String -> List QName -> CExp
   -- Need this for magic Nat
@@ -101,7 +101,7 @@ lookupDef fc nm = do
     Just def => pure def
 
 getBody : CAlt → CExp
-getBody (CConAlt _ _ _ _ t) = t
+getBody (CConAlt _ _ _ _ _ t) = t
 getBody (CLitAlt _ t) = t
 getBody (CDefAlt t) = t
 
@@ -137,6 +137,21 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
         arity <- arityForName fc nm
         case lookupMap' nm defs : Maybe Def of
           Just (DCon _ SuccCon _ _) => applySucc args'
+          -- Inline these two, maybe all of them?
+          Just (DCon tag ConsCon qs _) =>
+            if length' qs == length' args
+              then pure $ CConstr tag nm.baseName args' qs ConsCon
+              else apply nm args' arity
+          Just (DCon tag NilCon qs _) =>
+            if length' qs == length' args
+              then pure $ CConstr tag nm.baseName args' qs NilCon
+              else apply nm args' arity
+          -- REVIEW Slower for JS, faster for scheme. (2.88 vs 3.01)
+          -- but all of the "JS" diff is code gen?
+          -- Just (DCon tag info qs _) =>
+          --   if length' qs == length' args
+          --     then pure $ CConstr tag nm.baseName args' qs info
+          --     else apply nm args' arity
           _ => apply nm args' arity
   -- REVIEW maybe we want a different constructor for non-Ref applications?
   (t, args) => do
@@ -164,25 +179,25 @@ compileTerm (Case fc t alts) = do
       defs <- getRef Defs
       def <- lookupDef emptyFC qn
       case def of
-        DCon ix info _ _ => CConAlt ix nm info args <$> compileTerm tm
-        _ => error fc "\{show nm} is not constructor"
+        DCon ix info qs _ => CConAlt ix nm info args qs <$> compileTerm tm
+        _ => error fc "\{show nm} is not a data constructor"
 
     CaseLit lit tm => CLitAlt lit <$> compileTerm tm
   pure $ CCase t' $ fancyCons t' alts'
   where
     numAltP : CAlt → Bool
-    numAltP (CConAlt _ _ SuccCon _ _) = True
-    numAltP (CConAlt _ _ ZeroCon _ _) = True
+    numAltP (CConAlt _ _ SuccCon _ _ _) = True
+    numAltP (CConAlt _ _ ZeroCon _ _ _) = True
     numAltP _ = False
 
     enumAlt : CAlt → CAlt
-    enumAlt (CConAlt ix nm EnumCon args tm) = CLitAlt (LInt $ cast ix) tm
-    enumAlt (CConAlt ix nm FalseCon args tm) = CLitAlt (LBool False) tm
-    enumAlt (CConAlt ix nm TrueCon args tm) = CLitAlt (LBool True) tm
+    enumAlt (CConAlt ix nm EnumCon args _ tm) = CLitAlt (LInt $ cast ix) tm
+    enumAlt (CConAlt ix nm FalseCon args _ tm) = CLitAlt (LBool False) tm
+    enumAlt (CConAlt ix nm TrueCon args _ tm) = CLitAlt (LBool True) tm
     enumAlt alt = alt
 
     isInfo : ConInfo → CAlt → Bool
-    isInfo needle (CConAlt _ _  info _ _)  = needle == info
+    isInfo needle (CConAlt _ _  info _ _ _)  = needle == info
     isInfo _ _ = False
 
     isDef : CAlt → Bool
@@ -193,7 +208,7 @@ compileTerm (Case fc t alts) = do
     doNumCon : CExp → List CAlt → List CAlt
     doNumCon sc alts =
       let zeroAlt = case find (isInfo ZeroCon) alts of
-            Just (CConAlt _ _ _ _ tm) => CLitAlt (LInt 0) tm :: Nil
+            Just (CConAlt _ _ _ _ _ tm) => CLitAlt (LInt 0) tm :: Nil
             Just tm => fatalError "ERROR zeroAlt mismatch \{debugStr tm}"
             _ => case find isDef alts of
                   Just (CDefAlt tm) => CLitAlt (LInt 0) tm :: Nil
@@ -201,7 +216,7 @@ compileTerm (Case fc t alts) = do
                   _ => Nil
       in
       let succAlt = case find (isInfo SuccCon) alts of
-            Just (CConAlt _ _ _ _ tm) => CDefAlt (CLet "x" (CPrimOp "-" sc (CLit $ LInt 1)) tm) :: Nil
+            Just (CConAlt _ _ _ _ _ tm) => CDefAlt (CLet "x" (CPrimOp "-" sc (CLit $ LInt 1)) tm) :: Nil
             Just tm => fatalError "ERROR succAlt mismatch \{debugStr tm}"
             _ => case find isDef alts of
               Just alt => alt :: Nil
@@ -244,13 +259,13 @@ compileDCon : Nat → QName → ConInfo → List Quant → CExp
 compileDCon ix (QN _ nm) EnumCon Nil = CLit $ LInt $ cast ix
 compileDCon ix (QN _ nm) TrueCon Nil = CLit $ LBool True
 compileDCon ix (QN _ nm) FalseCon Nil = CLit $ LBool False
-compileDCon ix (QN _ nm) info Nil = CConstr ix nm Nil Nil
+compileDCon ix (QN _ nm) info Nil = CConstr ix nm Nil Nil info
 compileDCon ix (QN _ nm) info arity =
   -- so we're fully applying this here, but dropping the args later?
   -- The weird thing is that lambdas need the
   let args = mkArgs Z arity
       alen = length' arity
-  in CFun args $ CConstr ix nm (map (\k => CBnd $ alen - k - 1) (range 0 alen)) arity
+  in CFun args $ CConstr ix nm (map (\k => CBnd $ alen - k - 1) (range 0 alen)) arity info
   where
     mkArgs : Nat → List Quant → List (Quant × String)
     mkArgs k (quant :: args) = (quant, "h\{show k}") :: mkArgs (S k) args

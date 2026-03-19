@@ -38,22 +38,9 @@
 ;; REVIEW returns #f for failure
 (define Prelude.stringToInt string->number)
 
-;; coerce scheme list to newt
-(define (list->List xs)
-  (define (go acc xs)
-    (if (null? xs) acc
-        (go ($Cons #f (car xs) acc) (cdr xs))))
-  (go ($Nil #f) (reverse xs)))
-
-(define (List->list xs)
-  (define (go acc xs)
-    (if (= 0 (vector-ref xs 0)) (reverse acc)
-        (go (cons (vector-ref xs 2) acc) (vector-ref xs 3))))
-  (go '() xs))
-
-(define (Prelude.unpack str) (list->List (string->list str)))
-(define (Prelude.pack cs) (list->string (List->list cs)))
-(define (Prelude.fastConcat strings) (apply string-append (List->list strings)))
+(define (Prelude.unpack str) (string->list str))
+(define (Prelude.pack cs) (list->string cs))
+(define (Prelude.fastConcat strings) (apply string-append strings))
 
 (define (Prelude.isPrefixOf pfx str)
         (string=? pfx (substring str 0 (string-length pfx))))
@@ -94,4 +81,4 @@
     (if (<= n m)
         (string=? sfx (substring s (- m n) m))
         #f)))
-(define (Node.getArgs w) ($IORes (list->List (command-line)) w))
+(define (Node.getArgs w) ($IORes (command-line) w))

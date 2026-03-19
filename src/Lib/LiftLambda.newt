@@ -38,8 +38,8 @@ liftLambdaTm name env tm@(CCase t alts) = do
     liftLambdaAlt : CAlt → State ExpMap CAlt
     liftLambdaAlt (CDefAlt tm) = CDefAlt <$> liftLambdaTm name env tm
     liftLambdaAlt (CLitAlt l tm) = CLitAlt l <$> liftLambdaTm name env tm
-    liftLambdaAlt (CConAlt ix nm info args tm) =
-      CConAlt ix nm info args <$> liftLambdaTm name (env <>< map (_,_ Many) args) tm
+    liftLambdaAlt (CConAlt ix nm info args qs tm) =
+      CConAlt ix nm info args qs <$> liftLambdaTm name (env <>< map (_,_ Many) args) tm
 liftLambdaTm name@(QN ns nm) env tm@(CLam nm t) = do
   let (nms, t) = splitLam tm Lin
   t' <- liftLambdaTm name (env <>< nms) t

@@ -67,9 +67,8 @@ lspFileSource = do
 
 updateFile : String → String → Unit
 updateFile fn src = unsafePerformIO $ do
-    st <- readIORef state
     modifyIORef state [ files $= updateMap fn src ]
-    let st = the LSPState $ [ files $= updateMap fn src ] st
+    st <- readIORef state
     let (base,modName) = decomposeName fn
     Right (ctx,_) <- (invalidateModule modName).runM st.topContext
         | _ => writeIORef state st

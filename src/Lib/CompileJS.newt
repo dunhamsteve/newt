@@ -221,7 +221,7 @@ termToJS env (CLetRec nm t u) f =
   in case termToJS env' t (JAssign nm') of
     (JAssign _ exp) => JSnoc (JConst nm' exp) (termToJS env' u f)
     t' => JSnoc (JLet nm' t') (termToJS env' u f)
-termToJS env (CConstr ix _ args qs) f = go args qs 0 (\ args => f $ LitObject (("tag", LitInt (cast ix)) :: args))
+termToJS env (CConstr ix _ args qs info) f = go args qs 0 (\ args => f $ LitObject (("tag", LitInt (cast ix)) :: args))
   where
     go : ∀ e. List CExp -> List Quant -> Int -> (List (String × JSExp) -> JSStmt e) -> JSStmt e
     go (t :: ts) (Many :: qs) ix k = termToJS env t $ \ t' => go ts qs (ix + 1) $ \ args => k $ ("h\{show ix}", t') :: args
@@ -298,7 +298,7 @@ termToJS {e} env (CCase t alts) f =
     tertiary sc t f k = JIfThen sc t f
 
     termToJSAlt : JSEnv -> JSExp -> CAlt -> JAlt
-    termToJSAlt env nm (CConAlt ix name info args u) = JConAlt ix (termToJS (conAltEnv nm 0 env args) u f)
+    termToJSAlt env nm (CConAlt ix name info args qs u) = JConAlt ix (termToJS (conAltEnv nm 0 env args) u f)
     -- intentionally reusing scrutinee name here
     termToJSAlt env nm (CDefAlt u) = JDefAlt (termToJS  (env) u f)
     termToJSAlt env nm (CLitAlt lit u) = JLitAlt (litToJS lit) (termToJS env u f)
@@ -306,13 +306,13 @@ termToJS {e} env (CCase t alts) f =
     getArgs : CAlt → List String
     getArgs (CDefAlt _) = Nil
     getArgs (CLitAlt args _) = Nil
-    getArgs (CConAlt _ _ _ args _) = args
+    getArgs (CConAlt _ _ _ args qs _) = args
 
     maybeCaseStmt : JSEnv -> JSExp -> List CAlt -> JSStmt e
     -- deleteT23 does this...
     maybeCaseStmt env sc (CDefAlt u :: Nil) = (termToJS env u f)
     -- If there is a single alt, assume it matched
-    maybeCaseStmt env sc ((CConAlt _ _ info args u) :: Nil) = (termToJS (conAltEnv sc 0 env args) u f)
+    maybeCaseStmt env sc ((CConAlt _ _ info args qs u) :: Nil) = (termToJS (conAltEnv sc 0 env args) u f)
     maybeCaseStmt env sc alts@(CLitAlt _ _  :: _) =
         (JCase sc (map (termToJSAlt env sc) alts))
     maybeCaseStmt env sc alts = case alts of
@@ -322,7 +322,7 @@ termToJS {e} env (CCase t alts) f =
               e' = termToJS env (getBody alt) f
           in if b then tertiary sc t' e' f else tertiary sc e' t' f
         -- two branch alt becomes tertiary operator
-        CConAlt ix name info args t :: alt :: Nil =>
+        CConAlt ix name info args qs t :: alt :: Nil =>
           let cond = (JPrimOp "==" (Dot sc "tag") (LitInt $ cast ix))
               t' = termToJS (conAltEnv sc 0 env args) t f
               u' = termToJS (conAltEnv sc 0 env $ getArgs alt) (getBody alt) f
@@ -496,7 +496,7 @@ sortedNames defs names =
   map snd $ filter (not ∘ fst) $ foldl (go Nil) Nil $ map (True,) names
   where
     getBody : CAlt → CExp
-    getBody (CConAlt _ _ _ _ t) = t
+    getBody (CConAlt _ _ _ _ _ t) = t
     getBody (CLitAlt _ t) = t
     getBody (CDefAlt t) = t
 
@@ -523,7 +523,7 @@ sortedNames defs names =
     getNames deep acc (CRef qn) = (deep, qn) :: acc
     getNames deep acc (CLet _ t u) = getNames deep (getNames deep acc t) u
     getNames deep acc (CLetRec _ t u) = getNames deep (getNames deep acc t) u
-    getNames deep acc (CConstr _ _ ts _) = foldl (getNames deep) acc ts
+    getNames deep acc (CConstr _ _ ts _ info) = foldl (getNames deep) acc ts
     -- if the CRaw is called, then the deps are called
     getNames deep acc (CRaw _ deps) = map (_,_ deep) deps ++ acc
     -- wrote these out so I get an error when I add a new constructor

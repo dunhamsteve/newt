@@ -408,6 +408,7 @@ processShortData ns fc lhs sigs = do
     mkDecl args acc tm = error (getFC tm) "Expected contructor application, got: \{show tm}"
 
 -- Identify Nat-like, enum-like, etc
+-- TODO handle erased fields
 populateConInfo : List TopEntry → List TopEntry
 populateConInfo entries =
   let (Nothing) = traverse checkEnum entries
@@ -415,10 +416,20 @@ populateConInfo entries =
     | Just (a :: b :: Nil) => (setInfo a FalseCon :: setInfo b TrueCon :: Nil)
     | Just entries => entries in
   let (a :: b :: Nil) = entries | _ => entries in
-  let (Just succ) = find isSucc entries | _ => entries in
-  let (Just zero) = find isZero entries | _ => entries in
-  setInfo zero ZeroCon :: setInfo succ SuccCon :: Nil
+  fromMaybe entries $ checkNat entries <|> checkCons entries
+  -- let (Nothing) = checkNat entries | Just entries => entries in
+  -- let (Nothing) = checkNat entries | Just entries => entries in
+  -- entries
   where
+    countFields : TopEntry → Int
+    countFields (MkEntry fc name type def eflags) = go type
+     where
+       go : Tm → Int
+       go (Pi fc nm _ Zero a b) = go b
+       go (Pi fc nm _ Many a b) = 1 + go b
+       go _ = 0
+    countFields _ = 0
+
     setInfo : TopEntry → ConInfo → TopEntry
     setInfo (MkEntry fc nm dty (DCon ix _ arity hn) flags) info = MkEntry fc nm dty (DCon ix info arity hn) flags
     setInfo x _ = x
@@ -431,10 +442,25 @@ populateConInfo entries =
     isZero (MkEntry fc nm dty (DCon _ _ Nil hn) flags) = True
     isZero _ = False
 
-    -- TODO - handle indexes, etc
+    -- TODO - handle indexes, erased fields, etc
     isSucc : TopEntry → Bool
     isSucc (MkEntry fc nm dty@(Pi _ _ _ _ (Ref _ a) (Ref _ b)) (DCon _ _ (Many :: Nil) hn) _) = a == b
     isSucc _ = False
+
+    -- assumes we've filtered down to two entries
+    checkNat : List TopEntry → Maybe (List TopEntry)
+    checkNat entries = do
+      succ <- find isSucc entries
+      zero <- find isZero entries
+      pure $ setInfo zero ZeroCon :: setInfo succ SuccCon :: Nil
+
+
+    -- assumes we've filtered down to two entries
+    checkCons : List TopEntry → Maybe (List TopEntry)
+    checkCons entries = do
+      nil <- find (\ x => countFields x == 0) entries
+      cons <- find (\x => countFields x == 2) entries
+      pure $ setInfo nil NilCon :: setInfo cons ConsCon :: Nil
 
 processData : String → FC → FC × String → Raw → List Decl → M Unit
 processData ns fc (nameFC, nm) ty cons = do

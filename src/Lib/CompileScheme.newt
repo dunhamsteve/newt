@@ -18,6 +18,7 @@ import Data.SortedMap
 import Data.IORef
 import Data.SnocList
 
+-- FIXME SnocList
 SCEnv : U
 SCEnv = List String
 
@@ -63,6 +64,12 @@ scmName : QName → String
 scmName qn = scmIdent $ show qn
 
 cexpToScm : SCEnv → CExp → String
+
+argsToScm : SCEnv → List CExp → List Quant → List String
+argsToScm env Nil Nil = Nil
+argsToScm env (e :: es) (Many :: qs) = cexpToScm env e :: argsToScm env es qs
+argsToScm env (e :: es) (Zero :: qs) = argsToScm env es qs
+argsToScm env _ _ = fatalError "Arg count mismatch"
 
 withVar : SCEnv → CExp → (String → String) → String
 -- don't rebind a variable
@@ -117,16 +124,54 @@ cexpToScm env (CCase sc alts) = do
       (arg', env') => let ix = 1 + snoclen' lets
         in conAlt env' nm (lets :< "(\{arg'} (vector-ref \{nm} \{show ix}))") args body
 
+    nilAlt : SCEnv → List Quant → CExp → String
+    nilAlt env Nil body = cexpToScm env body
+    nilAlt env (Zero :: qs) body = nilAlt ("#f" :: env) qs body
+    nilAlt env (Many :: qs) body = fatalError "Non-empty field on nil constructor"
+
+    consAlt' : SCEnv → List String → List Quant → CExp → String
+    consAlt' env nms Nil body = cexpToScm env body
+    consAlt' env nms (Zero :: qs) body = consAlt' ("#f" :: env) nms qs body
+    consAlt' env Nil (Many :: qs) body = fatalError "Too many fields on cons constructor"
+    consAlt' env (nm :: nms) (Many :: qs) body = consAlt' (nm :: env) nms qs body
+
+    consAlt : SCEnv → String → List Quant → CExp → String
+    consAlt env nm qs body = consAlt' env ("(car \{nm})" :: "(cdr \{nm})" :: Nil) qs body
+
+    -- an alt branch in a `case` statement
+    -- for the Nil/Cons case, we're not inside a `case`.
     doAlt : String → CAlt → String
-    doAlt nm (CConAlt tag cname _ args body) = "((\{show tag}) \{conAlt env nm Lin args body})"
+    doAlt nm (CConAlt tag cname _ args qs body) = "((\{show tag}) \{conAlt env nm Lin args body})"
     doAlt nm (CDefAlt body) = "(else \{cexpToScm env body})"
     doAlt nm (CLitAlt lit body) = "((\{scmLit lit}) \{cexpToScm env body})"
 
+    -- doCase decides the top level path - case/cond/if/...
     doCase : String → List CAlt → String
-    -- I'm not sure the case tree should be generating this, c.f. deleteT23
+    -- I'm not sure the case tree should be generating this, c.f. deleteT23 (probably from doNumCon)
     doCase nm (CDefAlt body :: Nil) = cexpToScm env body
-    doCase nm (CConAlt tag cname _ args body :: Nil) = conAlt env nm Lin args body
+    -- TODO singleton ConsCon for pair, too. (Need to detect)
+    -- oh, but what if it's default?
+    doCase nm (cons@(CConAlt tag cname ConsCon args qs body ) :: rest) =
+      let consBranch = consAlt env nm qs body in
+      case rest of
+        Nil => consBranch
+        (CDefAlt body :: Nil) => "(if (null? \{nm}) \{cexpToScm env body} \{consBranch})"
+        (CConAlt _ _ NilCon _ qs body :: _) => "(if (null? \{nm}) \{nilAlt env qs body} \{consBranch})"
+        (CConAlt _ _ info _ _ _ :: _) => fatalError "\{show info} alt after cons"
+        (CLitAlt _ _ :: _) => fatalError "lit alt after cons"
+        _ => fatalError "too many alts after cons"
+    doCase nm (cons@(CConAlt tag cname NilCon args qs body ) :: rest) =
+      let nilBranch = consAlt env nm qs body in
+      case rest of
+        Nil => nilBranch
+        (CDefAlt body :: Nil) => "(if (null? \{nm}) \{nilBranch} \{cexpToScm env body})"
+        (CConAlt _ _ ConsCon _ qs body :: _) => "(if (null? \{nm}) \{nilBranch} \{consAlt env nm qs body})"
+        (CConAlt _ _ info _ _ _ :: _) => fatalError "\{show info} alt after nil"
+        (CLitAlt _ _ :: _) => fatalError "lit alt after nil"
+        _ => fatalError "too many alts after cons"
+    doCase nm (CConAlt tag cname _ args qs body :: Nil) = conAlt env nm Lin args body
     doCase nm alts@(CLitAlt _ _ :: _) = "(case \{nm} \{joinBy " " $ map (doAlt nm) alts})"
+    --
     doCase nm alts = "(case (vector-ref \{cexpToScm env sc} 0) \{joinBy " " $ map (doAlt nm) alts})"
 
 cexpToScm env (CRef nm) = scmName nm
@@ -141,12 +186,16 @@ cexpToScm env (CLetRec nm t u) =
 cexpToScm env (CLetLoop _ _) = fatalError "CLetLoop in scheme codegen"
 cexpToScm env (CLoop _ _) = fatalError "CLoop in scheme codegen"
 cexpToScm env CErased = "#f"
-cexpToScm env (CConstr tag nm args quants) =
-  -- FIXME need to deal with quants
+cexpToScm env (CConstr tag nm args quants NilCon) = "'()"
+cexpToScm env (CConstr tag nm args quants ConsCon) = case argsToScm env args quants of
+  (a :: b :: Nil) => "(cons \{a} \{b})"
+  _ => fatalError "Wrong number of args on a ConsCon"
+cexpToScm env (CConstr tag nm args quants info) =
+  -- FIXME need to deal with quants (on both sides!)
   let args' = map (cexpToScm env) args in
   "(vector \{show tag} \{joinBy " " args'})"
 -- TODO
-cexpToScm env (CRaw _ _) = "CRaw"
+cexpToScm env (CRaw _ _) = fatalError "Stray CRaw"
 -- TODO We still have a couple of these in CompileExp, for the magic Nat
 cexpToScm env (CPrimOp op a b) = "(\{op} \{cexpToScm env a} \{cexpToScm env b})"
 
@@ -218,13 +267,13 @@ TODO this could be made faster by keeping a map of the done information
 REVIEW could I avoid most of this by using `function` instead of arrow functions?
 
 -/
-
+-- TODO factor out to CompilerCommon
 sortedNames : SortedMap QName CExp → List QName → List QName
 sortedNames defs names =
   map snd $ filter (not ∘ fst) $ foldl (go Nil) Nil $ map (True,) names
   where
     getBody : CAlt → CExp
-    getBody (CConAlt _ _ _ _ t) = t
+    getBody (CConAlt _ _ _ _ _ t) = t
     getBody (CLitAlt _ t) = t
     getBody (CDefAlt t) = t
 
@@ -251,7 +300,7 @@ sortedNames defs names =
     getNames deep acc (CRef qn) = (deep, qn) :: acc
     getNames deep acc (CLet _ t u) = getNames deep (getNames deep acc t) u
     getNames deep acc (CLetRec _ t u) = getNames deep (getNames deep acc t) u
-    getNames deep acc (CConstr _ _ ts _) = foldl (getNames deep) acc ts
+    getNames deep acc (CConstr _ _ ts _ info) = foldl (getNames deep) acc ts
     -- if the CRaw is called, then the deps are called
     getNames deep acc (CRaw _ deps) = acc -- map (_,_ deep) deps ++ acc
     -- wrote these out so I get an error when I add a new constructor
