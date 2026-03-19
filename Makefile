@@ -25,7 +25,7 @@ newt3.js: newt2.js
 newt.ss: newt.js
 	$(RUNJS) newt.js src/Main.newt -o newt.ss
 
-newt.so: newt.ss
+newt.so: newt.ss prim.ss
 	chez --script scripts/compile-chez.ss
 
 test: newt.js

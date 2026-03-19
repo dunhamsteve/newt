@@ -415,11 +415,14 @@ populateConInfo entries =
     -- Boolean
     | Just (a :: b :: Nil) => (setInfo a FalseCon :: setInfo b TrueCon :: Nil)
     | Just entries => entries in
-  let (a :: b :: Nil) = entries | _ => entries in
-  fromMaybe entries $ checkNat entries <|> checkCons entries
-  -- let (Nothing) = checkNat entries | Just entries => entries in
-  -- let (Nothing) = checkNat entries | Just entries => entries in
-  -- entries
+  case entries of
+    a :: Nil => case countFields a of
+      0 => setInfo a NilCon :: Nil
+      2 => setInfo a ConsCon :: Nil
+      _ => entries
+    a :: b :: Nil =>
+      fromMaybe entries $ checkNat entries <|> checkCons entries
+    _ => entries
   where
     countFields : TopEntry → Int
     countFields (MkEntry fc name type def eflags) = go type

@@ -1,9 +1,8 @@
 ;; REVIEW all of this - some of it is IO and needs the IO dance
 ;; maybe we make a helper? A macro?
 
-(define $Nil (lambda (nm-0) (vector 0 nm-0)))
-(define $Cons (lambda (nm-0 nm-1 nm-2) (vector 1 nm-0 nm-1 nm-2)))
-(define $IORes (lambda (nm-1 nm-2) (vector 0 #f nm-1 nm-2)))
+; (define $IORes (lambda (nm-1 nm-2) (vector 0 #f nm-1 nm-2)))
+(define $IORes (lambda (nm-1 nm-2) (cons nm-1 nm-2)))
 (define ($Left x) (vector 0 #f #f x))
 (define ($Right x) (vector 1 #f #f x))
 (define $LT 0)
