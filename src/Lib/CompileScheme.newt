@@ -170,6 +170,8 @@ cexpToScm env (CCase sc alts) = do
         (CLitAlt _ _ :: _) => fatalError "lit alt after nil"
         _ => fatalError "too many alts after cons"
     doCase nm (CConAlt tag cname _ args qs body :: Nil) = conAlt env nm Lin args body
+    doCase nm (CLitAlt _ body :: Nil) = cexpToScm env body
+    doCase nm (CDefAlt body :: Nil) = cexpToScm env body
     doCase nm alts@(CLitAlt _ _ :: _) = "(case \{nm} \{joinBy " " $ map (doAlt nm) alts})"
     --
     doCase nm alts = "(case (vector-ref \{cexpToScm env sc} 0) \{joinBy " " $ map (doAlt nm) alts})"

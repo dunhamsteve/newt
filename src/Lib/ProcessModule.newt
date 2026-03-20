@@ -186,5 +186,7 @@ invalidateModule modname = do
     go : SortedMap String (List String) → List String → SortedMap String ModContext → SortedMap String ModContext
     go deps Nil mods = mods
     go deps (name :: names) mods =
+      -- Have we hit this name already?
+      let (Just _) = lookupMap name mods | _ => go deps names mods in
       let ds = fromMaybe Nil $ lookupMap' name deps in
       go deps (ds ++ names) (deleteMap name mods)
