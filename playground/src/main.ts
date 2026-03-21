@@ -95,7 +95,7 @@ if (!state.scheme.value) {
     // maybe send fileName, src?
     await ipc.sendMessage("updateFile", [fileName, src]);
     let scheme = await ipc.sendMessage("compile", [fileName, "scheme"]);
-    state.scheme.value = bundle(scheme);
+    state.scheme.value = scheme;
   }
 }
 
@@ -288,8 +288,6 @@ const language: EditorDelegate = {
         ipc.sendMessage("compile", [fileName, "javascript"]).then(js => state.javascript.value = bundle(js));
       if (state.selected.value === SCHEME)
         ipc.sendMessage("compile", [fileName, "scheme"]).then(scheme=> state.scheme.value = scheme);
-      // UI will update
-      state.scheme.value = "";
       return diags;
     } catch (e) {
       console.log("ERR", e);
