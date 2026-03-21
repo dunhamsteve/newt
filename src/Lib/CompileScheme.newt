@@ -85,8 +85,9 @@ cexpToScm env (CFun args body) = case bindAll args Lin env  of
   where
     bindAll : List (Quant × String) → SnocList String → SCEnv → List String × SCEnv
     bindAll Nil acc env = (acc <>> Nil, env)
-    bindAll ((_,nm) :: rest) acc env = case scbind nm env of
+    bindAll ((Many,nm) :: rest) acc env = case scbind nm env of
       (nm', env') => bindAll rest (acc :< nm') env'
+    bindAll ((Zero,nm) :: rest) acc env = bindAll rest acc ("#f" :: env)
 cexpToScm env (CApp t u) = "(\{cexpToScm env t} \{cexpToScm env u})"
 cexpToScm env (CAppRef nm args Nil) = go (scmName nm) $ map (cexpToScm env) args
   where
@@ -106,7 +107,8 @@ cexpToScm env (CAppRef nm args quants) =
     go env acc Nil (q :: qs) = case scbind "_" env of
       (nm, env') => let acc = "\{acc} \{nm}" in "(lambda (\{nm}) \{go env' acc Nil qs})"
     -- TODO / REVIEW Only for Many?
-    go env acc (arg :: args) (q :: qs) = go env "\{acc} \{arg}" args qs
+    go env acc (arg :: args) (Many :: qs) = go env "\{acc} \{arg}" args qs
+    go env acc (arg :: args) (Zero :: qs) = go env acc args qs
     -- go env acc (arg :: args) (q :: qs) = go env acc args qs
 -- so... we're not giving scrutinee a deBruijn index, but we may
 -- need to let it so we can pull data off for the CConAlt
