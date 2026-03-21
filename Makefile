@@ -34,6 +34,9 @@ newt2.ss: newt.so
 test: newt.js
 	scripts/test
 
+cheztest: newt.so
+	make test NEWT='chez --program newt.so' RUNOUT="chez --script" OUTFILE=tmp/out.ss
+
 aoctest: newt.js
 	scripts/aoc
 	scripts/aoc25

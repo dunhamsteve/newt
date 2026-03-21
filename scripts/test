@@ -1,7 +1,10 @@
 #!/bin/sh
 SAMPLES=$(find playground/samples -name "*.newt")
-# NCC="bun run newt.js"
-NCC="node newt.js"
+# NEWT ="bun run newt.js"
+NEWT=${NEWT:="node newt.js"}
+OUTFILE=${OUTFILE:="tmp/out.js"}
+RUNOUT=${RUNOUT:="node"}
+mkdir -p tmp
 total=0
 failed=0
 for fn in tests/*.newt ; do
@@ -9,10 +12,10 @@ for fn in tests/*.newt ; do
   echo Test $fn
   bn=$(basename $fn)
   if [ -f ${fn}.golden ]; then
-    $NCC $fn -o out.js > tmp/${bn}.compile
+    $NEWT $fn -o $OUTFILE > tmp/${bn}.compile
   else
     # we've dropped support for compiling things without main for now.
-    $NCC $fn > tmp/${bn}.compile
+    $NEWT $fn > tmp/${bn}.compile
   fi
   cerr=$?
   if [ -f ${fn}.fail ]; then
@@ -34,7 +37,7 @@ for fn in tests/*.newt ; do
   fi
   # if there is a golden file, run the code and compare output
   if [ -f ${fn}.golden ]; then
-    node out.js > tmp/${bn}.out
+    $RUNOUT $OUTFILE > tmp/${bn}.out
     if [ $? != "0" ]; then
       echo Run failed for $fn
       failed=$((failed + 1))

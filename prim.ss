@@ -1,6 +1,3 @@
-;; REVIEW all of this - some of it is IO and needs the IO dance
-;; maybe we make a helper? A macro?
-
 ; (define $IORes (lambda (nm-1 nm-2) (vector 0 #f nm-1 nm-2)))
 (define $IORes (lambda (nm-1 nm-2) (cons nm-1 nm-2)))
 (define ($Left x) (vector 0 #f #f x))
@@ -17,7 +14,6 @@
 (define (Prelude.ltString a b) (string<? a b))
 (define (Prelude.eqString a b) (string=? a b))
 (define Prelude.showInt number->string)
-(define (Node.exitFailure _ msg) (raise msg))
 (define (Prelude.primPutStrLn msg)
   (lambda (w)
     (display msg)
@@ -73,7 +69,12 @@
 (define (Prelude.subInt a b) (- a b))
 (define (Prelude.jsEq _ a b) (= a b))
 (define (Prelude.divInt a b) (fx/ a b))
-(define (Prelude.fatalError _ msg) (raise msg))
+;; In node this throws and the next one exits cleanly
+(define (Prelude.fatalError _ msg) (raise (error #f msg)))
+(define (Node.exitFailure _ msg)
+  (display msg)
+  (newline)
+  (exit 1))
 (define (Prelude.isSuffixOf sfx s)
   (let ((n (string-length sfx))
         (m (string-length s)))
@@ -81,3 +82,5 @@
         (string=? sfx (substring s (- m n) m))
         #f)))
 (define (Node.getArgs w) ($IORes (command-line) w))
+(define (Prelude.unsafePerformIO a f)
+  (car (f 'world)))
