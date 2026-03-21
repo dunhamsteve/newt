@@ -17,6 +17,7 @@ import Lib.ProcessDecl
 import Lib.Prettier
 import Lib.Error
 import Lib.CompileJS
+import Lib.CompileScheme
 
 pfunc js_castArray : Array JSObject → JSObject := `x => x`
 pfunc js_castInt : Int → JSObject := `x => x`
@@ -278,7 +279,6 @@ compileJS fn = unsafePerformIO $ do
   when (st.baseDir /= base) $ \ _ => resetState base
   repo <- lspFileSource
   (Right (top, src)) <- (do
-    putStrLn "woo"
     mod <- processModule emptyFC repo Nil modName
     docs <- compile
     let src = unlines $
@@ -290,4 +290,19 @@ compileJS fn = unsafePerformIO $ do
   modifyIORef state [ topContext := top ]
   pure $ js_castStr src
 
-#export updateFile checkFile hoverInfo codeActionInfo compileJS docSymbols
+compileToScheme : String → JSObject
+compileToScheme fn = unsafePerformIO $ do
+  let (base, modName) = decomposeName fn
+  st <- readIORef state
+  when (st.baseDir /= base) $ \ _ => resetState base
+  repo <- lspFileSource
+  (Right (top, src)) <- (do
+    mod <- processModule emptyFC repo Nil modName
+    docs <- compileScheme
+    let src = unlines docs
+    pure src).runM st.topContext
+    | Left err => pure $ js_castStr ";; \{errorMsg err}"
+  modifyIORef state [ topContext := top ]
+  pure $ js_castStr src
+
+#export updateFile checkFile hoverInfo codeActionInfo compileJS docSymbols compileToScheme

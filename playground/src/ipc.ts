@@ -49,7 +49,7 @@ export interface API {
   hoverInfo(fileName: string, row: number, col: number): HoverResult | boolean | null;
   codeActionInfo(fileName: string, row: number, col: number): CodeAction[] | null;
   // we need to add this to the LSP build
-  compile(fileName: string):  string;
+  compile(fileName: string, language: 'javascript'|'scheme'):  string;
 }
 
 export interface Message<K extends keyof API> {
@@ -116,4 +116,3 @@ export class IPC {
   }
 }
 
-class IPCClient {}

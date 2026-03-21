@@ -1,7 +1,7 @@
 import { shim } from "./emul";
 import { API, Message, ResponseMSG } from "./ipc";
 import { archive, preload } from "./preload";
-import { LSP_checkFile, LSP_codeActionInfo, LSP_compileJS, LSP_hoverInfo, LSP_updateFile } from './newt';
+import { LSP_checkFile, LSP_codeActionInfo, LSP_compileJS, LSP_compileToScheme, LSP_hoverInfo, LSP_updateFile } from './newt';
 
 const LOG = console.log
 
@@ -25,7 +25,10 @@ const api: API = {
   },
   hoverInfo: LSP_hoverInfo,
   codeActionInfo: LSP_codeActionInfo,
-  compile: LSP_compileJS,
+  compile: (fn, lang) => {
+    if (lang == 'scheme') return LSP_compileToScheme(fn);
+    return LSP_compileJS(fn);
+  }
 }
 
 const handleMessage = async function <K extends keyof API>(ev: { data: Message<K> }) {

@@ -154,6 +154,36 @@ const newtLanguage2: StreamLanguage<State> = StreamLanguage.define({
   },
 });
 
+export function scheme() {
+  return new LanguageSupport(schemeLanguage);
+}
+
+const schemeLanguage: StreamLanguage<State> = StreamLanguage.define({
+  startState: () => null,
+  token(stream, st) {
+    const keywords = ["define", "let", "case", "cond", "import", "include", "lambda", "else"];
+    if (stream.eatSpace()) return null;
+    if (stream.match("--")) {
+      stream.skipToEnd();
+      return "comment";
+    }
+    if (stream.match(/[0-9A-Za-z!%&*+./:<=>?@^_~-]+/)) {
+      let word = stream.current();
+      if (keywords.includes(word)) return "keyword";
+      return null;
+    }
+    // unhandled
+    stream.next();
+    return null
+  },
+  languageData: {
+    commentTokens: {
+      line: ";;",
+    },
+    wordChars: "!%&*+-./:<=>?@^_~",
+  },
+});
+
 function newt() {
   return new LanguageSupport(newtLanguage2);
 }

@@ -11,12 +11,12 @@ import {
   TopData,
   Marker,
 } from "./types.ts";
-import { CMEditor } from "./cmeditor.ts";
+import { CMEditor, scheme } from "./cmeditor.ts";
 import { deflate } from "./deflate.ts";
 import { inflate } from "./inflate.ts";
 import { IPC, Position } from "./ipc.ts";
 import helpText from "./help.md?raw";
-import { basicSetup, EditorView } from "codemirror";
+import { basicSetup, EditorView} from "codemirror";
 import {Compartment, EditorState} from "@codemirror/state";
 import { javascript } from "@codemirror/lang-javascript";
 import { oneDark } from "@codemirror/theme-one-dark";
@@ -82,8 +82,20 @@ if (!state.javascript.value) {
     const fileName = state.currentFile.value;
     // maybe send fileName, src?
     await ipc.sendMessage("updateFile", [fileName, src]);
-    let js = await ipc.sendMessage("compile", [fileName]);
+    let js = await ipc.sendMessage("compile", [fileName, "javascript"]);
     state.javascript.value = bundle(js);
+  }
+}
+
+async function refreshScheme() {
+if (!state.scheme.value) {
+    let src = state.editor.value!.getValue();
+    console.log("SEND TO", iframe.contentWindow);
+    const fileName = state.currentFile.value;
+    // maybe send fileName, src?
+    await ipc.sendMessage("updateFile", [fileName, src]);
+    let scheme = await ipc.sendMessage("compile", [fileName, "scheme"]);
+    state.scheme.value = bundle(scheme);
   }
 }
 
@@ -153,15 +165,23 @@ function getSavedCode() {
   return value;
 }
 
+const RESULTS = "Output";
+const JAVASCRIPT = "JS";
+const SCHEME = "Scheme";
+const CONSOLE = "Console";
+const HELP = "Help";
+
 const state = {
   output: signal(""),
   toast: signal(""),
   javascript: signal(""),
+  scheme: signal(""),
   messages: signal<string[]>([]),
   editor: signal<AbstractEditor | null>(null),
   dark: signal(false),
   files: signal<string[]>(["Tour.newt"]),
   currentFile: signal<string>(localStorage.currentFile ?? "Tour.newt"),
+  selected: signal(localStorage.tab ?? RESULTS),
 };
 
 // Monitor dark mode state (TODO - let user override system setting)
@@ -264,7 +284,12 @@ const language: EditorDelegate = {
       }
       setOutput(res.output)
       // less flashy version
-      ipc.sendMessage("compile", [fileName]).then(js => state.javascript.value = bundle(js));
+      if (state.selected.value === JAVASCRIPT)
+        ipc.sendMessage("compile", [fileName, "javascript"]).then(js => state.javascript.value = bundle(js));
+      if (state.selected.value === SCHEME)
+        ipc.sendMessage("compile", [fileName, "scheme"]).then(scheme=> state.scheme.value = scheme);
+      // UI will update
+      state.scheme.value = "";
       return diags;
     } catch (e) {
       console.log("ERR", e);
@@ -287,26 +312,26 @@ function Editor({ initialValue }: EditorProps) {
   return h("div", { id: "editor", ref });
 }
 
-// for extra credit, we could have a read-only monaco
-function JavaScript() {
-  const text = state.javascript.value;
+interface ViewerProps {
+  language: 'javascript' | 'scheme'
+}
+function SourceViewer({language}: ViewerProps) {
+  const text = state[language].value;
 
   // return h("div", { id: "javascript" }, text);
   const ref = useRef<HTMLDivElement>(null);
   const editorView = useRef<EditorView>(null);
   const themeRef = useRef<Compartment>(null);
   useEffect(() => {
-    console.log('JSEFFECT')
     const container = ref.current!;
     themeRef.current = new Compartment();
-
     const editor = new EditorView({
       doc: text,
       parent: container,
       extensions: [
         basicSetup,
         themeRef.current.of(state.dark.value ? oneDark : EditorView.baseTheme({})),
-        javascript(),
+        language == 'javascript' ? javascript() : scheme(),
         EditorState.readOnly.of(true),
         EditorView.editable.of(false),
       ],
@@ -347,16 +372,11 @@ function Console() {
   );
 }
 
-const RESULTS = "Output";
-const JAVASCRIPT = "JS";
-const CONSOLE = "Console";
-const HELP = "Help";
-
 function Tabs() {
-  const [selected, setSelected] = useState(localStorage.tab ?? RESULTS);
+  const selected = state.selected.value
   const Tab = (label: string) => {
     let onClick = () => {
-      setSelected(label);
+      state.selected.value = label;
       localStorage.tab = label;
     };
     let className = "tab";
@@ -365,20 +385,24 @@ function Tabs() {
   };
 
   useEffect(() => {
-    if (state.messages.value.length) setSelected(CONSOLE);
+    if (state.messages.value.length) state.selected.value = CONSOLE;
   }, [state.messages.value]);
 
   useEffect(() => {
     if (selected === JAVASCRIPT && !state.javascript.value) refreshJS();
-  }, [selected, state.javascript.value]);
+    if (selected === SCHEME && !state.scheme.value) refreshScheme();
+  }, [selected, state.javascript.value, state.scheme.value]);
 
   let body;
   switch (selected) {
     case RESULTS:
       body = h(Result, {});
       break;
+    case SCHEME:
+      body = h(SourceViewer, {language: 'scheme'});
+      break;
     case JAVASCRIPT:
-      body = h(JavaScript, {});
+      body = h(SourceViewer, {language:'javascript'});
       break;
     case CONSOLE:
       body = h(Console, {});
@@ -398,6 +422,7 @@ function Tabs() {
       { className: "tabBar" },
       Tab(RESULTS),
       Tab(JAVASCRIPT),
+      Tab(SCHEME),
       Tab(CONSOLE),
       Tab(HELP),
     ),
