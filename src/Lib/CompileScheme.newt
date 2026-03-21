@@ -119,12 +119,14 @@ cexpToScm env (CCase sc alts) = do
     withVar env sc $ \ nm => doCase nm alts
   where
     -- add a bunch of lets then do body
-    conAlt : SCEnv → String → SnocList String → List String → CExp → String
-    conAlt env nm lets Nil body = "(let (\{joinBy " " (lets <>> Nil)}) \{cexpToScm env body})"
+    conAlt : SCEnv → String → SnocList String → List String → List Quant → CExp → String
+    conAlt env nm lets Nil Nil body = "(let (\{joinBy " " (lets <>> Nil)}) \{cexpToScm env body})"
     -- TODO let `vector-ref nm ..`` vs `#f` (erased) in env for erased fields
-    conAlt env nm lets (arg :: args) body = case scbind arg env of
+    conAlt env nm lets (arg :: args) (Many :: qs) body = case scbind arg env of
       (arg', env') => let ix = 1 + snoclen' lets
-        in conAlt env' nm (lets :< "(\{arg'} (vector-ref \{nm} \{show ix}))") args body
+        in conAlt env' nm (lets :< "(\{arg'} (vector-ref \{nm} \{show ix}))") args qs body
+    conAlt env nm lets (arg :: args) (Zero :: qs) body = conAlt ("#f" :: env) nm lets args qs body
+    conAlt env nm lets _ _ body = fatalError "arg/qs mismatch in conAlt"
 
     nilAlt : SCEnv → List Quant → CExp → String
     nilAlt env Nil body = cexpToScm env body
@@ -143,16 +145,13 @@ cexpToScm env (CCase sc alts) = do
     -- an alt branch in a `case` statement
     -- for the Nil/Cons case, we're not inside a `case`.
     doAlt : String → CAlt → String
-    doAlt nm (CConAlt tag cname _ args qs body) = "((\{show tag}) \{conAlt env nm Lin args body})"
+    doAlt nm (CConAlt tag cname _ args qs body) = "((\{show tag}) \{conAlt env nm Lin args qs body})"
     doAlt nm (CDefAlt body) = "(else \{cexpToScm env body})"
     doAlt nm (CLitAlt lit body) = "((\{scmLit lit}) \{cexpToScm env body})"
 
     -- doCase decides the top level path - case/cond/if/...
     doCase : String → List CAlt → String
-    -- I'm not sure the case tree should be generating this, c.f. deleteT23 (probably from doNumCon)
     doCase nm (CDefAlt body :: Nil) = cexpToScm env body
-    -- TODO singleton ConsCon for pair, too. (Need to detect)
-    -- oh, but what if it's default?
     doCase nm (cons@(CConAlt tag cname ConsCon args qs body ) :: rest) =
       let consBranch = consAlt env nm qs body in
       case rest of
@@ -171,11 +170,10 @@ cexpToScm env (CCase sc alts) = do
         (CConAlt _ _ info _ _ _ :: _) => fatalError "\{show info} alt after nil"
         (CLitAlt _ _ :: _) => fatalError "lit alt after nil"
         _ => fatalError "too many alts after cons"
-    doCase nm (CConAlt tag cname _ args qs body :: Nil) = conAlt env nm Lin args body
+    doCase nm (CConAlt tag cname _ args qs body :: Nil) = conAlt env nm Lin args qs body
     doCase nm (CLitAlt _ body :: Nil) = cexpToScm env body
     doCase nm (CDefAlt body :: Nil) = cexpToScm env body
     doCase nm alts@(CLitAlt _ _ :: _) = "(case \{nm} \{joinBy " " $ map (doAlt nm) alts})"
-    --
     doCase nm alts = "(case (vector-ref \{cexpToScm env sc} 0) \{joinBy " " $ map (doAlt nm) alts})"
 
 cexpToScm env (CRef nm) = scmName nm
@@ -194,15 +192,11 @@ cexpToScm env (CConstr tag nm args quants NilCon) = "'()"
 cexpToScm env (CConstr tag nm args quants ConsCon) = case argsToScm env args quants of
   (a :: b :: Nil) => "(cons \{a} \{b})"
   _ => fatalError "Wrong number of args on a ConsCon"
-cexpToScm env (CConstr tag nm args quants info) =
-  -- FIXME need to deal with quants (on both sides!)
-  let args' = map (cexpToScm env) args in
-  "(vector \{show tag} \{joinBy " " args'})"
--- TODO
+cexpToScm env (CConstr tag nm args quants info) = "(vector \{show tag} \{unwords $ argsToScm env args quants})"
+-- Should be handled by the caller
 cexpToScm env (CRaw _ _) = fatalError "Stray CRaw"
 -- TODO We still have a couple of these in CompileExp, for the magic Nat
 cexpToScm env (CPrimOp op a b) = "(\{op} \{cexpToScm env a} \{cexpToScm env b})"
-
 
 -- Collect the QNames used in a term
 getNames : Tm -> List QName -> List QName
