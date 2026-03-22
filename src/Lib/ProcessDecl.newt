@@ -54,6 +54,8 @@ logMetas (Unsolved fc k ctx ty User cons :: rest) = do
       let msg = "\{env}\n  -----------\n  \{render 90 $ pprint names ty'}"
       info fc "User Hole\n\{msg}"
       logMetas rest
+-- error is reported separately
+logMetas (Unsolved fc k ctx ty ErrorHole cons :: rest) = logMetas rest
 logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
       ty' <- forceMeta ty
       tm <- quote ctx.lvl ty'

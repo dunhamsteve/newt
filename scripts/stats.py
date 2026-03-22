@@ -5,7 +5,7 @@ stats = {}
 acc = ''
 name = ''
 for line in open(fn):
-    if line.startswith('const'):
+    if line.startswith('const') or line.startswith('let'):
         if name: stats[name] = len(acc)
         acc = line
         name = line.split()[1]

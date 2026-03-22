@@ -52,7 +52,7 @@ liftWhereTm name env (LetRec fc nm ty t u) = do
   modifyRef Defs (updateMap qn (Fn $ wrapLam qs t'))
 
   -- The rest
-  u' <- liftWhereTm qn env' u
+  u' <- liftWhereTm name env' u
   pure $ LetRec fc nm (Erased fc) (Erased fc) u'
   where
     -- TODO might be nice if we could nest the names (Foo.go.go) for nested where
