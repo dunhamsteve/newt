@@ -283,11 +283,8 @@ const language: EditorDelegate = {
         });
       }
       setOutput(res.output)
-      // less flashy version
-      if (state.selected.value === JAVASCRIPT)
-        ipc.sendMessage("compile", [fileName, "javascript"]).then(js => state.javascript.value = bundle(js));
-      if (state.selected.value === SCHEME)
-        ipc.sendMessage("compile", [fileName, "scheme"]).then(scheme=> state.scheme.value = scheme);
+      state.javascript.value = ""
+      state.scheme.value = ""
       return diags;
     } catch (e) {
       console.log("ERR", e);
