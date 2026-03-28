@@ -310,6 +310,7 @@ processInstance ns instfc ty decls = do
   vdcty@(VPi _ nm icit rig a b) <- eval Nil dcty
     | x => error (getFC x) "dcty not Pi"
   debug $ \ _ => "dcty \{render 90 $ pprint Nil dcty}"
+  -- let (_,args) = funArgs codomain
 
   debug $ \ _ => "traverse \{show $ map show args}"
   -- This is a little painful because we're reverse engineering the
@@ -546,9 +547,6 @@ processRecord ns recordFC (nameFC, nm) tele cname decls = do
     processFields : Raw → Raw → List (String × Raw) → List (FC × String × Raw) → M Unit
     processFields _ _ _ Nil = pure MkUnit
     processFields autoPat tail deps ((fc,name,ty) :: rest) = do
-      -- TODO dependency isn't handled yet
-      -- we'll need to replace stuff like `len` with `len self`.
-
       let funType = substRaw deps $ teleToPi (impTele tele) $ RPi fc (BI fc "$self" Explicit Many) tail ty
 
       -- `.fieldName`

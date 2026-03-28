@@ -23,7 +23,10 @@ derive Show BD
 
 data Quant = Zero | Many
 derive Eq Quant
-derive Show Quant
+
+instance Show Quant where
+  show Zero = "0 "
+  show Many = ""
 
 -- We could make this polymorphic and use for environment...
 
@@ -169,20 +172,15 @@ Val : U
 Closure : U
 Env : U
 
-data VCaseAlt : U where
-  -- Like a Closure, but with a lot of args
-  VCaseCons : (name : QName) -> (args : List String) -> Env -> Tm ->  VCaseAlt
-  VCaseLit : Literal -> Val -> VCaseAlt
-  VCaseDefault : Val -> VCaseAlt
-
 data Val : U where
   VVar : FC -> (k : Int) -> (sp : SnocList Val) -> Val
   VRef : FC -> (nm : QName) -> (sp : SnocList Val) -> Val
-  VCase : FC -> (sc : Val) -> List VCaseAlt -> Val
+  VCase : FC -> (sc : Val) -> Env -> List CaseAlt -> Val
   VMeta : FC -> QName -> (sp : SnocList Val) -> Val
   VLam : FC -> Name -> Icit -> Quant -> Closure -> Val
   VPi : FC -> Name -> Icit -> Quant -> (a : Val) -> (b : Closure) -> Val
-  VLet : FC -> Name -> Val -> Val -> Val
+  -- not substing let, like idris
+  VLet : FC -> Name -> Val -> Closure -> Val
   VLetRec : FC -> Name -> Val -> Val -> Val -> Val
   VU : FC -> Val
   VErased : FC -> Val
@@ -196,7 +194,7 @@ data Closure = MkClosure Env Tm
 getValFC : Val -> FC
 getValFC (VVar fc _ _) = fc
 getValFC (VRef fc _ _) = fc
-getValFC (VCase fc _ _) = fc
+getValFC (VCase fc _ _ _) = fc
 getValFC (VMeta fc _ _) = fc
 getValFC (VLam fc _ _ _ _) = fc
 getValFC (VPi fc _ _ _ a b) = fc
@@ -220,15 +218,10 @@ instance Show Val where
   show (VPi fc str Implicit rig x y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{showClosure  y})"
   show (VPi fc str Explicit rig x y) = "(%pi (\{show rig} \{str} : \{show  x}). \{showClosure  y})"
   show (VPi fc str Auto rig x y) = "(%pi {{\{show rig} \{str} : \{show  x}}}. \{showClosure  y})"
-  show (VCase fc sc alts) = "(%case \{show sc} \{unwords $ map showAlt alts})"
-    where
-      showAlt : VCaseAlt → String
-      showAlt (VCaseDefault v) = "(%cdef \{show v})"
-      showAlt (VCaseLit lit v) = "(%clit \{show v})"
-      showAlt (VCaseCons nm args env v) = "(%ccon \{show nm} \{unwords $ map show args} [\{show $ length env} env] \{show v}"
+  show (VCase fc sc env alts) = "(%case \{show sc} \{unwords $ map show alts})"
   show (VU _) = "U"
   show (VLit _ lit) = show lit
-  show (VLet _ nm a b) = "(%let \{show nm} = \{show a} in \{show b}"
+  show (VLet _ nm a (MkClosure env b)) = "(%let \{show nm} = \{show a} in \{show b}"
   show (VLetRec _ nm ty a b) = "(%letrec \{show nm} : \{show ty} = \{show a} in \{show b}"
   show (VErased _) = "ERASED"
 
@@ -269,7 +262,10 @@ record MetaContext where
 
 derive Eq MetaMode
 
-data ConInfo = NormalCon | SuccCon | ZeroCon | EnumCon | TrueCon | FalseCon | NilCon | ConsCon
+data ConInfo = NormalCon
+             | SuccCon | ZeroCon
+             | EnumCon | TrueCon | FalseCon
+             | NilCon | ConsCon
 
 derive Eq ConInfo
 

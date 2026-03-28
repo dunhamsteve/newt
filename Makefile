@@ -29,7 +29,7 @@ newt.so: newt.ss prim.ss
 	chez --script scripts/compile-chez.ss
 
 newt2.ss: newt.so
-	chez --program newt.ss src/Main.newt -o newt2.ss
+	time chez --program newt.so src/Main.newt -o newt2.ss
 
 test: newt.js
 	scripts/test

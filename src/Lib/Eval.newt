@@ -9,6 +9,7 @@ import Lib.TopContext
 import Data.IORef
 import Data.SnocList
 import Data.SortedMap
+import Lib.Error
 
 eval : Env -> Tm -> M Val
 
@@ -27,6 +28,7 @@ vapp (VLam _ _ _ _ t) u = t $$ u
 vapp (VVar fc k sp) u = pure $ VVar fc k (sp :< u)
 vapp (VRef fc nm sp) u = pure $ VRef fc nm (sp :< u)
 vapp (VMeta fc k sp) u = pure $ VMeta fc k (sp :< u)
+-- not really impossible, could be a stuck VCase.
 vapp t u = error' "impossible in vapp \{show t} to \{show u}\n"
 
 vappSpine : Val -> SnocList Val -> M Val
@@ -69,8 +71,9 @@ tryEval env (VRef fc k sp) = do
             vtm <- eval env tm
             debug $ \ _ =>  "tm is \{render 90 $ pprint Nil tm}"
             val <- vappSpine vtm sp
+            -- These are considered "stuck" and we back out to the nearest name application
             case val of
-              VCase _ _ _ => pure Nothing
+              VCase _ _ _ _ => pure Nothing
               VLam _ _ _ _ _ => pure Nothing
               -- For now? There is a spot in Compile.newt that has
               -- two applications of fresh that is getting unfolded even
@@ -78,7 +81,7 @@ tryEval env (VRef fc k sp) = do
               -- coming out of a let and is instantly applied
               VLetRec _ _ _ _ _ => pure Nothing
               v => pure $ Just v)
-            (\ _ => pure Nothing)
+            (const $ pure Nothing)
       _ => do
         debug $ \ _ => "tryEval blocked on undefined \{show k}"
         pure Nothing
@@ -98,7 +101,7 @@ forceType env x = do
     | _ => pure x
   forceType env x'
 
--- for cases applied to a value
+-- Handles cases applied to a value, return Nothing if stuck
 -- TODO this does not handle CaseLit
 evalCase : Env -> Val -> List CaseAlt -> M (Maybe Val)
 evalCase env sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
@@ -112,39 +115,18 @@ evalCase env sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
       -- bail for a stuck function
       _ => pure Nothing
   where
+    -- put constructor args into scope
     pushArgs : Env -> List Val -> List String -> M (Maybe Val)
     pushArgs env (arg :: args) (nm :: nms) = pushArgs (arg :: env) args nms
-    pushArgs env args Nil = do
-      t' <- eval env t
-      Just <$> vappSpine t' (Lin <>< args)
+    pushArgs env Nil Nil = Just <$> eval env t
+    pushArgs env args Nil = fatalError "Extra args \{show args}"
     pushArgs env Nil rest = pure Nothing
--- REVIEW - this is handled in the caller already
-evalCase env sc@(VVar fc k sp) alts = case lookupVar env k of
-    Just tt@(VVar fc' k' sp') => do
-        debug $ \ _ =>  "lookup \{show k} is \{show tt}"
-        if k' == k
-          then pure Nothing
-          else do
-            val <- vappSpine (VVar fc' k' sp') sp
-            evalCase env val alts
-    Just t => do
-      val <- vappSpine t sp
-      evalCase env val alts
-    Nothing => do
-        debug $ \ _ =>  "lookup \{show k} is Nothing in env \{show env}"
-        pure Nothing
+
 evalCase env sc (CaseDefault u :: xs) = Just <$> eval env u
 evalCase env sc cc = do
   debug $ \ _ =>  "CASE BAIL sc \{show sc} vs " -- \{show cc}"
   debug $ \ _ =>  "env is \{show env}"
   pure Nothing
-
--- neutral alts
-evalAlt : Env → CaseAlt → M VCaseAlt
-evalAlt env (CaseDefault tm) = VCaseDefault <$> eval env tm
-evalAlt env (CaseLit lit tm) = VCaseLit lit <$> eval env tm
--- in the cons case, we're binding args
-evalAlt env (CaseCons nm args tm) = pure $ VCaseCons nm args env tm
 
 -- So smalltt says:
 --   Smalltt has the following approach:
@@ -173,13 +155,19 @@ eval env (Pi fc x icit rig a b) = do
   pure $ VPi fc x icit rig a' (MkClosure env b)
 eval env (Let fc nm t u) = do
   t' <- eval env t
-  u' <- eval (VVar fc (length' env) Lin :: env) u
-  pure $ VLet fc nm t' u'
+  --
+  if True
+    then pure $ VLet fc nm t' (MkClosure env u)
+    else eval (t' :: env) u
 eval env (LetRec fc nm ty t u) = do
-  ty' <- eval env ty
-  t' <- eval (VVar fc (length' env) Lin :: env) t
-  u' <- eval (VVar fc (length' env) Lin :: env) u
-  pure $ VLetRec fc nm ty' t' u'
+  -- Used for `where`, we'd probably need to treat this like Lam.
+  error fc "eval letrec"
+  -- I think we need to handle this like lam/let, disabled for now.
+  -- It should be gone by the time we hit inlining, we'll see if it arises in other cases
+  -- ty' <- eval env ty
+  -- t' <- eval (VVar fc (length' env) Lin :: env) t
+  -- u' <- eval (VVar fc (length' env) Lin :: env) u
+  -- pure $ VLetRec fc nm ty' t' u'
 -- Here, we assume env has everything. We push levels onto it during type checking.
 -- I think we could pass in an l and assume everything outside env is free and
 -- translate to a level
@@ -191,15 +179,13 @@ eval env (Lit fc lit) = pure $ VLit fc lit
 eval env tm@(Case fc sc alts) = do
   -- TODO we need to be able to tell eval to expand aggressively here.
   sc' <- eval env sc
-  sc' <- unlet env sc' -- try to expand lets from pattern matching
-  -- possibly too aggressive?
+  -- inline metas and do beta reduction at head
   sc' <- forceType env sc'
   Nothing <- evalCase env sc' alts
     | Just v => pure v
 
   vsc <- eval env sc
-  alts' <- traverse (evalAlt env) alts
-  pure $ VCase fc vsc alts'
+  pure $ VCase fc vsc env alts
 
 quote : (lvl : Int) -> Val -> M Tm
 
@@ -210,10 +196,14 @@ quoteSp lvl t (xs :< x) = do
   x' <- quote lvl x
   pure $ App emptyFC t' x'
 
-quoteAlt : Int → VCaseAlt → M CaseAlt
-quoteAlt l (VCaseDefault val) = CaseDefault <$> quote l val
-quoteAlt l (VCaseLit lit val) = CaseLit lit <$> quote l val
-quoteAlt l (VCaseCons nm args env tm) = do
+normAlt : Env → Int → CaseAlt → M CaseAlt
+normAlt env l (CaseDefault tm) = do
+   val <- eval env tm
+   CaseDefault <$> quote l val
+normAlt env l (CaseLit lit tm) = do
+   val <- eval env tm
+   CaseLit lit <$> quote l val
+normAlt env l (CaseCons nm args tm) = do
   val <- eval (mkenv l env args) tm
   tm <- quote (length' args + l) val
   pure $ CaseCons nm args tm
@@ -224,7 +214,7 @@ quoteAlt l (VCaseCons nm args env tm) = do
 
 quote l (VVar fc k sp) = if k < l
   then quoteSp l (Bnd fc (lvl2ix l k )) sp -- level to index
-  else error fc "Bad index in quote \{show k} depth \{show l}"
+  else error fc "Bad level in quote \{show k} depth \{show l}"
 quote l (VMeta fc i sp) = do
   meta <- lookupMeta i
   case meta of
@@ -241,6 +231,7 @@ quote l (VPi fc x icit rig a b) = do
   pure $ Pi fc x icit rig a' tm
 quote l (VLet fc nm t u) = do
   t' <- quote l t
+  u <- u $$ VVar fc l Lin
   u' <- quote (1 + l) u
   pure $ Let fc nm t' u'
 quote l (VLetRec fc nm ty t u) = do
@@ -250,10 +241,11 @@ quote l (VLetRec fc nm ty t u) = do
   pure $ LetRec fc nm ty' t' u'
 quote l (VU fc) = pure (UU fc)
 quote l (VRef fc n sp) = quoteSp l (Ref fc n) sp
-quote l (VCase fc sc valts) = do
+quote l (VCase fc sc env alts) = do
   sc' <- quote l sc
-  alts <- traverse (quoteAlt l) valts
-  pure $ Case fc sc' alts
+  alts' <- traverse (normAlt env l) alts
+  pure $ Case fc sc' alts'
+
 quote l (VLit fc lit) = pure $ Lit fc lit
 quote l (VErased fc) = pure $ Erased fc
 
@@ -267,7 +259,6 @@ prvalCtx : {{ctx : Context}} -> Val -> M String
 prvalCtx {{ctx}} v = do
   tm <- quote ctx.lvl v
   pure $ render 90 $ pprint (map fst ctx.types) tm
-
 
 -- 'zonk' is substituting metas _and_ doing inlining
 
@@ -309,23 +300,37 @@ zonkApp top l env t@(Meta fc k) sp = do
   meta <- lookupMeta k
   case meta of
     (Solved _ j v) => do
+      debug $ \ _ => "zonk for \{show k} env \{show env}"
+      debug $ \ _ => "spine \{show sp}"
       sp' <- traverse (eval env) sp
-      debug $ \ _ =>  "zonk \{show k} -> \{show v} spine \{show sp'}"
+      debug $ \ _ =>  "zonk meta \{show k} -> \{show v} spine \{show sp'}"
       foo <- vappSpine v (Lin <>< sp')
       debug $ \ _ =>  "-> result is \{show foo}"
-      tweakFC fc <$> quote l foo
+      if length' env /= l
+        then fatalError "MM2 \{show l} /= \{show $ length' env}"
+        else pure MkUnit
+      res <- tweakFC fc <$> quote l foo
+      debug $ \ _ => "quoted \{show res}"
+      pure res
     _ => pure $ appSpine t sp
 zonkApp top l env t sp = do
+  debug $ \ _ => "zonk2 for \{show t} env \{show env}"
+  debug $ \ _ => "spine \{show sp}"
   t' <- zonk top l env t
   -- inlining
   let (Just tm) = inlineDef t' | _ => pure $ appSpine t' sp
   sp' <- traverse (eval env) sp
   vtm <- eval env tm
   catchError (do
-    foo <- vappSpine vtm (Lin <>< sp')
-    t' <- quote l foo
-    zonk top l env t')
-    (\_ => pure $ appSpine t' sp)
+    debug $ \ _ =>  "zonk will app \{show t'} @ \{show sp} ~> \{show vtm} @ \{show sp'}"
+    res <- vappSpine vtm (Lin <>< sp')
+    debug $ \_ => "result is \{show res}"
+    t' <- quote l res
+    x <- zonk top l env t'
+    pure x)
+    (\err => do
+      debug $ \_ => "result err \{showError "" err}"
+      pure $ appSpine t' sp)
   where
     -- lookup name and return Def if flagged inline
     inlineDef : Tm → Maybe Tm

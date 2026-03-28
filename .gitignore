@@ -6,7 +6,7 @@ build/
 *.bak
 *.agda
 *.agdai
-/*.js
+/newt*.js
 input.txt
 node_modules
 mkday.py

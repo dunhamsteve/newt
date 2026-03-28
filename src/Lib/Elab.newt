@@ -138,7 +138,6 @@ findMatches ctx ty ((name, type) :: xs) = do
       debug $ \ _ => "TRY \{show name} : \{rpprint Nil type} for \{show ty}"
       -- This check is solving metas, so we save mc below in case we want this solution
       let (QN ns nm) = name
-      let (cod, tele) = splitTele type
       setMetaMode CheckFirst
       tm <- check ctx (RVar fc nm) ty
       debug $ \ _ => "Found \{rpprint Nil tm} for \{show ty}"
@@ -344,19 +343,9 @@ rename meta ren lvl (VPi fc n icit rig ty tm) = do
   pure (Pi fc n icit rig ty' scope')
 rename meta ren lvl (VU fc) = pure (UU fc)
 rename meta ren lvl (VErased fc) = pure (Erased fc)
--- for now, we don't do solutions with case in them.
-rename meta ren lvl (VCase fc sc alts) = error fc "Case in solution"
-rename meta ren lvl (VLit fc lit) = pure (Lit fc lit)
-rename meta ren lvl (VLet fc name val body) = do
-  val' <- rename meta ren lvl val
-  body' <- rename meta (lvl :: ren) (1 + lvl) body
-  pure $ Let fc name val' body'
--- these probably shouldn't show up in solutions...
-rename meta ren lvl (VLetRec fc name ty val body) = do
-  ty' <- rename meta ren lvl ty
-  val' <- rename meta (lvl :: ren) (1 + lvl) val
-  body' <- rename meta (lvl :: ren) (1 + lvl) body
-  pure $ LetRec fc name ty' val' body'
+-- for now, we don't do solutions with case, let, letrec in them
+-- If we we need this, follow the model of VLam
+rename meta ren lvl tm = error (getFC tm) "Unhandled term in `rename`: \{show tm}"
 
 lams : Nat -> List String -> Tm -> Tm
 lams Z _ tm = tm
@@ -749,7 +738,6 @@ substVal k v tm = go tm
   where
     go : Val -> Val
     go (VVar fc j sp) = if j == k then v else (VVar fc j (map go sp))
-    go (VLet fc nm a b) = VLet fc nm (go a) b
     go (VPi fc nm icit rig a b) = VPi fc nm icit rig (go a) b
     go (VMeta fc ix sp) = VMeta fc ix (map go sp)
     go (VRef fc nm sp) = VRef fc nm (map go sp)
