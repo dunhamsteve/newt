@@ -16,6 +16,8 @@ import {
   Location,
   TextDocumentIdentifier,
 } from "vscode-languageserver/node";
+import fs from 'node:fs';
+import path from 'node:path';
 import { TextDocument } from "vscode-languageserver-textdocument";
 
 const connection = createConnection(ProposedFeatures.all);
@@ -70,16 +72,18 @@ async function runChange() {
         console.log('STALE result not sent for', uri)
       }
     }
+  } catch (e) {
+    console.error(e);
   } finally {
     running = false;
   }
 }
-
 documents.onDidChangeContent(async (change) => {
   console.log('DIDCHANGE', change.document.uri)
   const uri = change.document.uri;
   const text = change.document.getText();
   // update/invalidate happens now, check happens on quiesce.
+  writeCache(path.basename(uri), text);
   LSP_updateFile(uri, text);
   addChange(change.document);
 });
@@ -138,6 +142,21 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => ({
   },
 }));
 
+function writeCache(fn: string, content: string) {
+  const home = process.env.HOME;
+  if (!home) return;
+  const dname = path.join(home, '.cache/newt-lsp');
+  const fname = path.join(dname, fn);
+  try {
+    fs.mkdirSync(dname, {recursive: true});
+  } catch (e) {
+  }
+  try {
+    fs.writeFileSync(fname, content, 'utf8');
+  } catch (e) {
+    console.error(e);
+  }
+}
 documents.listen(connection);
 connection.listen();
 console.log('STARTED')
