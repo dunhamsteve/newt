@@ -12,7 +12,7 @@ import Data.SortedMap
 
 eval : Env -> Tm -> M Val
 
--- REVIEW everything is evalutated whether it's needed or not
+-- REVIEW everything is evaluated whether it's needed or not
 -- It would be nice if the environment were lazy.
 -- e.g. case is getting evaluated when passed to a function because
 -- of dependencies in pi-types, even if the dependency isn't used
@@ -50,7 +50,7 @@ unlet : Env -> Val -> M Val
 unlet env t@(VVar fc k sp) = case lookupVar env k of
       Just tt@(VVar fc' k' sp') => do
         debug $ \ _ =>  "lookup \{show k} is \{show tt}"
-        if k' == k then pure t else (vappSpine (VVar fc' k' sp') sp >>= unlet env)
+        if k' == k then pure t else (vappSpine tt sp >>= unlet env)
       Just t => vappSpine t sp >>= unlet env
       Nothing => do
         debug $ \ _ =>  "lookup \{show k} is Nothing in env \{show env}"

@@ -300,7 +300,7 @@ termToJS {e} env (CCase t alts) f =
     termToJSAlt : JSEnv -> JSExp -> CAlt -> JAlt
     termToJSAlt env nm (CConAlt ix name info args qs u) = JConAlt ix (termToJS (conAltEnv nm 0 env args) u f)
     -- intentionally reusing scrutinee name here
-    termToJSAlt env nm (CDefAlt u) = JDefAlt (termToJS  (env) u f)
+    termToJSAlt env nm (CDefAlt u) = JDefAlt (termToJS (env) u f)
     termToJSAlt env nm (CLitAlt lit u) = JLitAlt (litToJS lit) (termToJS env u f)
 
     getArgs : CAlt → List String

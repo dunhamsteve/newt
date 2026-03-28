@@ -96,7 +96,7 @@ erase env t sp = case t of
     eraseSpine env (LetRec fc nm ty u' v') sp Nothing
   (Bnd fc k) => do
     case getAt (cast k) env of
-      Nothing => error fc "bad index \{show k}"
+      Nothing => error fc "Erase: bad index \{show k}"
       Just (nm, Zero, ty) => error fc "used erased value \{show nm} (FIXME FC may be wrong here)"
       Just (nm, Many, ty) => eraseSpine env t sp ty
   (UU fc) => eraseSpine env t sp (Just $ UU fc)

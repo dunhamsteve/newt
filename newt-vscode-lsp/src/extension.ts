@@ -23,7 +23,7 @@ export function activate(context: vscode.ExtensionContext) {
   let serverOptions: ServerOptions
   if (cmd) {
     serverOptions = {
-      run: { command: "node", args: [cmd], transport: TransportKind.pipe },
+      run: { command: "node", args: ['--heapsnapshot-signal=SIGUSR2',cmd], transport: TransportKind.pipe },
       debug: { command: "node", args: [cmd], transport: TransportKind.pipe },
     }
   } else {

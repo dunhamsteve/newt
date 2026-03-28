@@ -310,7 +310,6 @@ processInstance ns instfc ty decls = do
   vdcty@(VPi _ nm icit rig a b) <- eval Nil dcty
     | x => error (getFC x) "dcty not Pi"
   debug $ \ _ => "dcty \{render 90 $ pprint Nil dcty}"
-  let (_,args) = funArgs codomain
 
   debug $ \ _ => "traverse \{show $ map show args}"
   -- This is a little painful because we're reverse engineering the
