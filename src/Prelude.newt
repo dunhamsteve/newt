@@ -456,8 +456,7 @@ debugLog a = putStrLn (debugStr a)
 
 pfunc stringToInt : String → Int := `(s) => {
   let rval = Number(s)
-  if (isNaN(rval)) throw new Error(s + " is NaN")
-  return rval
+  return isNaN(rval) ? 0 : rval
 }`
 
 class Foldable (m : U → U) where

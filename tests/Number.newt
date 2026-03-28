@@ -1,0 +1,9 @@
+module Number
+
+import Prelude
+
+add : Int → Int → Int
+add a b = a + b
+
+main : IO Unit
+main = printLn $ add 2$ 40

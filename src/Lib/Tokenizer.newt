@@ -165,7 +165,8 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
     doChar : Char -> List Char ->  Either Error TState
     doChar c cs = if elem c standalone
       then rawTokenise (TS sl (sc + 1) (toks :< mktok True sl (sc + 1) Symbol (pack $ c :: Nil)) cs)
-      else let kind = if isDigit c then Number else if isUpper c then UIdent else Ident in
+      else if isDigit c then doRest (TS sl sc toks (c :: cs)) Number isDigit Lin
+      else let kind = if isUpper c then UIdent else Ident in
         doRest (TS sl sc toks (c :: cs)) kind isIdent Lin
 
 
