@@ -343,6 +343,7 @@ rename meta ren lvl (VPi fc n icit rig ty tm) = do
   pure (Pi fc n icit rig ty' scope')
 rename meta ren lvl (VU fc) = pure (UU fc)
 rename meta ren lvl (VErased fc) = pure (Erased fc)
+rename meta ren lvl (VLit fc lit) = pure (Lit fc lit)
 -- for now, we don't do solutions with case, let, letrec in them
 -- If we we need this, follow the model of VLam
 rename meta ren lvl tm = error (getFC tm) "Unhandled term in `rename`: \{show tm}"
