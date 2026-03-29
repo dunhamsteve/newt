@@ -119,14 +119,12 @@ cexpToScm env (CCase sc alts) = do
     withVar env sc $ \ nm => doCase nm alts
   where
     -- add a bunch of lets then do body
-    conAlt : SCEnv → String → SnocList String → List String → List Quant → CExp → String
-    conAlt env nm lets Nil Nil body = "(let (\{joinBy " " (lets <>> Nil)}) \{cexpToScm env body})"
-    -- TODO let `vector-ref nm ..`` vs `#f` (erased) in env for erased fields
-    conAlt env nm lets (arg :: args) (Many :: qs) body = case scbind arg env of
-      (arg', env') => let ix = 1 + snoclen' lets
-        in conAlt env' nm (lets :< "(\{arg'} (vector-ref \{nm} \{show ix}))") args qs body
-    conAlt env nm lets (arg :: args) (Zero :: qs) body = conAlt ("#f" :: env) nm lets args qs body
-    conAlt env nm lets _ _ body = fatalError "arg/qs mismatch in conAlt"
+    conAlt : SCEnv → String → Int → List String → List Quant → CExp → String
+    conAlt env nm ix Nil Nil body = cexpToScm env body
+    conAlt env nm ix (arg :: args) (Many :: qs) body =
+        conAlt ("(vector-ref \{nm} \{show ix})" :: env) nm (ix + 1) args qs body
+    conAlt env nm ix (arg :: args) (Zero :: qs) body = conAlt ("#f" :: env) nm ix args qs body
+    conAlt env nm ix _ _ body = fatalError "arg/qs mismatch in conAlt"
 
     nilAlt : SCEnv → List Quant → CExp → String
     nilAlt env Nil body = cexpToScm env body
@@ -145,7 +143,7 @@ cexpToScm env (CCase sc alts) = do
     -- an alt branch in a `case` statement
     -- for the Nil/Cons case, we're not inside a `case`.
     doAlt : String → CAlt → String
-    doAlt nm (CConAlt tag cname _ args qs body) = "((\{show tag}) \{conAlt env nm Lin args qs body})"
+    doAlt nm (CConAlt tag cname _ args qs body) = "((\{show tag}) \{conAlt env nm 1 args qs body})"
     doAlt nm (CDefAlt body) = "(else \{cexpToScm env body})"
     doAlt nm (CLitAlt lit body) = "((\{scmLit lit}) \{cexpToScm env body})"
 
@@ -170,7 +168,7 @@ cexpToScm env (CCase sc alts) = do
         (CConAlt _ _ info _ _ _ :: _) => fatalError "\{show info} alt after nil"
         (CLitAlt _ _ :: _) => fatalError "lit alt after nil"
         _ => fatalError "too many alts after cons"
-    doCase nm (CConAlt tag cname _ args qs body :: Nil) = conAlt env nm Lin args qs body
+    doCase nm (CConAlt tag cname _ args qs body :: Nil) = conAlt env nm 1 args qs body
     doCase nm (CLitAlt _ body :: Nil) = cexpToScm env body
     doCase nm (CDefAlt body :: Nil) = cexpToScm env body
     doCase nm alts@(CLitAlt _ _ :: _) = "(case \{nm} \{joinBy " " $ map (doAlt nm) alts})"
