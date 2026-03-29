@@ -1,51 +1,24 @@
 SRCS=$(shell find src -name "*.newt")
 
-# Node shaves off 40% of the time.
-# RUNJS=bun run
-RUNJS=node
-
 .PHONY:
 
-all: newt.js
+all: build/newt.js
 
+newt2: build/newt2.js
 
-src/Revision.newt: .PHONY
-	sh ./scripts/mkrevision
+newt3: build/newt3.js
 
-newt.js: ${SRCS} src/Revision.newt
-	$(RUNJS) bootstrap/newt.js src/Main.newt -o newt.js
-
-newt2.js: newt.js
-	$(RUNJS) newt.js src/Main.newt -o newt2.js
-
-newt3.js: newt2.js
-	time $(RUNJS) newt2.js src/Main.newt -o newt3.js
-	cmp newt2.js newt3.js
-
-newt.ss: newt.js
-	$(RUNJS) newt.js src/Main.newt -o newt.ss
-
-newt.so: newt.ss prim.ss
-	chez --script scripts/compile-chez.ss
-
-newt2.ss: newt.so
-	time chez --program newt.so src/Main.newt -o newt2.ss
-
-test: newt.js
+test: build/newt.js
 	scripts/test
 
-cheztest: newt.so
-	make test NEWT='chez --program newt.so' RUNOUT="chez --script" OUTFILE=tmp/out.ss
+cheztest: build/newt.so
+	make test NEWT='chez --program build/newt.so' RUNOUT="chez --script" OUTFILE=tmp/out.ss
 
-aoctest: newt.js
+aoctest: build/newt.js
 	scripts/aoc
 	scripts/aoc25
 
-# Misc
-
-# build / install old vscode extension
-# vscode:
-	# cd newt-vscode && vsce package && code --install-extension *.vsix
+lsp: newt-vscode-lsp/dist/lsp.js playground/src/newt.js
 
 # build / install new LSP vscode extension
 vscode-lsp vscode: lsp
@@ -55,29 +28,56 @@ playground: .PHONY
 	cd playground && ./build
 
 profile: .PHONY
-	rm isolate* build/*; node --prof newt.js -o newt2.js src/Main.newt
+	rm isolate* build/*
+	node --prof build/newt.js -o build/newt2.js src/Main.newt
 	node --prof-process isolate* > profile.txt
 
 clean:
-	rm newt*.js iife.js min.js min.js.gz
+	rm  build/*
 
 audit: .PHONY
 	(cd playground && npm audit)
 	(cd newt-vscode && npm audit)
 	(cd newt-vscode-lsp && npm audit)
 
-lsp.js: ${SRCS}
-	node newt.js src/LSP.newt -o lsp.js
+##
 
-newt-vscode-lsp/src/newt.js: lsp.js
-	cp lsp.js $@
+build:
+	mkdir -p build
 
-playground/src/newt.js: lsp.js
-	cp lsp.js $@
+src/Revision.newt: .PHONY build
+	sh ./scripts/mkrevision
+
+build/newt.js: ${SRCS} src/Revision.newt build
+	node bootstrap/newt.js src/Main.newt -o build/newt.js
+
+build/newt2.js: build/newt.js
+	node build/newt.js src/Main.newt -o build/newt2.js
+
+build/newt3.js: build/newt2.js
+	time node build/newt2.js src/Main.newt -o build/newt3.js
+	cmp build/newt2.js build/newt3.js
+
+build/newt.ss: build/newt.js
+	node build/newt.js src/Main.newt -o build/newt.ss
+
+build/newt.so: build/newt.ss prim.ss
+	chez --script scripts/compile-chez.ss
+
+build/newt2.ss: build/newt.so
+	time chez --program build/newt.so src/Main.newt -o build/newt2.ss
+
+build/lsp.js: ${SRCS} build/newt.js
+	node build/newt.js src/LSP.newt -o build/lsp.js
+
+newt-vscode-lsp/src/newt.js: build/lsp.js
+	cp build/lsp.js $@
+
+playground/src/newt.js: build/lsp.js
+	cp build/lsp.js $@
 
 newt-vscode-lsp/dist/lsp.js: newt-vscode-lsp/src/lsp.ts newt-vscode-lsp/src/newt.js
 	(cd newt-vscode-lsp && node esbuild.js)
 	chmod +x $@
 
-lsp: newt-vscode-lsp/dist/lsp.js playground/src/newt.js
 

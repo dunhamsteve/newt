@@ -1,8 +1,7 @@
-#!/bin/bash 
+#!/bin/bash
 mkdir -p public
-echo copy newt
-(cd .. && make lsp.js)
-cp ../lsp.js src/newt.js
+echo build lsp.js
+(cd .. && make lsp)
 echo build newt worker
 esbuild src/worker.ts --bundle --format=esm --platform=browser > public/worker.js
 esbuild src/frame.ts --bundle --format=esm --platform=browser > public/frame.js

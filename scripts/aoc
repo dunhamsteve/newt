@@ -2,7 +2,7 @@
 mkdir -p tmp
 echo "Test AoC 2024 solutions"
 # FIXME - it turns out there are some stack issues here (including length)
-NCC="bun run newt.js"
+NCC="bun run build/newt.js"
 total=0
 failed=0
 for fn in  aoc2024/Day*.newt; do
