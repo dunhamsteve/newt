@@ -28,7 +28,7 @@ parenWrap pa = do
   pure t
 
 braces : ∀ a. Parser a -> Parser a
-braces pa = do
+braces pa = try $ do
   symbol "{"
   t <- pa
   symbol "}"
@@ -107,8 +107,9 @@ asAtom = do
     Just exp => pure $ RAs fc nm exp
     Nothing  => pure $ RVar fc nm
 
--- the inside of Raw
+
 recordUpdate : Parser Raw
+recordUpdate' : Parser Raw
 
 parenTypeExp : Parser Raw
 parenTypeExp = do
@@ -126,6 +127,7 @@ atom : Parser Raw
 atom = do
   pure MkUnit
   RU <$> getPos <* keyword "U"
+    <|> recordUpdate'
     -- <|> RVar <$> getPos <*> ident
     <|> asAtom
     <|> RVar <$> getPos <*> uident
@@ -154,6 +156,15 @@ recordUpdate = do
   symbol "]"
   tm <- optional atom
   pure $ RUpdateRec fc clauses tm
+
+recordUpdate' = do
+  fc <- getPos
+  symbol "{"
+  clauses <- sepBy (symbol ";") updateClause
+  symbol "}"
+  tm <- optional atom
+  pure $ RUpdateRec fc clauses tm
+
 
 -- Argument to a Spine
 pArg : Parser (Icit × FC × Raw)
@@ -454,11 +465,14 @@ ebind = do
 
 ibind : Parser Telescope
 ibind = do
-  -- I've gone back and forth on this, but I think {m a b} is more useful than {Int}
-  symbol "{"
-  quant <- quantity
-  names <- (some (addPos varname))
-  ty <- symbol ":" *> typeExpr
+  -- we don't know if it's an ibind or record update until we hit the `:`
+  (quant, names) <- try $ do
+    symbol "{"
+    quant <- quantity
+    names <- (some (addPos varname))
+    symbol ":"
+    pure (quant, names)
+  ty <- typeExpr
   symbol "}"
   pure $ map (makeBind quant (Just ty)) names
   where
