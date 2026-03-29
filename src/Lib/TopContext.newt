@@ -53,7 +53,7 @@ setFlag name fc flag = do
   top <- getTop
   let (Just (MkEntry fc nm ty def flags)) = lookupMap' name top.currentMod.modDefs
     | Nothing => error fc "\{show name} not declared"
-  modifyTop [ currentMod $= [ modDefs $= (updateMap name (MkEntry fc name ty def (flag :: flags)))] ]
+  modifyTop { currentMod $= { modDefs $= (updateMap name (MkEntry fc name ty def (flag :: flags)))} }
 
 setDef : QName -> FC -> Tm -> Def → List EFlag -> M Unit
 setDef name fc ty def flags = do
@@ -61,14 +61,14 @@ setDef name fc ty def flags = do
   let (Nothing) = lookupMap' name top.currentMod.modDefs
     | Just (MkEntry fc' nm' ty' def' _) => error fc "\{show name} is already defined at \{show fc'}"
 
-  modifyTop [currentMod $= [ modDefs $= (updateMap name (MkEntry fc name ty def flags))] ]
+  modifyTop {currentMod $= { modDefs $= (updateMap name (MkEntry fc name ty def flags))} }
 
 updateDef : QName -> FC -> Tm -> Def -> M Unit
 updateDef name fc ty def = do
   top <- getTop
   let (Just (MkEntry fc' nm' ty' def' flags)) = lookupMap' name top.currentMod.modDefs
     | Nothing => error fc "\{show name} not declared"
-  modifyTop [ currentMod $= [ modDefs := updateMap name (MkEntry fc' name ty def flags) top.currentMod.modDefs ] ]
+  modifyTop { currentMod $= { modDefs := updateMap name (MkEntry fc' name ty def flags) top.currentMod.modDefs } }
 
 typeName : Tm → Maybe QName
 typeName (Pi fc nm Explicit rig t u) = Nothing
@@ -86,18 +86,18 @@ addHint qn = do
         | Nothing => error entry.fc "can't find tcon name for \{show qn}"
       let xs = fromMaybe Nil $ lookupMap' tyname top.hints
       let hints = updateMap tyname ((qn, entry.type) :: xs) top.hints
-      modifyTop [ hints := hints ]
+      modifyTop { hints := hints }
     Nothing => pure MkUnit
 
 addError : Error -> M Unit
-addError err = modifyTop [ currentMod $= [ modErrors $= (err ::) ] ]
+addError err = modifyTop { currentMod $= { modErrors $= (err ::) } }
 
 addInfo : EditorInfo → M Unit
-addInfo info = modifyTop [ currentMod $= [modInfos $= (info ::) ] ]
+addInfo info = modifyTop { currentMod $= {modInfos $= (info ::) } }
 
 -- temporary? used in derive for now
 freshName : String → M String
 freshName nm = do
   top <- getTop
-  modifyTop [ freshIx $= 1 + ]
+  modifyTop { freshIx $= 1 + }
   pure $ "f$" ++ nm ++ show top.freshIx

@@ -38,7 +38,7 @@ switchModule repo modns = do
     top <- getTop
     -- mod <- processModule emptyFC repo Nil modns
     let (Just mod) = lookupMap' modns top.modules | Nothing => pure Nothing
-    modifyTop [ currentMod := mod; ops := mod.modOps ]
+    modifyTop { currentMod := mod; ops := mod.modOps }
     pure $ Just mod
 
 data HoverInfo = NoHoverInfo | NeedCheck | HasHover FC String

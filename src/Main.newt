@@ -114,7 +114,7 @@ cmdLine : List String -> M (Maybe String × List String)
 cmdLine Nil = pure (Nothing, Nil)
 cmdLine ("--top" :: args) = cmdLine args -- handled later
 cmdLine ("-v" :: args) = do
-  modifyTop [ verbose $= _+_ 1 ]
+  modifyTop { verbose $= _+_ 1 }
   cmdLine args
 cmdLine ("-o" :: fn :: args) = do
   (out, files) <- cmdLine args
@@ -166,8 +166,8 @@ runCommand (Load fn) = processFile fn
 runCommand (HelpCmd) = replHelp
 runCommand (BrowseCmd qn) = browseTop qn
 runCommand (GetDoc name) = getDoc name
-runCommand (Verbose Nothing) = modifyTop [ verbose $= _+_ 1 ]
-runCommand (Verbose (Just v)) = modifyTop [ verbose := v ]
+runCommand (Verbose Nothing) = modifyTop { verbose $= _+_ 1 }
+runCommand (Verbose (Just v)) = modifyTop { verbose := v }
 runCommand (OutputJS fn) = writeSource fn
 runCommand DumpTop = do
   json <- jsonTopContext

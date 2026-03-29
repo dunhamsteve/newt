@@ -118,10 +118,10 @@ isCandidate _ _ = False
 
 setMetaMode : MetaMode → M Unit
 -- ideally we would support dotted paths like metaCtx.mcmode := CheckFirst
-setMetaMode mcmode = modifyTop [ currentMod $= [modMetaCtx $= [mcmode := mcmode] ] ]
+setMetaMode mcmode = modifyTop { currentMod $= {modMetaCtx $= {mcmode := mcmode} } }
 
 setMetaContext : MetaContext → M Unit
-setMetaContext mc = modifyTop [ currentMod $= [ modMetaCtx := mc ]]
+setMetaContext mc = modifyTop { currentMod $= { modMetaCtx := mc }}
 
 findMatches : Context -> Val -> List (QName × Tm) -> M (List QName)
 findMatches ctx ty Nil = pure Nil
@@ -255,7 +255,7 @@ updateMeta ix f = do
   let autos = case me of
     Solved _ _ _ => filter (_/=_ ix) mc.autos
     _ => mc.autos
-  setMetaContext $ [metas $= updateMap ix me; autos := autos] mc
+  setMetaContext $ {metas $= updateMap ix me; autos := autos} mc
 
 -- Try to solve autos that reference the meta ix
 checkAutos : QName -> List QName -> M Unit
@@ -618,7 +618,7 @@ freshMeta ctx fc ty kind = do
   let autos = case kind of
       AutoSolve => qn :: mc.autos
       _ => mc.autos
-  setMetaContext $ [ metas $= updateMap qn newmeta; autos := autos; next $= 1 +] mc
+  setMetaContext $ { metas $= updateMap qn newmeta; autos := autos; next $= 1 +} mc
 
   -- I tried checking Auto immediately if CheckAll, but there isn't enough information yet.
   pure $ applyBDs 0 (Meta fc qn) ctx.bds

@@ -68,12 +68,12 @@ lspFileSource = do
 
 updateFile : String → String → Unit
 updateFile fn src = unsafePerformIO $ do
-    modifyIORef state [ files $= updateMap fn src ]
+    modifyIORef state { files $= updateMap fn src }
     st <- readIORef state
     let (base,modName) = decomposeName fn
     Right (ctx,_) <- (invalidateModule modName).runM st.topContext
         | _ => writeIORef state st
-    modifyIORef state [ topContext := ctx ]
+    modifyIORef state { topContext := ctx }
 
 
 fcToRange : FC → Json
@@ -96,17 +96,17 @@ hoverInfo uri line col = unsafePerformIO $ do
     -- We're proactively running check if there is no module information, make sure we save it
     Right (top, HasHover fc msg) <- (getHoverInfo repo modns line col).runM st.topContext
         | Right (top, NeedCheck)  => do
-            modifyIORef state $ [ topContext := top ]
+            modifyIORef state $ { topContext := top }
             putStrLn $ "NeedsCheck"
             pure $ js_castBool True
         | Right (top, NoHoverInfo)  => do
-            modifyIORef state $ [ topContext := top ]
+            modifyIORef state $ { topContext := top }
             putStrLn $ "Nothing to see here"
             pure $ js_castBool True
         | Left err => do
             putStrLn $ showError "" err
             pure $ jsonToJObject JsonNull
-    modifyIORef state $ [ topContext := top ]
+    modifyIORef state $ { topContext := top }
     let location = JsonObj $ ("uri", JsonStr fc.file) :: ("range", fcToRange fc) :: Nil
     pure $ jsonToJObject $ JsonObj $ ("info", JsonStr msg) :: ("location", location) :: Nil
 
@@ -126,7 +126,7 @@ codeActionInfo uri line col = unsafePerformIO $ do
       putStrLn "ACTIONS ERROR"
       putStrLn $ showError "" err
       pure js_null
-  modifyIORef state $ [ topContext := top ]
+  modifyIORef state $ { topContext := top }
   pure $ jsonToJObject $ JsonArray $ map actionToJson actions
   where
     single : String → Json → Json
@@ -238,7 +238,7 @@ checkFile fn = unsafePerformIO $ do
     (Right (top, json)) <- (do
         putStrLn "processModule"
         mod <- processModule emptyFC repo Nil modName
-        modifyTop [ currentMod := mod; ops := mod.modOps ]
+        modifyTop { currentMod := mod; ops := mod.modOps }
 
         -- pull out errors and infos
         top <- getTop
@@ -251,7 +251,7 @@ checkFile fn = unsafePerformIO $ do
             putStrLn $ showError "" err
             pure $ jsonToJObject $ JsonArray $ errorToDiag err :: Nil
     -- Cache loaded modules
-    modifyIORef state $ [ topContext := top ]
+    modifyIORef state $ { topContext := top }
     pure $ jsonToJObject $ JsonArray json
 
 docSymbols : String → JSObject
@@ -265,11 +265,11 @@ docSymbols fn = unsafePerformIO $ do
     repo <- lspFileSource
     (Right (top, json)) <- (do
         mod <- processModule emptyFC repo Nil modName
-        modifyTop [ currentMod := mod; ops := mod.modOps ]
+        modifyTop { currentMod := mod; ops := mod.modOps }
         getSymbols).runM st.topContext
         | Left err => do
            pure $ jsonToJObject $ JsonNull
-    modifyIORef state $ [ topContext := top ]
+    modifyIORef state $ { topContext := top }
     pure $ jsonToJObject $ JsonArray json
 
 compileJS : String → JSObject
@@ -287,7 +287,7 @@ compileJS fn = unsafePerformIO $ do
           ++ map (render 90 ∘ noAlt) docs
     pure src).runM st.topContext
     | Left err => pure $ js_castStr "// \{errorMsg err}"
-  modifyIORef state [ topContext := top ]
+  modifyIORef state { topContext := top }
   pure $ js_castStr src
 
 compileToScheme : String → JSObject
@@ -302,7 +302,7 @@ compileToScheme fn = unsafePerformIO $ do
     let src = unlines docs
     pure src).runM st.topContext
     | Left err => pure $ js_castStr ";; \{errorMsg err}"
-  modifyIORef state [ topContext := top ]
+  modifyIORef state { topContext := top }
   pure $ js_castStr src
 
 #export updateFile checkFile hoverInfo codeActionInfo compileJS docSymbols compileToScheme

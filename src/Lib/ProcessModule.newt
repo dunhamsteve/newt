@@ -17,13 +17,13 @@ import Lib.Elab
 -- declare internal primitives
 addPrimitives : M ModContext
 addPrimitives = do
-  modifyTop [ currentMod := emptyModCtx "Prim" ""; hints := emptyMap; ops := emptyMap ]
+  modifyTop { currentMod := emptyModCtx "Prim" ""; hints := emptyMap; ops := emptyMap }
   processDecl primNS (PType emptyFC "Int" Nothing)
   processDecl primNS (PType emptyFC "String" Nothing)
   processDecl primNS (PType emptyFC "Char" Nothing)
   setDef (QN primNS "PiType") emptyFC (Erased emptyFC) (PrimFn "(h0, h1) => ({ tag: \"PiType\", h0, h1 });" (S (S Z)) Nil) Nil
   top <- getTop
-  modifyTop [ modules $= updateMap primNS top.currentMod ]
+  modifyTop { modules $= updateMap primNS top.currentMod }
   pure top.currentMod
 
 record FileSource where
@@ -74,12 +74,12 @@ processModule importFC repo stk modns = do
 
   -- Dummy for initial load/parse
   let mod = MkModCtx modns "" emptyMap freshMC emptyMap Nil Nil Nil
-  modifyTop [ currentMod := mod; hints := emptyMap; ops := emptyMap ]
+  modifyTop { currentMod := mod; hints := emptyMap; ops := emptyMap }
 
   -- TODO now we can pass in the module name...
   Right (fn,src) <- tryError $ repo.getFile importFC fn
     | Left err => reportError err  -- TODO maybe want a better FC.
-  modifyTop [ currentMod $= [ modSource := src ]]
+  modifyTop { currentMod $= { modSource := src }}
 
   let (Right toks) = tokenise fn src
     | Left err => reportError err
@@ -108,10 +108,10 @@ processModule importFC repo stk modns = do
   -- currentMod has been wiped by imports..
   let freshMC = MC emptyMap Nil 0 CheckAll
   let mod = MkModCtx modns src emptyMap freshMC emptyMap imported Nil Nil
-  modifyTop [ currentMod := mod
+  modifyTop { currentMod := mod
             ; hints := emptyMap
             ; ops := ops
-            ]
+            }
 
   -- top hints / ops include all directly imported modules
   top <- getTop
@@ -119,7 +119,7 @@ processModule importFC repo stk modns = do
     (MkImport fc (nameFC, ns)) => do
       let (Just mod) = lookupMap' ns top.modules | _ => error emptyFC "namespace \{show ns} missing"
       importHints (listValues mod.modDefs)
-      modifyTop [ ops $= mergeOps mod.modOps ]
+      modifyTop { ops $= mergeOps mod.modOps }
 
       -- add error if an import contains an error
       -- maybe move this to after reporting
@@ -135,7 +135,7 @@ processModule importFC repo stk modns = do
   -- aside from reworking parsing, we could filter
   -- other options are removing updates from parsing (so we must use incremental parsing)
   -- or removing pratt from parsing (so it happens in elaboration)
-  modifyTop [ currentMod $= [ modOps := ops ] ]
+  modifyTop { currentMod $= { modOps := ops } }
 
   log 1 $ \ _ => "process Decls"
   traverse (tryProcessDecl src modns) (collectDecl decls)
@@ -151,7 +151,7 @@ processModule importFC repo stk modns = do
   -- update modules with result, leave the rest of context in case this is top file
   top <- getTop
   let modules = updateMap modns top.currentMod top.modules
-  modifyTop [modules := modules]
+  modifyTop {modules := modules}
 
   pure top.currentMod
   where
@@ -159,7 +159,7 @@ processModule importFC repo stk modns = do
     reportError err = do
       addError err
       top <- getTop
-      modifyTop [modules $= updateMap modns top.currentMod ]
+      modifyTop {modules $= updateMap modns top.currentMod }
       pure top.currentMod
 
     tryProcessDecl : String → String → Decl → M Unit
@@ -174,7 +174,7 @@ invalidateModule modname = do
   let modules = join $ map getDeps $ toList top.modules
   let revMap = map swap modules
   let deps = foldl accumulate emptyMap revMap
-  modifyTop [ modules $= go deps (modname :: Nil) ]
+  modifyTop { modules $= go deps (modname :: Nil) }
   where
     accumulate : SortedMap String (List String) → String × String → SortedMap String (List String)
     accumulate deps (k,v) = let prev = fromMaybe Nil $ lookupMap' k deps
