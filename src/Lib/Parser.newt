@@ -109,7 +109,6 @@ asAtom = do
 
 
 recordUpdate : Parser Raw
-recordUpdate' : Parser Raw
 
 parenTypeExp : Parser Raw
 parenTypeExp = do
@@ -127,7 +126,7 @@ atom : Parser Raw
 atom = do
   pure MkUnit
   RU <$> getPos <* keyword "U"
-    <|> recordUpdate'
+    <|> recordUpdate
     -- <|> RVar <$> getPos <*> ident
     <|> asAtom
     <|> RVar <$> getPos <*> uident
@@ -136,7 +135,6 @@ atom = do
     <|> RImplicit <$> getPos <* keyword "_"
     <|> RHole <$> getPos <* keyword "?"
     <|> parenTypeExp
-    <|> recordUpdate
 
 updateClause : Parser UpdateClause
 updateClause = do
@@ -148,16 +146,7 @@ updateClause = do
     True => pure $ AssignField fc nm tm
     _    => pure $ ModifyField fc nm tm
 
--- ambiguity vs {a} or {a} -> ... is tough, we can do [] or put a keyword in front.
 recordUpdate = do
-  fc <- getPos
-  symbol "["
-  clauses <- sepBy (symbol ";") updateClause
-  symbol "]"
-  tm <- optional atom
-  pure $ RUpdateRec fc clauses tm
-
-recordUpdate' = do
   fc <- getPos
   symbol "{"
   clauses <- sepBy (symbol ";") updateClause

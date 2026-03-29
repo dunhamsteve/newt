@@ -8,12 +8,12 @@ record Foo where
   baz : Nat
 
 blah : Foo → Foo
-blah x = [ bar := Z ] x
+blah x = { bar := Z } x
 
 main : IO Unit
 main = do
   let x = blah $ MkFoo (S Z) (S (S Z))
   printLn x.bar
   -- this is unfortunate, it can't get record type from a meta
-  let x' = the Foo $ [ baz := Z ] x
+  let x' = the Foo $ { baz := Z } x
   printLn x'.baz
