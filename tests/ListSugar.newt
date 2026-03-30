@@ -1,0 +1,19 @@
+module ListSugar
+
+import Prelude
+
+
+blah : List Int
+blah = [ 1, 2, 3]
+
+bar : List Int → Int
+bar [ ] = 0
+bar [x] = 1
+bar _ = 42
+
+main : IO Unit
+main = do
+  printLn blah
+  printLn $ bar []
+  printLn $ bar [ 42 ]
+  printLn $ bar blah
