@@ -12,6 +12,6 @@ dependencies:
     - time
 steps:
   - name: "build newt"
-    command: "make newt3.js"
+    command: "make newt3"
   - name: "test"
     command: "make test"
