@@ -1,0 +1,13 @@
+.item {
+  display: flex;
+}
+.item > * {
+  vertical-align: middle;
+  padding-right: 10px;
+}
+.item > div {
+  display: inline;
+  width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
