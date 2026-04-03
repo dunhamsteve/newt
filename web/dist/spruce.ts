@@ -22,7 +22,7 @@ export function runapp<Model, Msg>(
 ) {
   function replace(parent: Node, node: Node | undefined, child: Node) {
     if (node) {
-      parent.insertBefore(node, child);
+      parent.insertBefore(child, node);
       parent.removeChild(node);
     } else {
       parent.appendChild(child);
