@@ -56,7 +56,7 @@ toHex 0 = Nil
 toHex v = snoc (toHex (div v 16)) (hexDigit v)
 
 padding : Int → Char → String
-padding n ch = go n Nil
+padding n ch = if n < 1 then "" else go n Nil
   where
     go : Int → List Char → String
     go 0 chs = pack chs
