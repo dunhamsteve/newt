@@ -29,8 +29,7 @@ pfunc runApp : ∀ msg model. Element → model → (update : msg → model → 
         if (node) {
             parent.insertBefore(child, node);
             parent.removeChild(node);
-        }
-        else {
+        } else {
             parent.appendChild(child);
         }
         return child;
@@ -47,8 +46,7 @@ pfunc runApp : ∀ msg model. Element → model → (update : msg → model → 
         let el;
         if (node instanceof Element && node.tagName.toLowerCase() == vnode.h1) {
             el = node;
-        }
-        else {
+        } else {
             el = document.createElement(vnode.h1);
         }
         // update node here
