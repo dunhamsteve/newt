@@ -385,10 +385,16 @@ expToDoc (Index obj ix) = expToDoc obj ++ text "[" ++ expToDoc ix ++ text "]"
 expToDoc (Dot obj nm) = expToDoc obj ++ text "." ++ jsIdent nm
 expToDoc (JPrimOp op t u) = parens 0 1 (expToDoc t) <+> text op <+> parens 0 1 (expToDoc u)
 
+stmtWithBreak : ∀ e. JSStmt e → Doc
+stmtWithBreak (JSnoc x y) = stmtToDoc x </> stmtWithBreak y
+stmtWithBreak st@(JReturn _) = stmtToDoc st
+stmtWithBreak st@(JContinue) = stmtToDoc st
+stmtWithBreak st = stmtToDoc st </> text "break;"
+
 caseBody : ∀ e. JSStmt e -> Doc
 caseBody stmt@(JReturn x) = nest 2 (line ++ stmtToDoc stmt)
-caseBody {e} stmt@(JCase _ _) = nest 2 (line ++ stmtToDoc stmt </> text "break;")
-caseBody stmt = line ++ text "{" ++ nest 2 (line ++ stmtToDoc stmt </> text "break;") </> text "}"
+caseBody stmt@(JCase _ _) = nest 2 (line ++ stmtToDoc stmt </> text "break;")
+caseBody stmt = line ++ text "{" ++ nest 2 (line ++ stmtWithBreak stmt) </> text "}"
 
 altToDoc : JAlt -> Doc
 altToDoc (JConAlt nm stmt) = text "case" <+> text (show nm) ++ text ":" ++ caseBody stmt
