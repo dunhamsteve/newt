@@ -1,0 +1,190 @@
+module Todo
+
+import Prelude
+import Web.Spruce
+
+data FilterState = All | Active | Completed
+derive Eq FilterState
+data Msg
+  = Toggle Nat
+  | Remove Nat
+  -- TODO behavior varies by implementation, but probably should do return / esc / blur
+  | StartEdit Nat
+  | EndEdit Nat String
+  | Change String
+  | Filter FilterState
+  | Clear
+  | ToggleAll
+
+record Item where
+  checked : Bool
+  text : String
+
+data EditState = NoEdit | Edit Nat
+
+record Model where
+  items : List Item
+  newText : String
+  filter : FilterState
+  edit : EditState
+
+ElCon : U
+ElCon = List (Attr Msg) → List (VNode Msg) → VNode Msg
+
+-- Attributes
+
+onChange : (String → Msg) → Attr Msg
+onChange = VAttr "onChange"
+
+onClick : Msg → Attr Msg
+onClick action = MAttr "OnClick" action
+
+className : String → Attr Msg
+className v = SAttr "class" v
+
+checkbox : Bool → Nat → VNode Msg
+checkbox checked ix =
+  tag "input" [ className "toggle"
+              , SAttr "checked" (ite checked "true" "")
+              , onChange (\ _ => Toggle ix)
+              , SAttr "type" "checkbox" ] []
+
+-- Elements
+
+section : ElCon
+section = tag "section"
+
+header : ElCon
+header = tag "header"
+
+footer : ElCon
+footer = tag "footer"
+
+div : ElCon
+div = tag "div"
+
+ul : ElCon
+ul = tag "ul"
+
+li : ElCon
+li = tag "li"
+
+span : ElCon
+span = tag "span"
+
+id_ : String → Attr Msg
+id_ id = SAttr "id" id
+
+itemView : FilterState → EditState → Nat × Item → Maybe (VNode Msg)
+itemView filter estate (ix , item) =
+  if exclude filter item then Nothing else
+  Just $ li [ className (getCName estate) ]
+    [ div [ className "view", MAttr "onDblClick" (StartEdit ix) ]
+      [ checkbox item.checked ix
+      , tag "label" [] [text item.text]
+      , tag "button" [ className "destroy", MAttr "onClick" (Remove ix)] []
+      ]
+    , tag "input" [ className "edit"
+                  , onChange (EndEdit ix)
+                  , SAttr "value" item.text ] [ ]
+    ]
+  where
+    getCName : EditState → String
+    getCName NoEdit = ite item.checked "completed" ""
+    getCName (Edit n) = if n == ix then "editing" else if item.checked then "completed" else ""
+
+    exclude : FilterState → Item → Bool
+    exclude All _ = False
+    exclude Active (MkItem checked text) = checked
+    exclude Completed (MkItem checked text) = not checked
+
+footerView : Model → VNode Msg
+-- we don't have undefined/empty at the moment..
+footerView (MkModel Nil _ _ _) = div [] []
+footerView (MkModel items _ select _) =
+  let count = length' $ filter (\ item => not item.checked) items
+      ccount = length' $ filter (\ item => item.checked) items
+      label = text $ if count == 1 then " item left" else " items left"
+  in footer [className "footer"]
+    [ span [ className "todo-count" ] [ tag "strong" [] [ text $ show count ], label ]
+    , ul [ className "filters" ]
+         [ li [] [ tag "a" [ getClass All, onClick (Filter All)] [ text "All" ]]
+         , li [] [ tag "a" [ getClass Active, onClick (Filter Active)] [ text "Active" ]]
+         , li [] [ tag "a" [ getClass Completed, onClick (Filter Completed)] [ text "Completed" ]]
+         ]
+    , (if ccount == 0 then div [] [] else tag "button" [ className "clear-completed", onClick Clear ] [ text "Clear completed" ])
+    ]
+  where
+    getClass : FilterState → Attr Msg
+    getClass x = if x == select then className "selected" else className ""
+
+listView : Model → VNode Msg
+listView (MkModel Nil _ _ _) = div [] []
+listView (MkModel items newText select estate) =
+    let count = length' items
+        acount = length' $ (filter (\ item => not item.checked) items)
+    in tag "section" [ className "main" ]
+      [ tag "input" [ id_ "toggle-all"
+                    , className "toggle-all"
+                    , onClick ToggleAll
+                    , SAttr "type" "checkbox"] []
+      -- accessibility
+      , tag "label" [ SAttr "for" "toggle-all"] [ text "Mark all as complete" ]
+      , ul [ className "todo-list" ] (mapMaybe (itemView select estate) (enumerate items))
+      ]
+view : Model → VNode Msg
+view model =
+  section [ className "todoapp" ]
+    [ header [ className "header" ]
+        [ tag "h1" [] [ text "todos" ]
+        , tag "input" [ className "new-todo"
+                      , SAttr "placeholder" "What needs to be done?"
+                      , SAttr "value" model.newText
+                      , VAttr "onChange" Change
+                      , SAttr "autofocus" "true"] []]
+    , listView model
+    , footerView model
+    ]
+
+isEmpty : ∀ a. List a → Bool
+isEmpty Nil = True
+isEmpty _ = False
+
+update : Msg → Model → Model
+update Clear model = { items $= filter (\ item => not item.checked) } model
+update (StartEdit ix) model = { edit := Edit ix } model
+update (EndEdit ix text) model = { edit := NoEdit; items $= edit ix } model
+  where
+    edit : Nat → List Item → List Item
+    edit Z (item :: items) = the Item { text := text } item :: items
+    edit (S k) (item :: items) = item :: edit k items
+    edit _ Nil = Nil
+
+update ToggleAll model =
+  let checked = not $ isEmpty $ filter (\item => not item.checked) model.items
+  in { items $= map (the (Item → Item) { checked := checked }) } model
+
+update (Toggle ix) model = { items $= toggle ix } model
+  where
+    toggleItem : Item → Item
+    toggleItem item = { checked := not item.checked } item
+
+    toggle : Nat → List Item → List Item
+    toggle _ Nil = Nil
+    toggle Z (item :: rest) = toggleItem item :: rest
+    toggle (S k) (item :: rest) = item :: toggle k rest
+
+update (Filter filter) model = { filter := filter } model
+update (Remove ix) model = {items $= delete ix } model
+  where
+    delete : Nat → List Item → List Item
+    delete _ Nil = Nil
+    delete Z (item :: rest) = rest
+    delete (S k) (item :: rest) = item :: delete k rest
+
+update (Change text) model = { items := (snoc model.items $ MkItem False text) } model
+
+main : IO Unit
+main = pure $ runApp (getElementById "main") (MkModel [] "" All NoEdit) update view
+
+

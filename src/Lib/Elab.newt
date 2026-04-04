@@ -1426,7 +1426,7 @@ updateRec ctx fc clauses arg ty = do
     getTele Nothing (VPi _ _ _ _ a b) = do
       a <- forceType ctx.env a
       getTele (Just $ RVar fc "$ru") a
-    getTele Nothing v = error fc "Expected a pi type, got \{show v}"
+    getTele Nothing v = error fc "Expected \{show v}, missing argument to record update."
     getTele (Just tm) v = error (getFC tm) "Expected a record type, got \{show v}"
 
 infer : Context -> Raw  -> M (Tm × Val)

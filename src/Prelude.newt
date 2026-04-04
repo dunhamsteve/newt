@@ -282,8 +282,6 @@ instance Eq String where
 instance Eq Char where
   a == b = eqChar a b
 
-
-
 ptype Array : U → U
 pfunc listToArray : ∀ a. List a → Array a := `
 (a, l) => {
