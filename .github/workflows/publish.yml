@@ -35,6 +35,11 @@ jobs:
           ./build
           vite build
           # vite build --base /newt
+      - name: build todomvc
+        run: |
+          cd todomvc
+          node ../build/newt.js src/Todo.newt -o app.js
+          vite build --base /todomvc --outDir ../playground/dist/todomvc
       - name: Upload playground
         id: deployment
         uses: actions/upload-pages-artifact@v3
