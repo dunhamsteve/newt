@@ -315,8 +315,8 @@ termToJS {e} env (CCase t alts) f =
     maybeCaseStmt env sc ((CConAlt _ _ info args qs u) :: Nil) = (termToJS (conAltEnv sc 0 env args) u f)
     maybeCaseStmt env sc alts@(CLitAlt _ u :: Nil) = termToJS env u f
     maybeCaseStmt env sc alts@(CDefAlt u :: Nil) = termToJS env u f
-    maybeCaseStmt env sc alts@(CLitAlt _ _  :: _) =
-        (JCase sc (map (termToJSAlt env sc) alts))
+    -- maybeCaseStmt env sc alts@(CLitAlt _ _  :: _) =
+    --     (JCase sc (map (termToJSAlt env sc) alts))
     maybeCaseStmt env sc alts = case alts of
         -- Bool alt becomes tertiary operator
         CLitAlt (LBool b) rhs :: alt :: Nil =>
@@ -329,6 +329,8 @@ termToJS {e} env (CCase t alts) f =
               t' = termToJS (conAltEnv sc 0 env args) t f
               u' = termToJS (conAltEnv sc 0 env $ getArgs alt) (getBody alt) f
           in tertiary cond t' u' f
+        alts@(CLitAlt _ _  :: _) =>
+          (JCase sc (map (termToJSAlt env sc) alts))
         -- fall back to switch statement
         alts => JCase (Dot sc "tag") (map (termToJSAlt env sc) alts)
 
