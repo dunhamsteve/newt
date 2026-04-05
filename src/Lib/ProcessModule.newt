@@ -181,7 +181,7 @@ invalidateModule modname = do
       in updateMap k (v :: prev) deps
 
     getDeps : String × ModContext → List (String × String)
-    getDeps (nm, mod) = map (nm , ) mod.modDeps
+    getDeps (nm, mod) = map (_,_ nm) mod.modDeps
 
     go : SortedMap String (List String) → List String → SortedMap String ModContext → SortedMap String ModContext
     go deps Nil mods = mods

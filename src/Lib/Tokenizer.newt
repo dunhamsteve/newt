@@ -25,7 +25,7 @@ keywords = ("let" :: "in" :: "where" :: "case" :: "of" :: "data" :: "U" :: "do" 
             "if" :: "then" :: "else" ::
             -- it would be nice to find a way to unkeyword "." so it could be
             -- used as an operator too
-            "$" :: "λ" :: "?" :: "@" :: "." ::
+            "$" :: "λ" :: "?" :: "@" :: "." :: "," ::
              "->" :: "→" :: ":" :: "=>" :: ":=" :: "$="
              :: "=" :: "<-" :: "\\" :: "_" :: "|" :: Nil)
 
@@ -101,7 +101,6 @@ rawTokenise ts@(TS sl sc toks chars) = case chars of
           rawTokenise (TS sl (sc + 1) (toks :< tok) cs)
         cs => Left $ E (MkFC "" (MkBounds sl sc sl (sc + 1))) "Expected '}'"
 
-  ',' :: cs => rawTokenise (TS sl (sc + 1) (toks :< mktok False sl (sc + 1) Ident ",") cs)
   '_' :: ',' :: '_' :: cs => rawTokenise (TS sl (sc + 3) (toks :< mktok False sl (sc + 3) MixFix "_,_") cs)
   '_' :: '.' :: '_' :: cs => rawTokenise (TS sl (sc + 3) (toks :< mktok False sl (sc + 3) MixFix "_._") cs)
   '\'' :: '\\' :: c :: '\'' :: cs =>

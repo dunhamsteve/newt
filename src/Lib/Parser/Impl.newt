@@ -131,11 +131,20 @@ some p = do
   pure (x :: xs)
 many p = some p <|> pure Nil
 
+optional : ∀ a. Parser a -> Parser (Maybe a)
+optional pa = Just <$> pa <|> pure Nothing
+
 -- one or more `a` seperated by `s`
 
 sepBy : ∀ s a. Parser s -> Parser a -> Parser (List a)
 sepBy s a = _::_ <$> a <*> many (s *> a)
 
+-- zero or more `a` seperated by `s`
+sepBy' : ∀ s a. Parser s -> Parser a -> Parser (List a)
+sepBy' s a = do
+    Just x <- optional a | _ => pure Nil
+    xs <- many (s *> a)
+    pure $ x :: xs
 
 getPos : Parser FC
 getPos = P $ \last toks com ops indent => case toks of

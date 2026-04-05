@@ -80,18 +80,6 @@ lookupDef ctx name = go 0 ctx.types ctx.env
     go ix ((nm, ty) :: xs) (v :: vs) = if nm == name then Just v else go (1 + ix) xs vs
     go ix _ _ = Nothing
 
-expandList : FC → Maybe Raw → Raw
-expandList fc Nothing = RVar fc "Nil"
-expandList fc (Just t) = go fc t
-  where
-    cons : FC → Raw → Raw → Raw
-    cons fc t u = RApp fc (RApp fc (RVar fc "_::_") t Explicit) u Explicit
-
-    go : FC → Raw → Raw
-    go fc (RApp fc' (RApp fc'' (RVar fc "_,_") t Explicit) u Explicit) =
-      cons fc t $ go fc u
-    go fc t = cons fc t (RVar fc "Nil")
-
 forceMeta : Val -> M Val
 forceMeta (VMeta fc ix sp) = do
   meta <- lookupMeta ix
@@ -989,7 +977,6 @@ mkPat (RAs fc as tm, icit) = do
     (PatCon fc icit nm args Nothing) => pure $ PatCon fc icit nm args (Just as)
     (PatCon fc icit nm args _) => error fc "Double as pattern \{show tm}"
     t => error fc "Can't put as on non-constructor \{show tm}"
-mkPat (RList fc mt, icit) = mkPat (expandList fc mt, icit)
 mkPat (tm, icit) = do
   top <- getTop
   case splitArgs tm Nil of
@@ -1550,8 +1537,6 @@ infer ctx (RVar fc nm) = go 0 ctx.types
         Nothing => throwError $ ENotInScope fc nm
     go i ((x, ty) :: xs) = if x == nm then pure (Bnd fc i, ty)
       else go (i + 1) xs
-
-infer ctx (RList fc mt) = infer ctx $ expandList fc mt
 
 infer ctx (RApp fc t u icit) = do
   -- If the app is explicit, add any necessary metas

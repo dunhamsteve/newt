@@ -6,6 +6,9 @@ import Prelude
 blah : List Int
 blah = [ 1, 2, 3]
 
+pairs : List (Int × Int)
+pairs = [ (1,2), (3,4)]
+
 bar : List Int → Int
 bar [ ] = 0
 bar [x] = 1

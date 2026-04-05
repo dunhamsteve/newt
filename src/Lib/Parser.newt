@@ -41,10 +41,6 @@ dbraces pa = do
   symbol "}}"
   pure t
 
-
-optional : ∀ a. Parser a -> Parser (Maybe a)
-optional pa = Just <$> pa <|> pure Nothing
-
 stringLit : Parser Raw
 stringLit = do
   fc <- getPos
@@ -98,25 +94,42 @@ lit = intLit <|> interpString <|> stringLit <|> charLit
 addPos : ∀ a. Parser a -> Parser (FC × a)
 addPos pa = _,_ <$> getPos <*> pa
 
-asAtom : Parser Raw
-asAtom = do
-  fc <- getPos
-  nm <- ident
-  asPat <- optional $ keyword "@" *> parenWrap typeExpr
-  case asPat of
-    Just exp => pure $ RAs fc nm exp
-    Nothing  => pure $ RVar fc nm
 
 
 recordUpdate : Parser Raw
+parseOp : Parser Raw
 
 listTypeExp : Parser Raw
 listTypeExp = do
   fc <- getPos
   symbol "["
-  tm <- optional typeExpr
+  -- many of these though
+  tms <- sepBy' (symbol ",") parseOp
+  nilFC <- getPos
   symbol "]"
-  pure $ RList fc tm
+  pure $ expandList nilFC tms
+  where
+    cons : FC → Raw → Raw → Raw
+    cons fc t u = RApp fc (RApp fc (RVar fc "_::_") t Explicit) u Explicit
+
+    expandList : FC → List Raw → Raw
+    expandList fc Nil = RVar fc "Nil"
+    expandList fc (x :: xs) = cons (getFC x) x $ expandList fc xs
+
+
+
+parenTypeExp' : Parser Raw
+parenTypeExp' = do
+  pure MkUnit
+  t <- typeExpr
+  ts <- many $ keyword "," >> typeExpr
+  pure $ comma t ts
+  where
+    comma : Raw → List Raw → Raw
+    comma acc Nil = acc
+    comma acc (t :: ts) =
+      let fc = getFC t in
+      (RApp fc (RApp fc (RVar fc "_,_") acc Explicit) (comma t ts) Explicit)
 
 parenTypeExp : Parser Raw
 parenTypeExp = do
@@ -126,9 +139,16 @@ parenTypeExp = do
   fc' <- getPos
   Nothing <- optional $ symbol ")"
     | Just tm => do pure $ RImpossible (fc + fc')
-  t <- typeExpr
-  symbol ")"
-  pure t
+  parenTypeExp' <* symbol ")"
+
+asAtom : Parser Raw
+asAtom = do
+  fc <- getPos
+  nm <- ident
+  asPat <- optional $ keyword "@" *> parenTypeExp
+  case asPat of
+    Just exp => pure $ RAs fc nm exp
+    Nothing  => pure $ RVar fc nm
 
 atom : Parser Raw
 atom = do
@@ -168,9 +188,9 @@ recordUpdate = do
 pArg : Parser (Icit × FC × Raw)
 pArg = do
   fc <- getPos
-  (\x => Implicit, fc, x) <$> braces typeExpr
-    <|> (\x => Auto, fc, x) <$> dbraces typeExpr
-    <|> (\x => Explicit, fc, x) <$> atom
+  (\x => (Implicit, fc, x)) <$> braces typeExpr
+    <|> (\x => (Auto, fc, x)) <$> dbraces typeExpr
+    <|> (\x => (Explicit, fc, x)) <$> atom
 
 AppSpine : U
 AppSpine = List (Icit × FC × Raw)
@@ -263,14 +283,14 @@ pratt ops prec stop left spine = do
 
 
 
-parseOp : Parser Raw
+
 parseOp = do
   fc <- getPos
   ops <- getOps
   hd <- atom
   rest <- many pArg
   (res, Nil) <- pratt ops 0 "" hd rest
-    | _ => fail "extra stuff"
+    | (res, xs) => fail "extra stuff \{show xs}"
   pure res
 
 letExpr : Parser Raw
@@ -300,10 +320,10 @@ pLamArg = impArg <|> expArg
   where
     -- TODO - we're moving away from uppercase variables, but a test uses them
     impArg : Parser (Icit × String × Maybe Raw)
-    impArg = (Implicit, ) <$> braces (_,_ <$> (ident <|> uident) <*> optional (symbol ":" >> typeExpr))
+    impArg = (_,_ Implicit ) <$> braces (_,_ <$> (ident <|> uident) <*> optional (symbol ":" >> typeExpr))
 
     expArg : Parser (Icit × String × Maybe Raw)
-    expArg = (Explicit , ) <$> parenWrap (_,_ <$> ident <*> optional (symbol ":" >> typeExpr))
+    expArg = (_,_ Explicit) <$> parenWrap (_,_ <$> ident <*> optional (symbol ":" >> typeExpr))
 
 lamExpr : Parser Raw
 lamExpr = do
@@ -353,7 +373,7 @@ caseLet = do
   -- look ahead so we can fall back to normal let
   fc <- getPos
   try (keyword "let" >> symbol "(")
-  pat <- typeExpr
+  pat <- parenTypeExp'
   symbol ")"
   keyword "="
   sc <- typeExpr
@@ -368,7 +388,7 @@ doCaseLet = do
   -- Maybe make it work like arrow?
   fc <- getPos
   try (keyword "let" >> symbol "(")
-  pat <- typeExpr
+  pat <- parenTypeExp'
   symbol ")"
   keyword "="
   sc <- typeExpr

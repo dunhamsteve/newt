@@ -60,7 +60,6 @@ data Raw : U where
   -- has to be applied or we have to know its type as Foo → Foo to elaborate.
   -- I can bake the arg in here, or require an app in elab.
   RUpdateRec : (fc : FC) → List UpdateClause → Maybe Raw → Raw
-  RList : (fc : FC) → Maybe Raw → Raw
 
 instance HasFC Raw where
   getFC (RVar fc nm) = fc
@@ -79,7 +78,6 @@ instance HasFC Raw where
   getFC (RAs fc _ _) = fc
   getFC (RUpdateRec fc _ _) = fc
   getFC (RImpossible fc) = fc
-  getFC (RList fc _) = fc
 
 data Import = MkImport FC (FC × Name)
 
@@ -191,8 +189,6 @@ instance Pretty Raw where
     asDoc p (RWhere _ dd b) = text "TODO pretty RWhere"
     asDoc p (RAs _ nm x) = text nm ++ text "@(" ++ asDoc 0 x ++ text ")"
     asDoc p (RUpdateRec _ clauses tm) = text "{" <+> text "TODO RUpdateRec" <+> text "}"
-    asDoc p (RList _ (Just t)) = text "[" <+> asDoc p t <+> text "]"
-    asDoc p (RList _ Nothing) = text "[]"
 
 prettyBind : (BindInfo × Raw) -> Doc
 prettyBind (BI _ nm icit quant, ty) = wrap icit (text (show quant ++ nm) <+> text ":" <+> pretty ty)
@@ -250,8 +246,7 @@ substRaw ss t = case t of
   (RWhere fc ds body) => RWhere fc (map substDecl ds) (substRaw ss body)
   (RDo fc stmts) => RDo fc (substStmts ss stmts)
   (RCase fc scrut mdef alts) => RCase fc (substRaw ss scrut) (map (substRaw ss) mdef) (map substAlt alts)
-  (RList fc (Just t)) => RList fc (Just $ substRaw ss t)
-  (RList fc Nothing) => RList fc Nothing
+
   -- Enumerate to force consideration of new cases
   t@(RImpossible _) => t
   t@(RU _) => t

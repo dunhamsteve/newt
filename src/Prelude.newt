@@ -88,7 +88,7 @@ xs <>< (y :: ys) = (xs :< y) <>< ys
 -- f $ a = f a
 
 infixr 8 _×_
-infixr 2 _,_
+infixr 2 _,_ -- deprecated decl, it is special now
 data a × b = (a,b)
 
 fst : ∀ a b. a × b → a

@@ -266,7 +266,7 @@ REVIEW could I avoid most of this by using `function` instead of arrow functions
 -- TODO factor out to CompilerCommon
 sortedNames : SortedMap QName CExp → List QName → List QName
 sortedNames defs names =
-  map snd $ filter (not ∘ fst) $ foldl (go Nil) Nil $ map (True,) names
+  map snd $ filter (not ∘ fst) $ foldl (go Nil) Nil $ map (_,_ True) names
   where
     getBody : CAlt → CExp
     getBody (CConAlt _ _ _ _ _ t) = t
