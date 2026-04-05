@@ -757,6 +757,13 @@ instance Ord Int where
 instance Ord Char where
   compare a b = if eqChar a b then EQ else if ltChar a b then LT else GT
 
+instance Ord Bool where
+  compare True True = EQ
+  compare True False = GT
+  compare False True = LT
+  compare False False = EQ
+
+
 flip : ∀ a b c. (a → b → c) → (b → a → c)
 flip f b a = f a b
 

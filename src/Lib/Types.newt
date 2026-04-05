@@ -23,11 +23,10 @@ derive Show BD
 data Quant = Zero | Many
 derive Eq Quant
 
+-- Used for pretty-printing
 instance Show Quant where
   show Zero = "0 "
   show Many = ""
-
--- We could make this polymorphic and use for environment...
 
 data BindInfo : U where
   BI : (fc : FC) -> (name : Name) -> (icit : Icit) -> (quant : Quant) -> BindInfo
