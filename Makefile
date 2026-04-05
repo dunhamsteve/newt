@@ -27,10 +27,12 @@ vscode-lsp vscode: lsp
 playground: .PHONY
 	cd playground && ./build
 
-profile: .PHONY
-	rm isolate* build/*
-	node --prof build/newt.js -o build/newt2.js src/Main.newt
-	node --prof-process isolate* > profile.txt
+# prettify newt2 (the version built by latest newt) and run a profile on it
+profile: .PHONY build/newt.js build/newt2.js
+	rm -f isolate*
+	prettier -w build/newt2.js --ignore-path junk.js
+	node --prof build/newt2.js -o build/newt3.js src/Main.newt
+	node --prof-process isolate* > build/profile.txt
 
 clean:
 	rm  build/*
