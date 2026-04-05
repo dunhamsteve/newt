@@ -104,7 +104,7 @@ listTypeExp = do
   fc <- getPos
   symbol "["
   -- many of these though
-  tms <- sepBy' (symbol ",") parseOp
+  tms <- sepBy' (symbol ",") typeExpr
   nilFC <- getPos
   symbol "]"
   pure $ expandList nilFC tms
