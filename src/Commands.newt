@@ -16,7 +16,6 @@ import Data.SortedMap
 import Lib.Parser
 import Lib.Syntax
 import Lib.Parser.Impl
-import Lib.Error
 
 -- For now we cheat and assume capitalized directories are a module component
 decomposeName : String → String × String
@@ -235,7 +234,7 @@ introActions (Just $ Unsolved fc qn ctx vty User constraints) =
         pure $ map makeEdit cons
   ) $ \ err => do
       putStrLn "Got error in introActions:"
-      putStrLn $ showError "" err
+      putStrLn $ show err
       pure Nil
   where
     introDCon : QName × Int × Tm → List String

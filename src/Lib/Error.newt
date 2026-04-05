@@ -1,30 +1,26 @@
 module Lib.Error
 
 import Prelude
+import Lib.Types
+import Lib.Eval
 import Lib.Common
 
--- I'll want to get Context / Val in some of these
--- and a pretty printer in the monad
-data Error
-  = E FC String
-  | ENotInScope FC String
-  | Postpone FC QName String
+prettyErrorMsg : Error -> M String
+prettyErrorMsg (E x str) = pure str
+prettyErrorMsg (ENotInScope x nm) = pure "\{nm} not in scope"
+prettyErrorMsg (Postpone x k str) = pure str
+prettyErrorMsg (UnificationError fc names a b err) = do
+  let lvl = length' names
+  a <- quote lvl a
+  b <- quote lvl b
+  pure "unification failure: \{errorMsg err}\n  failed to unify \{rpprint names a}\n             with \{rpprint names b}\n  "
 
-
-instance HasFC Error where
-  getFC (E x str) = x
-  getFC (ENotInScope x _) = x
-  getFC (Postpone x k str) = x
-
-errorMsg : Error -> String
-errorMsg (E x str) = str
-errorMsg (ENotInScope x nm) = "\{nm} not in scope"
-errorMsg (Postpone x k str) = str
-
-showError : (src : String) -> Error -> String
-showError src err =
-  let fc = getFC err
-  in "ERROR at \{show $ getFC err}: \{errorMsg err}\n" ++ go fc 0 (lines src)
+-- Use prettyError when possible
+showError : (src : String) -> Error -> M String
+showError src err = do
+    let fc = getFC err
+    msg <- prettyErrorMsg err
+    pure $ "ERROR at \{show fc}: \{msg}\n" ++ go fc 0 (lines src)
   where
     go : FC → Int → List String → String
     go fc l Nil = ""
@@ -34,4 +30,5 @@ showError src err =
         "  \{x}\n  \{padding (fcCol fc) ' '}\{padding width '^'}\n"
       else if fcLine fc - 3 < l then "  " ++ x ++ "\n" ++ go fc (l + 1) xs
       else go fc (l + 1) xs
+
 

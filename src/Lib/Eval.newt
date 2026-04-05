@@ -9,7 +9,7 @@ import Lib.TopContext
 import Data.IORef
 import Data.SnocList
 import Data.SortedMap
-import Lib.Error
+
 
 eval : Env -> Tm -> M Val
 
@@ -329,7 +329,7 @@ zonkApp top l env t sp = do
     x <- zonk top l env t'
     pure x)
     (\err => do
-      debug $ \_ => "result err \{showError "" err}"
+      debug $ \_ => "result err \{show err}"
       pure $ appSpine t' sp)
   where
     -- lookup name and return Def if flagged inline

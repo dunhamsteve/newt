@@ -102,7 +102,7 @@ class Monad (m : U → U) where
   bind : ∀ a b. m a → (a → m b) → m b
   pure : ∀ a. a → m a
 
-infixl 1 _>>=_ _>>_
+infixl 1 _>>=_ _>>_ _>=>_
 _>>=_ : ∀ m a b. {{Monad m}} → (m a) → (a → m b) → m b
 ma >>= amb = bind ma amb
 
@@ -111,6 +111,9 @@ ma >> mb = bind ma (\ _ => mb)
 
 join : ∀ m a. {{Monad m}} → m (m a) → m a
 join mma = mma >>= id
+
+_>=>_ : ∀ m a b c. {{Monad m}} → (a → m b) → (b → m c) → a → m c
+(mab >=> mac) a = mab a >>= mac
 
 -- Equality
 

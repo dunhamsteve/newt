@@ -13,7 +13,6 @@ import Lib.Util
 import Lib.TopContext
 import Lib.Syntax
 import Lib.Types
-import Lib.Error
 
 vprint : Context -> Val -> M String
 vprint ctx v = do
@@ -28,9 +27,6 @@ collectDecl ((FunDef fc nm cl) :: rest@(FunDef _ nm' cl' :: xs)) =
   else (FunDef fc nm cl :: collectDecl rest)
 collectDecl (x :: xs) = x :: collectDecl xs
 
--- TODO Move this, so we don't need to import all of Elab
-rpprint : List String → Tm → String
-rpprint names tm = render 90 $ pprint names tm
 
 showCtx : Context -> M String
 showCtx ctx =
@@ -144,7 +140,7 @@ findMatches ctx ty ((name, type) :: xs) = do
       setMetaContext mc
       (_::_ name) <$> findMatches ctx ty xs)
     (\ err => do
-      debug $ \ _ => "No match \{show ty} \{rpprint Nil type} \{showError "" err}"
+      debug $ \ _ => "No match \{show ty} \{rpprint Nil type} \{show err}"
       setMetaContext mc
       findMatches ctx ty xs)
 
@@ -166,7 +162,7 @@ contextMatches ctx ty = go (zip ctx.env ctx.types)
           tm <- quote ctx.lvl tm
           (_::_ (tm, vty)) <$> go xs)
         (\ err => do
-          debug $ \ _ => "No match \{show ty} \{rpprint (names ctx) type} \{showError "" err}"
+          debug $ \ _ => "No match \{show ty} \{rpprint (names ctx) type} \{show err}"
           setMetaContext mc
           go xs)
 
@@ -394,7 +390,7 @@ solve env m sp t = do
   -- Will this get is into trouble?
   Right ren <- tryError $ invert l sp
     | Left err => do
-        debug $ \ _ => "postpone constraint \{showError "" err}"
+        debug $ \ _ => "postpone constraint \{show err}"
         addConstraint env m sp t
   -- force unlet
   hack <- quote l t
@@ -588,10 +584,7 @@ unifyCatch fc ctx ty' ty = do
     res <- catchError (unify ctx.env UNormal ty' ty) $ \err => do
       let names = map fst ctx.types
       debug $ \ _ => "fail \{show ty'} \{show ty}"
-      a <- quote ctx.lvl ty'
-      b <- quote ctx.lvl ty
-      let msg = "unification failure: \{errorMsg err}\n  failed to unify \{rpprint names a}\n             with \{rpprint names b}\n  "
-      throwError (E fc msg)
+      throwError $ UnificationError fc names ty' ty err
     case res of
       MkResult Nil => pure MkUnit
       cs => do

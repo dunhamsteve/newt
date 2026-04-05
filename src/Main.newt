@@ -8,6 +8,7 @@ import Lib.CompileJS
 import Lib.CompileScheme
 import Lib.Parser
 import Lib.Elab
+import Lib.Error
 import Lib.Util
 import Lib.Parser.Impl
 import Lib.Prettier
@@ -20,7 +21,6 @@ import Lib.Syntax
 import Lib.ReplParser
 import Node
 import Revision
-import Lib.Error
 
 dirFileSource : String → FileSource
 dirFileSource base = MkFileSource base $ \fc fn => do
@@ -177,10 +177,10 @@ runCommand DumpTop = do
 runString : String → M Unit
 runString line = do
   let (Right toks) = tokenise "<stdin>" line
-    | Left err => putStrLn (showError line err)
+    | Left err => showError line err >>= putStrLn
   let (Right cmd) = parse "<stdin>" parseCommand toks
-    | Left err => putStrLn (showError line err)
-  catchError (runCommand cmd) (\ err => putStrLn $ showError line err)
+    | Left err => showError line err >>= putStrLn
+  catchError (runCommand cmd) (showError line >=> putStrLn)
 
 runRepl : M Unit
 runRepl = do

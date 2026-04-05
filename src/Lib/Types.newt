@@ -3,7 +3,6 @@ module Lib.Types
 import Prelude
 import Lib.Common
 import Lib.Prettier
-import Lib.Error
 
 import Data.IORef
 import Data.SnocList
@@ -234,6 +233,33 @@ data MetaKind = Normal | User | AutoSolve | ErrorHole
 
 derive Show MetaKind
 derive Eq MetaKind
+
+rpprint : List String → Tm → String
+rpprint names tm = render 90 $ pprint names tm
+
+-- In types so we can have Val / Tm / Context
+data Error
+  = E FC String
+  | ENotInScope FC String
+  | Postpone FC QName String
+  | UnificationError FC (List String) Val Val Error
+
+instance HasFC Error where
+  getFC (E x str) = x
+  getFC (UnificationError fc _ _ _ _) = fc
+  getFC (ENotInScope x _) = x
+  getFC (Postpone x k str) = x
+
+-- Non-pretty version, there is an in-monad prettyErrorMsg in Lib.Error
+errorMsg : Error -> String
+errorMsg (E x str) = str
+errorMsg (ENotInScope x nm) = "\{nm} not in scope"
+errorMsg (Postpone x k str) = str
+errorMsg (UnificationError fc names a b err) =
+  "unification failure: \{errorMsg err}\n  failed to unify \{show a}\n             with \{show b}\n  "
+
+instance Show Error where
+  show err = "ERROR at \{show $ getFC err}: \{errorMsg err}\n"
 
 -- constrain meta applied to val to be a val
 
@@ -536,4 +562,3 @@ profile desc work = do
   end <- getTime
   putStrLn "PROF \{desc} \{show $ end - start} ms"
   pure res
-

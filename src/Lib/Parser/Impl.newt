@@ -7,7 +7,7 @@ import Data.String
 import Data.Int
 import Data.List1
 import Data.SortedMap
-import Lib.Error
+import Lib.Types
 
 TokenList : U
 TokenList = List BTok

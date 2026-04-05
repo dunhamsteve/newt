@@ -3,6 +3,7 @@ module LSP
 import Prelude
 import Lib.Common
 import Lib.Eval
+import Lib.Error
 import Lib.Types
 import Lib.TopContext
 import Lib.Tokenizer
@@ -15,7 +16,7 @@ import Node
 import Commands
 import Lib.ProcessDecl
 import Lib.Prettier
-import Lib.Error
+
 import Lib.CompileJS
 import Lib.CompileScheme
 
@@ -104,7 +105,7 @@ hoverInfo uri line col = unsafePerformIO $ do
             putStrLn $ "Nothing to see here"
             pure $ js_castBool True
         | Left err => do
-            putStrLn $ showError "" err
+            putStrLn $ show err
             pure $ jsonToJObject JsonNull
     modifyIORef state $ { topContext := top }
     let location = JsonObj $ ("uri", JsonStr fc.file) :: ("range", fcToRange fc) :: Nil
@@ -124,7 +125,7 @@ codeActionInfo uri line col = unsafePerformIO $ do
     pure actions).runM st.topContext
     | Left err => do
       putStrLn "ACTIONS ERROR"
-      putStrLn $ showError "" err
+      putStrLn $ show err
       pure js_null
   modifyIORef state $ { topContext := top }
   pure $ jsonToJObject $ JsonArray $ map actionToJson actions
@@ -161,12 +162,13 @@ codeActionInfo uri line col = unsafePerformIO $ do
         :: ("edit", (single "changes" $ single uri $ JsonArray $ map editToJson edits))
         :: Nil
 
-errorToDiag : Error -> Json
-errorToDiag err =
-  JsonObj
+errorToDiag : Error -> M Json
+errorToDiag err = do
+  msg <- prettyErrorMsg err
+  pure $ JsonObj
     $  ("severity", JsonInt 1)
     :: ("range", fcToRange (getFC err))
-    :: ("message", JsonStr (errorMsg err))
+    :: ("message", JsonStr msg)
     :: ("source", JsonStr "newt") -- what is this key for?
     :: Nil
 -- These shouldn't escape
@@ -242,14 +244,21 @@ checkFile fn = unsafePerformIO $ do
 
         -- pull out errors and infos
         top <- getTop
-        let errors = map (errorToDiag) top.currentMod.modErrors
+        errors <- traverse (errorToDiag) top.currentMod.modErrors
         infos <- getInfos
         pure $ infos ++ errors
         ).runM st.topContext
         | Left err => do
             putStrLn "**** Error without updating top:"
-            putStrLn $ showError "" err
-            pure $ jsonToJObject $ JsonArray $ errorToDiag err :: Nil
+            putStrLn $ show err
+            pure $ jsonToJObject $ JsonArray
+              [ JsonObj $ ("severity", JsonInt 1)
+                        :: ("range", fcToRange (getFC err))
+                        :: ("message", JsonStr (errorMsg err))
+                        :: ("source", JsonStr "newt") -- what is this key for?
+                        :: Nil
+                        ]
+
     -- Cache loaded modules
     modifyIORef state $ { topContext := top }
     pure $ jsonToJObject $ JsonArray json

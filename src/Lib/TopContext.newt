@@ -6,7 +6,7 @@ import Data.String
 import Prelude
 import Lib.Common
 import Lib.Types
-import Lib.Error
+
 
 -- TODO move the def in here (along with M) or merge this into types
 -- The Monad can be its own file if we pull all of the monad update functions there.

@@ -5,7 +5,7 @@ import Lib.Common
 import Lib.Types
 import Lib.Syntax
 import Lib.TopContext
-import Lib.Error
+
 import Lib.Elab -- (lookupDCon)
 import Lib.Prettier
 
