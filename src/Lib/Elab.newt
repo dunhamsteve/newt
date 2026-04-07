@@ -132,9 +132,9 @@ findMatches ctx ty ((name, type) :: xs) = do
       -- TODO sort out the FC here
       let fc = getFC ty
       debug $ \ _ => "TRY \{show name} : \{rpprint Nil type} for \{show ty}"
-      -- This check is solving metas, so we save mc below in case we want this solution
       let (QN ns nm) = name
       setMetaMode CheckFirst
+      -- Check is filling in implicit arguments here
       tm <- check ctx (RVar fc nm) ty
       debug $ \ _ => "Found \{rpprint Nil tm} for \{show ty}"
       setMetaContext mc
@@ -157,7 +157,6 @@ contextMatches ctx ty = go (zip ctx.env ctx.types)
       catchError(do
           debug $ \ _ => "TRY context \{nm} : \{rpprint (names ctx) type} for \{show ty}"
           unifyCatch (getFC ty) ctx ty vty
-          let mc' = top.currentMod.modMetaCtx
           setMetaContext mc
           tm <- quote ctx.lvl tm
           (_::_ (tm, vty)) <$> go xs)
@@ -1073,6 +1072,7 @@ checkDone fc ctx (PC nm (PatVar pvfc _ nm') scty :: xs) body ty = do
   addInfo $ CaseSplit pvfc ctx nm' scty
 
   let ctx = MkCtx ctx.lvl ctx.env (rename ctx.types) ctx.bds ctx.ctxFC
+  let ctx = the Context { types $= rename } ctx
   checkDone fc ctx xs body ty
   where
     rename : List (String × Val) -> List (String × Val)

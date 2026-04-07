@@ -382,6 +382,7 @@ caseLet = do
   body <- term
   pure $ RCase fc sc Nothing (MkAlt pat (Just body) :: alts)
 
+-- TODO Desugaring here because there is not corresponding DoStmt
 doCaseLet : Parser DoStmt
 doCaseLet = do
   -- look ahead so we can fall back to normal let
@@ -393,7 +394,6 @@ doCaseLet = do
   keyword "="
   sc <- typeExpr
   alts <- startBlock $ manySame $ symbol "|" *> caseAlt
-  -- REVIEW why am I collecting the rest here?
   bodyFC <- getPos
   body <- RDo <$> getPos <*> someSame doStmt
   pure $ DoExpr fc (RCase fc sc Nothing (MkAlt pat (Just body) :: alts))

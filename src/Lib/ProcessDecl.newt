@@ -179,10 +179,8 @@ processDef ns fc nm clauses = do
   clauses' <- traverse makeClause clauses
   tm <- buildTree (mkCtx fc) (MkProb clauses' vty)
 
+  -- We might want to freeze the autos after this
   solveAutos
-  -- This inlines metas and functions flagged Inline.
-  -- moved to Compile.newt because it was interfering with type checking (Zoo4eg.newt) via over-reduction
-  -- tm' <- zonk top 0 Nil tm
 
   -- for effect, so we see errors in the editor
   -- We need to keep the _unerased_ term for checking

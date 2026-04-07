@@ -2,15 +2,13 @@
 ## TODO
 
 - [x] Scheme backend
-- [ ] Smart encoding of lists (and cons cells?) in scheme
-- [ ] Unsolved meta in Lib.Types doesn't print when building newt.
-  - delete Show Char to test, it does surface in the LSP, we need to dump these when processing dependent modules
+- [x] Smart encoding of lists (and cons cells?) in scheme
 - [ ] maybe `let case` instead of `let ()` (which is a little subtle)
   - Or simply put a term in there and treat as a variable iff it is lowercase and non-app
 - [x] Use looping for TCO
   - For single functions at least - I think this would be a performance win. I've learned that the slowness on `bun` goes away if I drop the TCO transform.
   - Doing this manually for `lookupT23` got 3% speedup.
-  - got 12% speedup overall from this, not doing it for mutual recursion
+  - [ ] got 12% speedup overall from this, not doing it yet for mutual recursion
 - [ ] Importing Prelude twice should be an error (currently it causes double hints and breaks auto)
 - [x] For errors in other files, point to the import
 - [x] Unsolved metas should be errors (user metas are fine)
@@ -19,12 +17,12 @@
 - [ ] preserve information on record / class / instance for LSP "document symbols" kind
   - We will want some of this for default implementations in class
   - It may help avoid reverse-engineering the class when processing implementation
-- [ ] Put `Def` on `Ref`
+- [ ] Put a copy of the `Def` on `Ref` terms
   - It may be Axiom for forward/recursive functions, but it would get us DCon and TCon info without lookup - and may save passing around the Ref2 (+lookup) during Compilation.
 - [x] Restore "add missing cases" for LSP mode
 - [x] Case split for LSP mode
 - [x] Require lowercase pattern variables
-  - I accidentally misspell a constructor and end up with a wildcard.
+  - otherwise, I accidentally misspell a constructor and end up with a wildcard.
 - [x] Leverage LSP code for web playground
 - [ ] Improve handling of names:
   - We need FC on names in a lot of places
@@ -152,6 +150,7 @@
 - [x] implement magic nat
 - [ ] Consider splitting desugar/check
   - We can only check physical syntax at the moment, which has been inconvenient in a couple of spots where we want to check generated code. E.g. solutions to auto implicits.
+  - case let for do, list syntax, and tuple syntax are desugared in the parser. operators are run in the parser.
 - [x] record update can't elaborate if type is unsolved meta
   - The issue actually was a solved meta that wasn't forced
 - [x] drop erased args on types and top level functions
