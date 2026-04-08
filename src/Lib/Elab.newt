@@ -33,7 +33,7 @@ showCtx ctx =
   unlines ∘ reverse <$> go (names ctx) 0 (reverse $ zip ctx.env ctx.types) Nil
   where
     isVar : Int -> Val -> Bool
-    isVar k (VVar _ k' Lin) = k == k'
+    isVar k (VVar _ nm k' Lin) = k == k'
     isVar _ _ = False
 
     go : List String -> Int -> List (Val × String × Val) -> List String -> M (List String)
@@ -174,7 +174,7 @@ getArity _ = Nil
 makeSpine : Int -> List BD -> SnocList Val
 makeSpine k Nil = Lin
 makeSpine k (Defined :: xs) = makeSpine (k - 1) xs
-makeSpine k (Bound :: xs) = makeSpine (k - 1) xs :< VVar emptyFC (k - 1) Lin
+makeSpine k (Bound :: xs) = makeSpine (k - 1) xs :< VVar emptyFC "_" (k - 1) Lin
 
 solve : Env -> QName -> SnocList Val -> Val -> M Unit
 
@@ -289,7 +289,7 @@ invert lvl sp = go sp Nil
   where
     go : SnocList Val -> List Int -> M (List Int)
     go Lin acc = pure $ reverse acc
-    go (xs :< VVar fc k Lin) acc = do
+    go (xs :< VVar fc nm k Lin) acc = do
       if elem k acc
         then do
           debug $ \ _ => "\{show k} \{show acc}"
@@ -307,7 +307,7 @@ renameSpine meta ren lvl tm (xs :< x) = do
   xs' <- renameSpine meta ren lvl tm xs
   pure $ App emptyFC xs' xtm
 
-rename meta ren lvl (VVar fc k sp) = case findIndex' (_==_ k) ren of
+rename meta ren lvl (VVar fc nm k sp) = case findIndex' (_==_ k) ren of
   Nothing => error fc "scope/skolem thinger VVar \{show k} ren \{show ren}"
   Just x => renameSpine meta ren lvl (Bnd fc x) sp
 rename meta ren lvl (VRef fc nm sp) = renameSpine meta ren lvl (Ref fc nm) sp
@@ -328,12 +328,12 @@ rename meta ren lvl (VMeta fc ix sp) = do
           debug $ \ _ => "rename: \{show ix} is unsolved"
           catchError (renameSpine meta ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc ix (errorMsg err))
 rename meta ren lvl (VLam fc n icit rig t) = do
-  tapp <- t $$ VVar fc lvl Lin
+  tapp <- t $$ VVar fc n lvl Lin
   scope <- rename meta (lvl :: ren) (1 + lvl) tapp
   pure (Lam fc n icit rig scope)
 rename meta ren lvl (VPi fc n icit rig ty tm) = do
   ty' <- rename meta ren lvl ty
-  tmapp <- tm $$ VVar emptyFC lvl Lin
+  tmapp <- tm $$ VVar emptyFC n lvl Lin
   scope' <- rename meta (lvl :: ren) (1 + lvl) tmapp
   pure (Pi fc n icit rig ty' scope')
 rename meta ren lvl (VU fc) = pure (UU fc)
@@ -463,8 +463,8 @@ unify env mode t u = do
     -- newt will have similar issues because it doesn't emit a default case
 
     unifyRest : Val -> Val -> M UnifyResult
-    unifyRest (VPi fc _ _ _ a b) (VPi fc' _ _ _ a' b') = do
-      let fresh = VVar fc (length' env) Lin
+    unifyRest (VPi fc nm _ _ a b) (VPi fc' _ _ _ a' b') = do
+      let fresh = VVar fc nm (length' env) Lin
       xb <- b $$ fresh
       xb' <- b' $$ fresh
       _<+>_ <$> unify env mode a a' <*> unify (fresh :: env) mode xb xb'
@@ -514,18 +514,18 @@ unify env mode t u = do
     unifyRef t u = unifyRest t u
 
     unifyVar : Val -> Val -> M UnifyResult
-    unifyVar t'@(VVar fc k sp)  u'@(VVar fc' k' sp')  =
+    unifyVar t'@(VVar fc n₁ k sp)  u'@(VVar fc' n₂ k' sp')  =
       if k == k' then unifySpine env mode (k == k') sp sp'
       -- FIXME - get some names in here.
       else error fc "Failed to unify \{show t'} and \{show u'}"
 
-    unifyVar t'@(VVar fc k Lin) u = do
+    unifyVar t'@(VVar fc nm k Lin) u = do
       vu <- tryEval env u
       case vu of
         Just v => unify env mode t' v
         Nothing => error fc "Failed to unify \{show t'} and \{show u}"
 
-    unifyVar t u'@(VVar fc k Lin) = do
+    unifyVar t u'@(VVar fc nm k Lin) = do
       vt <- tryEval env t
       case vt of
         Just v => unify env mode v u'
@@ -533,20 +533,20 @@ unify env mode t u = do
     unifyVar t u = unifyRef t u
 
     unifyLam : Val -> Val -> M UnifyResult
-    unifyLam (VLam fc _ _ _ t)  (VLam _ _ _ _ t') = do
-      let fresh = VVar fc (length' env) Lin
+    unifyLam (VLam fc n _ _ t)  (VLam _ _ _ _ t') = do
+      let fresh = VVar fc n (length' env) Lin
       vappt <- t $$ fresh
       vappt' <- t' $$ fresh
       unify (fresh :: env) mode vappt vappt'
-    unifyLam t         (VLam fc' _ _ _ t') = do
+    unifyLam t         (VLam fc' nm _ _ t') = do
       debug $ \ _ => "ETA \{show t}"
-      let fresh = VVar fc' (length' env) Lin
+      let fresh = VVar fc' nm (length' env) Lin
       vappt <- vapp t fresh
       vappt' <- t' $$ fresh
       unify (fresh :: env) mode vappt vappt'
-    unifyLam (VLam fc _ _ _ t)  t'     = do
+    unifyLam (VLam fc n _ _ t)  t'     = do
       debug $ \ _ => "ETA' \{show t'}"
-      let fresh = VVar fc (length' env) Lin
+      let fresh = VVar fc n (length' env) Lin
       appt <- t $$ fresh
       vappt' <- vapp t' fresh
       unify (fresh :: env) mode appt vappt'
@@ -565,7 +565,7 @@ unify env mode t u = do
     unifyMeta t v = unifyLam t v
 
     unifyPattern : Val -> Val -> M UnifyResult
-    unifyPattern t'@(VVar fc k sp)  u'@(VVar fc' k' sp')  =
+    unifyPattern t'@(VVar fc n₁ k sp)  u'@(VVar fc' n₂ k' sp')  =
       if k == k' then unifySpine env mode (k == k') sp sp'
       else case (sp, sp') of
         (Lin,Lin) => if k < k'
@@ -575,8 +575,8 @@ unify env mode t u = do
         (_,Lin) => pure $ MkResult ((k', t') :: Nil)
         _ => error fc "Failed to unify \{show t'} and \{show u'} at \{show mode}"
 
-    unifyPattern (VVar fc k Lin) u = pure $ MkResult((k, u) :: Nil)
-    unifyPattern t (VVar fc k Lin) = pure $ MkResult ((k, t) :: Nil)
+    unifyPattern (VVar fc nm k Lin) u = pure $ MkResult((k, u) :: Nil)
+    unifyPattern t (VVar fc nm k Lin) = pure $ MkResult ((k, t) :: Nil)
     unifyPattern t u = unifyMeta t u
 
 unifyCatch fc ctx ty' ty = do
@@ -718,9 +718,9 @@ extendPi : Context -> Val -> SnocList Bind -> SnocList Val -> M (Context × Val 
 extendPi ctx (VPi x str icit rig a b) nms sc = do
     let nm = fresh str -- "pat"
     let ctx' = extend ctx nm a
-    let v = VVar emptyFC (length' ctx.env) Lin
+    let v = VVar emptyFC str (length' ctx.env) Lin
     tyb <- b $$ v
-    extendPi ctx' tyb (nms :< MkBind nm icit a) (sc :< VVar x (length' ctx.env) Lin)
+    extendPi ctx' tyb (nms :< MkBind nm icit a) (sc :< VVar x str (length' ctx.env) Lin)
 extendPi ctx ty nms sc = pure (ctx, ty, nms <>> Nil, sc)
 
 -- turn vars into lets for forced values.
@@ -730,7 +730,7 @@ substVal : Int -> Val -> Val -> Val
 substVal k v tm = go tm
   where
     go : Val -> Val
-    go (VVar fc j sp) = if j == k then v else (VVar fc j (map go sp))
+    go (VVar fc nm j sp) = if j == k then v else (VVar fc nm j (map go sp))
     go (VPi fc nm icit rig a b) = VPi fc nm icit rig (go a) b
     go (VMeta fc ix sp) = VMeta fc ix (map go sp)
     go (VRef fc nm sp) = VRef fc nm (map go sp)
@@ -748,7 +748,7 @@ updateContext ctx ((k, val) :: cs) =
   else
   let ix = cast $ lvl2ix (length' ctx.env) k in
   case getAt ix ctx.env of
-    (Just (VVar _ k' Lin)) =>
+    (Just (VVar _ _ k' Lin)) =>
       if k' /= k
         then updateContext ctx ((k',val) :: cs)
         else
@@ -761,7 +761,7 @@ updateContext ctx ((k, val) :: cs) =
     Nothing => error (getFC val) "INTERNAL ERROR: bad index in updateContext"
   where
     isSelf : Int → Val → Bool
-    isSelf ix (VVar _ k Lin) = ix == k
+    isSelf ix (VVar _ _ k Lin) = ix == k
     isSelf ix _ = False
 
     replaceV : ∀ a. Nat -> a -> List a -> List a
@@ -1223,7 +1223,7 @@ buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ str 
   -- type of the rest
   clauses <- traverse (introClause nm icit a) prob.clauses
   -- REVIEW fc from a pat?
-  vb <- b $$ VVar fc l Lin
+  vb <- b $$ VVar fc nm l Lin
   Lam fc nm icit rig <$> buildTree ctx' (MkProb clauses vb)
 buildTree ctx prob@(MkProb ((MkClause fc cons pats@(x :: xs) expr) :: cs) ty) =
   error fc "Extra pattern variables \{show pats}"
@@ -1309,7 +1309,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
     pat => error (getFC pat) "Internal error - tried to split on \{show pat}"
 
 showDef : Context -> List String -> Int -> Val -> M String
-showDef ctx names n v@(VVar _ n' Lin) =  if n == n'
+showDef ctx names n v@(VVar _ nm n' Lin) =  if n == n'
   then pure ""
   else do
     -- REVIEW - was using names, is it ok to pull from the context?
@@ -1453,13 +1453,13 @@ check ctx tm ty = do
     (t@(RLam fc (BI _ nm icit _) tm), ty@(VPi fc' nm' icit' rig a b)) => do
             debug $ \ _ => "icits \{nm} \{show icit} \{nm'} \{show icit'}"
             if icit == icit' then do
-                let var = VVar fc (length' ctx.env) Lin
+                let var = VVar fc nm (length' ctx.env) Lin
                 let ctx' = extend ctx nm a
                 bapp <- b $$ var
                 tm' <- check ctx' tm bapp
                 pure $ Lam fc nm icit rig tm'
               else if icit' /= Explicit then do
-                let var = VVar fc (length' ctx.env) Lin
+                let var = VVar fc nm' (length' ctx.env) Lin
                 ty' <- b $$ var
                 -- use nm' here if we want them automatically in scope
                 sc <- check (extend ctx nm' a) t ty'
@@ -1485,7 +1485,7 @@ check ctx tm ty = do
     (tm, ty@(VPi fc nm' Implicit rig a b)) => do
       let names = map fst ctx.types
       debug $ \ _ => "elab.insert: Add implicit lambda {\{nm'} : \{show a}} to \{show tm} "
-      let var = VVar fc (length' ctx.env) Lin
+      let var = VVar fc nm' (length' ctx.env) Lin
       ty' <- b $$ var
       debugM $ do
         pty' <- prvalCtx {{(extend ctx nm' a)}} ty'
@@ -1495,7 +1495,7 @@ check ctx tm ty = do
 
     (tm, ty@(VPi fc nm' Auto rig a b)) => do
       debug $ \ _ => "elab.insert: Add auto lambda {\{nm'} : \{show a}} to \{show tm}"
-      let var = VVar fc (length' ctx.env) Lin
+      let var = VVar fc nm' (length' ctx.env) Lin
       ty' <- b $$ var
       debugM $ do
         pty' <- prvalCtx {{(extend ctx nm' a)}} ty'

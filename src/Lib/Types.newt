@@ -171,7 +171,7 @@ Closure : U
 Env : U
 
 data Val : U where
-  VVar : FC -> (k : Int) -> (sp : SnocList Val) -> Val
+  VVar : FC -> (nm : String) -> (k : Int) -> (sp : SnocList Val) -> Val
   VRef : FC -> (nm : QName) -> (sp : SnocList Val) -> Val
   VCase : FC -> (sc : Val) -> Env -> List CaseAlt -> Val
   VMeta : FC -> QName -> (sp : SnocList Val) -> Val
@@ -190,7 +190,7 @@ Env = List Val
 data Closure = MkClosure Env Tm
 
 getValFC : Val -> FC
-getValFC (VVar fc _ _) = fc
+getValFC (VVar fc _ _ _) = fc
 getValFC (VRef fc _ _) = fc
 getValFC (VCase fc _ _ _) = fc
 getValFC (VMeta fc _ _) = fc
@@ -207,8 +207,8 @@ instance HasFC Val where getFC = getValFC
 showClosure : Closure → String
 
 instance Show Val where
-  show (VVar _ k Lin) = "%var\{show k}"
-  show (VVar _ k sp) = "(%var\{show k} \{unwords $ map show (sp <>> Nil)})"
+  show (VVar _ nm k Lin) = "\{show nm}:\{show k}"
+  show (VVar _ nm k sp) = "(\{show nm}:\{show k} \{unwords $ map show (sp <>> Nil)})"
   show (VRef _ nm Lin) = show nm
   show (VRef _ nm sp) = "(\{show nm} \{unwords $ map show (sp <>> Nil)})"
   show (VMeta _ ix sp) = "(%meta \{show ix} [\{show $ snoclen sp} sp])"
@@ -387,7 +387,7 @@ record Context where
 -- add a binding to environment
 extend : Context -> String -> Val -> Context
 extend (MkCtx lvl env types bds ctxFC) name ty =
-  MkCtx (1 + lvl) (VVar emptyFC lvl Lin :: env) ((name,ty) :: types) (Bound :: bds) ctxFC
+  MkCtx (1 + lvl) (VVar emptyFC name lvl Lin :: env) ((name,ty) :: types) (Bound :: bds) ctxFC
 
 -- add a def to the environment
 define : Context -> String -> Val -> Val -> Context

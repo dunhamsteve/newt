@@ -25,7 +25,7 @@ _$$_ (MkClosure env tm) u = eval (u :: env) tm
 
 vapp : Val -> Val -> M Val
 vapp (VLam _ _ _ _ t) u = t $$ u
-vapp (VVar fc k sp) u = pure $ VVar fc k (sp :< u)
+vapp (VVar fc nm k sp) u = pure $ VVar fc nm k (sp :< u)
 vapp (VRef fc nm sp) u = pure $ VRef fc nm (sp :< u)
 vapp (VMeta fc k sp) u = pure $ VMeta fc k (sp :< u)
 -- not really impossible, could be a stuck VCase.
@@ -42,15 +42,15 @@ lookupVar env k = let l = cast $ length env in
   if k > l
     then Nothing
     else case getAt (cast $ lvl2ix l k) env of
-      Just v@(VVar fc k' sp) => if k == k' then Nothing else Just v
+      Just v@(VVar fc nm k' sp) => if k == k' then Nothing else Just v
       Just v => Just v
       Nothing => Nothing
 
 -- hoping to apply what we got via pattern matching
 -- TODO see if we can drop this after updating pattern matching
 unlet : Env -> Val -> M Val
-unlet env t@(VVar fc k sp) = case lookupVar env k of
-      Just tt@(VVar fc' k' sp') => do
+unlet env t@(VVar fc nm k sp) = case lookupVar env k of
+      Just tt@(VVar fc' nm' k' sp') => do
         debug $ \ _ =>  "lookup \{show k} is \{show tt}"
         if k' == k then pure t else (vappSpine tt sp >>= unlet env)
       Just t => vappSpine t sp >>= unlet env
@@ -210,28 +210,28 @@ normAlt env l (CaseCons nm args tm) = do
   where
     mkenv : Int → Env → List String → Env
     mkenv l env Nil = env
-    mkenv l env (n :: ns) = mkenv (l + 1) (VVar emptyFC l Lin :: env) ns
+    mkenv l env (n :: ns) = mkenv (l + 1) (VVar emptyFC n l Lin :: env) ns
 
-quote l (VVar fc k sp) = if k < l
+quote l (VVar fc nm k sp) = if k < l
   then quoteSp l (Bnd fc (lvl2ix l k )) sp -- level to index
-  else error fc "Bad level in quote \{show k} depth \{show l}"
+  else error fc "Bad level in quote \{nm}:\{show k} depth \{show l}"
 quote l (VMeta fc i sp) = do
   meta <- lookupMeta i
   case meta of
         (Solved _ k t) => vappSpine t sp >>= quote l
         _ => quoteSp l (Meta fc i) sp
 quote l (VLam fc x icit rig t) = do
-  val <- t $$ VVar emptyFC l Lin
+  val <- t $$ VVar emptyFC x l Lin
   tm <- quote (1 + l) val
   pure $ Lam fc x icit rig tm
 quote l (VPi fc x icit rig a b) = do
   a' <- quote l a
-  val <- b $$ VVar emptyFC l Lin
+  val <- b $$ VVar emptyFC x l Lin
   tm <- quote (1 + l) val
   pure $ Pi fc x icit rig a' tm
 quote l (VLet fc nm t u) = do
   t' <- quote l t
-  u <- u $$ VVar fc l Lin
+  u <- u $$ VVar fc nm l Lin
   u' <- quote (1 + l) u
   pure $ Let fc nm t' u'
 quote l (VLetRec fc nm ty t u) = do
@@ -268,7 +268,7 @@ prvalCtx {{ctx}} v = do
 zonk : TopContext -> Int -> Env -> Tm -> M Tm
 
 zonkBind : TopContext -> Int -> Env -> Tm -> M Tm
-zonkBind top l env tm = zonk top (1 + l) (VVar (getFC tm) l Lin :: env) tm
+zonkBind top l env tm = zonk top (1 + l) (VVar (getFC tm) "_" l Lin :: env) tm
 
 -- REVIEW FC might be dicey here
 appSpine : Tm -> List Tm -> Tm
@@ -346,10 +346,10 @@ zonkAlt top l env (CaseCons name args t) = CaseCons name args <$> go l env args 
   where
     go : Int -> Env -> List String -> Tm -> M Tm
     go l env Nil tm = zonk top l env t
-    go l env (x :: xs) tm = go (1 + l) (VVar (getFC tm) l Lin :: env) xs tm
+    go l env (x :: xs) tm = go (1 + l) (VVar (getFC tm) x l Lin :: env) xs tm
 
 zonk top l env t =
-  let env' = VVar emptyFC l Lin :: env in
+  let env' = VVar emptyFC "_" l Lin :: env in
   case t of
   (Meta fc k) => zonkApp top l env t Nil
   (Lam fc nm icit rig u) => Lam fc nm icit rig <$> (zonk top (1 + l) env' u)

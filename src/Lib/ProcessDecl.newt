@@ -23,7 +23,7 @@ dumpEnv ctx =
   unlines ∘ reverse <$> go (names ctx) 0 (reverse $ zip ctx.env ctx.types) Nil
   where
     isVar : Int -> Val -> Bool
-    isVar k (VVar _ k' Lin) = k == k'
+    isVar k (VVar _ _ k' Lin) = k == k'
     isVar _ _ = False
 
     go : List String -> Int -> List (Val × String × Val) -> List String -> M (List String)
@@ -353,16 +353,16 @@ processInstance ns instfc ty decls = do
     getFields : Val -> Env -> List Binder -> M (List Binder)
     getFields tm@(VPi fc nm Explicit rig ty sc) env bnds = do
       bnd <- MkBinder fc nm Explicit rig <$> quote (length' env) ty
-      appsc <- sc $$ VVar fc (length' env) Lin
+      appsc <- sc $$ VVar fc nm (length' env) Lin
       getFields appsc env (bnd :: bnds)
     getFields tm@(VPi fc nm _ rig ty sc) env bnds = do
-      appsc <- sc $$ VVar fc (length' env) Lin
+      appsc <- sc $$ VVar fc nm (length' env) Lin
       getFields appsc env bnds
     getFields tm xs bnds = pure $ reverse bnds
 
     tenv : Nat -> Env
     tenv Z = Nil
-    tenv (S k) = (VVar emptyFC (cast k) Lin :: tenv k)
+    tenv (S k) = (VVar emptyFC "_" (cast k) Lin :: tenv k)
 
     mkRHS : String -> List Binder -> Raw -> Raw
     mkRHS instName (MkBinder fc nm Explicit rig ty :: bs) tm = mkRHS instName bs (RApp fc tm (RVar fc "\{instName},\{nm}") Explicit)
