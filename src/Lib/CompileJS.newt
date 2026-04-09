@@ -172,6 +172,8 @@ compilePrimOp _ _ = Nothing
 -- a JSStmt, wrapping recursive calls in JSnoc if necessary.
 termToJS : ∀ e. JSEnv -> CExp -> Cont e -> JSStmt e
 termToJS env (CBnd k) f = f $ getEnv k env.jsenv
+termToJS env (CForce t) f = termToJS env t $ \ t' => f $ Apply t' Nil
+termToJS env (CThunk t) f = f $ JLam Nil $ termToJS env t JReturn
 termToJS env CErased f = f JUndefined
 termToJS env (CRaw str _) f = f (Raw str)
 termToJS env (CLam nm t) f =
@@ -433,22 +435,6 @@ cexpToDoc (qn, ct) =
   -- If we leak extra statements/assignments, we need an IIFE
   let exp = maybeWrap $ termToJS emptyJSEnv ct JReturn
   in stmtToDoc $ JConst (show qn) exp
-
--- Collect the QNames used in a term
-getNames : Tm -> List QName -> List QName
-getNames (Ref x nm) acc = nm :: acc
-getNames (Lam x str _ _ t) acc = getNames t acc
-getNames (App x t u) acc = getNames u $ getNames t acc
-getNames (Pi x str icit y t u) acc = getNames u $ getNames t $ QN primNS "PiType" :: acc
-getNames (Let x str t u) acc = getNames u $ getNames t acc
-getNames (LetRec x str _ t u) acc = getNames u $  getNames t acc
-getNames (Case x t alts) acc = getNames t $ foldl getAltNames acc alts
-  where
-    getAltNames : List QName -> CaseAlt -> List QName
-    getAltNames acc (CaseDefault t) = getNames t acc
-    getAltNames acc (CaseCons name args t) = name :: getNames t acc
-    getAltNames acc (CaseLit lit t) = getNames t acc
-getNames _ acc = acc
 
 -- returns a QName -> Def of in-use entries
 -- This will be what we work on for optimization passes

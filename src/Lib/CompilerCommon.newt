@@ -4,6 +4,7 @@ import Prelude
 import Lib.Common
 import Data.SortedMap
 import Lib.CompileExp
+import Lib.Types
 
 /-
 
@@ -63,6 +64,8 @@ sortedNames defs names =
     getNames : (deep : Bool) → List (Bool × QName) → CExp →  List (Bool × QName)
     -- liftIO calls a lambda statically
     getNames deep acc (CLam _ t) = getNames deep acc t
+    getNames deep acc (CForce t) = getNames deep acc t
+    getNames deep acc (CThunk t) = getNames deep acc t
     getNames deep acc (CLetLoop _ t) = getNames deep acc t
     -- top level 0-ary function, doesn't happen
     getNames deep acc (CFun _ t) = if deep then getNames deep acc t else acc
@@ -107,3 +110,22 @@ sortedNames defs names =
           case lookupMap' qn defs of
             Nothing => acc   -- only `bouncer`
             Just exp => addName this $ foldl (go $ this :: loop) acc (getNames deep Nil exp)
+
+-- Collect the QNames used in a term
+getNames : Tm -> List QName -> List QName
+getNames (Ref x nm) acc = nm :: acc
+getNames (Lam x str _ _ t) acc = getNames t acc
+getNames (App x t u) acc = getNames u $ getNames t acc
+getNames (Pi x str icit y t u) acc = getNames u $ getNames t $ QN primNS "PiType" :: acc
+getNames (Let x str t u) acc = getNames u $ getNames t acc
+getNames (LetRec x str _ t u) acc = getNames u $  getNames t acc
+getNames (Case x t alts) acc = getNames t $ foldl getAltNames acc alts
+  where
+    getAltNames : List QName -> CaseAlt -> List QName
+    getAltNames acc (CaseDefault t) = getNames t acc
+    getAltNames acc (CaseCons name args t) = name :: getNames t acc
+    getAltNames acc (CaseLit lit t) = getNames t acc
+getNames (Delay _ t) acc = getNames t acc
+getNames (Force _ t) acc = getNames t acc
+getNames _ acc = acc
+

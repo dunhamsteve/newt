@@ -624,11 +624,6 @@ lazyType : Val → Maybe Val
 lazyType (VRef _ (QN "Prim" "Lazy") (Lin :< a)) = Just a
 lazyType ty = Nothing
 
-insertForce : (ctx : Context) -> Tm -> Val → Val -> M (Tm × Val)
-insertForce ctx tm ty exp = do
-   case (lazyType ty, lazyType exp) of
-     (Just x, Nothing) => pure (Force (getFC tm) tm, x)
-     _ => pure (tm, ty)
 
 insert : (ctx : Context) -> Tm -> Val -> M (Tm × Val)
 insert ctx tm ty = do
@@ -1423,8 +1418,6 @@ infer : Context -> Raw  -> M (Tm × Val)
 
 check ctx tm ty = do
   ty' <- forceType ctx.env ty
-  let (Nothing) = lazyType ty'
-    | Just ty' => Delay (getFC tm) <$> check ctx tm ty'
   case (tm, ty') of
     (RUpdateRec fc clauses arg, ty) => updateRec ctx fc clauses arg ty
     (RWhere fc decls body, ty) => checkWhere ctx (collectDecl decls) body ty
@@ -1436,6 +1429,7 @@ check ctx tm ty = do
       body <- undo stmts
       check ctx body ty
     (RCase fc rsc mty alts, ty) => do
+      -- infer scrutinee if not given
       (sc, scty) <- case mty of
         Nothing => infer ctx rsc
         Just ty => do
@@ -1456,8 +1450,13 @@ check ctx tm ty = do
       -- buildCase expects scrutinee to be a name in the context, so we need to let it.
       -- if it's a Bnd and not shadowed we could skip the let, but that's messy.
       let ctx' = withPos (extend ctx scnm scty) (getFC tm)
-      tree <- buildTree ctx' $ MkProb clauses ty
-      pure $ Let fc scnm sc tree
+      case lazyType ty of
+        Nothing => do
+          tree <- buildTree ctx' $ MkProb clauses ty
+          pure $ Let fc scnm sc tree
+        Just ty => do
+          tree <- buildTree ctx' $ MkProb clauses ty
+          pure $ Delay fc $ Let fc scnm sc tree
 
     -- rendered in ProcessDecl
     (RHole fc, ty) => freshMeta ctx fc ty User
@@ -1515,6 +1514,7 @@ check ctx tm ty = do
       sc <- check (extend ctx nm' a) tm ty'
       pure $ Lam (getFC tm) nm' Auto rig sc
 
+    -- this ends up in the tree a couple of times, pull it into a function
     (tm, ty) => do
       (tm', ty') <- infer ctx tm
       (tm', ty') <- insert ctx tm' ty'
@@ -1524,6 +1524,16 @@ check ctx tm ty = do
       debug $ \ _ => "INFER \{show tm} to (\{rpprint names tm'} : \{show ty'}) expect \{show ty}"
       unifyCatch (getFC tm) ctx ty' ty
       pure tm'
+    where
+
+      insertForce : (ctx : Context) -> Tm -> Val → Val -> M (Tm × Val)
+      insertForce ctx tm ty exp = do
+         case (lazyType ty, lazyType exp) of
+           -- expect nothing, tm is lazy
+           (Just x, Nothing) => pure (Force (getFC tm) tm, x)
+           -- expect lazy, tm is not
+           (Nothing, Just x) => let fc = getFC tm in pure (Delay fc tm, VRef fc (QN "Prim" "Lazy") (Lin :< ty))
+           _ => pure (tm, ty)
 
 infer ctx tm@(RUpdateRec fc _ _) = error fc "I can't infer record updates"
 
@@ -1569,9 +1579,9 @@ infer ctx (RApp fc t u icit) = do
       tty => do
         debug $ \ _ => "unify PI for \{show tty} at \{show $ getFC tty}"
         a <- freshMeta ctx fc (VU emptyFC) Normal >>= eval ctx.env
-        b <- MkClosure ctx.env <$> freshMeta (extend ctx ":ins" a) fc (VU emptyFC) Normal
+        b <- MkClosure ctx.env <$> freshMeta (extend ctx "_" a) fc (VU emptyFC) Normal
         -- FIXME - I had to guess Many here.  What are the side effects?
-        unifyCatch fc ctx tty (VPi fc ":ins" icit Many a b)
+        unifyCatch fc ctx tty (VPi fc "_" icit Many a b)
         pure (a,b)
 
   u <- check ctx u a

@@ -20,6 +20,8 @@ import Data.SortedMap
 -- Find names of applications in tail position
 tailNames : CExp → List QName
 tailNames (CAppRef nm args n) = nm :: Nil
+tailNames (CForce t) = tailNames t
+tailNames (CThunk t) = tailNames t
 -- these two shouldn't exist yet
 tailNames (CLoop _ _) = Nil
 tailNames (CLetLoop _ _) = Nil

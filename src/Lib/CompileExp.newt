@@ -49,6 +49,8 @@ data CExp : U where
   -- Need this for magic Nat
   -- TODO - use for primitives too
   CPrimOp : String → CExp → CExp -> CExp
+  CThunk : CExp → CExp
+  CForce : CExp → CExp
 
 -- I'm counting Lam in the term for arity.  This matches what I need in
 -- code gen.
@@ -107,10 +109,9 @@ getBody (CDefAlt t) = t
 
 compileTerm : {{Ref2 Defs St}} → Tm -> M CExp
 compileTerm (Bnd _ k) = pure $ CBnd k
-compileTerm (Force fc t) = do
-  t' <- compileTerm t
-  pure $ CApp t' CErased
-compileTerm (Delay fc t) = CLam "_" <$> compileTerm t
+-- can't reuse CLam / CApp because of deBruijn, but backends may want to memoize anyway
+compileTerm (Force fc t) = CForce <$> compileTerm t
+compileTerm (Delay fc t) = CThunk <$> compileTerm t
 -- need to eta expand to arity
 compileTerm t@(Ref fc nm@(QN _ tag)) = do
   arity <- arityForName fc nm

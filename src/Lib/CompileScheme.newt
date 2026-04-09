@@ -79,6 +79,8 @@ withVar env t f = let nm = "wv$\{show $ length' env}"
   in "(let ((\{nm} \{cexpToScm env t})) \{f nm})"
 
 cexpToScm env (CBnd n) = getEnv n env
+cexpToScm env (CForce t) = "(\{cexpToScm env t})"
+cexpToScm env (CThunk t) = "(lambda () \{cexpToScm env t})"
 cexpToScm env (CLam nm t) = case scbind nm env of
   (nm', env') => "(lambda (\{nm'}) \{cexpToScm env' t})"
 cexpToScm env (CFun args body) = case bindAll args Lin env  of
@@ -196,22 +198,6 @@ cexpToScm env (CConstr tag nm args quants info) = "(vector \{show tag} \{unwords
 cexpToScm env (CRaw _ _) = fatalError "Stray CRaw"
 -- TODO We still have a couple of these in CompileExp, for the magic Nat
 cexpToScm env (CPrimOp op a b) = "(\{op} \{cexpToScm env a} \{cexpToScm env b})"
-
--- Collect the QNames used in a term
-getNames : Tm -> List QName -> List QName
-getNames (Ref x nm) acc = nm :: acc
-getNames (Lam x str _ _ t) acc = getNames t acc
-getNames (App x t u) acc = getNames u $ getNames t acc
-getNames (Pi x str icit y t u) acc = getNames u $ getNames t $ QN primNS "PiType" :: acc
-getNames (Let x str t u) acc = getNames u $ getNames t acc
-getNames (LetRec x str _ t u) acc = getNames u $  getNames t acc
-getNames (Case x t alts) acc = getNames t $ foldl getAltNames acc alts
-  where
-    getAltNames : List QName -> CaseAlt -> List QName
-    getAltNames acc (CaseDefault t) = getNames t acc
-    getAltNames acc (CaseCons name args t) = name :: getNames t acc
-    getAltNames acc (CaseLit lit t) = getNames t acc
-getNames _ acc = acc
 
 -- returns a QName -> Def of in-use entries
 -- This will be what we work on for optimization passes

@@ -4,6 +4,10 @@ import Prelude
 log : Lazy String → IO Unit
 log s = putStrLn s
 
-main : IO Unit
-main = log "Hello, World."
+log2 : Lazy String → IO Unit
+log2 a = log a
 
+main : IO Unit
+main = do
+  log "Hello, World."
+  log2 "done."

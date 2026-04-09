@@ -1,0 +1,10 @@
+module Lazy2
+
+import Prelude
+
+-- Something is going weird here...
+force : ∀ a. Lazy a → a
+force f = f MkUnit
+
+
+

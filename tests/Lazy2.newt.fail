@@ -1,0 +1,13 @@
+*** Process tests/Lazy2.newt
+module Prelude
+module Lazy2
+ERROR at tests/Lazy2.newt:7:11--7:19: unification failure: unify failed (Prim.Lazy a$0:0) [no Fn] =?= (%pi ( _ : (%meta Lazy2.$m1 [2 sp])). (%cl [2 env] ((((Meta Lazy2.$m2) (Bnd 2)) (Bnd 1)) (Bnd 0))))
+  failed to unify Prim.Lazy a$0:1
+             with (?$m1 a$0:1 f:0) -> ?$m2 a$0:2 f:1 _:0
+  
+  -- Something is going weird here...
+  force : ∀ a. Lazy a → a
+  force f = f MkUnit
+            ^^^^^^^^
+
+ERROR at tests/Lazy2.newt:1:1--1:1: Compile failed

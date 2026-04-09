@@ -140,9 +140,10 @@ pprint' p names (Bnd _ k) = case getAt (cast k) names of
 pprint' p names (Force _ t) = text "%force" <+> pprint' p names t
 pprint' p names (Delay _ t) = parens 0 p $ text "%delay" <+> pprint' 0 names t
 pprint' p names (Ref _ str) = text (show str)
-pprint' p names (Meta _ k) = text "?m:\{show k}"
+pprint' p names (Meta _ (QN qns baseName)) = text "?\{baseName}"
 pprint' p names (Lam _ nm icit quant t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> pprint' 0 (nm :: names) t
--- FIXME - we've lost icity, so we implict app as normal
+-- TODO would be nice to make Meta app prettier, we could funArgs it, but might not be able
+-- to drop them because we do want to show if the meta is applied to _extra_ args
 pprint' p names (App _ t u) = parens 0 p $ pprint' 0 names t <+> pprint' 1 names u
 pprint' p names (UU _) = text "U"
 pprint' p names (Pi _ nm Auto rig t u) = parens 0 p $
@@ -524,8 +525,10 @@ lookupMeta ix@(QN ns nm) = do
   case lookupMap' ix top.currentMod.modMetaCtx.metas of
     Just meta => pure meta
     Nothing => case lookupMap' ns top.modules of
-      Nothing =>
-          error emptyFC "missing module: \{show ns} looking up meta \{show ix}"
+      Nothing => do
+          -- happens when printing an error because the top is reset
+          debug $ \ _ => "missing module: \{show ns} looking up meta \{show ix}"
+          pure $ OutOfScope
       Just mod => case lookupMap' ix mod.modMetaCtx.metas of
         Nothing =>
           error emptyFC "missing meta: \{show ix}"
