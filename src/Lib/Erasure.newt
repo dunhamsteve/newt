@@ -68,12 +68,20 @@ doAlt env (CaseLit lit t) = CaseLit lit <$> erase env t Nil
 -- This is a little fuzzy because we don't have all of the types.
 erase env t sp = case t of
   (App fc u v) => erase env u ((fc,v) :: sp)
+  (Force fc t) => do
+     t <- erase env t Nil
+     eraseSpine env (Force fc t) sp Nothing
+  (Delay fc t) => do
+    t <- erase env t Nil
+    eraseSpine env (Delay fc t) sp Nothing
   (Ref fc nm) => do
     top <- getTop
     case lookup nm top of
       Nothing => error fc "\{show nm} not in scope"
       (Just (MkEntry _ name type def _)) => eraseSpine env t sp (Just type)
-  (Lam fc nm icit rig u) => Lam fc nm icit rig <$> erase ((nm, rig, Nothing) :: env) u Nil
+  (Lam fc nm icit rig u) => do
+    t <- Lam fc nm icit rig <$> erase ((nm, rig, Nothing) :: env) u Nil
+    eraseSpine env t sp Nothing
   -- If we get here, we're looking at a runtime pi type
   (Pi fc nm icit rig u v) => do
     u' <- erase env u Nil

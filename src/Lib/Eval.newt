@@ -138,6 +138,12 @@ evalCase env sc cc = do
 -- TODO maybe add glueing
 
 eval env (Ref fc x) = pure $ VRef fc x Lin
+eval env (Force fc t) = do
+  vt <- eval env t
+  case vt of
+    VDelay fc t' => pure t'
+    t' => pure $ VForce fc t'
+eval env (Delay fc t) = VDelay fc <$> eval env t
 eval env (App _ t u) = do
   t' <- eval env t
   u' <- eval env u
@@ -162,12 +168,6 @@ eval env (Let fc nm t u) = do
 eval env (LetRec fc nm ty t u) = do
   -- Used for `where`, we'd probably need to treat this like Lam.
   error fc "eval letrec"
-  -- I think we need to handle this like lam/let, disabled for now.
-  -- It should be gone by the time we hit inlining, we'll see if it arises in other cases
-  -- ty' <- eval env ty
-  -- t' <- eval (VVar fc (length' env) Lin :: env) t
-  -- u' <- eval (VVar fc (length' env) Lin :: env) u
-  -- pure $ VLetRec fc nm ty' t' u'
 -- Here, we assume env has everything. We push levels onto it during type checking.
 -- I think we could pass in an l and assume everything outside env is free and
 -- translate to a level
@@ -215,6 +215,8 @@ normAlt env l (CaseCons nm args tm) = do
 quote l (VVar fc nm k sp) = if k < l
   then quoteSp l (Bnd fc (lvl2ix l k )) sp -- level to index
   else error fc "Bad level in quote \{nm}:\{show k} depth \{show l}"
+quote l (VForce fc t) = Force fc <$> quote l t
+quote l (VDelay fc t) = Delay fc <$> quote l t
 quote l (VMeta fc i sp) = do
   meta <- lookupMeta i
   case meta of
@@ -278,8 +280,11 @@ appSpine t (x :: xs) = appSpine (App (getFC t) t x) xs
 -- REVIEW When metas are subst in, the fc point elsewhere
 -- We might want to update when it is solved and update recursively?
 -- For errors, I think we want to pretend the code has been typed in place
+-- TODO we want this in general for HasFC, probably will use it in the parser
 tweakFC : FC -> Tm -> Tm
 tweakFC fc (Bnd fc1 k) = Bnd fc k
+tweakFC fc (Force _ t) = Force fc t
+tweakFC fc (Delay _ t) = Delay fc t
 tweakFC fc (Ref fc1 nm) = Ref fc nm
 tweakFC fc (UU fc1) = UU fc
 tweakFC fc (Meta fc1 k) = Meta fc k
@@ -352,6 +357,8 @@ zonk top l env t =
   let env' = VVar emptyFC "_" l Lin :: env in
   case t of
   (Meta fc k) => zonkApp top l env t Nil
+  (Force fc t) => Force fc <$> zonk top l env t
+  (Delay fc t) => Delay fc <$> zonk top l env t
   (Lam fc nm icit rig u) => Lam fc nm icit rig <$> (zonk top (1 + l) env' u)
   (App fc _ _) => zonkApp top l env t Nil
   (Pi fc nm icit rig a b) => Pi fc nm icit rig <$> zonk top l env a <*> zonkBind top (l + 1) env' b

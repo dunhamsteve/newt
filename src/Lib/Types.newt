@@ -72,10 +72,15 @@ data Tm : U where
   -- for desugaring where
   LetRec : FC -> Name -> (ty : Tm) -> (t : Tm) -> (u : Tm) -> Tm
   Lit : FC -> Literal -> Tm
+  -- An erased value
   Erased : FC -> Tm
+  Delay : FC → Tm → Tm
+  Force : FC → Tm → Tm
 
 instance HasFC Tm where
   getFC (Bnd fc k) = fc
+  getFC (Force fc _) = fc
+  getFC (Delay fc _) = fc
   getFC (Ref fc str) = fc
   getFC (Meta fc k) = fc
   getFC (Lam fc str _ _ t) = fc
@@ -92,6 +97,8 @@ showCaseAlt : CaseAlt → String
 
 instance Show Tm where
   show (Bnd _ k) = "(Bnd \{show k})"
+  show (Force _ t) = "(Force \{show t})"
+  show (Delay _ t) = "(Delay \{show t})"
   show (Ref _ str) = "(Ref \{show str})"
   show (Lam _ nm icit rig t) = "(\\ \{show rig}\{nm}  => \{show  t})"
   show (App _ t u) = "(\{show t} \{show u})"
@@ -130,6 +137,8 @@ pprint' p names (Bnd _ k) = case getAt (cast k) names of
   -- Either a bug or we're printing without names
   Nothing => text "BND:\{show k}"
   Just nm => text "\{nm}:\{show k}"
+pprint' p names (Force _ t) = text "%force" <+> pprint' p names t
+pprint' p names (Delay _ t) = parens 0 p $ text "%delay" <+> pprint' 0 names t
 pprint' p names (Ref _ str) = text (show str)
 pprint' p names (Meta _ k) = text "?m:\{show k}"
 pprint' p names (Lam _ nm icit quant t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> pprint' 0 (nm :: names) t
@@ -183,6 +192,8 @@ data Val : U where
   VU : FC -> Val
   VErased : FC -> Val
   VLit : FC -> Literal -> Val
+  VDelay : FC -> Val -> Val
+  VForce : FC -> Val -> Val
 
 
 Env = List Val
@@ -191,6 +202,8 @@ data Closure = MkClosure Env Tm
 
 getValFC : Val -> FC
 getValFC (VVar fc _ _ _) = fc
+getValFC (VForce fc _) = fc
+getValFC (VDelay fc _) = fc
 getValFC (VRef fc _ _) = fc
 getValFC (VCase fc _ _ _) = fc
 getValFC (VMeta fc _ _) = fc
@@ -208,6 +221,8 @@ showClosure : Closure → String
 
 instance Show Val where
   show (VVar _ nm k Lin) = "\{show nm}:\{show k}"
+  show (VForce _ t) = "(%force \{show t})"
+  show (VDelay _ t) = "(%delay \{show t})"
   show (VVar _ nm k sp) = "(\{show nm}:\{show k} \{unwords $ map show (sp <>> Nil)})"
   show (VRef _ nm Lin) = show nm
   show (VRef _ nm sp) = "(\{show nm} \{unwords $ map show (sp <>> Nil)})"
@@ -469,7 +484,7 @@ modifyTop f = do
 
 -- Force argument and print if verbose is true
 
-log : Int -> Lazy String -> M Unit
+log : Int -> Lazy' String -> M Unit
 log lvl x = do
   top <- getTop
   when (lvl <= top.verbose) $ \ _ => putStrLn $ force x
@@ -482,7 +497,7 @@ logM lvl x = do
     putStrLn msg
 
 -- deprecated for `log 2`
-debug : Lazy String -> M Unit
+debug : Lazy' String -> M Unit
 debug x = log 2 x
 
 info : FC -> String -> M Unit
@@ -554,7 +569,7 @@ instance Show Constraint where
   show (PC nm pat ty) = show (nm,pat,ty)
 
 -- Lazy because `let` would do work at the top of a `M a`
-profile : ∀ a. String → Lazy (M a) → M a
+profile : ∀ a. String → Lazy' (M a) → M a
 profile desc work = do
   start <- getTime
   res <- force work

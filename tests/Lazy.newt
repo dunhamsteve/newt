@@ -1,0 +1,9 @@
+module Lazy
+import Prelude
+
+log : Lazy String → IO Unit
+log s = putStrLn s
+
+main : IO Unit
+main = log "Hello, World."
+

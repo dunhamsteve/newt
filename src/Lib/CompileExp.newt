@@ -107,6 +107,10 @@ getBody (CDefAlt t) = t
 
 compileTerm : {{Ref2 Defs St}} → Tm -> M CExp
 compileTerm (Bnd _ k) = pure $ CBnd k
+compileTerm (Force fc t) = do
+  t' <- compileTerm t
+  pure $ CApp t' CErased
+compileTerm (Delay fc t) = CLam "_" <$> compileTerm t
 -- need to eta expand to arity
 compileTerm t@(Ref fc nm@(QN _ tag)) = do
   arity <- arityForName fc nm

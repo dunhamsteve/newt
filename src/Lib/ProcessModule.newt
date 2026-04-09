@@ -21,6 +21,7 @@ addPrimitives = do
   processDecl primNS (PType emptyFC "Int" Nothing)
   processDecl primNS (PType emptyFC "String" Nothing)
   processDecl primNS (PType emptyFC "Char" Nothing)
+  processDecl primNS (PType emptyFC "Lazy" (Just (RPi emptyFC (BI emptyFC "_" Explicit Zero) (RU emptyFC) (RU emptyFC))))
   setDef (QN primNS "PiType") emptyFC (Erased emptyFC) (PrimFn "(h0, h1) => ({ tag: \"PiType\", h0, h1 });" (S (S Z)) Nil) Nil
   top <- getTop
   modifyTop { modules $= updateMap primNS top.currentMod }

@@ -620,6 +620,16 @@ freshMeta ctx fc ty kind = do
     applyBDs k t (Bound :: xs) = App emptyFC (applyBDs (1 + k) t xs) (Bnd emptyFC k)
     applyBDs k t (Defined :: xs) = applyBDs (1 + k) t xs
 
+lazyType : Val → Maybe Val
+lazyType (VRef _ (QN "Prim" "Lazy") (Lin :< a)) = Just a
+lazyType ty = Nothing
+
+insertForce : (ctx : Context) -> Tm -> Val → Val -> M (Tm × Val)
+insertForce ctx tm ty exp = do
+   case (lazyType ty, lazyType exp) of
+     (Just x, Nothing) => pure (Force (getFC tm) tm, x)
+     _ => pure (tm, ty)
+
 insert : (ctx : Context) -> Tm -> Val -> M (Tm × Val)
 insert ctx tm ty = do
   ty' <- forceMeta ty
@@ -1413,6 +1423,8 @@ infer : Context -> Raw  -> M (Tm × Val)
 
 check ctx tm ty = do
   ty' <- forceType ctx.env ty
+  let (Nothing) = lazyType ty'
+    | Just ty' => Delay (getFC tm) <$> check ctx tm ty'
   case (tm, ty') of
     (RUpdateRec fc clauses arg, ty) => updateRec ctx fc clauses arg ty
     (RWhere fc decls body, ty) => checkWhere ctx (collectDecl decls) body ty
@@ -1506,6 +1518,7 @@ check ctx tm ty = do
     (tm, ty) => do
       (tm', ty') <- infer ctx tm
       (tm', ty') <- insert ctx tm' ty'
+      (tm', ty') <- insertForce ctx tm' ty' ty
 
       let names = map fst ctx.types
       debug $ \ _ => "INFER \{show tm} to (\{rpprint names tm'} : \{show ty'}) expect \{show ty}"
