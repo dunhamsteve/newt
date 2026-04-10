@@ -67,7 +67,7 @@ logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
         AutoSolve => do
           x <- quote ctx.lvl ty
           ty <- eval ctx.env x
-          debug $ \ _ => "AUTO ---> \{show ty}"
+          debug "AUTO ---> \{show ty}"
           -- we want the context here too.
           top <- getTop
           let (VRef _ tyname _) = ty | _ => pure Nil
@@ -111,11 +111,11 @@ processDecl :  String -> Decl -> M Unit
 
 processTypeSig :  String → FC → List Name → Raw → M Unit
 processTypeSig ns fc names tm = do
-  log 1 $ \ _ => "-----"
+  log 1 "-----"
   top <- getTop
   traverse (checkAlreadyDef fc) names
   ty <- check (mkCtx fc) tm (VU fc)
-  log 1 $ \ _ => "TypeSig \{unwords names} : \{render 90 $ pprint Nil ty}"
+  log 1 "TypeSig \{unwords names} : \{render 90 $ pprint Nil ty}"
   ignore $ for names $ \nm => setDef (QN ns nm) fc ty Axiom Nil
 
 
@@ -132,7 +132,7 @@ processPrimFn ns fc nm used ty src = do
   top <- getTop
   ty <- check (mkCtx fc) ty (VU fc)
   ty' <- nf Nil ty
-  log 1 $ \ _ => "pfunc \{nm} : \{render 90 $ pprint Nil ty'} = \{show src}"
+  log 1 "pfunc \{nm} : \{render 90 $ pprint Nil ty'} = \{show src}"
   -- TODO wire through fc for not in scope error
   used' <- for used $ \ name => case lookupRaw name top of
     Nothing => error fc "\{name} not in scope"
@@ -162,8 +162,8 @@ complexity _ = 100
 
 processDef :  String → FC → String → List (Raw × Maybe Raw) → M Unit
 processDef ns fc nm clauses = do
-  log 1 $ \ _ => "-----"
-  log 1 $ \ _ => "Def \{show nm}"
+  log 1 "-----"
+  log 1 "Def \{show nm}"
   top <- getTop
   let mc = top.currentMod.modMetaCtx
   let (Just entry) = lookup (QN ns nm) top
@@ -171,10 +171,10 @@ processDef ns fc nm clauses = do
   let (MkEntry fc name ty Axiom _) = entry
     | _ => throwError $ E fc "\{nm} already defined at \{show entry.fc}"
 
-  log 1 $ \ _ => "check \{nm} at \{render 90 $ pprint Nil ty}"
+  log 1 "check \{nm} at \{render 90 $ pprint Nil ty}"
   vty <- eval Nil ty
 
-  debug $ \ _ => "\{nm} vty is \{show vty}"
+  debug "\{nm} vty is \{show vty}"
 
   clauses' <- traverse makeClause clauses
   tm <- buildTree (mkCtx fc) (MkProb clauses' vty)
@@ -186,7 +186,7 @@ processDef ns fc nm clauses = do
   -- We need to keep the _unerased_ term for checking
   _ <- erase Nil tm Nil
 
-  debug $ \ _ => "Add def \{nm} \{render 90 $ pprint Nil tm} : \{render 90 $ pprint Nil ty}"
+  debug "Add def \{nm} \{render 90 $ pprint Nil tm} : \{render 90 $ pprint Nil ty}"
   updateDef (QN ns nm) fc ty (Fn tm)
   -- putStrLn "complexity \{show (QN ns nm)} \{show $ complexity tm}"
   -- putStrLn $ show tm
@@ -201,7 +201,7 @@ processDef ns fc nm clauses = do
 
 processCheck :  String → FC → Raw → Raw → M Unit
 processCheck ns fc tm ty = do
-  log 1 $ \ _ => "----- DCheck"
+  log 1 "----- DCheck"
   top <- getTop
 
   info fc "check \{show tm} at \{show ty}"
@@ -219,8 +219,8 @@ processClass ns classFC (nameFC, nm) tele decls = do
   -- REVIEW maybe we can leverage Record for this
   -- a couple of catches, we don't want the dotted accessors and
   -- the self argument should be an auto-implicit
-  log 1 $ \ _ => "-----"
-  log 1 $ \ _ => "Class \{nm}"
+  log 1 "-----"
+  log 1 "Class \{nm}"
   let fields = getSigs decls
   -- We'll need names for the telescope
   let dcName = "Mk\{nm}"
@@ -228,11 +228,11 @@ processClass ns classFC (nameFC, nm) tele decls = do
   let tail = foldl mkApp (RVar classFC nm) tele
   let dcType = teleToPi (impTele tele) $ foldr mkPi tail fields
 
-  log 1 $ \ _ => "tcon type \{render 90 $ pretty tcType}"
-  log 1 $ \ _ => "dcon type \{render 90 $ pretty dcType}"
+  log 1 "tcon type \{render 90 $ pretty tcType}"
+  log 1 "dcon type \{render 90 $ pretty dcType}"
   let decl = Data classFC (nameFC, nm) tcType (Just $ TypeSig classFC (dcName :: Nil) dcType :: Nil)
-  log 1 $ \ _ => "Decl:"
-  log 1 $ \ _ => render 90 $ pretty decl
+  log 1 "Decl:"
+  log 1 $ render 90 $ pretty decl
   processDecl ns decl
   ignore $ for fields $ \case
     (fc,name,ty) => do
@@ -242,8 +242,8 @@ processClass ns classFC (nameFC, nm) tele decls = do
       let lhs = RApp classFC lhs autoPat Auto
       let decl = FunDef fc name ((lhs, (Just $ RVar fc name)) :: Nil)
 
-      log 1 $ \ _ => "\{name} : \{render 90 $ pretty funType}"
-      log 1 $ \ _ => "\{render 90 $ pretty decl}"
+      log 1 "\{name} : \{render 90 $ pretty funType}"
+      log 1 "\{render 90 $ pretty decl}"
       processDecl ns $ TypeSig fc (name :: Nil) funType
       setFlag (QN ns name) fc Inline
       processDecl ns decl
@@ -264,8 +264,8 @@ processClass ns classFC (nameFC, nm) tele decls = do
 
 processInstance :  String → FC → Raw → Maybe (List Decl) → M Unit
 processInstance ns instfc ty decls = do
-  log 1 $ \ _ => "-----"
-  log 1 $ \ _ => "Instance \{render 90 $ pretty ty}"
+  log 1 "-----"
+  log 1 "Instance \{render 90 $ pretty ty}"
   top <- getTop
   let tyFC = getFC ty
 
@@ -274,8 +274,8 @@ processInstance ns instfc ty decls = do
   let (codomain, tele) = splitTele vty
   -- env represents the environment of those arguments
   let env = tenv (length tele)
-  debug $ \ _ => "codomain \{render 90 $ pprint Nil codomain}"
-  debug $ \ _ => "tele is \{show tele}"
+  debug "codomain \{render 90 $ pprint Nil codomain}"
+  debug "tele is \{show tele}"
 
   -- ok so we need a name, a hack for now.
   -- Maybe we need to ask the user (e.g. `instance someName : Monad Foo where`)
@@ -295,7 +295,7 @@ processInstance ns instfc ty decls = do
 
   let (Just decls) = collectDecl <$> decls
     | _ => do
-      debug $ \ _ => "Forward declaration \{show sigDecl}"
+      debug "Forward declaration \{show sigDecl}"
 
   let (Ref _ tconName, args) = funArgs codomain
     | (tm, _) => error tyFC "\{render 90 $ pprint Nil codomain} doesn't appear to be a TCon application"
@@ -307,14 +307,14 @@ processInstance ns instfc ty decls = do
     | _ => error tyFC "can't find constructor \{show con}"
   vdcty@(VPi _ nm icit rig a b) <- eval Nil dcty
     | x => error (getFC x) "dcty not Pi"
-  debug $ \ _ => "dcty \{render 90 $ pprint Nil dcty}"
+  debug "dcty \{render 90 $ pprint Nil dcty}"
   -- let (_,args) = funArgs codomain
 
-  debug $ \ _ => "traverse \{show $ map show args}"
+  debug "traverse \{show $ map show args}"
   -- This is a little painful because we're reverse engineering the
   -- individual types back out from the composite type
   args' <- traverse (eval env) args
-  debug $ \ _ => "args' is \{show args'}"
+  debug "args' is \{show args'}"
   appty <- apply vdcty args'
   conTele <- getFields appty env Nil
   -- declare individual functions, collect their defs
@@ -331,21 +331,21 @@ processInstance ns instfc ty decls = do
        -- REVIEW if we want to Hint this
        setDef (QN ns nm') fc ty' Axiom Nil
        let decl = (FunDef fc nm' xs)
-       log 1 $ \ _ => "***"
-       log 1 $ \ _ => "«\{nm'}» : \{render 90 $ pprint Nil ty'}"
-       log 1 $ \ _ => render 80 $ pretty decl
+       log 1 "***"
+       log 1 "«\{nm'}» : \{render 90 $ pprint Nil ty'}"
+       log 1 $ render 80 $ pretty decl
        pure $ Just decl
      _ => pure Nothing
 
   for (mapMaybe id defs) $ \decl => do
     -- debug because already printed above, but nice to have it near processing
-    debug $ \ _ => render 80 $ pretty decl
+    debug $ render 80 $ pretty decl
     processDecl ns decl
   let (QN _ con') = con
   let decl = FunDef instfc instname ((RVar instfc instname, (Just $ mkRHS instname conTele (RVar instfc con'))) :: Nil)
-  log 1 $ \ _ => "SIGDECL"
-  log 1 $ \ _ => "\{render 90 $ pretty sigDecl}"
-  log 1 $ \ _ => render 80 $ pretty decl
+  log 1 "SIGDECL"
+  log 1 "\{render 90 $ pretty sigDecl}"
+  log 1 $ render 80 $ pretty decl
   processDecl ns decl
   where
     -- try to extract types of individual fields from the typeclass dcon
@@ -383,8 +383,8 @@ processShortData ns fc lhs sigs = do
   let ty = foldr mkPi (RU fc) args
   cons <- traverse (mkDecl args Nil) sigs
   let dataDecl = Data fc (nameFC, nm) ty (Just cons)
-  log 1 $ \ _ => "SHORTDATA"
-  log 1 $ \ _ => "\{render 90 $ pretty dataDecl}"
+  log 1 "SHORTDATA"
+  log 1 "\{render 90 $ pretty dataDecl}"
   processDecl ns dataDecl
   where
     mkPi : FC × Name → Raw → Raw
@@ -467,8 +467,8 @@ populateConInfo entries =
 
 processData : String → FC → FC × String → Raw → List Decl → M Unit
 processData ns fc (nameFC, nm) ty cons = do
-  log 1 $ \ _ => "-----"
-  log 1 $ \ _ => "Data \{nm}"
+  log 1 "-----"
+  log 1 "Data \{nm}"
   top <- getTop
   let mc = top.currentMod.modMetaCtx
   tyty <- check (mkCtx fc) ty (VU fc)
@@ -483,9 +483,9 @@ processData ns fc (nameFC, nm) ty cons = do
   allCons <- join <$> (for cons $ \x => case x of
       (TypeSig fc names tm) => do
           traverse (checkAlreadyDef fc) names
-          debug $ \ _ => "check dcon \{show names} \{show tm}"
+          debug "check dcon \{show names} \{show tm}"
           dty <- check (mkCtx fc) tm (VU fc)
-          debug $ \ _ => "dty \{show names} is \{render 90 $ pprint Nil dty}"
+          debug "dty \{show names} is \{render 90 $ pprint Nil dty}"
 
           -- We only check that codomain used the right type constructor
           -- We know it's in U because it's part of a checked Pi type
@@ -494,7 +494,7 @@ processData ns fc (nameFC, nm) ty cons = do
           let tnames = reverse $ map binderName tele
           let (Ref _ hn, args) = funArgs codomain
             | (tm, _) => error (getFC tm) "expected \{nm} got \{render 90 $ pprint tnames tm}"
-          when (hn /= QN ns nm) $ \ _ =>
+          when (hn /= QN ns nm) $
             error (getFC codomain) "Constructor codomain is \{render 90 $ pprint tnames codomain} rather than \{nm}"
           pure $ map (_,_ dty) names
       decl => throwError $ E (getFC decl) "expected constructor declaration")
@@ -505,7 +505,7 @@ processData ns fc (nameFC, nm) ty cons = do
   for entries $ \case (MkEntry name fc dty def flags) => setDef fc name dty def flags
   let cnames = map (\x => x.name) entries
 
-  log 1 $ \ _ => "setDef \{nm}  TCon \{show cnames}"
+  log 1 "setDef \{nm}  TCon \{show cnames}"
   let arity = cast $ piArity tyty
   updateDef (QN ns nm) fc tyty (TCon arity cnames)
   where
@@ -523,8 +523,8 @@ processData ns fc (nameFC, nm) ty cons = do
 
 processRecord :  String → FC → FC × String → Telescope → Maybe (FC × Name) → List Decl → M Unit
 processRecord ns recordFC (nameFC, nm) tele cname decls = do
-  log 1 $ \ _ => "-----"
-  log 1 $ \ _ => "Record"
+  log 1 "-----"
+  log 1 "Record"
   let fields = getSigs decls
   let (dcFC,dcName) = fromMaybe (nameFC,"Mk\{show nm}") cname
   let tcType = teleToPi tele (RU recordFC)
@@ -532,11 +532,11 @@ processRecord ns recordFC (nameFC, nm) tele cname decls = do
   let dcType = teleToPi (impTele tele) $
     foldr (\ x acc => case x : FC × String × Raw of (fc, nm, ty) =>  RPi fc (BI fc nm Explicit Many) ty acc  ) tail fields
 
-  log 1 $ \ _ => "tcon type \{render 90 $ pretty tcType}"
-  log 1 $ \ _ => "dcon type \{render 90 $ pretty dcType}"
+  log 1 "tcon type \{render 90 $ pretty tcType}"
+  log 1 "dcon type \{render 90 $ pretty dcType}"
   let decl = Data recordFC (nameFC,nm) tcType (Just $ TypeSig recordFC (dcName :: Nil) dcType :: Nil)
-  log 1 $ \ _ => "Decl:"
-  log 1 $ \ _ => render 90 $ pretty decl
+  log 1 "Decl:"
+  log 1 $ render 90 $ pretty decl
   processDecl ns decl
   -- pattern to peel out fields on LHS
   let autoPat = foldl (\acc x => case x : FC × String × Raw of (fc,nm,ty) => RApp fc acc (RVar nameFC nm) Explicit) (RVar nameFC dcName) fields
@@ -552,8 +552,8 @@ processRecord ns recordFC (nameFC, nm) tele cname decls = do
       let lhs = foldl (\acc x => case x : BindInfo × Raw of (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc pname) tele
       let lhs = RApp recordFC lhs autoPat Explicit
       let pdecl = FunDef fc pname ((lhs, (Just $ RVar fc name)) :: Nil)
-      log 1 $ \ _ => "\{pname} : \{render 90 $ pretty funType}"
-      log 1 $ \ _ => "\{render 90 $ pretty pdecl}"
+      log 1 "\{pname} : \{render 90 $ pretty funType}"
+      log 1 "\{render 90 $ pretty pdecl}"
       processDecl ns $ TypeSig fc (pname :: Nil) funType
       processDecl ns pdecl
       setFlag (QN ns pname) fc Inline

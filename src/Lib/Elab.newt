@@ -131,16 +131,16 @@ findMatches ctx ty ((name, type) :: xs) = do
   catchError (do
       -- TODO sort out the FC here
       let fc = getFC ty
-      debug $ \ _ => "TRY \{show name} : \{rpprint Nil type} for \{show ty}"
+      debug "TRY \{show name} : \{rpprint Nil type} for \{show ty}"
       let (QN ns nm) = name
       setMetaMode CheckFirst
       -- Check is filling in implicit arguments here
       tm <- check ctx (RVar fc nm) ty
-      debug $ \ _ => "Found \{rpprint Nil tm} for \{show ty}"
+      debug "Found \{rpprint Nil tm} for \{show ty}"
       setMetaContext mc
       (_::_ name) <$> findMatches ctx ty xs)
     (\ err => do
-      debug $ \ _ => "No match \{show ty} \{rpprint Nil type} \{show err}"
+      debug "No match \{show ty} \{rpprint Nil type} \{show err}"
       setMetaContext mc
       findMatches ctx ty xs)
 
@@ -155,13 +155,13 @@ contextMatches ctx ty = go (zip ctx.env ctx.types)
       top <- getTop
       let mc = top.currentMod.modMetaCtx
       catchError(do
-          debug $ \ _ => "TRY context \{nm} : \{rpprint (names ctx) type} for \{show ty}"
+          debug "TRY context \{nm} : \{rpprint (names ctx) type} for \{show ty}"
           unifyCatch (getFC ty) ctx ty vty
           setMetaContext mc
           tm <- quote ctx.lvl tm
           (_::_ (tm, vty)) <$> go xs)
         (\ err => do
-          debug $ \ _ => "No match \{show ty} \{rpprint (names ctx) type} \{show err}"
+          debug "No match \{show ty} \{rpprint (names ctx) type} \{show err}"
           setMetaContext mc
           go xs)
 
@@ -180,41 +180,41 @@ solve : Env -> QName -> SnocList Val -> Val -> M Unit
 
 trySolveAuto : MetaEntry -> M Bool
 trySolveAuto (Unsolved fc k ctx ty AutoSolve _) = do
-      debug $ \ _ => "TRYAUTO solving \{show k} : \{show ty}"
+      debug "TRYAUTO solving \{show k} : \{show ty}"
       -- fill in solved metas in type
       x <- quote ctx.lvl ty
       ty <- eval ctx.env x
-      debug $ \ _ => "AUTO ---> \{show ty}"
+      debug "AUTO ---> \{show ty}"
       -- we want the context here too.
       top <- getTop
       Nil <- contextMatches ctx ty
           | ((tm, vty) :: Nil) => do
               val <- eval ctx.env tm
-              debug $ \ _ => "LOCAL SOLUTION \{rpprint Nil tm} evaled to \{show val}"
+              debug "LOCAL SOLUTION \{rpprint Nil tm} evaled to \{show val}"
               let sp = makeSpine ctx.lvl ctx.bds
               solve ctx.env k sp val
-              debug $ \ _ => "<-- AUTO LOCAL"
-              debug $ \ _ => ">UNIFY \{show k}"
+              debug "<-- AUTO LOCAL"
+              debug ">UNIFY \{show k}"
               -- Causes infinite loop if we do this before the solve
               -- may be nice to push it into solve, but vty is not there..
               unifyCatch (getFC ty) ctx ty vty
-              debug $ \ _ => "<UNIFY \{show k}"
+              debug "<UNIFY \{show k}"
               pure True
           | res => do
-              debug $ \ _ => "LOCAL FAILED to solve \{show ty}, matches: \{render 90 $ commaSep $ map (pprint Nil ∘ fst) res}"
+              debug "LOCAL FAILED to solve \{show ty}, matches: \{render 90 $ commaSep $ map (pprint Nil ∘ fst) res}"
               pure False
 
       let (VRef _ tyname _) = ty | _ => pure False
       let cands = fromMaybe Nil $ lookupMap' tyname top.hints
       (QN _ nm :: Nil) <- findMatches ctx ty cands
         | res => do
-          debug $ \ _ => "GLOBAL FAILED to solve \{show ty}, matches: \{show res}"
+          debug "GLOBAL FAILED to solve \{show ty}, matches: \{show res}"
           pure False
       -- The `check` fills in implicits
       tm <- check ctx (RVar fc nm) ty
       val <- eval ctx.env tm
-      debug $ \ _ => "SOLUTION \{rpprint Nil tm} evaled to \{show val}"
-      debug $ \ _ => "GLOBAL SOLUTION \{show val}"
+      debug "SOLUTION \{rpprint Nil tm} evaled to \{show val}"
+      debug "GLOBAL SOLUTION \{show val}"
       let sp = makeSpine ctx.lvl ctx.bds
       -- Sometimes this gets solved during the `check` above
       entry@(Unsolved _ _ _ _ _ _) <- lookupMeta k | _ => pure True
@@ -278,7 +278,7 @@ addConstraint env ix sp tm = do
   let (CheckAll) = mc.mcmode | _ => pure MkUnit
   updateMeta ix $ \case
     (Unsolved pos k a b c cons) => do
-      debug $ \ _ => "Add constraint \{show ix} \{show sp} =?= \{show tm}"
+      debug "Add constraint \{show ix} \{show sp} =?= \{show tm}"
       pure (Unsolved pos k a b c (MkMc (getFC tm) env sp tm :: cons))
     (Solved fc k tm) => error fc "Meta \{show k} already solved [addConstraint]"
     (OutOfScope) => error' "Meta \{show ix} out of scope"
@@ -292,7 +292,7 @@ invert lvl sp = go sp Nil
     go (xs :< VVar fc nm k Lin) acc = do
       if elem k acc
         then do
-          debug $ \ _ => "\{show k} \{show acc}"
+          debug "\{show k} \{show acc}"
           -- when does this happen?
           error fc "non-linear pattern: \{show sp}"
         else go xs (k :: acc)
@@ -313,7 +313,7 @@ rename meta ren lvl (VVar fc nm k sp) = case findIndex' (_==_ k) ren of
 rename meta ren lvl (VRef fc nm sp) = renameSpine meta ren lvl (Ref fc nm) sp
 rename meta ren lvl (VMeta fc ix sp) = do
   -- So sometimes we have an unsolved meta in here which reference vars out of scope.
-  debug $ \ _ => "rename Meta \{show ix} spine \{show sp}"
+  debug "rename Meta \{show ix} spine \{show sp}"
   if ix == meta
   -- REVIEW is this the right fc?
     then error fc "meta occurs check"
@@ -321,11 +321,11 @@ rename meta ren lvl (VMeta fc ix sp) = do
       meta' <- lookupMeta ix
       case meta' of
         Solved fc _ val => do
-          debug $ \ _ => "rename: \{show ix} is solved"
+          debug "rename: \{show ix} is solved"
           val' <- vappSpine val sp
           rename meta ren lvl val'
         _ => do
-          debug $ \ _ => "rename: \{show ix} is unsolved"
+          debug "rename: \{show ix} is unsolved"
           catchError (renameSpine meta ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc ix (errorMsg err))
 rename meta ren lvl (VLam fc n icit rig t) = do
   tapp <- t $$ VVar fc n lvl Lin
@@ -372,24 +372,24 @@ maybeCheck action = do
 solve env m sp t = do
   meta@(Unsolved metaFC ix ctx_ ty kind cons) <- lookupMeta m
     | _ => error (getFC t) "Meta \{show m} already solved! [solve]"
-  debug $ \ _ => "SOLVE \{show m} \{show kind} lvl \{show $ length' env} sp \{show sp} is \{show t}"
+  debug "SOLVE \{show m} \{show kind} lvl \{show $ length' env} sp \{show sp} is \{show t}"
   let size = length $ filter (\x => x == Bound) ctx_.bds
-  debug $ \ _ => "\{show m} size is \{show size} sps \{show $ snoclen sp}"
+  debug "\{show m} size is \{show size} sps \{show $ snoclen sp}"
   let (True) = snoclen sp == size
     | _ => do
       let l = length' env
-      debug $ \ _ => "meta \{show m} (\{show ix}) applied to \{show $ snoclen sp} args instead of \{show size}"
-      debug $ \ _ => "CONSTRAINT \{show ix} \{show sp} =?= \{show t}"
+      debug "meta \{show m} (\{show ix}) applied to \{show $ snoclen sp} args instead of \{show size}"
+      debug "CONSTRAINT \{show ix} \{show sp} =?= \{show t}"
       addConstraint env m sp t
   let l = length' env
-  debug $ \ _ => "meta \{show meta}"
+  debug "meta \{show meta}"
 
   -- tests/UnifyPi.newt - Solution is non-linear, but is solved later
   -- REVIEW We add constraints to be checked later (here and above) and assume the unification succeeds
   -- Will this get is into trouble?
   Right ren <- tryError $ invert l sp
     | Left err => do
-        debug $ \ _ => "postpone constraint \{show err}"
+        debug "postpone constraint \{show err}"
         addConstraint env m sp t
   -- force unlet
   hack <- quote l t
@@ -409,13 +409,13 @@ solve env m sp t = do
       for_ cons $ \case
         MkMc fc env sp rhs => do
           val <- vappSpine soln sp
-          debug $ \ _ => "discharge l=\{show $ length' env} \{(show val)} =?= \{(show rhs)}"
+          debug "discharge l=\{show $ length' env} \{(show val)} =?= \{(show rhs)}"
           unify env UNormal val rhs
       -- check any autos
       top <- getTop
       let mc = top.currentMod.modMetaCtx
       let (CheckAll) = mc.mcmode | _ => pure MkUnit
-      debug $ \ _ => "check autos depending on \{show ix} \{debugStr mc.mcmode}"
+      debug "check autos depending on \{show ix} \{debugStr mc.mcmode}"
       checkAutos ix mc.autos
     pure MkUnit
     )
@@ -423,7 +423,7 @@ solve env m sp t = do
     (\case
       Postpone fc ix msg => do
         -- let someone else solve this and then check again.
-        debug $ \ _ => "CONSTRAINT2 \{show ix} \{show sp} =?= \{show t}"
+        debug "CONSTRAINT2 \{show ix} \{show sp} =?= \{show t}"
         addConstraint env m sp t
       -- replace with wrapper
       err => throwError (E (getFC err) "\{errorMsg err} for \{show ix} \{show sp} =?= \{show t}")
@@ -438,15 +438,15 @@ unifySpine env mode True (xs :< x) (ys :< y) =
 unifySpine env mode True _ _ = error emptyFC "meta spine length mismatch"
 
 unify env mode t u = do
-  debug $ \ _ => "Unify lvl \{show $ length env}"
-  debug $ \ _ => "  \{show t}"
-  debug $ \ _ => "  =?= \{show u}"
+  debug "Unify lvl \{show $ length env}"
+  debug "  \{show t}"
+  debug "  =?= \{show u}"
   t' <- forceMeta t >>= unlet env
   u' <- forceMeta u >>= unlet env
-  debug $ \ _ => "forced \{show t'}"
-  debug $ \ _ => "  =?= \{show u'}"
-  debug $ \ _ => "env \{show env}"
-  -- debug $ \ _ => "types \{show $ ctx.types}"
+  debug "forced \{show t'}"
+  debug "  =?= \{show u'}"
+  debug "env \{show env}"
+  -- debug "types \{show $ ctx.types}"
   let l = length' env
   -- On the LHS, variable matching is yields constraints/substitutions
   -- We want this to happen before VRefs are expanded, and mixing mode
@@ -484,7 +484,7 @@ unify env mode t u = do
       -- unifySpine is a problem for cmp (S x) (S y) =?= cmp x y
       Nothing <- tryEval env t'
         | Just v => do
-            debug $ \ _ => "tryEval \{show t'} to \{show v}"
+            debug "tryEval \{show t'} to \{show v}"
             unify env mode v u'
       Nothing <- tryEval env u'
         | Just v => unify env mode t' v
@@ -493,7 +493,7 @@ unify env mode t u = do
         else error fc "vref mismatch \{show t'} =?= \{show u'}"
 
     unifyRef t         u@(VRef fc' k' sp') = do
-      debug $ \ _ => "expand \{show t} =?= %ref \{show k'}"
+      debug "expand \{show t} =?= %ref \{show k'}"
       top <- getTop
       case lookup k' top of
         Just (MkEntry _ name ty (Fn tm) _) => do
@@ -503,7 +503,7 @@ unify env mode t u = do
         _ => error fc' "unify failed \{show t} =?= \{show u} [no Fn]"
 
     unifyRef t@(VRef fc k sp) u = do
-      debug $ \ _ => "expand %ref \{show k} \{show sp} =?= \{show u}"
+      debug "expand %ref \{show k} \{show sp} =?= \{show u}"
       top <- getTop
       case lookup k top of
         Just (MkEntry _ name ty (Fn tm) _) => do
@@ -539,13 +539,13 @@ unify env mode t u = do
       vappt' <- t' $$ fresh
       unify (fresh :: env) mode vappt vappt'
     unifyLam t         (VLam fc' nm _ _ t') = do
-      debug $ \ _ => "ETA \{show t}"
+      debug "ETA \{show t}"
       let fresh = VVar fc' nm (length' env) Lin
       vappt <- vapp t fresh
       vappt' <- t' $$ fresh
       unify (fresh :: env) mode vappt vappt'
     unifyLam (VLam fc n _ _ t)  t'     = do
-      debug $ \ _ => "ETA' \{show t'}"
+      debug "ETA' \{show t'}"
       let fresh = VVar fc n (length' env) Lin
       appt <- t $$ fresh
       vappt' <- vapp t' fresh
@@ -582,14 +582,14 @@ unify env mode t u = do
 unifyCatch fc ctx ty' ty = do
     res <- catchError (unify ctx.env UNormal ty' ty) $ \err => do
       let names = map fst ctx.types
-      debug $ \ _ => "fail \{show ty'} \{show ty}"
+      debug "fail \{show ty'} \{show ty}"
       throwError $ UnificationError fc names ty' ty err
     case res of
       MkResult Nil => pure MkUnit
       cs => do
         -- probably want a unification mode that throws instead of returning constraints
         -- TODO need a normalizeHoles, maybe on quote?
-        debug $ \ _ => "fail with constraints \{show cs.constraints}"
+        debug "fail with constraints \{show cs.constraints}"
         a <- quote ctx.lvl ty'
         b <- quote ctx.lvl ty
         let names = map fst ctx.types
@@ -602,7 +602,7 @@ freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
 freshMeta ctx fc ty kind = do
   top <- getTop
   let mc = top.currentMod.modMetaCtx
-  debug $ \ _ => "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
+  debug "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
   -- need the ns here
   -- we were fudging this for v1
   let qn = QN top.currentMod.modName "$m\{show mc.next}"
@@ -631,15 +631,15 @@ insert ctx tm ty = do
   case ty' of
     VPi fc x Auto rig a b => do
       m <- freshMeta ctx (getFC tm) a AutoSolve
-      debug $ \ _ => "INSERT Auto \{rpprint (names ctx) m} : \{show a}"
-      debug $ \ _ => "TM \{rpprint (names ctx) tm}"
+      debug "INSERT Auto \{rpprint (names ctx) m} : \{show a}"
+      debug "TM \{rpprint (names ctx) tm}"
       mv <- eval ctx.env m
       bapp <- b $$ mv
       insert ctx (App (getFC tm) tm m) bapp
     VPi fc x Implicit rig a b => do
       m <- freshMeta ctx (getFC tm) a Normal
-      debug $ \ _ => "INSERT \{rpprint (names ctx) m} : \{show a}"
-      debug $ \ _ => "TM \{rpprint (names ctx) tm}"
+      debug "INSERT \{rpprint (names ctx) m} : \{show a}"
+      debug "TM \{rpprint (names ctx) tm}"
       mv <- eval ctx.env m
       bapp <- b $$ mv
       insert ctx (App (getFC tm) tm m) bapp
@@ -781,7 +781,7 @@ checkCase ctx scnm scty (dcName, arity, ty) = do
   (ctx', ty', vars, sc) <- extendPi ctx (vty) Lin Lin
   (Right res) <- tryError (unify ctx'.env UPattern ty' scty)
           | Left err => do
-            debug $ \ _ => "SKIP \{show dcName} because unify error \{errorMsg err}"
+            debug "SKIP \{show dcName} because unify error \{errorMsg err}"
             pure False
 
   case lookupDef ctx scnm of
@@ -792,7 +792,7 @@ checkCase ctx scnm scty (dcName, arity, ty) = do
 -- return Nothing if dcon type doesn't unify with scrut
 buildCase : Context -> Problem -> String -> Val -> (QName × Int × Tm) -> M (Maybe CaseAlt)
 buildCase ctx prob scnm scty (dcName, arity, ty) = do
-  debug $ \ _ => "CASE \{scnm} match \{show dcName} ty \{rpprint (names ctx) ty}"
+  debug "CASE \{scnm} match \{show dcName} ty \{rpprint (names ctx) ty}"
   -- Add the constructor arguments to the context
   vty <- eval Nil ty
   (ctx', ty', vars, sc) <- extendPi ctx (vty) Lin Lin
@@ -806,15 +806,15 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
 
   -- We get unification constraints from matching the data constructor's
   -- codomain with the scrutinee type
-  debug $ \ _ => "unify dcon cod with scrut\n  \{show ty'}\n  \{show scty}"
+  debug "unify dcon cod with scrut\n  \{show ty'}\n  \{show scty}"
   Just res <- catchError(Just <$> unify ctx'.env UPattern ty' scty)
               (\err => do
-                  debug $ \ _ => "SKIP \{show dcName} because unify error \{errorMsg err}"
+                  debug "SKIP \{show dcName} because unify error \{errorMsg err}"
                   pure Nothing)
     | _ => pure Nothing
 
   -- if the value is already constrained to a different constructor, return Nothing
-  debug $ \ _ => "scrut \{scnm} constrained to \{show $ lookupDef ctx scnm}"
+  debug "scrut \{scnm} constrained to \{show $ lookupDef ctx scnm}"
   let (VRef _ sctynm _) = scty | _ => error (getFC scty) "case split on non-inductive \{show scty}"
 
   case lookupDef ctx scnm of
@@ -822,11 +822,11 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
     Just val@(VRef fc nm sp) =>
       if nm /= dcName
       then do
-        debug $ \ _ => "SKIP \{show dcName} because \{scnm} forced to \{show val}"
+        debug "SKIP \{show dcName} because \{scnm} forced to \{show val}"
         pure Nothing
       else do
-        debug $ \ _ => "case \{show dcName} dotted \{show val}"
-        when (length vars /= snoclen sp) $ \ _ => error emptyFC "\{show $ length vars} vars /= \{show $ snoclen sp}"
+        debug "case \{show dcName} dotted \{show val}"
+        when (length vars /= snoclen sp) $ error emptyFC "\{show $ length vars} vars /= \{show $ snoclen sp}"
 
         -- constrain arguments to spine of dotted value
         let lvl = length' ctx'.env - length' vars
@@ -834,20 +834,20 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         ctx' <- updateContext ctx' scons
 
         -- TODO bundle up this debug message so it doesn't run the loops when not debugging
-        debug $ \ _ => "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
-        debug $ \ _ => "(dcon \{show dcName}) (vars \{show vars}) clauses were"
-        for prob.clauses $ (\x => debug $ \ _ => "    \{show x}")
+        debug "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
+        debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
+        for prob.clauses $ (\x => debug "    \{show x}")
         clauses <- mapMaybe id <$> traverse (rewriteClause sctynm vars) prob.clauses
-        debug $ \ _ => "and now:"
-        for clauses $ (\x => debug $ \ _ => "    \{show x}")
-        when (length' clauses == 0) $ \ _ => error ctx.ctxFC "Missing case for \{show dcName} splitting \{scnm}"
+        debug "and now:"
+        for clauses $ (\x => debug "    \{show x}")
+        when (length' clauses == 0) $ error ctx.ctxFC "Missing case for \{show dcName} splitting \{scnm}"
         tm <- buildTree ctx' (MkProb clauses prob.ty)
         pure $ Just $ CaseCons dcName (map getName vars) tm
 
     _ => do
         (Right res) <- tryError (unify ctx'.env UPattern ty' scty)
           | Left err => do
-            debug $ \ _ => "SKIP \{show dcName} because unify error \{errorMsg err}"
+            debug "SKIP \{show dcName} because unify error \{errorMsg err}"
             putStrLn "SKIP \{show dcName} because unify error \{errorMsg err}"
             pure Nothing
 
@@ -857,29 +857,29 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         let lvl = lvl2ix (length' ctx'.env) x
         let scon = (lvl, VRef ctx.ctxFC dcName sc) -- (DCon arity dcName)
 
-        debug $ \ _ => "scty \{show scty}"
-        debug $ \ _ => "UNIFY results \{show res.constraints}"
-        debug $ \ _ => "before types: \{show ctx'.types}"
-        debug $ \ _ => "before env: \{show ctx'.env}"
-        debug $ \ _ => "SC CONSTRAINT: \{show scon}"
+        debug "scty \{show scty}"
+        debug "UNIFY results \{show res.constraints}"
+        debug "before types: \{show ctx'.types}"
+        debug "before env: \{show ctx'.env}"
+        debug "SC CONSTRAINT: \{show scon}"
 
         -- push the constraints into the environment by turning bind into define
         -- Is this kosher?  It might be a problem if we've already got metas over
         -- this stuff, because it intends to ignore defines.
         ctx' <- updateContext ctx' (scon :: res.constraints)
 
-        debug $ \ _ => "context types: \{show ctx'.types}"
-        debug $ \ _ => "context env: \{show ctx'.env}"
+        debug "context types: \{show ctx'.types}"
+        debug "context env: \{show ctx'.env}"
 
         -- What if all of the pattern vars are defined to meta
 
-        debug $ \ _ => "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
-        debug $ \ _ => "(dcon \{show dcName}) (vars \{show vars}) clauses were"
-        for prob.clauses $ (\x => debug $ \ _ => "    \{show x}")
+        debug "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
+        debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
+        for prob.clauses $ (\x => debug "    \{show x}")
         clauses <- mapMaybe id <$> traverse (rewriteClause sctynm vars) prob.clauses
-        debug $ \ _ => "and now:"
-        for clauses $ (\x => debug $ \ _ => "    \{show x}")
-        when (length' clauses == 0) $ \ _ => error ctx.ctxFC "Missing case for \{show dcName} splitting \{scnm}"
+        debug "and now:"
+        for clauses $ (\x => debug "    \{show x}")
+        when (length' clauses == 0) $ error ctx.ctxFC "Missing case for \{show dcName} splitting \{scnm}"
         tm <- buildTree ctx' (MkProb clauses prob.ty)
         pure $ Just $ CaseCons dcName (map getName vars) tm
   where
@@ -1014,16 +1014,16 @@ checkWhere ctx decls body ty = do
     | x :: _ => error (getFC x) "expected type signature"
     | _ => check ctx body ty
   funTy <- check ctx rawtype (VU sigFC)
-  debug $ \ _ => "where clause \{name} : \{rpprint (names ctx) funTy}"
+  debug "where clause \{name} : \{rpprint (names ctx) funTy}"
   let (FunDef defFC name' clauses :: decls') = decls
     | x :: _ => error (getFC x) "expected function definition"
     | _ => error sigFC "expected function definition after this signature"
-  unless (name == name') $ \ _ => error defFC "Expected def for \{name}"
+  unless (name == name') $ error defFC "Expected def for \{name}"
   -- REVIEW is this right, cribbed from my top level code
   top <- getTop
   clauses' <- traverse makeClause clauses
   vty <- eval ctx.env funTy
-  debug $ \ _ => "\{name} vty is \{show vty}"
+  debug "\{name} vty is \{show vty}"
   let ctx' = extend ctx name vty
 
   -- if I lift, I need to namespace it, add args, and add args when
@@ -1040,7 +1040,7 @@ checkWhere ctx decls body ty = do
 checkDone : FC -> Context -> List Constraint -> Maybe Raw -> Val -> M Tm
 checkDone fc ctx Nil Nothing ty = error fc "impossible clause needs () on RHS"
 checkDone fc ctx Nil (Just body) ty = do
-  debug $ \ _ => "DONE-> check body \{show body} at \{show ty}"
+  debug "DONE-> check body \{show body} at \{show ty}"
   -- TODO better dump context function
   debugM $ showCtx ctx
   -- Hack to try to get Combinatory working
@@ -1055,7 +1055,7 @@ checkDone fc ctx Nil (Just body) ty = do
       ty' <- eval env' nty
       pure (nm, ty')
   let ctx = MkCtx ctx.lvl env' types' ctx.bds ctx.ctxFC
-  debug $ \ _ => "AFTER"
+  debug "AFTER"
   debugM $ showCtx ctx
   -- I'm running an eval here to run case statements that are
   -- unblocked by lets in the env. (Tree.newt:cmp)
@@ -1064,13 +1064,13 @@ checkDone fc ctx Nil (Just body) ty = do
   ty <- quote (length' ctx.env) ty
   ty <- eval ctx.env ty
 
-  debug $ \ _ => "check at \{show ty}"
+  debug "check at \{show ty}"
   got <- check ctx body ty
-  debug $ \ _ => "DONE<- got \{rpprint (names ctx) got}"
+  debug "DONE<- got \{rpprint (names ctx) got}"
   pure got
 checkDone fc ctx (PC x (PatWild pvfc icit) scty :: xs) body ty = do
   -- sometimes have the same FC as real arguments
-  when (icit == Explicit) $ \ _ => addInfo $ CaseSplit pvfc ctx "_" scty
+  when (icit == Explicit) $ addInfo $ CaseSplit pvfc ctx "_" scty
   checkDone fc ctx xs body ty
 checkDone fc ctx (PC nm (PatVar pvfc _ nm') scty :: xs) body ty = do
   -- TIME 5.50 -> 5.62 (we can flag this if it's an issue)
@@ -1142,7 +1142,7 @@ buildLitCase ctx prob fc scnm scty lit = do
   ctx' <- updateContext ctx (scon :: Nil)
   let clauses = mapMaybe rewriteClause prob.clauses
 
-  when (length' clauses == 0) $ \ _ => error ctx.ctxFC "Missing case for \{show lit} splitting \{scnm}"
+  when (length' clauses == 0) $ error ctx.ctxFC "Missing case for \{show lit} splitting \{scnm}"
   tm <- buildTree ctx' (MkProb clauses prob.ty)
   pure $ CaseLit lit tm
 
@@ -1183,7 +1183,7 @@ buildLitCases ctx prob fc scnm scty = do
   alts <- traverse (buildLitCase ctx prob fc scnm scty) lits
 
   let defclauses = filter (isDefaultCase scnm) prob.clauses
-  when (length' defclauses == 0) $ \ _ => error fc "no default for literal slot on \{show scnm}"
+  when (length' defclauses == 0) $ error fc "no default for literal slot on \{show scnm}"
   tm <- buildTree ctx (MkProb defclauses prob.ty)
 
   pure $ alts ++ ( CaseDefault tm  :: Nil)
@@ -1237,14 +1237,14 @@ buildTree ctx prob@(MkProb ((MkClause fc cons pats@(x :: xs) expr) :: cs) ty) =
 -- then run the split
 -- some of this is copied into check
 buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
-  debug $ \ _ => "buildTree \{show constraints} \{show expr}"
+  debug "buildTree \{show constraints} \{show expr}"
   let (Just (PC scnm pat scty)) = findSplit constraints
     | _ => do
-      debug $ \ _ => "checkDone \{show constraints}"
+      debug "checkDone \{show constraints}"
       checkDups fc constraints
       checkDone fc ctx constraints expr ty
 
-  debug $ \ _ => "SPLIT on \{scnm} because \{show pat} \{show $ getFC pat}"
+  debug "SPLIT on \{scnm} because \{show pat} \{show $ getFC pat}"
   let (Just (sctm, scty)) = lookupName ctx scnm
     | _ => error fc "Internal Error: can't find \{scnm} in environment"
 
@@ -1272,7 +1272,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
   case pat of
     PatCon fc _ _ _ as => do
       -- expand vars that may be solved, eval top level functions
-      debug $ \ _ => "EXP \{show scty} -> \{show scty'}"
+      debug "EXP \{show scty} -> \{show scty'}"
       -- this is per the paper, but it would be nice to coalesce
       -- default cases
       cons <- getConstructors ctx (getFC pat) scty'
@@ -1287,13 +1287,13 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
             then pure MkUnit
             else error fc "\{show qn} not a constructor for \{show scty}"
 
-      debug $ \ _ => "CONS \{show $ map fst cons} matched \{show matched} miss \{show miss} miss' \{show miss'}"
+      debug "CONS \{show $ map fst cons} matched \{show matched} miss \{show miss} miss' \{show miss'}"
 
       -- process constructors with matches
       alts <- traverse (buildCase ctx prob scnm scty') hit
-      debug $ \ _ => "GOTALTS \{show alts}"
+      debug "GOTALTS \{show alts}"
       let alts' = mapMaybe id alts
-      when (length' alts' == 0) $ \ _ => error (fc) "no alts for \{show scty'}"
+      when (length' alts' == 0) $ error (fc) "no alts for \{show scty'}"
       -- build a default case for missed constructors
       case miss' of
         Nil => pure $ Case fc sctm (mapMaybe id alts)
@@ -1305,7 +1305,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
     PatLit fc v => do
       let tyname = litTyName v
       case scty' of
-        (VRef fc1 nm sp) => when (nm /= tyname) $ \ _ => error fc "expected \{show scty} and got \{show tyname}"
+        (VRef fc1 nm sp) => when (nm /= tyname) $ error fc "expected \{show scty} and got \{show tyname}"
         _ => error fc "expected \{show scty} and got \{show tyname}"
       -- need to run through all of the PatLits in this slot and then find a fallback
       -- walk the list of patterns, stop if we hit a PatVar / PatWild, fail if we don't
@@ -1438,8 +1438,8 @@ check ctx tm ty = do
           sc <- check ctx rsc vscty
           pure (sc, vscty)
       scty <- forceMeta scty
-      debug $ \ _ => "SCTM \{rpprint (names ctx) sc}"
-      debug $ \ _ => "SCTY \{show scty}"
+      debug "SCTM \{rpprint (names ctx) sc}"
+      debug "SCTY \{show scty}"
 
       let scnm = fresh "sc"
       top <- getTop
@@ -1462,7 +1462,7 @@ check ctx tm ty = do
     (RHole fc, ty) => freshMeta ctx fc ty User
 
     (t@(RLam fc (BI _ nm icit _) tm), ty@(VPi fc' nm' icit' rig a b)) => do
-            debug $ \ _ => "icits \{nm} \{show icit} \{nm'} \{show icit'}"
+            debug "icits \{nm} \{show icit} \{nm'} \{show icit'}"
             if icit == icit' then do
                 let var = VVar fc nm (length' ctx.env) Lin
                 let ctx' = extend ctx nm a
@@ -1495,7 +1495,7 @@ check ctx tm ty = do
 
     (tm, ty@(VPi fc nm' Implicit rig a b)) => do
       let names = map fst ctx.types
-      debug $ \ _ => "elab.insert: Add implicit lambda {\{nm'} : \{show a}} to \{show tm} "
+      debug "elab.insert: Add implicit lambda {\{nm'} : \{show a}} to \{show tm} "
       let var = VVar fc nm' (length' ctx.env) Lin
       ty' <- b $$ var
       debugM $ do
@@ -1505,7 +1505,7 @@ check ctx tm ty = do
       pure $ Lam (getFC tm) nm' Implicit rig sc
 
     (tm, ty@(VPi fc nm' Auto rig a b)) => do
-      debug $ \ _ => "elab.insert: Add auto lambda {\{nm'} : \{show a}} to \{show tm}"
+      debug "elab.insert: Add auto lambda {\{nm'} : \{show a}} to \{show tm}"
       let var = VVar fc nm' (length' ctx.env) Lin
       ty' <- b $$ var
       debugM $ do
@@ -1521,7 +1521,7 @@ check ctx tm ty = do
       (tm', ty') <- insertForce ctx tm' ty' ty
 
       let names = map fst ctx.types
-      debug $ \ _ => "INFER \{show tm} to (\{rpprint names tm'} : \{show ty'}) expect \{show ty}"
+      debug "INFER \{show tm} to (\{rpprint names tm'} : \{show ty'}) expect \{show ty}"
       unifyCatch (getFC tm) ctx ty' ty
       pure tm'
     where
@@ -1544,7 +1544,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
       top <- getTop
       case lookupRaw nm top of
         Just (MkEntry _ name ty def _) => do
-          debug $ \ _ => "lookup \{show name} as \{show def}"
+          debug "lookup \{show name} as \{show def}"
           vty <- eval Nil ty
           pure (Ref fc name, vty)
         -- Can we soften this without introducing a meta for the type
@@ -1577,7 +1577,7 @@ infer ctx (RApp fc t u icit) = do
       -- If it's not a VPi, try to unify it with a VPi
       -- TODO test case to cover this.
       tty => do
-        debug $ \ _ => "unify PI for \{show tty} at \{show $ getFC tty}"
+        debug "unify PI for \{show tty} at \{show $ getFC tty}"
         a <- freshMeta ctx fc (VU emptyFC) Normal >>= eval ctx.env
         b <- MkClosure ctx.env <$> freshMeta (extend ctx "_" a) fc (VU emptyFC) Normal
         -- FIXME - I had to guess Many here.  What are the side effects?
@@ -1608,7 +1608,7 @@ infer ctx (RLam _ (BI fc nm icit quant) tm) = do
   a <- freshMeta ctx fc (VU emptyFC) Normal >>= eval ctx.env
   let ctx' = extend ctx nm a
   (tm', b) <- infer ctx' tm
-  debug $ \ _ => "make lam for \{show nm} scope \{rpprint (names ctx) tm'} : \{show b}"
+  debug "make lam for \{show nm} scope \{rpprint (names ctx) tm'} : \{show b}"
   tyb <- quote (1 + ctx.lvl) b
   pure (Lam fc nm icit quant tm', VPi fc nm icit quant a (MkClosure ctx.env tyb))
 

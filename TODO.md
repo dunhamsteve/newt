@@ -3,6 +3,7 @@
 
 - [x] Scheme backend
 - [x] Smart encoding of lists (and cons cells?) in scheme
+- [ ] in batch mode, stop at first erroring module
 - [ ] maybe `let case` instead of `let ()` (which is a little subtle)
   - Or simply put a term in there and treat as a variable iff it is lowercase and non-app
 - [x] Use looping for TCO

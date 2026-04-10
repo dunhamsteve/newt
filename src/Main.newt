@@ -90,7 +90,7 @@ processFile fn = do
   let (dirs,file) = unsnoc parts
   let dir = if dirs == Nil then "." else joinBy "/" dirs
   let (name, ext) = splitFileName file
-  log 1 $ \ _ => "\{show dir} \{show name} \{show ext}"
+  log 1 "\{show dir} \{show name} \{show ext}"
 
   (Right src) <- liftIO {M} $ readFile fn
     | Left err => error (emptyFC' fn) "error reading \{fn}: \{show err}"
@@ -204,7 +204,7 @@ main' = do
 
   traverse processFile files
 
-  when (elem "--top" args) $ \ _ => do
+  when (elem "--top" args) $ do
     json <- jsonTopContext
     putStrLn "TOP:\{renderJson json}"
 

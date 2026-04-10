@@ -142,7 +142,7 @@ tailCallOpt expMap = do
     processGroup : ExpMap → List QName → M ExpMap
     processGroup expMap names = do
       -- Looks like only two are > 1
-      debug $ \ _ => "compile.tco: group \{show $ length' names} \{show names}"
+      debug "compile.tco: group \{show $ length' names} \{show names}"
       let pairs = mapMaybe (flip lookupMap expMap) names
       updates <- doOptimize pairs
       pure $ foldl doUpdate expMap updates

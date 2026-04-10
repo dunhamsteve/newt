@@ -3,7 +3,6 @@ module Lib.Types
 import Prelude
 import Lib.Common
 import Lib.Prettier
-
 import Data.IORef
 import Data.SnocList
 import Data.SortedMap
@@ -485,20 +484,20 @@ modifyTop f = do
 
 -- Force argument and print if verbose is true
 
-log : Int -> Lazy' String -> M Unit
+log : Int -> Lazy String -> M Unit
 log lvl x = do
   top <- getTop
-  when (lvl <= top.verbose) $ \ _ => putStrLn $ force x
+  when (lvl <= top.verbose) $ putStrLn  x
 
 logM : Int → M String -> M Unit
 logM lvl x = do
   top <- getTop
-  when (lvl <= top.verbose) $ \ _ => do
+  when (lvl <= top.verbose) $ do
     msg <- x
     putStrLn msg
 
 -- deprecated for `log 2`
-debug : Lazy' String -> M Unit
+debug : Lazy String -> M Unit
 debug x = log 2 x
 
 info : FC -> String -> M Unit
@@ -527,7 +526,7 @@ lookupMeta ix@(QN ns nm) = do
     Nothing => case lookupMap' ns top.modules of
       Nothing => do
           -- happens when printing an error because the top is reset
-          debug $ \ _ => "missing module: \{show ns} looking up meta \{show ix}"
+          debug "missing module: \{show ns} looking up meta \{show ix}"
           pure $ OutOfScope
       Just mod => case lookupMap' ix mod.modMetaCtx.metas of
         Nothing =>
@@ -572,10 +571,10 @@ instance Show Constraint where
   show (PC nm pat ty) = show (nm,pat,ty)
 
 -- Lazy because `let` would do work at the top of a `M a`
-profile : ∀ a. String → Lazy' (M a) → M a
+profile : ∀ a. String → Lazy (M a) → M a
 profile desc work = do
   start <- getTime
-  res <- force work
+  res <- work
   end <- getTime
   putStrLn "PROF \{desc} \{show $ end - start} ms"
   pure res

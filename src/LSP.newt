@@ -98,11 +98,11 @@ hoverInfo uri line col = unsafePerformIO $ do
     Right (top, HasHover fc msg) <- (getHoverInfo repo modns line col).runM st.topContext
         | Right (top, NeedCheck)  => do
             modifyIORef state $ { topContext := top }
-            putStrLn $ "NeedsCheck"
+            putStrLn "NeedsCheck"
             pure $ js_castBool True
         | Right (top, NoHoverInfo)  => do
             modifyIORef state $ { topContext := top }
-            putStrLn $ "Nothing to see here"
+            putStrLn "Nothing to see here"
             pure $ js_castBool True
         | Left err => do
             putStrLn $ show err
@@ -285,7 +285,7 @@ compileJS : String → JSObject
 compileJS fn = unsafePerformIO $ do
   let (base, modName) = decomposeName fn
   st <- readIORef state
-  when (st.baseDir /= base) $ \ _ => resetState base
+  when (st.baseDir /= base) $ resetState base
   repo <- lspFileSource
   (Right (top, src)) <- (do
     mod <- processModule emptyFC repo Nil modName
@@ -303,7 +303,7 @@ compileToScheme : String → JSObject
 compileToScheme fn = unsafePerformIO $ do
   let (base, modName) = decomposeName fn
   st <- readIORef state
-  when (st.baseDir /= base) $ \ _ => resetState base
+  when (st.baseDir /= base) $ resetState base
   repo <- lspFileSource
   (Right (top, src)) <- (do
     mod <- processModule emptyFC repo Nil modName

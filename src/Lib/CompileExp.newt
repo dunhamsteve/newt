@@ -154,7 +154,7 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
           _ => apply nm args' arity
   -- REVIEW maybe we want a different constructor for non-Ref applications?
   (t, args) => do
-        debug $ \ _ => "apply other \{render 90 $ pprint Nil t}"
+        debug "apply other \{render 90 $ pprint Nil t}"
         t' <- compileTerm t
         args' <- traverse compileTerm args
         pure $ foldl CApp t' args'

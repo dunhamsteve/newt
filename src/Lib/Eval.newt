@@ -51,11 +51,11 @@ lookupVar env k = let l = cast $ length env in
 unlet : Env -> Val -> M Val
 unlet env t@(VVar fc nm k sp) = case lookupVar env k of
       Just tt@(VVar fc' nm' k' sp') => do
-        debug $ \ _ =>  "lookup \{show k} is \{show tt}"
+        debug $  "lookup \{show k} is \{show tt}"
         if k' == k then pure t else (vappSpine tt sp >>= unlet env)
       Just t => vappSpine t sp >>= unlet env
       Nothing => do
-        debug $ \ _ =>  "lookup \{show k} is Nothing in env \{show env}"
+        debug $  "lookup \{show k} is Nothing in env \{show env}"
         pure t
 unlet env x = pure x
 
@@ -67,9 +67,9 @@ tryEval env (VRef fc k sp) = do
       Just (MkEntry _ name ty (Fn tm) _) =>
         catchError (
             do
-            debug $ \ _ =>  "app \{show name} to \{show sp}"
+            debug $  "app \{show name} to \{show sp}"
             vtm <- eval env tm
-            debug $ \ _ =>  "tm is \{render 90 $ pprint Nil tm}"
+            debug $  "tm is \{render 90 $ pprint Nil tm}"
             val <- vappSpine vtm sp
             -- These are considered "stuck" and we back out to the nearest name application
             case val of
@@ -83,7 +83,7 @@ tryEval env (VRef fc k sp) = do
               v => pure $ Just v)
             (const $ pure Nothing)
       _ => do
-        debug $ \ _ => "tryEval blocked on undefined \{show k}"
+        debug "tryEval blocked on undefined \{show k}"
         pure Nothing
 tryEval _ _ = pure Nothing
 
@@ -108,7 +108,7 @@ evalCase env sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
   top <- getTop
   if nm == name
     then do
-      debug $ \ _ =>  "ECase \{show nm} \{show sp} \{show nms} \{show t}"
+      debug $  "ECase \{show nm} \{show sp} \{show nms} \{show t}"
       pushArgs env (sp <>> Nil) nms
     else case lookup nm top of
       (Just (MkEntry _ str type (DCon _ _ k str1) _)) => evalCase env sc xs
@@ -124,8 +124,8 @@ evalCase env sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
 
 evalCase env sc (CaseDefault u :: xs) = Just <$> eval env u
 evalCase env sc cc = do
-  debug $ \ _ =>  "CASE BAIL sc \{show sc} vs " -- \{show cc}"
-  debug $ \ _ =>  "env is \{show env}"
+  debug $  "CASE BAIL sc \{show sc} vs " -- \{show cc}"
+  debug $  "env is \{show env}"
   pure Nothing
 
 -- So smalltt says:
@@ -305,36 +305,36 @@ zonkApp top l env t@(Meta fc k) sp = do
   meta <- lookupMeta k
   case meta of
     (Solved _ j v) => do
-      debug $ \ _ => "zonk for \{show k} env \{show env}"
-      debug $ \ _ => "spine \{show sp}"
+      debug "zonk for \{show k} env \{show env}"
+      debug "spine \{show sp}"
       sp' <- traverse (eval env) sp
-      debug $ \ _ =>  "zonk meta \{show k} -> \{show v} spine \{show sp'}"
+      debug $  "zonk meta \{show k} -> \{show v} spine \{show sp'}"
       foo <- vappSpine v (Lin <>< sp')
-      debug $ \ _ =>  "-> result is \{show foo}"
+      debug $  "-> result is \{show foo}"
       if length' env /= l
         then fatalError "MM2 \{show l} /= \{show $ length' env}"
         else pure MkUnit
       res <- tweakFC fc <$> quote l foo
-      debug $ \ _ => "quoted \{show res}"
+      debug "quoted \{show res}"
       pure res
     _ => pure $ appSpine t sp
 zonkApp top l env t sp = do
-  debug $ \ _ => "zonk2 for \{show t} env \{show env}"
-  debug $ \ _ => "spine \{show sp}"
+  debug "zonk2 for \{show t} env \{show env}"
+  debug "spine \{show sp}"
   t' <- zonk top l env t
   -- inlining
   let (Just tm) = inlineDef t' | _ => pure $ appSpine t' sp
   sp' <- traverse (eval env) sp
   vtm <- eval env tm
   catchError (do
-    debug $ \ _ =>  "zonk will app \{show t'} @ \{show sp} ~> \{show vtm} @ \{show sp'}"
+    debug $  "zonk will app \{show t'} @ \{show sp} ~> \{show vtm} @ \{show sp'}"
     res <- vappSpine vtm (Lin <>< sp')
-    debug $ \_ => "result is \{show res}"
+    debug "result is \{show res}"
     t' <- quote l res
     x <- zonk top l env t'
     pure x)
     (\err => do
-      debug $ \_ => "result err \{show err}"
+      debug "result err \{show err}"
       pure $ appSpine t' sp)
   where
     -- lookup name and return Def if flagged inline

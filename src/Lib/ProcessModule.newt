@@ -53,7 +53,7 @@ importToName  (MkImport fc (_,name)) = splitBy name '.'
 importHints : List TopEntry → M Unit
 importHints Nil = pure MkUnit
 importHints (entry :: entries) = do
-  when (elem Hint entry.eflags) $ \ _ => addHint entry.name
+  when (elem Hint entry.eflags) $ addHint entry.name
   importHints entries
 
 mergeOps : Operators → Operators → Operators
@@ -88,7 +88,7 @@ processModule importFC repo stk modns = do
   let (Right ((nameFC, modName), ops, toks)) = partialParse fn parseModHeader top.ops toks
     | Left (err, toks) => reportError err
 
-  log 1 $ \ _ => "scan imports for module \{modName}"
+  log 1 "scan imports for module \{modName}"
   let (True) = modns == modName
     | _ => reportError $ E nameFC "module name \{show modName} doesn't match file name \{show fn}"
 
@@ -97,7 +97,7 @@ processModule importFC repo stk modns = do
 
   imported <- for imports $ \case
     MkImport fc (nameFC, name') => do
-      when (elem name' stk) $ \ _ => error nameFC "import loop \{modns} → \{name'}"
+      when (elem name' stk) $ error nameFC "import loop \{modns} → \{name'}"
       mod <- processModule nameFC repo (modns :: stk) name'
       pure $ name'
 
@@ -128,7 +128,7 @@ processModule importFC repo stk modns = do
         Nil => pure MkUnit
         _ => addError $ E nameFC "Error in import \{ns}"
 
-  log 1 $ \ _ => "parse Decls"
+  log 1 "parse Decls"
   top <- getTop
   (decls, ops) <- parseDecls fn top.ops toks Lin
 
@@ -138,7 +138,7 @@ processModule importFC repo stk modns = do
   -- or removing pratt from parsing (so it happens in elaboration)
   modifyTop { currentMod $= { modOps := ops } }
 
-  log 1 $ \ _ => "process Decls"
+  log 1 "process Decls"
   traverse (tryProcessDecl src modns) (collectDecl decls)
   top <- getTop
 

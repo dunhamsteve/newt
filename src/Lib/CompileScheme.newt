@@ -258,7 +258,7 @@ process names = do
       (qn, cexp) <- lookupMap name cexpMap
       case cexp of
         CRaw _ _ => Nothing
-        _ => Just $ "(define \{scmName qn} \{cexpToScm Nil cexp})"
+        _ => Just "(define \{scmName qn} \{cexpToScm Nil cexp})"
 
 compileScheme : M (List String)
 compileScheme = do
