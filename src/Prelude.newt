@@ -100,7 +100,7 @@ snd (a,b) = b
 
 class Monad (m : U → U) where
   bind : ∀ a b. m a → (a → m b) → m b
-  pure : ∀ a. a → m a
+  return : ∀ a. a → m a
 
 infixl 1 _>>=_ _>>_ _>=>_
 _>>=_ : ∀ m a b. {{Monad m}} → (m a) → (a → m b) → m b
@@ -183,12 +183,12 @@ instance Functor SnocList where
 infixl 3 _<*>_ _<*_ _*>_
 class Applicative (f : U → U) where
   -- appIsFunctor : Functor f
-  return : ∀ a. a → f a
+  pure : ∀ a. a → f a
   _<*>_ : ∀ a b. f (a → b) → f a → f b
 
 
 _<*_ : ∀ f a b. {{Applicative f}} → f a → f b → f a
-fa <* fb = return const <*> fa <*> fb
+fa <* fb = pure const <*> fa <*> fb
 
 _*>_ : ∀ f a b. {{Functor f}} {{Applicative f}} → f a → f b → f b
 a *> b = map (const id) a <*> b
@@ -198,20 +198,20 @@ class Traversable (t : U → U) where
   traverse : ∀ f a b. {{Applicative f}} → (a → f b) → t a → f (t b)
 
 instance Traversable List where
-  traverse f Nil = return Nil
-  traverse f (x :: xs) = return _::_ <*> f x <*> traverse f xs
+  traverse f Nil = pure Nil
+  traverse f (x :: xs) = pure _::_ <*> f x <*> traverse f xs
 
 traverse_ : ∀ t f a b. {{Traversable t}} {{Applicative f}} → (a → f b) → t a → f Unit
-traverse_ f xs = return (const MkUnit) <*> traverse f xs
+traverse_ f xs = pure (const MkUnit) <*> traverse f xs
 
 for : {0 t : U → U} {0 f : U → U} → {{Traversable t}} {{appf : Applicative f}} → {0 a : U} → {0 b : U} → t a → (a → f b) → f (t b)
 for stuff fun = traverse fun stuff
 
 for_ : {0 t : U → U} {0 f : U → U} → {{Traversable t}} {{appf : Applicative f}} → {0 a : U} → {0 b : U} → t a → (a → f b) → f Unit
-for_ stuff fun = return (const MkUnit) <*> traverse fun stuff
+for_ stuff fun = pure (const MkUnit) <*> traverse fun stuff
 
 instance Applicative Maybe where
-  return a = Just a
+  pure a = Just a
   Nothing <*> _ = Nothing
   Just f <*> fa = f <$> fa
 
@@ -347,7 +347,7 @@ IO a = World → IORes a
 instance Monad IO where
   bind ma mab = \ w => case ma w of
     MkIORes a w => mab a w
-  pure = MkIORes
+  return = MkIORes
 
 bindList : ∀ a b. List a → (a → List b) → List b
 
@@ -361,7 +361,7 @@ instance ∀ a. Concat (List a) where
 
 
 instance Monad List where
-  pure a = a :: Nil
+  return a = a :: Nil
   bind Nil amb = Nil
   bind (x :: xs) amb = amb x ++ bind xs amb
 
@@ -369,16 +369,16 @@ instance Monad List where
 
 -- This is traverse, but we haven't defined Traversable yet
 mapA : ∀ m. {{Applicative m}} {0 a b : _} → (a → m b) → List a → m (List b)
-mapA f Nil = return Nil
-mapA f (x :: xs) = return _::_ <*> f x <*> mapA f xs
+mapA f Nil = pure Nil
+mapA f (x :: xs) = pure _::_ <*> f x <*> mapA f xs
 
 
 mapM : ∀ m. {{Monad m}} {0 a b : _} → (a → m b) → List a → m (List b)
-mapM f Nil = pure Nil
+mapM f Nil = return Nil
 mapM f (x :: xs) = do
   b <- f x
   bs <- mapM f xs
-  pure (b :: bs)
+  return (b :: bs)
 
 class HasIO (m : U → U) where
   liftIO : ∀ a. IO a → m a
@@ -575,18 +575,18 @@ getAt! (S k) (x :: xs) = getAt! k xs
 
 
 instance ∀ a. Applicative (Either a) where
-  return b = Right b
+  pure b = Right b
   Right x <*> Right y = Right (x y)
   Left x <*> _ = Left x
   Right x <*> Left y = Left y
 
 instance ∀ a. Monad (Either a) where
-  pure x = Right x
+  return x = Right x
   bind (Right x) mab = mab x
   bind (Left x) mab = Left x
 
 instance Monad Maybe where
-  pure x = Just x
+  return x = Just x
   bind Nothing mab = Nothing
   bind (Just x) mab = mab x
 
@@ -674,7 +674,7 @@ instance Cast Int Double where
   cast = intToDouble
 
 instance Applicative IO where
-  return a = \ w => MkIORes a w
+  pure a = \ w => MkIORes a w
   f <*> a = \ w =>
     let (MkIORes f w) = f w in
     let (MkIORes a w) = a w in
@@ -702,7 +702,7 @@ instance Bifunctor _×_ where
   bimap f g (a,b) = (f a, g b)
 
 instance Functor IO where
-  map f a = bind a $ \ a => pure (f a)
+  map f a = bind a $ \ a => return (f a)
 
 instance ∀ a. Functor (Either a) where
   map f (Left x) = Left x
@@ -720,7 +720,7 @@ curry f a b = f (a,b)
 
 -- TODO Idris has a tail recursive version of this
 instance Applicative List where
-  return a = a :: Nil
+  pure a = a :: Nil
   Nil <*> _ = Nil
   fs <*> ys = join $ map (\ f => map f ys) fs
 
@@ -848,7 +848,7 @@ instance ∀ a. {{Show a}} → Show (List a) where
 
 -- unlike Idris, user will have to write \ _ => ...
 when : ∀ f. {{Applicative f}} → Bool → Lazy (f Unit) → f Unit
-when b fa = if b then fa else return MkUnit
+when b fa = if b then fa else pure MkUnit
 
 unless : ∀ f. {{Applicative f}} → Bool → Lazy (f Unit) → f Unit
 unless b fa = when (not b) fa
@@ -933,7 +933,7 @@ findIndex' {a} pred xs = go xs 0
 pfunc fatalError : ∀ a. String → a := `(_, msg) => { throw new Error(msg) }`
 
 foldlM : ∀ m a e. {{Monad m}} → (a → e → m a) → a → List e → m a
-foldlM f a xs = foldl (\ ma b => ma >>= flip f b) (pure a) xs
+foldlM f a xs = foldl (\ ma b => ma >>= flip f b) (return a) xs
 
 pfunc unsafePerformIO : ∀ a. IO a → a := `(a, f) => f().h1 `
 

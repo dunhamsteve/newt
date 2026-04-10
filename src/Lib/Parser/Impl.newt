@@ -87,7 +87,7 @@ instance Functor Parser where
 
 
 instance Applicative Parser where
-  return pa = P (\ last toks com ops col => OK pa last toks com ops)
+  pure pa = P (\ last toks com ops col => OK pa last toks com ops)
   P pab <*> P pa = P $ \last toks com ops col =>
     case pab last toks com ops col of
       Fail err last toks com ops => Fail err last toks com ops
@@ -108,7 +108,7 @@ instance Alternative Parser where
 
 
 instance Monad Parser where
-  pure = return
+  return = pure
   bind (P pa) pab = P $ \last toks com ops col =>
     case pa last toks com ops col of
       (OK a last toks com ops) => runP (pab a) last toks com ops col

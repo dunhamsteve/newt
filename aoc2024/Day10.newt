@@ -53,7 +53,7 @@ paths2 grid pts ht =
   where
     getCands : Point × Int → List (Point × Int)
     getCands (pt,cnt) =
-      map (\ x => fst x , cnt)
+      map (\ x => (fst x , cnt))
         $ filter (_==_ (ht + 1) ∘ snd)
         $ mapMaybe (\ p => lookupMap p grid) (peers pt)
 

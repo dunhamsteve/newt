@@ -11,14 +11,14 @@ record State st a where
   runState : st → (st × a)
 
 instance ∀ st. Applicative (State st) where
-  return x = ST (\st => (st, x))
+  pure x = ST (\st => (st, x))
   (ST sf) <*> (ST sx) = ST $ \st =>
     let (st', f) = sf st in
     let (st'', x) = sx st' in
     (st'', f x)
 
 instance ∀ st. Monad (State st) where
-  pure x = ST (\st => (st, x))
+  return x = ST (\st => (st, x))
   bind (ST run) f = ST $ \st =>
     let (st', a) = run st in
     let (ST run') = f a in

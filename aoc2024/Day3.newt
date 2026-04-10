@@ -8,7 +8,7 @@ Parser : U → U
 Parser a = List Char → Maybe (a × List Char)
 
 instance Monad Parser where
-  pure a = \ cs => Just (a, cs)
+  return a = \ cs => Just (a, cs)
   bind ma mab = \ cs => ma cs >>= uncurry mab
 
 instance Alternative Parser where
@@ -31,17 +31,17 @@ any : Parser Char
 any = satisfy (λ _ => True)
 
 some many : ∀ a. Parser a → Parser (List a)
-many p = some p <|> pure Nil
+many p = some p <|> return Nil
 some p = do
   v <- p
   vs <- many p
-  pure (v :: vs)
+  return (v :: vs)
 
 pnum : Parser Int
 pnum = do
   chars <- many (satisfy isDigit)
   if S (S (S Z)) < length chars then fail
-    else pure $ stringToInt $ pack chars
+    else return $ stringToInt $ pack chars
 
 data Inst : U where
   Mult : Int → Int → Inst
@@ -58,7 +58,7 @@ mul = do
   match ','
   y <- pnum
   match ')'
-  pure $ Mult x y
+  return $ Mult x y
 
 pdo : Parser Inst
 pdo = do
@@ -66,7 +66,7 @@ pdo = do
   match 'o'
   match '('
   match ')'
-  pure Do
+  return Do
 
 pdont : Parser Inst
 pdont = do
@@ -77,17 +77,17 @@ pdont = do
   match 't'
   match '('
   match ')'
-  pure Dont
+  return Dont
 
 some' many' : ∀ a. Parser a → Parser (List a)
 many' p = do
-  pure MkUnit
-  some' p <|> (any >> many' p) <|> pure Nil
+  return MkUnit
+  some' p <|> (any >> many' p) <|> return Nil
 
 some' p = do
   v <- p
   vs <- many' p
-  pure (v :: vs)
+  return (v :: vs)
 
 inst : Parser Inst
 inst = mul <|> pdo <|> pdont

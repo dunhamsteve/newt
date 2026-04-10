@@ -7,7 +7,7 @@ Parser : U → U
 Parser a = List Char → Either String (a × List Char)
 
 instance Monad Parser where
-  pure a = \ cs => Right (a, cs)
+  return a = \ cs => Right (a, cs)
   bind ma mab = \ cs => ma cs >>= uncurry mab
 
 instance Alternative Parser where
@@ -21,7 +21,7 @@ instance Functor Parser where
     Right (a, cs) => Right (f a, cs)
 
 instance Applicative Parser where
-  return a = pure a
+  pure a = return a
   pa <*> pb = pa >>= (\ f => map f pb)
 
 

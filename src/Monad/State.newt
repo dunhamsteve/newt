@@ -21,13 +21,13 @@ instance ∀ s. Functor (State s) where
   map f (MkState run) = MkState (\s => let (a, s') = run s in (f a, s'))
 
 instance ∀ s. Applicative (State s) where
-  return x = MkState (\s => (x, s))
+  pure x = MkState (\s => (x, s))
   (MkState f) <*> (MkState x) = MkState (\s => let (g, s') = f s in
                                                let (a, s'') = x s'
                                                in (g a, s''))
 
 instance ∀ s. Monad (State s) where
-  pure x = MkState (\s => (x, s))
+  return x = MkState (\s => (x, s))
   bind (MkState x) f = MkState (\s => let (a, s') = x s in
                                      let (MkState y) = f a in
                                      y s')

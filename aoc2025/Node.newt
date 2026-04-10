@@ -13,10 +13,10 @@ pfunc promise_lift : ∀ a. IO a → Promise a := `(a,f) => Promise.resolve(f('W
 
 instance Monad Promise where
   bind = promise_bind
-  pure = promise_pure
+  return = promise_pure
 
 instance Applicative Promise where
-  return = pure
+  pure = return
   fab <*> fa = promise_app fab fa
 
 instance HasIO Promise where

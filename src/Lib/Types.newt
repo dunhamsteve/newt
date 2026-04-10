@@ -428,54 +428,54 @@ record M a where
 instance Functor M where
   map f (MkM run) = MkM $ \tc => do
     (Right (tc', a))  <- (run tc)
-      | Left err => pure $ Left err
-    pure $ Right (tc', f a)
+      | Left err => return $ Left err
+    return $ Right (tc', f a)
 
 instance Applicative M where
-  return x = MkM $ \tc => pure $ Right (tc, x)
+  pure x = MkM $ \tc => return $ Right (tc, x)
   (MkM f) <*> (MkM x) = MkM $ \tc => do
     Right (tc', f') <- f tc
-      | Left err => pure $ Left err
+      | Left err => return $ Left err
     Right (tc'', x') <- x tc'
-      | Left err => pure $ Left err
-    pure $ Right (tc'', f' x')
+      | Left err => return $ Left err
+    return $ Right (tc'', f' x')
 
 instance Monad M where
-  pure = return
+  return = pure
   bind (MkM x) f = MkM $ \tc => do
     (Right (tc', a)) <- x tc
-      | Left err => pure $ Left err
+      | Left err => return $ Left err
     .runM (f a) tc'
 
 instance HasIO M where
   liftIO io = MkM $ \tc => do
     result <- io
-    pure $ Right (tc, result)
+    return $ Right (tc, result)
 
 throwError : ∀ a. Error -> M a
-throwError err = MkM $ \_ => pure $ Left err
+throwError err = MkM $ \_ => return $ Left err
 
 catchError : ∀ a. M a -> (Error -> M a) -> M a
 catchError (MkM ma) handler = MkM $ \tc => do
   (Right (tc', a)) <- ma tc
     | Left err => .runM (handler err) tc
-  pure $ Right (tc', a)
+  return $ Right (tc', a)
 
 tryError : ∀ a. M a -> M (Either Error a)
-tryError ma = catchError (map Right ma) (pure ∘ Left)
+tryError ma = catchError (map Right ma) (return ∘ Left)
 
 filterM : ∀ a. (a → M Bool) → List a → M (List a)
-filterM pred Nil = pure Nil
+filterM pred Nil = return Nil
 filterM pred (x :: xs) = do
   check <- pred x
   if check then _::_ x <$> filterM pred xs else filterM pred xs
 
 
 getTop : M TopContext
-getTop = MkM $ \ tc => pure $ Right (tc, tc)
+getTop = MkM $ \ tc => return $ Right (tc, tc)
 
 putTop : TopContext -> M Unit
-putTop tc = MkM $ \_ => pure $ Right (tc, MkUnit)
+putTop tc = MkM $ \_ => return $ Right (tc, MkUnit)
 
 modifyTop : (TopContext -> TopContext) -> M Unit
 modifyTop f = do
@@ -522,16 +522,16 @@ lookupMeta : QName -> M MetaEntry
 lookupMeta ix@(QN ns nm) = do
   top <- getTop
   case lookupMap' ix top.currentMod.modMetaCtx.metas of
-    Just meta => pure meta
+    Just meta => return meta
     Nothing => case lookupMap' ns top.modules of
       Nothing => do
           -- happens when printing an error because the top is reset
           debug "missing module: \{show ns} looking up meta \{show ix}"
-          pure $ OutOfScope
+          return $ OutOfScope
       Just mod => case lookupMap' ix mod.modMetaCtx.metas of
         Nothing =>
           error emptyFC "missing meta: \{show ix}"
-        Just entry => pure entry
+        Just entry => return entry
 
 mkCtx : FC -> Context
 mkCtx fc = MkCtx 0 Nil Nil Nil fc
@@ -577,4 +577,4 @@ profile desc work = do
   res <- work
   end <- getTime
   putStrLn "PROF \{desc} \{show $ end - start} ms"
-  pure res
+  return res
