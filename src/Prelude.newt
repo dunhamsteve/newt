@@ -829,7 +829,6 @@ find : ∀ a. (a → Bool) → List a → Maybe a
 find f Nil = Nothing
 find f (x :: xs) = if f x then Just x else find f xs
 
--- TODO maybe use fastConcat
 joinBy : String → List String → String
 joinBy _ Nil = ""
 joinBy _ (x :: Nil) = x
@@ -844,9 +843,6 @@ instance ∀ a b. {{Show a}} {{Show b}} → Show (a × b) where
 instance ∀ a. {{Show a}} → Show (List a) where
   show xs = "[" ++ (joinBy ", " $ map show xs) ++ "]"
 
--- For now, I'm not having the compiler do this automatically
-
--- unlike Idris, user will have to write \ _ => ...
 when : ∀ f. {{Applicative f}} → Bool → Lazy (f Unit) → f Unit
 when b fa = if b then fa else pure MkUnit
 

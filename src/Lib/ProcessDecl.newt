@@ -25,7 +25,8 @@ dumpEnv ctx =
     isVar : Int -> Val -> Bool
     isVar k (VVar _ _ k' Lin) = k == k'
     isVar _ _ = False
-
+    -- REVIEW consider moving the goal up for editors like Helix that truncate
+    -- REVIEW should we hide/demphasize entries that aren't bound to names?
     go : List String -> Int -> List (Val × String × Val) -> List String -> M (List String)
     go _ _ Nil acc = pure acc
     -- don't show the = bit for now. Lean folds it.
@@ -59,6 +60,8 @@ logMetas (Unsolved fc k ctx ty ErrorHole cons :: rest) = logMetas rest
 logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
       ty' <- forceMeta ty
       tm <- quote ctx.lvl ty'
+      top <- getTop
+      tm <- zonk top 0 Nil tm
       let msg = "Unsolved meta \{show k} \{show kind} type \{render 90 $ pprint (names ctx) tm} \{show $ length' cons} constraints"
       msgs <- for cons $ \case
         (MkMc fc env sp val) => do
@@ -71,6 +74,7 @@ logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
           -- we want the context here too.
           top <- getTop
           let (VRef _ tyname _) = ty | _ => pure Nil
+          -- TODO maybe log matches from ctx, too
           let cands = fromMaybe Nil $ lookupMap' tyname top.hints
           matches <- findMatches ctx ty cands
           pure ("  \{show $ length' matches} Solutions: \{show matches}" :: Nil)
@@ -145,7 +149,9 @@ processPrimFn ns fc nm used ty src = do
 complexity : Tm → Int
 complexity (Ref _ _) = 1
 complexity (Meta _ _) = 1 -- what's a good score for this, it's not inlined yet.
-complexity (Lam _ _ _ _ sc) = 1 + complexity sc
+-- don't inline lambda, it captures extra stuff
+-- e.g. emptyMap was capturing top and leaking memory...
+complexity (Lam _ _ _ _ sc) = 100 + complexity sc
 -- Ignore metas - they may be erased and likely are much smaller when substituted
 complexity (App _ t u) = go t (complexity u)
   where
@@ -180,6 +186,7 @@ processDef ns fc nm clauses = do
   tm <- buildTree (mkCtx fc) (MkProb clauses' vty)
 
   -- We might want to freeze the autos after this
+  -- TODO look at what is not solved at this point and see if we can catch it earlier
   solveAutos
 
   -- for effect, so we see errors in the editor

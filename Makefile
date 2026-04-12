@@ -33,6 +33,7 @@ profile: .PHONY build/newt.js build/newt2.js
 	prettier -w build/newt2.js --ignore-path junk.js
 	node --prof build/newt2.js -o build/newt3.js src/Main.newt
 	node --prof-process isolate* > build/profile.txt
+	rm -f isolate*
 
 clean:
 	rm  build/*

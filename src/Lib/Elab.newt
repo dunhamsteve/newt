@@ -131,16 +131,16 @@ findMatches ctx ty ((name, type) :: xs) = do
   catchError (do
       -- TODO sort out the FC here
       let fc = getFC ty
-      debug "TRY \{show name} : \{rpprint Nil type} for \{show ty}"
+      debug "auto: TRY \{show name} : \{rpprint Nil type} for \{show ty}"
       let (QN ns nm) = name
       setMetaMode CheckFirst
       -- Check is filling in implicit arguments here
       tm <- check ctx (RVar fc nm) ty
-      debug "Found \{rpprint Nil tm} for \{show ty}"
+      debug "auto: Found \{rpprint Nil tm} for \{show ty}"
       setMetaContext mc
       (_::_ name) <$> findMatches ctx ty xs)
     (\ err => do
-      debug "No match \{show ty} \{rpprint Nil type} \{show err}"
+      debug "auto: No match \{show ty} \{rpprint Nil type} \{show err}"
       setMetaContext mc
       findMatches ctx ty xs)
 
@@ -155,13 +155,13 @@ contextMatches ctx ty = go (zip ctx.env ctx.types)
       top <- getTop
       let mc = top.currentMod.modMetaCtx
       catchError(do
-          debug "TRY context \{nm} : \{rpprint (names ctx) type} for \{show ty}"
+          debug "auto: TRY context \{nm} : \{rpprint (names ctx) type} for \{show ty}"
           unifyCatch (getFC ty) ctx ty vty
           setMetaContext mc
           tm <- quote ctx.lvl tm
           (_::_ (tm, vty)) <$> go xs)
         (\ err => do
-          debug "No match \{show ty} \{rpprint (names ctx) type} \{show err}"
+          debug "auto: No match \{show ty} \{rpprint (names ctx) type} \{show err}"
           setMetaContext mc
           go xs)
 

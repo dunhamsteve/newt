@@ -320,10 +320,16 @@ pLamArg = impArg <|> expArg
   where
     -- TODO - we're moving away from uppercase variables, but a test uses them
     impArg : Parser (Icit × String × Maybe Raw)
-    impArg = (_,_ Implicit ) <$> braces (_,_ <$> (ident <|> uident) <*> optional (symbol ":" >> typeExpr))
+    impArg = braces $ do
+      nm <- (ident <|> uident)
+      ty <- optional (symbol ":" >> typeExpr)
+      pure (Implicit, nm, ty)
 
     expArg : Parser (Icit × String × Maybe Raw)
-    expArg = (_,_ Explicit) <$> parenWrap (_,_ <$> ident <*> optional (symbol ":" >> typeExpr))
+    expArg = parenWrap $ do
+      nm <- ident
+      ty <- optional (symbol ":" >> typeExpr)
+      pure (Explicit, nm, ty)
 
 lamExpr : Parser Raw
 lamExpr = do
