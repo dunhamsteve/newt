@@ -611,10 +611,23 @@ freshMeta ctx fc ty kind = do
       AutoSolve => qn :: mc.autos
       _ => mc.autos
   setMetaContext $ { metas $= updateMap qn newmeta; autos := autos; next $= 1 +} mc
+  if (kind == AutoSolve) then
+    case ty of
+      VRef _ nm sp => do
+        when (checkAuto sp) $ do
+          success <- trySolveAuto newmeta
+          debug "auto: instant \{show success} \{show newmeta}"
+      _ => return MkUnit
+    else pure MkUnit
 
   -- I tried checking Auto immediately if CheckAll, but there isn't enough information yet.
   pure $ applyBDs 0 (Meta fc qn) ctx.bds
   where
+    checkAuto : SnocList Val → Bool
+    checkAuto Lin = True
+    checkAuto (sp :< VMeta _ nm _) = False
+    checkAuto (sp :< _) = checkAuto sp
+
     applyBDs : Int -> Tm -> List BD -> Tm
     applyBDs k t Nil = t
     applyBDs k t (Bound :: xs) = App emptyFC (applyBDs (1 + k) t xs) (Bnd emptyFC k)
