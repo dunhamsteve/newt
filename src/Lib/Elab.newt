@@ -27,7 +27,6 @@ collectDecl ((FunDef fc nm cl) :: rest@(FunDef _ nm' cl' :: xs)) =
   else (FunDef fc nm cl :: collectDecl rest)
 collectDecl (x :: xs) = x :: collectDecl xs
 
-
 showCtx : Context -> M String
 showCtx ctx =
   unlines ∘ reverse <$> go (names ctx) 0 (reverse $ zip ctx.env ctx.types) Nil
@@ -102,9 +101,6 @@ check : Context -> Raw -> Val -> M Tm
 
 unifyCatch : FC -> Context -> Val -> Val -> M Unit
 
--- Check that the arguments are not explicit and the type constructor in codomain matches
--- Later we will build a table of codomain type, and maybe make the user tag the candidates
--- like Idris does with %hint
 isCandidate : Val -> Tm -> Bool
 isCandidate ty (Pi fc nm Explicit rig t u) = False
 isCandidate ty (Pi fc nm icit rig t u) = isCandidate ty u
@@ -421,7 +417,7 @@ solve env m sp t = do
     )
 
     (\case
-      Postpone fc ix msg => do
+      Postpone fc ix' msg => do
         -- let someone else solve this and then check again.
         debug "CONSTRAINT2 \{show ix} \{show sp} =?= \{show t}"
         addConstraint env m sp t
@@ -429,6 +425,7 @@ solve env m sp t = do
       err => throwError (E (getFC err) "\{errorMsg err} for \{show ix} \{show sp} =?= \{show t}")
         )
 
+-- TODO remove that unused Bool
 unifySpine : Env -> UnifyMode -> Bool -> SnocList Val -> SnocList Val  -> M UnifyResult
 unifySpine env mode False _ _ = error emptyFC "unify failed at head" -- unreachable now
 unifySpine env mode True Lin Lin = pure (MkResult Nil)
@@ -516,7 +513,6 @@ unify env mode t u = do
     unifyVar : Val -> Val -> M UnifyResult
     unifyVar t'@(VVar fc n₁ k sp)  u'@(VVar fc' n₂ k' sp')  =
       if k == k' then unifySpine env mode (k == k') sp sp'
-      -- FIXME - get some names in here.
       else error fc "Failed to unify \{show t'} and \{show u'}"
 
     unifyVar t'@(VVar fc nm k Lin) u = do
@@ -1251,6 +1247,8 @@ buildTree ctx prob@(MkProb ((MkClause fc cons pats@(x :: xs) expr) :: cs) ty) =
 -- some of this is copied into check
 buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
   debug "buildTree \{show constraints} \{show expr}"
+  -- reverse constraints if we want to try left to right
+  -- probably need to skip quant 0 (dotted) at least, though
   let (Just (PC scnm pat scty)) = findSplit constraints
     | _ => do
       debug "checkDone \{show constraints}"
@@ -1534,7 +1532,7 @@ check ctx tm ty = do
       (tm', ty') <- insertForce ctx tm' ty' ty
 
       let names = map fst ctx.types
-      debug "INFER \{show tm} to (\{rpprint names tm'} : \{show ty'}) expect \{show ty}"
+      debug "INFER \{render 90 $ pretty tm}\n   to (\{rpprint names tm'}\n   ty \{show ty'})\nexpect \{show ty}"
       unifyCatch (getFC tm) ctx ty' ty
       pure tm'
     where

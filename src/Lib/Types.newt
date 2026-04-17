@@ -527,10 +527,12 @@ lookupMeta ix@(QN ns nm) = do
       Nothing => do
           -- happens when printing an error because the top is reset
           debug "missing module: \{show ns} looking up meta \{show ix}"
-          return $ OutOfScope
+          return OutOfScope
       Just mod => case lookupMap' ix mod.modMetaCtx.metas of
-        Nothing =>
-          error emptyFC "missing meta: \{show ix}"
+        Nothing => do
+          -- happens for rolled back metas in error messages
+          debug "meta not present: \{show ix}"
+          return OutOfScope
         Just entry => return entry
 
 mkCtx : FC -> Context

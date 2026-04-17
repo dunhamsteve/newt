@@ -17,8 +17,6 @@ not : Bool → Bool
 not True = False
 not False = True
 
--- In Idris, this is lazy in the second arg, we're not doing
--- magic laziness for now, it's messy
 infixr 4 _||_
 _||_ : Bool → Bool → Bool
 True || _ = True
