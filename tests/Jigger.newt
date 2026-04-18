@@ -1,0 +1,49 @@
+module Jigger
+
+-- https://personal.cis.strath.ac.uk/conor.mcbride/fooling/Jigger.agda
+
+
+data Nat : U where
+    Z : Nat
+    S : Nat → Nat
+
+infixl 4 _+_
+
+_+_ : Nat → Nat → Nat
+Z + n = n
+S m + n = S (m + n)
+
+data Fin : Nat → U where
+    FZ : ∀ n. Fin (S n)
+    FS : ∀ n. Fin n → Fin (S n)
+
+max : {n : Nat} → Fin (S n)
+max {Z} = FZ
+max {S n} = FS (max {n})
+
+embed : {n : Nat} → Fin n → Fin (S n)
+embed FZ = FZ
+embed (FS n) = FS (embed n)
+
+var : (m : Nat) {n : Nat} → Fin (S (m + n))
+var Z = max
+var (S m) = embed (var m)
+
+-- Agda lets us put a telescope on the left and we don't need to repeat.
+-- It's a parameter and not in the constructors, but we could stuff it on the left of the constructors (implicit)
+-- and save some typing.
+infixl 2 _$$_
+data Tm : Nat → U where
+    V : ∀ n. Fin n → Tm n
+    -- they have _$_ but we can't use $
+    _$$_ : ∀ n. Tm n → Tm n → Tm n
+    L : ∀ n. Tm (S n) → Tm n
+
+l : {m : Nat} → (({n : Nat} → Tm (S (m + n))) → Tm (S m)) → Tm m
+l {m} f = L (f $ \ {n} => V (var m {n}))
+
+myTest : Tm Z
+myTest = l {_} (\f => l (\x => f $$ (f $$ x)))
+-- implicits from agda
+-- myTest = l {Z} (\f => l {S Z} (\x => f {S Z} $$ (f {S Z} $$ x {Z}) ))
+

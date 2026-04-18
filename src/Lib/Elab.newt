@@ -75,6 +75,33 @@ lookupDef ctx name = go 0 ctx.types ctx.env
     go ix ((nm, ty) :: xs) (v :: vs) = if nm == name then Just v else go (1 + ix) xs vs
     go ix _ _ = Nothing
 
+-- get metas referenced in a term
+getTMetas : Tm → List QName
+getTMetas (Meta _ nm) = [nm]
+getTMetas (App _ t u) = getTMetas t ++ getTMetas u
+getTMetas (Pi fc nm _ _ a b) = getTMetas a ++ getTMetas b
+getTMetas (Lam _ _ _ _ sc) = getTMetas sc
+getTMetas _ = Nil
+-- TODO
+getTMetas (Case _ _ _) = ?
+getTMetas (Let _ _ _ _) = ?
+getTMetas (LetRec _ _ ty t u) = ?
+getTMetas (Delay _ _) = ?
+getTMetas (Force _ _) = ?
+
+-- get metas referenced in a value
+getMetas : Val → List QName
+getMetas (VMeta _ ix sp) = [ix]
+getMetas (VVar _ nm k sp) = join $ map getMetas (sp <>> Nil)
+getMetas (VRef _ nm sp) = join $ map getMetas (sp <>> Nil)
+getMetas (VPi _ _ _ _ a (MkClosure _ b)) = getMetas a ++ getTMetas b
+getMetas (VLam _ _ _ _ (MkClosure _ sc)) = getTMetas sc
+getMetas (VLet _ _ t (MkClosure _ b)) = getMetas t ++ getTMetas b
+getMetas _ = []
+-- TODO
+getMetas (VCase _ sc _ _) = []
+getMetas (VLetRec _ _ _ _ _) = []
+
 forceMeta : Val -> M Val
 forceMeta (VMeta fc ix sp) = do
   meta <- lookupMeta ix
@@ -83,26 +110,7 @@ forceMeta (VMeta fc ix sp) = do
     _ => pure (VMeta fc ix sp)
 forceMeta x = pure x
 
--- NOW - we want to collect constraints for postponement, too.
--- my plan was to throw them into the meta context and re-run the
--- unification when one of the metas was solved.
-
--- Alternative is to return a postpone meta from unify, with the expected type and
--- let it be solved by rerunning the `check` at the end (I think Idris
--- does something like this.) The idea there is to be safe by not letting
--- anyone at the Tm until it has been fully checked.
---
--- So, put a bunch of stuck metas in unify result and rerun the check? Or
--- work it like the existing postpone? (addConstraint)
--- I think we want constraints, shaped differently. is there an env for addConstraint?
---
--- OK, for now:
---
--- - constraints are (metas) env lhs rhs
--- - live in a list in the metacontext
--- - when added, we should flag the metas in the list (later)
--- - when a meta is solved, check constraints that name it
-
+-- currently only used for pattern matching
 record UnifyResult where
   constructor MkResult
   -- wild guess here - lhs is a VVar
@@ -114,8 +122,9 @@ instance Semigroup UnifyResult where
 instance Monoid UnifyResult where
   neutral = MkResult Nil
 
-data UnifyMode = UNormal | UPattern
+data UnifyMode = UNormal | UPattern | USpine
 derive Show UnifyMode
+derive Eq UnifyMode
 
 check : Context -> Raw -> Val -> M Tm
 
@@ -292,14 +301,16 @@ addConstraint env nms tm' tm = do
   top <- getTop
   let mc = top.currentMod.modMetaCtx
   let (CheckAll) = mc.mcmode | _ => pure MkUnit
+  let nms = expand mc nms Nil
   let const = (MkMc (getFC tm) nms env tm' tm)
   modifyTop { currentMod $= { modMetaCtx $= { mpost $= const :: }}}
-  for_ nms $ \ ix => updateMeta ix $ \case
-    (Unsolved pos k a b c cons) => do
-      debug "Add constraint \{show tm'} =?= \{show tm} deps \{show nms}"
-      pure $ Unsolved pos k a b c True
-    (Solved fc k tm) => error fc "Meta \{show k} already solved [addConstraint]"
-    (OutOfScope) => error' "Meta \{show ix} out of scope"
+  where
+    expand : MetaContext → List QName → List QName → List QName
+    expand mc Nil acc = acc
+    expand mc (n :: ns) acc = case lookupMap' n mc.metas of
+      (Just (Unsolved _ _ _ _ _ _)) => expand mc ns (n :: acc)
+      Just (Solved fc qn val) => expand mc (getMetas val ++ ns) acc
+      _ => expand mc ns acc
 
 -- return renaming, the position is the new VVar
 invert : Int -> SnocList Val -> M (List Int)
@@ -344,7 +355,7 @@ rename meta ren lvl (VMeta fc ix sp) = do
           rename meta ren lvl val'
         _ => do
           debug "rename: \{show ix} is unsolved"
-          catchError (renameSpine meta ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc ix (errorMsg err))
+          catchError (renameSpine meta ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc [ix] (errorMsg err))
 rename meta ren lvl (VLam fc n icit rig t) = do
   tapp <- t $$ VVar fc n lvl Lin
   scope <- rename meta (lvl :: ren) (1 + lvl) tapp
@@ -453,17 +464,19 @@ solve env m sp t = do
     )
 
     (\case
-      Postpone fc ix' msg => do
+      Postpone fc deps msg => do
         -- we were tossing ix' ?
         -- let someone else solve this and then check again.
         debug "CONSTRAINT2 \{show ix} \{show sp} =?= \{show t}"
-        addConstraint env [ix', m] (VMeta fc m sp) t
+        addConstraint env (m :: deps) (VMeta fc m sp) t
       -- replace with wrapper
       err => throwError (E (getFC err) "\{errorMsg err} for \{show ix} \{show sp} =?= \{show t}")
         )
   where
     refs : QName → MConstraint → Bool
+    -- FIXME deps is missing some, Jigger.newt fails
     refs ix (MkMc _ deps _ _ _) = elem ix deps
+
 
 -- TODO remove that unused Bool
 unifySpine : Env -> UnifyMode -> Bool -> SnocList Val -> SnocList Val  -> M UnifyResult
@@ -490,15 +503,14 @@ unify env mode t u = do
   -- into the case tree explodes it further.
   case mode of
     UPattern => unifyPattern t' u'
-    UNormal => unifyMeta t' u'
+    _ => unifyMeta t' u'
 
   -- The case tree is still big here. It's hard for idris to sort
   -- What we really want is what I wrote - handle meta, handle lam, handle var, etc
 
   where
-    -- The case tree here was huge, so I split it into stages
-    -- newt will have similar issues because it doesn't emit a default case
 
+    -- The case tree in Idris was huge, so I split it into stages
     unifyRest : Val -> Val -> M UnifyResult
     unifyRest (VPi fc nm _ _ a b) (VPi fc' _ _ _ a' b') = do
       let fresh = VVar fc nm (length' env) Lin
@@ -535,16 +547,26 @@ unify env mode t u = do
       -- NOW we need to postpone if there are non-matchy metas in the spines
       if k == k'
         then unifySpine env mode' (k == k') sp sp'
-        else error fc "vref mismatch \{show t'} =?= \{show u'}"
+        else do
+          sp <- traverse forceMeta (sp <>> Nil)
+          sp' <- traverse forceMeta (sp' <>> Nil)
+          case join (map getMetas sp) ++ join (map getMetas sp') : List QName of
+            Nil => error fc "vref mismatch \{show t'} =?= \{show u'}"
+            metas => do
+              top <- getTop
+              let mc = top.currentMod.modMetaCtx
+              case mc.mcmode of
+                -- otherwise we get false positives checking autos.
+                CheckAll => throwError $ Postpone fc metas "postponed"
+                _ => error fc "vref mismatch"
       where
         spineMode : Maybe TopEntry → UnifyMode
         spineMode (Just (MkEntry _ name ty (DCon _ _ _ _) _) ) = mode
         spineMode (Just (MkEntry _ name ty (PrimTCon _) _) ) = mode
         spineMode (Just (MkEntry _ name ty (TCon _ _) _) ) = mode
-        -- NOW This is not right, it just adds the ability to match var at the front.
-        -- need a straight up alpha check, or maybe if we were only returning the meta constraints
-        -- we could look at that.
-        spineMode _ = UPattern
+        spineMode _ = case mode of
+           UNormal => USpine
+           _ => mode
 
     unifyRef t         u@(VRef fc' k' sp') = do
       debug "expand \{show t} =?= %ref \{show k'}"
@@ -605,14 +627,25 @@ unify env mode t u = do
       unify (fresh :: env) mode appt vappt'
     unifyLam t u = unifyVar t u
 
+    solve' : Env -> QName -> SnocList Val -> Val -> M UnifyResult
+    solve' env nm sp sol = do
+      case mode of
+        UPattern => do
+          putStrLn "pattern solve \{show nm} \{show sp} =?= \{show sol}"
+          pure neutral
+        USpine => do
+          putStrLn "spine match \{show nm}"
+          throwError $ Postpone (getFC sol) (nm :: getMetas sol) "spine match"
+        _ => solve env nm sp sol >> pure neutral
+
     unifyMeta : Val -> Val -> M UnifyResult
     -- flex/flex
     unifyMeta t@(VMeta fc k sp) t'@(VMeta fc' k' sp') =
       if k == k' then unifySpine env mode (k == k') sp sp'
       -- TODO, might want to try the other way, too.
       else if snoclen sp < snoclen sp'
-        then solve env k' sp' (VMeta fc k sp) >> pure neutral
-        else solve env k sp (VMeta fc' k' sp') >> pure neutral
+        then solve' env k' sp' (VMeta fc k sp) >> pure neutral
+        else solve' env k sp (VMeta fc' k' sp') >> pure neutral
     unifyMeta t (VMeta fc' i' sp') = solve env i' sp' t >> pure neutral
     unifyMeta (VMeta fc i sp) t' = solve env i sp t' >> pure neutral
     unifyMeta t v = unifyLam t v
@@ -633,12 +666,21 @@ unify env mode t u = do
     unifyPattern t u = unifyMeta t u
 
 unifyCatch fc ctx ty' ty = do
-    res <- catchError (unify ctx.env UNormal ty' ty) $ \err => do
-      let names = map fst ctx.types
-      debug "fail \{show ty'} \{show ty}"
-      throwError $ UnificationError fc names ty' ty err
+    res <- catchError (unify ctx.env UNormal ty' ty) $ \case
+      Postpone _ ix _ => do
+        addConstraint ctx.env ix ty' ty
+        pure neutral
+
+      err => do
+        let names = map fst ctx.types
+        debug "fail \{show ty'} \{show ty}"
+        throwError $ UnificationError fc names ty' ty err
     case res of
       MkResult Nil => pure MkUnit
+      -- NOW check if "postponing" without checking solves things
+      -- NB - we're only getting constraints in UPattern right now.
+      -- Is this even reachable?
+      _ => pure MkUnit
       cs => do
         -- probably want a unification mode that throws instead of returning constraints
         -- TODO need a normalizeHoles, maybe on quote?

@@ -47,7 +47,7 @@ logConstraints : M Unit
 logConstraints = do
   top <- getTop
   for_ top.currentMod.modMetaCtx.mpost $ \case
-    MkMc fc _ _ ty' ty => addError $ E fc "Constraint: \{show ty'} =?= \{show ty}"
+    MkMc fc nms env ty' ty => addError $ E fc "Constraint: \{show ty'} =?= \{show ty} deps \{show nms}"
 
 logMetas : List MetaEntry -> M Unit
 logMetas Nil = pure MkUnit

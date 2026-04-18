@@ -86,11 +86,6 @@ documents.onDidChangeContent(async (change) => {
   writeCache(path.basename(uri), text);
   LSP_updateFile(uri, text);
   addChange(change.document);
-  if (global.gc) {
-    console.log('BEFORE', process.memoryUsage());
-    global.gc();
-    console.log('AFTER', process.memoryUsage());
-  }
 });
 
 connection.onHover((params): Hover | null => {

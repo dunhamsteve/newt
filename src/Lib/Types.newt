@@ -256,7 +256,7 @@ data Error
   = E FC String
   | ENotInScope FC String
   -- Postpone signals a meta that needs to be solved first
-  | Postpone FC QName String
+  | Postpone FC (List QName) String
   | UnificationError FC (List String) Val Val Error
 
 instance HasFC Error where
