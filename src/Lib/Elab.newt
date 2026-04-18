@@ -83,6 +83,26 @@ forceMeta (VMeta fc ix sp) = do
     _ => pure (VMeta fc ix sp)
 forceMeta x = pure x
 
+-- NOW - we want to collect constraints for postponement, too.
+-- my plan was to throw them into the meta context and re-run the
+-- unification when one of the metas was solved.
+
+-- Alternative is to return a postpone meta from unify, with the expected type and
+-- let it be solved by rerunning the `check` at the end (I think Idris
+-- does something like this.) The idea there is to be safe by not letting
+-- anyone at the Tm until it has been fully checked.
+--
+-- So, put a bunch of stuck metas in unify result and rerun the check? Or
+-- work it like the existing postpone? (addConstraint)
+-- I think we want constraints, shaped differently. is there an env for addConstraint?
+--
+-- OK, for now:
+--
+-- - constraints are (metas) env lhs rhs
+-- - live in a list in the metacontext
+-- - when added, we should flag the metas in the list (later)
+-- - when a meta is solved, check constraints that name it
+
 record UnifyResult where
   constructor MkResult
   -- wild guess here - lhs is a VVar
@@ -267,15 +287,16 @@ checkAutos ix (cand :: rest) = do
 
 checkAutos ix (_ :: rest) = checkAutos ix rest
 
-addConstraint : Env -> QName -> SnocList Val -> Val -> M Unit
-addConstraint env ix sp tm = do
+addConstraint : Env -> List QName -> Val -> Val -> M Unit
+addConstraint env nms tm' tm = do
   top <- getTop
   let mc = top.currentMod.modMetaCtx
   let (CheckAll) = mc.mcmode | _ => pure MkUnit
-  updateMeta ix $ \case
+
+  for_ nms $ \ ix => updateMeta ix $ \case
     (Unsolved pos k a b c cons) => do
-      debug "Add constraint \{show ix} \{show sp} =?= \{show tm}"
-      pure (Unsolved pos k a b c (MkMc (getFC tm) env sp tm :: cons))
+      debug "Add constraint \{show tm'} =?= \{show tm} deps \{show nms}"
+      pure (Unsolved pos k a b c (MkMc (getFC tm) nms env tm' tm :: cons))
     (Solved fc k tm) => error fc "Meta \{show k} already solved [addConstraint]"
     (OutOfScope) => error' "Meta \{show ix} out of scope"
 
@@ -376,7 +397,7 @@ solve env m sp t = do
       let l = length' env
       debug "meta \{show m} (\{show ix}) applied to \{show $ snoclen sp} args instead of \{show size}"
       debug "CONSTRAINT \{show ix} \{show sp} =?= \{show t}"
-      addConstraint env m sp t
+      addConstraint env [m] (VMeta (getFC t) m sp) t
   let l = length' env
   debug "meta \{show meta}"
 
@@ -386,7 +407,7 @@ solve env m sp t = do
   Right ren <- tryError $ invert l sp
     | Left err => do
         debug "postpone constraint \{show err}"
-        addConstraint env m sp t
+        addConstraint env [m] (VMeta (getFC t) m sp) t
   -- force unlet
   hack <- quote l t
   t <- eval env hack
@@ -403,10 +424,13 @@ solve env m sp t = do
       OutOfScope => error' "Meta \{show ix} out of scope"
     maybeCheck $ do
       for_ cons $ \case
-        MkMc fc env sp rhs => do
-          val <- vappSpine soln sp
-          debug "discharge l=\{show $ length' env} \{(show val)} =?= \{(show rhs)}"
-          unify env UNormal val rhs
+        MkMc fc _ env lhs rhs => do
+          -- val <- vappSpine soln sp
+          debug "discharge l=\{show $ length' env} \{(show lhs)} =?= \{(show rhs)}"
+          -- REVIEW - get fc in here? or catch and update FC
+          MkResult Nil <- unify env UNormal lhs rhs
+           | MkResult cs => error fc "unify returned constraints \{show cs}"
+          pure MkUnit
       -- check any autos
       top <- getTop
       let mc = top.currentMod.modMetaCtx
@@ -418,9 +442,10 @@ solve env m sp t = do
 
     (\case
       Postpone fc ix' msg => do
+        -- we were tossing ix' ?
         -- let someone else solve this and then check again.
         debug "CONSTRAINT2 \{show ix} \{show sp} =?= \{show t}"
-        addConstraint env m sp t
+        addConstraint env [ix', m] (VMeta fc m sp) t
       -- replace with wrapper
       err => throwError (E (getFC err) "\{errorMsg err} for \{show ix} \{show sp} =?= \{show t}")
         )
@@ -484,10 +509,24 @@ unify env mode t u = do
             debug "tryEval \{show t'} to \{show v}"
             unify env mode v u'
       Nothing <- tryEval env u'
-        | Just v => unify env mode t' v
+        | Just v => do
+            debug "tryEval \{show u'} to \{show v}"
+            unify env mode t' v
+
+      top <- getTop
+      let mode' = spineMode $ lookup k top
+      debug "mode for \{show k} is \{show mode'}"
+
+      -- TODO we need to postpone if there are non-matchy metas in the spines
       if k == k'
-        then unifySpine env mode (k == k') sp sp'
+        then unifySpine env mode' (k == k') sp sp'
         else error fc "vref mismatch \{show t'} =?= \{show u'}"
+      where
+        spineMode : Maybe TopEntry → UnifyMode
+        spineMode (Just (MkEntry _ name ty (DCon _ _ _ _) _) ) = mode
+        spineMode (Just (MkEntry _ name ty (PrimTCon _) _) ) = mode
+        spineMode (Just (MkEntry _ name ty (TCon _ _) _) ) = mode
+        spineMode _ = UPattern
 
     unifyRef t         u@(VRef fc' k' sp') = do
       debug "expand \{show t} =?= %ref \{show k'}"
@@ -1536,7 +1575,6 @@ check ctx tm ty = do
       unifyCatch (getFC tm) ctx ty' ty
       pure tm'
     where
-
       insertForce : (ctx : Context) -> Tm -> Val → Val -> M (Tm × Val)
       insertForce ctx tm ty exp = do
          case (lazyType ty, lazyType exp) of

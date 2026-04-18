@@ -61,6 +61,7 @@
   - [x] add missing cases should share code between vscode and playground
   - [x] "Not in scope" should offer to import
   - [x] Case split
+- [ ] Maybe run whole project for completion search and "all errors in project"
 - [ ] Delay checking
   - We have things like `foldr (\ x acc => case x : ...`, where the lambda doesn't have a good type, so we have to be explicit. If we could defer the checking of that expression until more things are solved, we might not need the annotation (e.g. checking the other arguments). Some `case` statements may have a similar situation.
   - One idea is to throw the checks onto some sort of TODO list and run whatever works. (I think Idris may have a heuristic where it checks arguments backwards in some cases.)

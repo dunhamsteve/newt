@@ -41,7 +41,7 @@ instance Show Literal where
   show (LString str) = quoteString str
   show (LBool b) = if b then "true" else "false"
   show (LInt i) = show i
-  show (LChar c) = "'\{show c}'" -- FIXME single quote
+  show (LChar c) = "\{show c}"
 
 data CaseAlt : U where
   CaseDefault : Tm -> CaseAlt
@@ -255,6 +255,7 @@ rpprint names tm = render 90 $ pprint names tm
 data Error
   = E FC String
   | ENotInScope FC String
+  -- Postpone signals a meta that needs to be solved first
   | Postpone FC QName String
   | UnificationError FC (List String) Val Val Error
 
@@ -277,10 +278,10 @@ instance Show Error where
 
 -- constrain meta applied to val to be a val
 
-data MConstraint = MkMc FC Env (SnocList Val) Val
+data MConstraint = MkMc FC (List QName) Env Val Val
 
 instance Show MConstraint where
-  show (MkMc fc env (args) ty) = "MkMC \{show fc} env \{show args} \{show ty}"
+  show (MkMc fc ms env ty' ty) = "MkMC \{show fc} env \{show ty'} \{show ty}"
 
 data MetaEntry
   = Unsolved FC QName Context Val MetaKind (List MConstraint)

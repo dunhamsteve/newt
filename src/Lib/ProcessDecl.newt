@@ -64,8 +64,8 @@ logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
       tm <- zonk top 0 Nil tm
       let msg = "Unsolved meta \{show k} \{show kind} type \{render 90 $ pprint (names ctx) tm} \{show $ length' cons} constraints"
       msgs <- for cons $ \case
-        (MkMc fc env sp val) => do
-            pure "  * (m\{show k} (\{unwords $ map show $ sp <>> Nil}) =?= \{show val}"
+        (MkMc fc env _ lhs val) => do
+            pure "  * (m\{show k} (\{show lhs}) =?= \{show val}"
       sols <- case kind of
         AutoSolve => do
           x <- quote ctx.lvl ty
