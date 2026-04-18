@@ -284,7 +284,7 @@ instance Show MConstraint where
   show (MkMc fc ms env ty' ty) = "MkMC \{show fc} env \{show ty'} \{show ty}"
 
 data MetaEntry
-  = Unsolved FC QName Context Val MetaKind (List MConstraint)
+  = Unsolved FC QName Context Val MetaKind Bool -- (List MConstraint)
   | Solved FC QName Val
   | OutOfScope
 
@@ -298,6 +298,7 @@ record MetaContext where
   constructor MC
   metas : SortedMap QName MetaEntry
   autos : List QName
+  mpost : List MConstraint
   next : Int
   mcmode : MetaMode
 
@@ -359,7 +360,7 @@ record ModContext where
   modInfos : List EditorInfo
 
 emptyModCtx : String → String → ModContext
-emptyModCtx modName source = MkModCtx modName source emptyMap (MC emptyMap Nil 0 NoCheck) emptyMap Nil Nil Nil
+emptyModCtx modName source = MkModCtx modName source emptyMap (MC emptyMap Nil Nil 0 NoCheck) emptyMap Nil Nil Nil
 
 HintTable : U
 HintTable = SortedMap QName (List (QName × Tm))
@@ -411,7 +412,7 @@ define (MkCtx lvl env types bds ctxFC) name val ty =
   MkCtx (1 + lvl) (val :: env) ((name,ty) :: types) (Defined :: bds) ctxFC
 
 instance Show MetaEntry where
-  show (Unsolved pos k ctx ty kind constraints) = "Unsolved \{show pos} \{show k} \{show kind} : \{show ty} \{show ctx.bds} cs \{show $ length constraints}"
+  show (Unsolved pos k ctx ty kind constrained) = "Unsolved \{show pos} \{show k} \{show kind} : \{show ty} \{show ctx.bds} cs \{show constrained}"
   show (Solved _ k x) = "Solved \{show k} \{show x}"
   show OutOfScope = "OutOfScope"
 

@@ -43,6 +43,11 @@ dumpEnv ctx =
     --     ty' <- quote ctx.lvl ty
     --     go names (1 + k) xs ("  \{n} = \{render 90 $ pprint names v'} : \{render 90 $ pprint names ty'}":: acc)
 
+logConstraints : M Unit
+logConstraints = do
+  top <- getTop
+  for_ top.currentMod.modMetaCtx.mpost $ \case
+    MkMc fc _ _ ty' ty => addError $ E fc "Constraint: \{show ty'} =?= \{show ty}"
 
 logMetas : List MetaEntry -> M Unit
 logMetas Nil = pure MkUnit
@@ -62,10 +67,10 @@ logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
       tm <- quote ctx.lvl ty'
       top <- getTop
       tm <- zonk top 0 Nil tm
-      let msg = "Unsolved meta \{show k} \{show kind} type \{render 90 $ pprint (names ctx) tm} \{show $ length' cons} constraints"
-      msgs <- for cons $ \case
-        (MkMc fc env _ lhs val) => do
-            pure "  * (m\{show k} (\{show lhs}) =?= \{show val}"
+      let msg = "Unsolved meta \{show k} \{show kind} type \{render 90 $ pprint (names ctx) tm}"
+      -- msgs <- for cons $ \case
+      --   (MkMc fc env _ lhs val) => do
+      --       pure "  * (m\{show k} (\{show lhs}) =?= \{show val}"
       sols <- case kind of
         AutoSolve => do
           x <- quote ctx.lvl ty
@@ -81,7 +86,7 @@ logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
 
         _ => pure Nil
 
-      addError $ E fc $ unlines ((msg :: Nil) ++ msgs ++ sols)
+      addError $ E fc $ unlines ((msg :: Nil) ++ sols)
       logMetas rest
 
 

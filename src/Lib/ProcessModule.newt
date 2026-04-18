@@ -69,7 +69,7 @@ processModule importFC repo stk modns = do
     | Just mod => pure mod
 
   let (False) = modns == primNS | _ => addPrimitives
-  let freshMC = MC emptyMap Nil 0 CheckAll
+  let freshMC = MC emptyMap Nil Nil 0 CheckAll
   let parts = splitBy modns '.'
   let fn = joinBy "/" parts ++ ".newt"
 
@@ -107,7 +107,7 @@ processModule importFC repo stk modns = do
   putStrLn "module \{modName}"
 
   -- currentMod has been wiped by imports..
-  let freshMC = MC emptyMap Nil 0 CheckAll
+  let freshMC = MC emptyMap Nil Nil 0 CheckAll
   let mod = MkModCtx modns src emptyMap freshMC emptyMap imported Nil Nil
   modifyTop { currentMod := mod
             ; hints := emptyMap
@@ -144,6 +144,7 @@ processModule importFC repo stk modns = do
 
   -- This has addErrors as a side-effect
   logMetas $ reverse $ listValues top.currentMod.modMetaCtx.metas
+  logConstraints
 
   top <- getTop
   -- print errors (for batch processing case)

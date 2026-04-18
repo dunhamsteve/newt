@@ -292,11 +292,12 @@ addConstraint env nms tm' tm = do
   top <- getTop
   let mc = top.currentMod.modMetaCtx
   let (CheckAll) = mc.mcmode | _ => pure MkUnit
-
+  let const = (MkMc (getFC tm) nms env tm' tm)
+  modifyTop { currentMod $= { modMetaCtx $= { mpost $= const :: }}}
   for_ nms $ \ ix => updateMeta ix $ \case
     (Unsolved pos k a b c cons) => do
       debug "Add constraint \{show tm'} =?= \{show tm} deps \{show nms}"
-      pure (Unsolved pos k a b c (MkMc (getFC tm) nms env tm' tm :: cons))
+      pure $ Unsolved pos k a b c True
     (Solved fc k tm) => error fc "Meta \{show k} already solved [addConstraint]"
     (OutOfScope) => error' "Meta \{show ix} out of scope"
 
@@ -386,6 +387,12 @@ maybeCheck action = do
       setMetaMode CheckFirst
     NoCheck => pure MkUnit
 
+-- NOW - how do we manage this?
+--    C1 C2 C3 ...
+-- if C2 is relevant , or you know whatever
+-- check C2 - if it unifies, we're done.
+checkCons : QName → List MConstraint → M Unit
+
 solve env m sp t = do
   meta@(Unsolved metaFC ix ctx_ ty kind cons) <- lookupMeta m
     | _ => error (getFC t) "Meta \{show m} already solved! [solve]"
@@ -419,11 +426,15 @@ solve env m sp t = do
     soln <- eval Nil tm
 
     updateMeta m $ \case
-      (Unsolved pos k _ _ _ cons) => pure $ Solved pos k soln
+      (Unsolved pos k _ _ _ post) => pure $ Solved pos k soln
       (Solved fc k x) => error fc "Meta \{show ix} already solved! [solve2]"
       OutOfScope => error' "Meta \{show ix} out of scope"
     maybeCheck $ do
-      for_ cons $ \case
+      top <- getTop
+      let mc = top.currentMod.modMetaCtx
+      let (rel,irel) = partition (refs ix) mc.mpost
+      modifyTop { currentMod $= {modMetaCtx $= { mpost := irel }}}
+      for_ rel $ \case
         MkMc fc _ env lhs rhs => do
           -- val <- vappSpine soln sp
           debug "discharge l=\{show $ length' env} \{(show lhs)} =?= \{(show rhs)}"
@@ -431,6 +442,7 @@ solve env m sp t = do
           MkResult Nil <- unify env UNormal lhs rhs
            | MkResult cs => error fc "unify returned constraints \{show cs}"
           pure MkUnit
+
       -- check any autos
       top <- getTop
       let mc = top.currentMod.modMetaCtx
@@ -449,6 +461,9 @@ solve env m sp t = do
       -- replace with wrapper
       err => throwError (E (getFC err) "\{errorMsg err} for \{show ix} \{show sp} =?= \{show t}")
         )
+  where
+    refs : QName → MConstraint → Bool
+    refs ix (MkMc _ deps _ _ _) = elem ix deps
 
 -- TODO remove that unused Bool
 unifySpine : Env -> UnifyMode -> Bool -> SnocList Val -> SnocList Val  -> M UnifyResult
@@ -517,7 +532,7 @@ unify env mode t u = do
       let mode' = spineMode $ lookup k top
       debug "mode for \{show k} is \{show mode'}"
 
-      -- TODO we need to postpone if there are non-matchy metas in the spines
+      -- NOW we need to postpone if there are non-matchy metas in the spines
       if k == k'
         then unifySpine env mode' (k == k') sp sp'
         else error fc "vref mismatch \{show t'} =?= \{show u'}"
@@ -526,6 +541,9 @@ unify env mode t u = do
         spineMode (Just (MkEntry _ name ty (DCon _ _ _ _) _) ) = mode
         spineMode (Just (MkEntry _ name ty (PrimTCon _) _) ) = mode
         spineMode (Just (MkEntry _ name ty (TCon _ _) _) ) = mode
+        -- NOW This is not right, it just adds the ability to match var at the front.
+        -- need a straight up alpha check, or maybe if we were only returning the meta constraints
+        -- we could look at that.
         spineMode _ = UPattern
 
     unifyRef t         u@(VRef fc' k' sp') = do
@@ -589,7 +607,7 @@ unify env mode t u = do
 
     unifyMeta : Val -> Val -> M UnifyResult
     -- flex/flex
-    unifyMeta (VMeta fc k sp) (VMeta fc' k' sp') =
+    unifyMeta t@(VMeta fc k sp) t'@(VMeta fc' k' sp') =
       if k == k' then unifySpine env mode (k == k') sp sp'
       -- TODO, might want to try the other way, too.
       else if snoclen sp < snoclen sp'
@@ -641,7 +659,7 @@ freshMeta ctx fc ty kind = do
   -- need the ns here
   -- we were fudging this for v1
   let qn = QN top.currentMod.modName "$m\{show mc.next}"
-  let newmeta = Unsolved fc qn ctx ty kind Nil
+  let newmeta = Unsolved fc qn ctx ty kind False
   let autos = case kind of
       AutoSolve => qn :: mc.autos
       _ => mc.autos

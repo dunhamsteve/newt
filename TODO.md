@@ -1,6 +1,11 @@
 
 ## TODO
 
+- [ ] Fix unification issue (postpone App/App with metas)
+- [ ] Literate programming? Allow markdown files?
+- [ ] Look into Constatine Theocaris erasure thing
+  - https://cthe.me/erasure-sogat.pdf
+  - Can this technique work for async, too?
 - [x] Scheme backend
 - [x] Smart encoding of lists (and cons cells?) in scheme
 - [ ] in batch mode, stop at first erroring module
@@ -15,6 +20,7 @@
 - [x] Unsolved metas should be errors (user metas are fine)
 - [x] Better syntax for forward declared data (so we can distinguish from functions)
 - [ ] maybe allow "Main" module name for any file
+  - possibly allow eliding `module` for Main?
 - [ ] preserve information on record / class / instance for LSP "document symbols" kind
   - We will want some of this for default implementations in class
   - It may help avoid reverse-engineering the class when processing implementation
@@ -45,7 +51,6 @@
 - [x] Show Either
 - [ ] `local` for `where`-like `let` clauses? (I want a `where` that closes over more stuff)
   - I can do `let f : ... = \ a b c => ...`. But it doesn't work for recursion and cases are awkward.
-- [x] Erasure checking happens at compile time and isn't surfaced to editor..
 - [ ] Erasure issue during AoC from case building replacing a non-erased value with erased.
 - [x] Add Foldable
 - [ ] Maybe return constraints instead of solving metas during unification
