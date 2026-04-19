@@ -12,18 +12,6 @@ EEnv = List (String × Quant × Maybe Tm)
 -- TODO look into removing Nothing below, can we recover all of the types?
 -- Idris does this in `chk` for linearity checking.
 
--- check App at type
-
-getType : Tm -> M (Maybe Tm)
-getType (Ref fc nm) = do
-  top <- getTop
-  case lookup nm top of
-    -- Should not nappen.
-    Nothing => error fc "\{show nm} not in scope"
-    (Just (MkEntry _ name type def _)) => pure $ Just type
-getType tm = pure Nothing
-
-
 erase : EEnv -> Tm -> List (FC × Tm) -> M Tm
 
 -- App a spine using type
