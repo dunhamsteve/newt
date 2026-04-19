@@ -1,7 +1,7 @@
 module Jigger
 
+-- I don't remember why I was looking at this, but it revealed bugs in newt
 -- https://personal.cis.strath.ac.uk/conor.mcbride/fooling/Jigger.agda
-
 
 data Nat : U where
     Z : Nat
@@ -29,9 +29,7 @@ var : (m : Nat) {n : Nat} → Fin (S (m + n))
 var Z = max
 var (S m) = embed (var m)
 
--- Agda lets us put a telescope on the left and we don't need to repeat.
--- It's a parameter and not in the constructors, but we could stuff it on the left of the constructors (implicit)
--- and save some typing.
+-- The original Agda has the Nat as a parameter on the left of the :
 infixl 2 _$$_
 data Tm : Nat → U where
     V : ∀ n. Fin n → Tm n
@@ -43,7 +41,5 @@ l : {m : Nat} → (({n : Nat} → Tm (S (m + n))) → Tm (S m)) → Tm m
 l {m} f = L (f $ \ {n} => V (var m {n}))
 
 myTest : Tm Z
-myTest = l {_} (\f => l (\x => f $$ (f $$ x)))
--- implicits from agda
--- myTest = l {Z} (\f => l {S Z} (\x => f {S Z} $$ (f {S Z} $$ x {Z}) ))
+myTest = l (\f => l (\x => f $$ (f $$ x)))
 

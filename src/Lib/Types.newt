@@ -256,20 +256,20 @@ data Error
   = E FC String
   | ENotInScope FC String
   -- Postpone signals a meta that needs to be solved first
-  | Postpone FC (List QName) String
+  | Postpone FC String
   | UnificationError FC (List String) Val Val Error
 
 instance HasFC Error where
   getFC (E x str) = x
   getFC (UnificationError fc _ _ _ _) = fc
   getFC (ENotInScope x _) = x
-  getFC (Postpone x k str) = x
+  getFC (Postpone x str) = x
 
 -- Non-pretty version, there is an in-monad prettyErrorMsg in Lib.Error
 errorMsg : Error -> String
 errorMsg (E x str) = str
 errorMsg (ENotInScope x nm) = "\{nm} not in scope"
-errorMsg (Postpone x k str) = str
+errorMsg (Postpone x str) = str
 errorMsg (UnificationError fc names a b err) =
   "unification failure: \{errorMsg err}\n  failed to unify \{show a}\n             with \{show b}\n  "
 
@@ -284,7 +284,7 @@ instance Show MConstraint where
   show (MkMc fc ms env ty' ty) = "MkMC \{show fc} env \{show ty'} \{show ty}"
 
 data MetaEntry
-  = Unsolved FC QName Context Val MetaKind Bool -- (List MConstraint)
+  = Unsolved FC QName Context Val MetaKind
   | Solved FC QName Val
   | OutOfScope
 
@@ -412,7 +412,7 @@ define (MkCtx lvl env types bds ctxFC) name val ty =
   MkCtx (1 + lvl) (val :: env) ((name,ty) :: types) (Defined :: bds) ctxFC
 
 instance Show MetaEntry where
-  show (Unsolved pos k ctx ty kind constrained) = "Unsolved \{show pos} \{show k} \{show kind} : \{show ty} \{show ctx.bds} cs \{show constrained}"
+  show (Unsolved pos k ctx ty kind) = "Unsolved \{show pos} \{show k} \{show kind} : \{show ty} \{show ctx.bds} cs"
   show (Solved _ k x) = "Solved \{show k} \{show x}"
   show OutOfScope = "OutOfScope"
 

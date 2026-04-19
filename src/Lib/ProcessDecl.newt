@@ -53,7 +53,7 @@ logMetas : List MetaEntry -> M Unit
 logMetas Nil = pure MkUnit
 logMetas (OutOfScope :: rest) = logMetas rest
 logMetas (Solved fc k soln :: rest) = logMetas rest
-logMetas (Unsolved fc k ctx ty User cons :: rest) = do
+logMetas (Unsolved fc k ctx ty User :: rest) = do
       ty' <- quote ctx.lvl ty
       let names = map fst ctx.types
       env <- dumpEnv ctx
@@ -61,16 +61,13 @@ logMetas (Unsolved fc k ctx ty User cons :: rest) = do
       info fc "User Hole\n\{msg}"
       logMetas rest
 -- error is reported separately
-logMetas (Unsolved fc k ctx ty ErrorHole cons :: rest) = logMetas rest
-logMetas (Unsolved fc k ctx ty kind cons :: rest) = do
+logMetas (Unsolved fc k ctx ty ErrorHole :: rest) = logMetas rest
+logMetas (Unsolved fc k ctx ty kind :: rest) = do
       ty' <- forceMeta ty
       tm <- quote ctx.lvl ty'
       top <- getTop
       tm <- zonk top 0 Nil tm
       let msg = "Unsolved meta \{show k} \{show kind} type \{render 90 $ pprint (names ctx) tm}"
-      -- msgs <- for cons $ \case
-      --   (MkMc fc env _ lhs val) => do
-      --       pure "  * (m\{show k} (\{show lhs}) =?= \{show val}"
       sols <- case kind of
         AutoSolve => do
           x <- quote ctx.lvl ty

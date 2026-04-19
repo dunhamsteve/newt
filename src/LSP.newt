@@ -212,7 +212,7 @@ getInfos = do
     where
         go : List Json → List MetaEntry → M (List Json)
         go acc Nil = pure acc
-        go acc (Unsolved fc k ctx ty User cons :: rest) = do
+        go acc (Unsolved fc k ctx ty User :: rest) = do
             ty' <- quote ctx.lvl ty
             let names = map fst ctx.types
             let dispType = render 90 $ pprint names ty'

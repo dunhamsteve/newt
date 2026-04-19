@@ -212,11 +212,11 @@ getHole mod row col =
   find isUserMeta $ listValues mod.modMetaCtx.metas
   where
     isUserMeta : MetaEntry → Bool
-    isUserMeta (Unsolved fc _ _ _ User _) = posInFC row col fc
+    isUserMeta (Unsolved fc _ _ _ User) = posInFC row col fc
     isUserMeta _ = False
 
 introActions : Maybe MetaEntry → M (List CodeAction)
-introActions (Just $ Unsolved fc qn ctx vty User constraints) =
+introActions (Just $ Unsolved fc qn ctx vty User) =
   catchError (do
     -- Are there ever any constraints?
     top <- getTop
