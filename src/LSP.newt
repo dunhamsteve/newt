@@ -17,8 +17,8 @@ import Commands
 import Lib.ProcessDecl
 import Lib.Prettier
 
-import Lib.CompileJS
-import Lib.CompileScheme
+import Lib.Compile.JS
+import Lib.Compile.Scheme
 
 pfunc js_castArray : Array JSObject → JSObject := `x => x`
 pfunc js_castInt : Int → JSObject := `x => x`

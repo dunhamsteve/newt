@@ -3,6 +3,8 @@ module Jigger
 -- I don't remember why I was looking at this, but it revealed bugs in newt
 -- https://personal.cis.strath.ac.uk/conor.mcbride/fooling/Jigger.agda
 
+-- I think I got the link from: https://github.com/effectfully/Cubes
+
 data Nat : U where
     Z : Nat
     S : Nat → Nat

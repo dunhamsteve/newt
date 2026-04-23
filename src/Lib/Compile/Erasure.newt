@@ -1,4 +1,4 @@
-module Lib.Erasure
+module Lib.Compile.Erasure
 
 import Prelude
 import Lib.Common

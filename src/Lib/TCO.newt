@@ -5,7 +5,7 @@ import Data.Graph
 import Lib.Ref2
 import Lib.Common
 import Lib.Types
-import Lib.CompileExp
+import Lib.Compile.CExp
 import Data.SortedMap
 
 /-

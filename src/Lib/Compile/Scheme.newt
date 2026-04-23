@@ -1,23 +1,23 @@
-module Lib.CompileScheme
+module Lib.Compile.Scheme
 
 import Prelude
 import Lib.Common
 import Lib.Types
 import Lib.Eval
 import Lib.Prettier
-import Lib.CompileExp
+import Lib.Compile.CExp
 import Lib.TopContext
-import Lib.LiftWhere
-import Lib.LiftLambda
+import Lib.Compile.LiftWhere
+import Lib.Compile.LiftLambda
 import Lib.TCO
 import Lib.Ref2
-import Lib.Erasure
+import Lib.Compile.Erasure
 import Data.String
 import Data.Int
 import Data.SortedMap
 import Data.IORef
 import Data.SnocList
-import Lib.CompilerCommon
+import Lib.Compile.Common
 
 -- FIXME SnocList
 SCEnv : U
@@ -196,7 +196,7 @@ cexpToScm env (CConstr tag nm args quants ConsCon) = case argsToScm env args qua
 cexpToScm env (CConstr tag nm args quants info) = "(vector \{show tag} \{unwords $ argsToScm env args quants})"
 -- Should be handled by the caller
 cexpToScm env (CRaw _ _) = fatalError "Stray CRaw"
--- TODO We still have a couple of these in CompileExp, for the magic Nat
+-- TODO We still have a couple of these in Compile.CExp, for the magic Nat
 cexpToScm env (CPrimOp op a b) = "(\{op} \{cexpToScm env a} \{cexpToScm env b})"
 
 -- returns a QName -> Def of in-use entries

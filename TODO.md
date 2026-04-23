@@ -1,7 +1,7 @@
 
 ## TODO
 
-- [ ] Fix unification issue (postpone App/App with metas)
+- [x] Fix unification issue (postpone App/App with metas)
 - [ ] Literate programming? Allow markdown files?
 - [ ] Look into Constatine Theocaris erasure thing
   - https://cthe.me/erasure-sogat.pdf
@@ -389,7 +389,6 @@
   - `\case` is sufficient
   - I kept wanting this in AoC and use it a lot in the newt code
   - This conflicts with current code (unused?) that allows telescope information in lambdas
-
 
 ### Parsing
 

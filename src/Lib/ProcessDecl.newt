@@ -15,7 +15,7 @@ import Lib.Eval
 import Lib.Prettier
 import Lib.Types
 import Lib.Util
-import Lib.Erasure
+import Lib.Compile.Erasure
 import Lib.Derive
 
 dumpEnv : Context -> M String

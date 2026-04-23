@@ -1,7 +1,7 @@
-vim.lsp.config['newt_ls'] = {
+vim.lsp.config['newt'] = {
 	-- we'll change this to a newt-lsp wrapper later
-	cmd =  { 'node', 'newt-vscode-lsp/dist/lsp.js', '--stdio' },
+	cmd =  { 'newt-lsp', '--stdio' },
 	filetypes = { 'newt' },
 	root_markers = { '.git' }
 }
-vim.lsp.enable('newt_ls')
+vim.lsp.enable('newt')

@@ -4,8 +4,8 @@ import Prelude
 import Data.List1
 import Data.SortedMap
 import Lib.Common
-import Lib.CompileJS
-import Lib.CompileScheme
+import Lib.Compile.JS
+import Lib.Compile.Scheme
 import Lib.Parser
 import Lib.Elab
 import Lib.Error

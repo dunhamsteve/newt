@@ -1,8 +1,8 @@
-module Lib.LiftLambda
+module Lib.Compile.LiftLambda
 
 import Prelude
 import Lib.Common
-import Lib.CompileExp
+import Lib.Compile.CExp
 import Lib.Types
 import Lib.TopContext
 import Lib.Ref2

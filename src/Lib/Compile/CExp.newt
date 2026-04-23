@@ -1,4 +1,4 @@
-module Lib.CompileExp
+module Lib.Compile.CExp
 
 import Prelude
 import Lib.Common

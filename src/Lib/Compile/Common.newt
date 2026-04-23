@@ -1,9 +1,9 @@
-module Lib.CompilerCommon
+module Lib.Compile.Common
 
 import Prelude
 import Lib.Common
 import Data.SortedMap
-import Lib.CompileExp
+import Lib.Compile.CExp
 import Lib.Types
 
 /-
