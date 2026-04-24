@@ -35,7 +35,8 @@ data JSExp : U where
   LitInt : Int -> JSExp
   Apply : JSExp -> List JSExp -> JSExp
   Var : String -> JSExp
-  JLam : List String -> JSStmt Return -> JSExp
+  JFun : List String -> JSStmt Return -> JSExp
+  JLam : String -> JSStmt Return -> JSExp
   JPrimOp : String → JSExp → JSExp → JSExp
   JUndefined : JSExp
   JTernary : JSExp → JSExp → JSExp → JSExp
@@ -75,16 +76,17 @@ record JSEnv where
   jsenv : List JSExp
   -- This is not depth, it is incremented as we go down the tree to get fresh names
   depth : Int
+  noprim : Bool
 
 -- this was like this, are we not using depth?
 push : JSEnv -> JSExp -> JSEnv
-push (MkEnv env depth) exp = MkEnv (exp :: env) depth
+push (MkEnv env depth noprim) exp = MkEnv (exp :: env) (depth + 1) noprim
 
 incr : JSEnv → JSEnv
-incr env = MkEnv env.jsenv (1 + env.depth)
+incr env = MkEnv env.jsenv (1 + env.depth) env.noprim
 
 emptyJSEnv : JSEnv
-emptyJSEnv = MkEnv Nil 0
+emptyJSEnv = MkEnv Nil 0 False
 
 litToJS : Literal -> JSExp
 litToJS (LString str) = LitString str
@@ -172,16 +174,18 @@ compilePrimOp _ _ = Nothing
 -- a JSStmt, wrapping recursive calls in JSnoc if necessary.
 termToJS : ∀ e. JSEnv -> CExp -> Cont e -> JSStmt e
 termToJS env (CBnd k) f = f $ getEnv k env.jsenv
+-- REVIEW - might need to handle these in lifting..
 termToJS env (CForce t) f = termToJS env t $ \ t' => f $ Apply t' Nil
-termToJS env (CThunk t) f = f $ JLam Nil $ termToJS env t JReturn
+-- REVIEW was Nil for args
+termToJS env (CThunk t) f = f $ JLam (freshName "_" env) $ termToJS env t JReturn
 termToJS env CErased f = f JUndefined
 termToJS env (CRaw str _) f = f (Raw str)
 termToJS env (CLam nm t) f =
   let (nm',env') = freshName' nm env -- "\{nm}$\{show $ length env}"
-  in f $ JLam (nm' :: Nil) (termToJS env' t JReturn)
+  in f $ JLam nm' (termToJS env' t JReturn)
 termToJS env (CFun nms t) f =
   let (nms', env') = freshNames nms env
-  in f $ JLam nms' (termToJS env' t JReturn)
+  in f $ JFun nms' (termToJS env' t JReturn)
 termToJS env (CRef nm) f = f $ Var (show nm)
 termToJS env (CPrimOp op t u) f = termToJS env t $ \ t => termToJS env u $ \ u => f $ JPrimOp op t u
 termToJS env (CMeta k) f = f $ LitString "META \{show k}"
@@ -244,7 +248,8 @@ termToJS {e} env (CLoop args quants) f = runArgs (reverse env.jsenv) args quants
     runArgs (wat :: rest) (arg :: args) (q :: qs) = fatalError "bad env for quant \{show q}"
     runArgs a b c = fatalError "FALLBACK \{show $ length' a} \{show $ length' b} \{show $ length' c}"
 termToJS env (CAppRef nm args quants) f =
-  case compilePrimOp (show nm) args of
+  -- TODO noprim is kind of a hack for C support
+  case ite env.noprim Nothing $ compilePrimOp (show nm) args of
     Just cexp => termToJS env cexp f
     Nothing => termToJS env (CRef nm) (\ t' => (argsToJS env t' args quants Lin f))
   where
@@ -254,8 +259,8 @@ termToJS env (CAppRef nm args quants) f =
       let nm' = freshName "eta" env
           env' = push env (Var nm')
        in case q of
-        Many => JLam (nm' :: Nil) $ JReturn $ etaExpand (push env (Var nm')) qs (args :< Var nm') tm
-        _ => JLam (nm' :: Nil) $ JReturn $ etaExpand (push env (Var nm')) qs args tm
+        Many => JLam nm' $ JReturn $ etaExpand (push env (Var nm')) qs (args :< Var nm') tm
+        _ => JLam nm' $ JReturn $ etaExpand (push env (Var nm')) qs args tm
 
     apply : ∀ e. JSEnv → JSExp → (List CExp) → (JSExp → JSStmt e) → JSStmt e
     apply env tm Nil k = k tm
@@ -383,8 +388,10 @@ expToDoc (Raw str) = text str
 expToDoc (Apply x@(JLam _ _) xs) = text "(" ++ expToDoc x ++ text ")" ++ text "(" ++ nest 2 (commaSep (map expToDoc xs)) ++ text ")"
 expToDoc (Apply x xs) = expToDoc x ++ text "(" ++ nest 2 (commaSep (map expToDoc xs)) ++ text ")"
 expToDoc (Var nm) = jsIdent nm
-expToDoc (JLam nms (JReturn exp)) = text "(" <+> commaSep (map jsIdent nms) <+> text ") =>" <+> text "(" ++ expToDoc exp ++ text ")"
-expToDoc (JLam nms body) = text "(" <+> commaSep (map jsIdent nms) <+> text ") =>" <+> bracket "{" (stmtToDoc body) "}"
+expToDoc (JFun nms (JReturn exp)) = text "(" <+> commaSep (map jsIdent nms) <+> text ") =>" <+> text "(" ++ expToDoc exp ++ text ")"
+expToDoc (JFun nms body) = text "(" <+> commaSep (map jsIdent nms) <+> text ") =>" <+> bracket "{" (stmtToDoc body) "}"
+expToDoc (JLam nm (JReturn exp)) = text "(" <+> jsIdent nm <+> text ") =>" <+> text "(" ++ expToDoc exp ++ text ")"
+expToDoc (JLam nm body) = text "(" <+> jsIdent nm <+> text ") =>" <+> bracket "{" (stmtToDoc body) "}"
 expToDoc JUndefined = text "null"
 expToDoc (Index obj ix) = expToDoc obj ++ text "[" ++ expToDoc ix ++ text "]"
 expToDoc (Dot obj nm) = expToDoc obj ++ text "." ++ jsIdent nm
@@ -428,7 +435,7 @@ stmtToDoc (JCase sc alts) =
 -- use iife to turn stmts into expr
 maybeWrap : JSStmt Return -> JSExp
 maybeWrap (JReturn exp) = exp
-maybeWrap stmt = Apply (JLam Nil stmt) Nil
+maybeWrap stmt = Apply (JFun Nil stmt) Nil
 
 cexpToDoc : (QName × CExp) -> Doc
 cexpToDoc (qn, ct) =
@@ -496,8 +503,8 @@ process names = do
         then Just $ text "export" <+> cexpToDoc cexp
         else Just $ cexpToDoc cexp
 
-compile : M (List Doc)
-compile = do
+compileJS : M (List Doc)
+compileJS = do
   top <- getTop
   let exports = getExports Nil $ listValues top.currentMod.modDefs
   let mainName = (QN top.currentMod.modName "main")
