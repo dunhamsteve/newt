@@ -27,7 +27,7 @@ pfunc js_castStr : String → JSObject := `x => x`
 pfunc js_null : JSObject := `null`
 pfunc js_castObj : Array (String × JSObject) → JSObject := `(data) => {
     let rval = {}
-    for (let x of data) rval[x.h2] = x.h3
+    for (let x of data) rval[x.h1] = x.h2
     return rval
 }`
 
@@ -289,9 +289,9 @@ compileJS fn = unsafePerformIO $ do
   repo <- lspFileSource
   (Right (top, src)) <- (do
     mod <- processModule emptyFC repo Nil modName
-    docs <- compile
+    docs <- compileJavascript
     let src = unlines $
-          ( "const bouncer = (f,ini) => { let obj = ini; while (obj.tag) obj = f(obj); return obj.h0 };"
+          ( "const bouncer = (f,ini) => { let obj = ini; while (obj.tag) obj = f(obj); return obj.h1 };"
           :: Nil)
           ++ map (render 90 ∘ noAlt) docs
     pure src).runM st.topContext

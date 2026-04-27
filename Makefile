@@ -35,6 +35,10 @@ profile: .PHONY build/newt.js build/newt2.js
 	node --prof-process isolate* > build/profile.txt
 	rm -f isolate*
 
+bench: .PHONY build/newt2.js build/newt.so
+	hyperfine 'node build/newt2.js src/Main.newt -o out.js'  'scheme --program build/newt.so src/Main.newt -o out.js' > build/bench.txt
+	cat build/bench.txt
+
 clean:
 	rm  build/*
 

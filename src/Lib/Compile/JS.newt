@@ -41,7 +41,7 @@ data JSExp : U where
   JUndefined : JSExp
   JTernary : JSExp → JSExp → JSExp → JSExp
   Index : JSExp -> JSExp -> JSExp
-  Dot : JSExp -> String -> JSExp
+  Dot : JSExp -> Int -> JSExp
   Raw : String -> JSExp
 
 data JSStmt : StKind -> U where
@@ -95,9 +95,11 @@ litToJS (LChar c) = LitString $ pack (c :: Nil)
 litToJS (LInt i) = LitInt i
 
 -- Stuff nm.h1, nm.h2, ... into environment for constructor match
-conAltEnv : JSExp -> Int -> JSEnv -> List String -> JSEnv
+conAltEnv : JSExp -> Int -> JSEnv -> List Quant -> JSEnv
 conAltEnv sc k env Nil = env
-conAltEnv sc k env (x :: xs) = conAltEnv sc (1 + k) (push env (Dot sc "h\{show k}")) xs
+conAltEnv sc k env (Many :: xs) = conAltEnv sc (1 + k) (push env (Dot sc k )) xs
+conAltEnv sc k env (Zero :: xs) = conAltEnv sc k (push env JUndefined) xs
+
 
 -- given a name, find a similar one that doesn't shadow in Env
 freshName : String -> JSEnv -> String
@@ -228,11 +230,11 @@ termToJS env (CLetRec nm t u) f =
   in case termToJS env' t (JAssign nm') of
     (JAssign _ exp) => JSnoc (JConst nm' exp) (termToJS env' u f)
     t' => JSnoc (JLet nm' t') (termToJS env' u f)
-termToJS env (CConstr ix _ args qs info) f = go args qs 0 (\ args => f $ LitObject (("tag", LitInt (cast ix)) :: args))
+termToJS env (CConstr ix _ args qs info) f = go args qs 1 (\ args => f $ LitObject (("tag", LitInt (cast ix)) :: args))
   where
     go : ∀ e. List CExp -> List Quant -> Int -> (List (String × JSExp) -> JSStmt e) -> JSStmt e
     go (t :: ts) (Many :: qs) ix k = termToJS env t $ \ t' => go ts qs (ix + 1) $ \ args => k $ ("h\{show ix}", t') :: args
-    go (t :: ts) (q :: qs) ix k = go ts qs (ix + 1) $ \ args => k args
+    go (t :: ts) (q :: qs) ix k = go ts qs ix $ \ args => k args
     go _ _ ix k = k Nil
 termToJS {e} env (CLoop args quants) f = runArgs (reverse env.jsenv) args quants
   where
@@ -306,25 +308,23 @@ termToJS {e} env (CCase t alts) f =
     tertiary sc t f k = JIfThen sc t f
 
     termToJSAlt : JSEnv -> JSExp -> CAlt -> JAlt
-    termToJSAlt env nm (CConAlt ix name info args qs u) = JConAlt ix (termToJS (conAltEnv nm 0 env args) u f)
+    termToJSAlt env nm (CConAlt ix name info args qs u) = JConAlt ix (termToJS (conAltEnv nm 1 env qs) u f)
     -- intentionally reusing scrutinee name here
     termToJSAlt env nm (CDefAlt u) = JDefAlt (termToJS (env) u f)
     termToJSAlt env nm (CLitAlt lit u) = JLitAlt (litToJS lit) (termToJS env u f)
 
-    getArgs : CAlt → List String
-    getArgs (CDefAlt _) = Nil
-    getArgs (CLitAlt args _) = Nil
-    getArgs (CConAlt _ _ _ args qs _) = args
+    getQuants : CAlt → List Quant
+    getQuants (CDefAlt _) = Nil
+    getQuants (CLitAlt args _) = Nil
+    getQuants (CConAlt _ _ _ args qs _) = qs
 
     maybeCaseStmt : JSEnv -> JSExp -> List CAlt -> JSStmt e
     -- deleteT23 does this...
     maybeCaseStmt env sc (CDefAlt u :: Nil) = (termToJS env u f)
     -- If there is a single alt, assume it matched
-    maybeCaseStmt env sc ((CConAlt _ _ info args qs u) :: Nil) = (termToJS (conAltEnv sc 0 env args) u f)
+    maybeCaseStmt env sc ((CConAlt _ _ info args qs u) :: Nil) = (termToJS (conAltEnv sc 1 env qs) u f)
     maybeCaseStmt env sc alts@(CLitAlt _ u :: Nil) = termToJS env u f
     maybeCaseStmt env sc alts@(CDefAlt u :: Nil) = termToJS env u f
-    -- maybeCaseStmt env sc alts@(CLitAlt _ _  :: _) =
-    --     (JCase sc (map (termToJSAlt env sc) alts))
     maybeCaseStmt env sc alts = case alts of
         -- Bool alt becomes tertiary operator
         CLitAlt (LBool b) rhs :: alt :: Nil =>
@@ -332,15 +332,15 @@ termToJS {e} env (CCase t alts) f =
               e' = termToJS env (getBody alt) f
           in if b then tertiary sc t' e' f else tertiary sc e' t' f
         -- two branch alt becomes tertiary operator
-        CConAlt ix name info args qs t :: alt :: Nil =>
-          let cond = (JPrimOp "==" (Dot sc "tag") (LitInt $ cast ix))
-              t' = termToJS (conAltEnv sc 0 env args) t f
-              u' = termToJS (conAltEnv sc 0 env $ getArgs alt) (getBody alt) f
+        CConAlt ix name info args qs t :: CConAlt _ _ _ _ qs' u :: Nil =>
+          let cond = (JPrimOp "==" (Dot sc 0) (LitInt $ cast ix))
+              t' = termToJS (conAltEnv sc 1 env qs) t f
+              u' = termToJS (conAltEnv sc 1 env qs') u f
           in tertiary cond t' u' f
         alts@(CLitAlt _ _  :: _) =>
           (JCase sc (map (termToJSAlt env sc) alts))
         -- fall back to switch statement
-        alts => JCase (Dot sc "tag") (map (termToJSAlt env sc) alts)
+        alts => JCase (Dot sc 0) (map (termToJSAlt env sc) alts)
 
 jsKeywords : List String
 jsKeywords = (
@@ -394,7 +394,8 @@ expToDoc (JLam nm (JReturn exp)) = text "(" <+> jsIdent nm <+> text ") =>" <+> t
 expToDoc (JLam nm body) = text "(" <+> jsIdent nm <+> text ") =>" <+> bracket "{" (stmtToDoc body) "}"
 expToDoc JUndefined = text "null"
 expToDoc (Index obj ix) = expToDoc obj ++ text "[" ++ expToDoc ix ++ text "]"
-expToDoc (Dot obj nm) = expToDoc obj ++ text "." ++ jsIdent nm
+expToDoc (Dot obj 0) = expToDoc obj ++ text ".tag"
+expToDoc (Dot obj k) = expToDoc obj ++ text ".h\{show k}"
 expToDoc (JPrimOp op t u) = parens 0 1 (expToDoc t) <+> text op <+> parens 0 1 (expToDoc u)
 
 stmtWithBreak : ∀ e. JSStmt e → Doc
@@ -503,8 +504,8 @@ process names = do
         then Just $ text "export" <+> cexpToDoc cexp
         else Just $ cexpToDoc cexp
 
-compileJS : M (List Doc)
-compileJS = do
+compileJavascript : M (List Doc)
+compileJavascript = do
   top <- getTop
   let exports = getExports Nil $ listValues top.currentMod.modDefs
   let mainName = (QN top.currentMod.modName "main")

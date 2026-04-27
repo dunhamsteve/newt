@@ -60,10 +60,6 @@ liftLambdaTm name@(QN ns nm) env tm@(CLam nm t) = do
     splitLam (CLam nm t) acc = splitLam t (acc :< (Many, nm))
     splitLam t acc = (acc <>> Nil, t)
 
-    wrapLam : Nat → CExp → CExp
-    wrapLam Z t = t
-    wrapLam (S k) t = CLam "_" $ wrapLam k t
-
     makeApp : Nat → List CExp
     makeApp Z = Nil
     makeApp (S k) = CBnd (cast k) :: makeApp k

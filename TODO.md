@@ -1,6 +1,10 @@
 
 ## TODO
 
+- [ ] Constraint error messages have bad FC
+  - point to say a constructor def and not the code with the constraint
+  - e.g. change a `List String` to `String` in a dcon arg
+  - and wrong file, even. A problem in LSP
 - [x] Fix unification issue (postpone App/App with metas)
 - [ ] Literate programming? Allow markdown files?
 - [ ] Look into Constatine Theocaris erasure thing
@@ -75,7 +79,6 @@
 - [ ] Add sugar for type aliases (maybe infer arguments)
   - Lean has this, we maybe could run infer on the RHS and call it a day? We would need a simple LHS, though.
 - [ ] see if we can get a better error if `for` is used instead of `for_` in do blocks
-- [ ] Maybe make the editor json more compact (we want to replace this with REPL / LSP though)
 - [ ] Remove erased args from primitive functions
   - But we need separate `+` functions rather than the magic `∀ a. a -> a -> a` to support other backends
 - [ ] consider moving primitive functions to a support file

@@ -52,7 +52,7 @@ rewriteTailCalls nms tm = case tm of
   CAppRef nm args qs =>
       if length' args == length' qs
       then case getTag (S Z) nm nms of
-        Just ix => CConstr ix (show nm) args (map (const Many) args) NormalCon
+        Just ix => CConstr ix (show nm) args qs NormalCon
         Nothing => CConstr Z "return" (tm :: Nil) (Many :: Nil) NormalCon
       else CConstr Z "return" (tm :: Nil) (Many :: Nil) NormalCon
   CLetRec nm t u => CLetRec nm t $ rewriteTailCalls nms u
@@ -110,7 +110,7 @@ doOptimize fns = do
     mkWrap recName (ix, qn, CFun args _) = do
       let arglen = length' args
       let conargs = map (\k => CBnd (arglen - k - 1)) (range 0 arglen)
-      let conquant = map (const Many) conargs
+      let conquant = map fst args
       let arg = CConstr (S ix) (show qn) conargs conquant NormalCon
       let body = CAppRef bouncer (CRef recName :: arg :: Nil) (Many :: Many :: Nil)
       pure (qn, CFun args body)

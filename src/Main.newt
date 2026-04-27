@@ -39,12 +39,12 @@ writeScheme fn = do
 
 writeJS : String -> M Unit
 writeJS fn = do
-  docs <- compileJS
+  docs <- compileJavascript
   let src = unlines $
         ( "import fs from 'fs'"
-        :: "const bouncer = (f,ini) => { let obj = ini; while (obj.tag) obj = f(obj); return obj.h0 };"
+        :: "const bouncer = (f,ini) => { let obj = ini; while (obj.tag) obj = f(obj); return obj.h1 };"
         :: Nil)
-        ++ map (render 90 ∘ noAlt) docs
+        ++ map (render 90) docs
   (Right _) <- liftIO {M} $ writeFile fn src
     | Left err => throwError $ E (MkFC fn $ MkBounds 0 0 0 0) err
   pure MkUnit
