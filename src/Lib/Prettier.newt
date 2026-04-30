@@ -31,13 +31,23 @@ flatten Line = Text " "
 flatten (Text str) = Text str
 flatten (Alt x y) = flatten x
 
+-- This ends up like flatten because Line ends up on the right Alt
 noAlt : Doc -> Doc
 noAlt Empty = Empty
 noAlt (Seq x y) = Seq (noAlt x) (noAlt y)
-noAlt (Nest i x) = noAlt x
+noAlt (Nest i x) = Nest i $ noAlt x
 noAlt Line = Line
 noAlt (Text str) = Text str
 noAlt (Alt x y) = noAlt x
+
+-- this one chooses to wrap
+noAlt' : Doc -> Doc
+noAlt' Empty = Empty
+noAlt' (Seq x y) = Seq (noAlt' x) (noAlt' y)
+noAlt' (Nest i x) = Nest i $ noAlt' x
+noAlt' Line = Line
+noAlt' (Text str) = Text str
+noAlt' (Alt x y) = noAlt' y
 
 group : Doc -> Doc
 group x = Alt (flatten x) x

@@ -12,7 +12,7 @@ import Data.SortedMap
 -- REVIEW Separate pass for constructor magic?
 -- ConCase SuccCon will be replaced by Default CLet,
 -- but we would need to fix up zero, since we collapse extra constructors into a default case.
--- But should be ok becaon CLitAlt doesn't bind.
+-- But should be ok because CLitAlt doesn't bind.
 
 CExp : U
 
@@ -31,6 +31,7 @@ data CExp : U where
   CAppRef : QName -> List CExp -> List Quant -> CExp
   CApp : CExp -> CExp -> CExp
   CCase : CExp -> List CAlt -> CExp
+  -- Only used for 0-arity top level defs (and Axiom.. probably wrong)
   CRef : QName -> CExp
   CMeta : Int -> CExp
   CLit : Literal -> CExp

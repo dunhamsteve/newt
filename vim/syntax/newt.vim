@@ -1,11 +1,11 @@
 syn keyword newtInfix infix infixl infixr
-syn keyword newtKW data where let in case of derive module import
-syn match newtIdentifier "[a-zA-Z][a-zA-Z]*" contained
-syn region newtBlockComment start="/-" end="-/" contained
+syn keyword newtKW data where let in case of derive module import if then else
+syn match newtType "\<[A-Z][a-zA-Z]*\>"
+syn region newtBlockComment start="/-" end="-/"
 syn match newtLineComment "--.*$" contains=@Spell
 
 " no idea why this works for idris but not here
-"highlight dev link newtIdentifier Identifier
+highlight def link newtType Identifier
 highlight def link newtInfix PreProc
 highlight def link newtBlockComment Comment
 highlight def link newtLineComment Comment
