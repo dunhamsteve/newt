@@ -7,14 +7,29 @@
   - and wrong file, even. A problem in LSP
 - [x] Fix unification issue (postpone App/App with metas)
 - [ ] Literate programming? Allow markdown files?
+- [ ] Build single name map on import
+  - Check performance - cost to build this vs not walking $n$ maps
+  - This will likely be needed for qualified / partial imports
+- [ ] Support pattern matching on `Lazy x`
+  - e.g. change second arg of `<|>` to lazy, Parser.Impl doesn't compile
+    complaining that `Lazy` is not a type constructor.
+  - Put a match on `Delay` there (add `Delay` to surface syntax). Eliminator forces the function
+  - Can be manually done today by breaking out another `case` for the lazy value (scrutinee is forced)
 - [ ] Look into Constatine Theocaris erasure thing
   - https://cthe.me/erasure-sogat.pdf
   - Can this technique work for async, too?
+  - We will want this to get rid of erased args in C backend
+- [ ] C backend
+  - [-] Rework the Javascript AST to be more generic semi-A-Normal form (WIP)
+  - [ ] Generated code accepted by C compiler
+  - [ ] Runtime implementation
+- [ ] code formatter
+  - [ ] consider moving caselet, etc. desugaring out of the parser
 - [x] Scheme backend
 - [x] Smart encoding of lists (and cons cells?) in scheme
 - [ ] in batch mode, stop at first erroring module
-- [ ] maybe `let case` instead of `let ()` (which is a little subtle)
-  - Or simply put a term in there and treat as a variable iff it is lowercase and non-app
+- [ ] maybe `let case` instead of `let (...)` (which is a little subtle)
+  - Or simply put a term in there and treat as a variable iff it is lowercase and non-applied
 - [x] Use looping for TCO
   - For single functions at least - I think this would be a performance win. I've learned that the slowness on `bun` goes away if I drop the TCO transform.
   - Doing this manually for `lookupT23` got 3% speedup.
@@ -384,10 +399,10 @@
   - Needed before we newtype IO, so the tail recursion still works
   - Without handling erased values, there are only two instances in the compiler code.
 - [x] vscode: syntax highlighting for String
+- [ ] Maybe a rollup plugin?
 - [ ] add `poper` or variant of `pfunc` that maps to an operator, giving the js operator and precedence on RHS
   - This has now been hard-coded in codegen, but a syntax or something would be better.
   - We want to drop implicit / erased args - i.e. pick the right two args for the native operator, see jsEq
-- [ ] consider moving caselet, etc. desugaring out of the parser
 - [-] pattern matching lambda
   - `\case` is sufficient
   - I kept wanting this in AoC and use it a lot in the newt code

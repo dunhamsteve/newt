@@ -1,0 +1,3 @@
+#!/bin/zsh
+NEWT_HOME=${NEWT_HOME:=$HOME/prj/newt}
+exec node --expose-gc --heapsnapshot-signal=SIGUSR2 $NEWT_HOME/newt-vscode-lsp/dist/lsp.js $*

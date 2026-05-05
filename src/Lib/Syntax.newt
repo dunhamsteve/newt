@@ -33,7 +33,7 @@ data UpdateClause = AssignField FC String Raw | ModifyField FC String Raw
 data DoStmt : U where
   DoExpr : (fc : FC) -> Raw -> DoStmt
   DoLet : (fc : FC) -> String -> Raw -> DoStmt
-  DoArrow : (fc : FC) -> Raw -> Raw -> List RCaseAlt -> DoStmt
+  DoArrow : (fc : FC) -> (lhs : Raw) -> (rhs : Raw) -> (alts : List RCaseAlt) -> DoStmt
 
 instance HasFC DoStmt where
   getFC (DoExpr fc _) = fc
@@ -135,8 +135,16 @@ derive Show RCaseAlt
 derive Show UpdateClause
 derive Show Raw
 
+-- TODO fill in pretty printing
+--
+-- We want to be able to print the entire file back out and get something usable.
+--
+-- Ideally, it would be usable as a formatter. That means we need to handle infix and possibly push
+-- some desugaring to later. String comprehension, case let in do, maybe `$` (but handle LHS of pattern matching)
+
 instance Pretty Literal where
-  pretty (LString t) = text t
+  -- FIXME quote properly
+  pretty (LString t) = text "\"\{t}\""
   pretty (LBool b) = if b then text "true" else text "false"
   pretty (LInt i) = text $ show i
   pretty (LChar c) = text $ show c
@@ -161,31 +169,48 @@ instance Pretty Raw where
     bindDoc : BindInfo -> Doc
     bindDoc (BI _ nm icit quant) = text "BINDDOC"
 
-    par : Int -> Int -> Doc -> Doc
-    par p p' d = if p' < p then text "(" ++ d ++ text ")" else d
+    paren : Int -> Int -> Doc -> Doc
+    paren p p' d = if p' < p then text "(" ++ d ++ text ")" else d
 
     asDoc : Int -> Raw -> Doc
     asDoc p (RVar _ str) = text str
-    asDoc p (RLam _ (BI _ nm icit q) x) = par p 0 $ text "\\" ++ wrap icit (text nm) <+> text "=>" <+> asDoc 0 x
+    asDoc p (RLam _ (BI _ nm icit q) x) = paren p 0 $ text "\\" ++ wrap icit (text nm) <+> text "=>" <+> asDoc 0 x
     -- This needs precedence and operators...
-    asDoc p (RApp _ x y Explicit) = par p 2 $ asDoc 2 x <+> asDoc 3 y
-    asDoc p (RApp _ x y Implicit) = par p 2 $ asDoc 2 x <+> text "{" ++ asDoc 0 y ++ text "}"
-    asDoc p (RApp _ x y Auto) = par p 2 $ asDoc 2 x <+> text "{{" ++ asDoc 0 y ++ text "}}"
+    asDoc p (RApp _ x y Explicit) = paren p 2 $ asDoc 2 x <+> asDoc 3 y
+    asDoc p (RApp _ x y Implicit) = paren p 2 $ asDoc 2 x <+> text "{" ++ asDoc 0 y ++ text "}"
+    asDoc p (RApp _ x y Auto) = paren p 2 $ asDoc 2 x <+> text "{{" ++ asDoc 0 y ++ text "}}"
     asDoc p (RU _) = text "U"
-    asDoc p (RPi _ (BI _ "_" Explicit Many) ty scope) = par p 1 $ asDoc p ty <+> text "->" <+/> asDoc p scope
+    asDoc p (RPi _ (BI _ "_" Explicit Many) ty scope) = paren p 1 $ asDoc p ty <+> text "->" <+/> asDoc p scope
     asDoc p (RPi _ (BI _ nm icit quant) ty scope) =
-      par p 1 $ wrap icit (text (show quant ++ nm) <+> text ":" <+> asDoc p ty ) <+> text "->" <+/> asDoc 1 scope
+      paren p 1 $ wrap icit (text (show quant ++ nm) <+> text ":" <+> asDoc p ty ) <+> text "->" <+/> asDoc 1 scope
     asDoc p (RLet _ x v ty scope) =
-      par p 0 $ text "let" <+> text x <+> text ":" <+> asDoc p ty
+      paren p 0 $ text "let" <+> text x <+> text ":" <+> asDoc p ty
           <+> text "=" <+> asDoc p v
           <+/> text "in" <+> asDoc p scope
     asDoc p (RLit _ lit) = pretty lit
-    asDoc p (RCase _ x _ xs) = text "TODO - Pretty RCase"
+    asDoc p (RCase fc sc mty alts) = --text "TODO - Pretty RCase"
+      text "case" <+> nest 2 (asDoc 0 sc) <+> text "of" ++ nest 2 (line ++ stack (map caseAltDoc alts))
+      where
+        caseAltDoc : RCaseAlt → Doc
+        -- TODO we want a <+/> after the "=>"
+        caseAltDoc (MkAlt lhs (Just rhs)) = asDoc 0 lhs <+> text "=>" ++ (nest 2 (asDoc 0 rhs))
+        caseAltDoc (MkAlt lhs Nothing) = asDoc 0 lhs
     asDoc p (RImplicit _) = text "_"
     asDoc p (RImpossible _) = text "()"
     asDoc p (RHole _) = text "?"
-    asDoc p (RDo _ stmts) = text "TODO - Pretty RDo"
-    asDoc p (RIf _ x y z) = par p 0 $ text "if" <+> asDoc 0 x <+/> text "then" <+> asDoc 0 y <+/> text "else" <+> asDoc 0 z
+    asDoc p (RDo _ stmts) = text "do" ++ nest 2 (line ++ stack (map prettyDoStmt stmts))
+      where
+        prettyDoStmt : DoStmt → Doc
+        prettyDoStmt (DoExpr fc t) = asDoc 0 t
+        prettyDoStmt (DoLet fc n t) = text "let" <+> text n <+> text "=" <+/> nest 2 (asDoc 0 t)
+        prettyDoStmt (DoArrow fc lhs rhs alts) = go alts $ asDoc 0 lhs <+> text "<-" <+/> nest 2 (asDoc 0 rhs)
+          where
+            go : List RCaseAlt → Doc → Doc
+            go Nil acc = acc
+            go ((MkAlt lhs (Just rhs)) :: alts) acc = go alts $ acc ++ nest 2 (line ++ text "|" <+> asDoc 0 lhs <+> text "=>" <+> nest 2 (asDoc 0 rhs))
+            go ((MkAlt lhs Nothing) :: alts) acc = go alts $ acc ++ nest 2 (line ++ text "|" <+> asDoc 0 lhs)
+
+    asDoc p (RIf _ x y z) = paren p 0 $ text "if" <+> asDoc 0 x <+/> text "then" <+> asDoc 0 y <+/> text "else" <+> asDoc 0 z
     asDoc p (RWhere _ dd b) = text "TODO pretty RWhere"
     asDoc p (RAs _ nm x) = text nm ++ text "@(" ++ asDoc 0 x ++ text ")"
     asDoc p (RUpdateRec _ clauses tm) = text "{" <+> text "TODO RUpdateRec" <+> text "}"
@@ -292,4 +317,3 @@ instance Pretty Module where
       where
         doImport : Import -> Doc
         doImport (MkImport _ (_,nm)) = text "import" <+> text nm ++ line
-

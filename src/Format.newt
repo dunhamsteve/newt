@@ -1,0 +1,35 @@
+module Format
+import Prelude
+import Lib.Parser
+import Lib.Parser.Impl
+import Lib.Prettier
+import Lib.Tokenizer
+import Node
+import Lib.Types
+import Lib.Syntax
+
+
+-- Maybe insert a node for FC...
+-- and we'll need less desugaring during parsing
+
+-- I think the issue here is that it's exponential. It was fine without noAlt before I filled in more printing
+-- But my notes say it broke when I shifted from Nat to Int
+render : Int -> Doc -> String
+render w x = layout (best w 0 ( x)) Lin
+
+formatFile : String → IO Unit
+formatFile fn = do
+  -- ironically, this formatting will go away when we succeed
+  Right src <- readFile fn | Left err => fatalError "error reading \{fn}: \{show err}"
+  let (Right toks) = tokenise fn src | Left err => fatalError $ show err
+  let (Right mod) = parse fn parseMod toks | Left err => fatalError $ show err
+  let pmod = pretty mod
+  putStrLn $ render 80 pmod
+
+
+main : IO Unit
+main = do
+  putStrLn "TODO"
+  arg0 :: args <- getArgs
+    |  _ => putStrLn "Usage: format File.newt"
+  traverse_ formatFile args

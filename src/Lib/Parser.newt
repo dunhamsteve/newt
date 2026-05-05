@@ -743,11 +743,8 @@ parseImports = manySame parseImport
 
 
 parseMod : Parser Module
-parseMod = do
-  sameLevel (keyword "module")
-  name <- uident
-  rest <- many $ token Projection
+parseMod = startBlock $ do
+  (fc, name) <- parseModHeader
   imports <- manySame parseImport
   decls <- manySame parseDecl
-  let name = joinBy "" (name :: rest)
   pure $ MkModule name imports decls
