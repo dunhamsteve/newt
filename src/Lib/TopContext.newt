@@ -73,7 +73,7 @@ updateDef name fc ty def = do
 typeName : Tm → Maybe QName
 typeName (Pi fc nm Explicit rig t u) = Nothing
 typeName (Pi fc name icit rig t u) = typeName u
-typeName (App fc t u) = typeName t
+typeName (App fc t u q) = typeName t
 typeName (Ref _ nm) = Just nm
 typeName _ = Nothing
 

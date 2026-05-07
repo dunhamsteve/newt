@@ -132,14 +132,14 @@ compileTerm t@(Ref fc nm@(QN _ tag)) = do
 
 compileTerm (Meta fc k) = error fc "Compiling meta \{show k}"
 compileTerm (Lam _ nm _ _ t) = CLam nm <$> compileTerm t
-compileTerm tm@(App _ _ _) = case funArgs tm of
+compileTerm tm@(App _ _ _ _) = case funArgs tm of
   (Meta _ k, args) => do
         error (getFC tm) "Compiling an unsolved meta \{show tm}"
         -- info (getFC tm) "Compiling an unsolved meta \{show tm}"
         -- pure $ CAppRef  "Meta\{show k}" Nil 0
   (t@(Ref fc nm), args) => do
         defs <- getRef Defs
-        args' <- traverse compileTerm args
+        args' <- traverse compileTerm' args
         arity <- arityForName fc nm
         case lookupMap' nm defs : Maybe Def of
           Just (DCon _ SuccCon _ _) => applySucc args'
@@ -157,13 +157,17 @@ compileTerm tm@(App _ _ _) = case funArgs tm of
   (t, args) => do
         debug "apply other \{render 90 $ pprint Nil t}"
         t' <- compileTerm t
-        args' <- traverse compileTerm args
+        args' <- traverse compileTerm' args
         pure $ foldl CApp t' args'
   where
     applySucc : List CExp → M CExp
     applySucc Nil = pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
     applySucc (t :: Nil) = pure $ CPrimOp "+" (CLit $ LInt 1) t
     applySucc _ = error (getFC tm) "overapplied Succ \{show tm}"
+
+    compileTerm' : Tm × Quant → M CExp
+    compileTerm' (tm, Zero) = pure CErased
+    compileTerm' (tm, Many) = compileTerm tm
 
 compileTerm (UU _) = pure $ CRef (QN "" "U")
 compileTerm (Pi _ nm icit rig t u) = do

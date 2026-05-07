@@ -3,7 +3,6 @@ module Lib.ProcessDecl
 import Prelude
 import Data.IORef
 import Data.String
-
 import Lib.Common
 import Lib.Elab
 
@@ -27,12 +26,12 @@ dumpEnv ctx =
     isVar _ _ = False
     -- REVIEW consider moving the goal up for editors like Helix that truncate
     -- REVIEW should we hide/demphasize entries that aren't bound to names?
-    go : List String -> Int -> List (Val × String × Val) -> List String -> M (List String)
+    go : List String -> Int -> List (Val × String × Val × Quant) -> List String -> M (List String)
     go _ _ Nil acc = pure acc
-    -- don't show the = bit for now. Lean folds it.
-    go names k ((v, n, ty) :: xs) acc = do
+    -- don't show the = bit for now. Lean folds it. We could truncate or ... it so we know it's a def.
+    go names k ((v, n, ty, q) :: xs) acc = do
         ty' <- quote ctx.lvl ty
-        go names (1 + k) xs ("  \{n} : \{render 90 $ pprint names ty'}":: acc)
+        go names (1 + k) xs ("  \{show q}\{n} : \{render 90 $ pprint names ty'}":: acc)
 
     -- go names k ((v, n, ty) :: xs) acc = if isVar k v
     --   then do
@@ -120,15 +119,16 @@ processTypeSig ns fc names tm = do
   log 1 "-----"
   top <- getTop
   traverse (checkAlreadyDef fc) names
-  ty <- check (mkCtx fc) tm (VU fc)
+  ty <- checkIn (mkCtx fc) Zero tm (VU fc)
   log 1 "TypeSig \{unwords names} : \{render 90 $ pprint Nil ty}"
   ignore $ for names $ \nm => setDef (QN ns nm) fc ty Axiom Nil
 
 
 processPrimType : String → FC → Name → Maybe Raw → M Unit
 processPrimType ns fc nm ty = do
+  log 1 "Ptype \{show nm} : \{show ty}"
   top <- getTop
-  ty' <- check (mkCtx fc) (maybe (RU fc) id ty) (VU fc)
+  ty' <- checkIn (mkCtx fc) Zero (maybe (RU fc) id ty) (VU fc)
   let arity = cast $ piArity ty'
   setDef (QN ns nm) fc ty' (PrimTCon arity) Nil
 
@@ -136,7 +136,7 @@ processPrimType ns fc nm ty = do
 processPrimFn :  String → FC → String → List String → Raw → String → M Unit
 processPrimFn ns fc nm used ty src = do
   top <- getTop
-  ty <- check (mkCtx fc) ty (VU fc)
+  ty <- checkIn (mkCtx fc) Zero ty (VU fc)
   ty' <- nf Nil ty
   log 1 "pfunc \{nm} : \{render 90 $ pprint Nil ty'} = \{show src}"
   -- TODO wire through fc for not in scope error
@@ -155,10 +155,10 @@ complexity (Meta _ _) = 1 -- what's a good score for this, it's not inlined yet.
 -- e.g. emptyMap was capturing top and leaking memory...
 complexity (Lam _ _ _ _ sc) = 100 + complexity sc
 -- Ignore metas - they may be erased and likely are much smaller when substituted
-complexity (App _ t u) = go t (complexity u)
+complexity (App _ t u _) = go t (complexity u)
   where
     go : Tm → Int → Int
-    go (App _ t u) acc = go t (acc + complexity u)
+    go (App _ t u _) acc = go t (acc + complexity u)
     go (Meta _ _) acc = 1
     go t acc = acc + complexity t
 complexity (Bnd _ _) = 1
@@ -278,7 +278,7 @@ processInstance ns instfc ty decls = do
   top <- getTop
   let tyFC = getFC ty
 
-  vty <- check (mkCtx instfc) ty (VU instfc)
+  vty <- checkIn (mkCtx instfc) Zero ty (VU instfc)
   -- Here `tele` holds arguments to the instance
   let (codomain, tele) = splitTele vty
   -- env represents the environment of those arguments
@@ -319,6 +319,7 @@ processInstance ns instfc ty decls = do
   debug "dcty \{render 90 $ pprint Nil dcty}"
   -- let (_,args) = funArgs codomain
 
+  let args = map fst args
   debug "traverse \{show $ map show args}"
   -- This is a little painful because we're reverse engineering the
   -- individual types back out from the composite type
@@ -480,7 +481,7 @@ processData ns fc (nameFC, nm) ty cons = do
   log 1 "Data \{nm}"
   top <- getTop
   let mc = top.currentMod.modMetaCtx
-  tyty <- check (mkCtx fc) ty (VU fc)
+  tyty <- checkIn (mkCtx fc) Zero ty (VU fc)
   case lookup (QN ns nm) top of
     Just (MkEntry _ name type Axiom _) => do
       tyty' <- eval Nil tyty
@@ -493,7 +494,7 @@ processData ns fc (nameFC, nm) ty cons = do
       (TypeSig fc names tm) => do
           traverse (checkAlreadyDef fc) names
           debug "check dcon \{show names} \{show tm}"
-          dty <- check (mkCtx fc) tm (VU fc)
+          dty <- checkIn (mkCtx fc) Zero tm (VU fc)
           debug "dty \{show names} is \{render 90 $ pprint Nil dty}"
 
           -- We only check that codomain used the right type constructor

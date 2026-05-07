@@ -16,8 +16,8 @@ LiftEnv = List (Quant × Maybe (QName × List Quant))
 liftWhereTm : {{Ref2 Defs St}} → QName → LiftEnv → Tm → M Tm
 liftWhereTm name env (Lam fc nm icit quant t) =
   Lam fc nm icit quant <$> liftWhereTm name ((quant, Nothing) :: env) t
-liftWhereTm name env (App fc t u) =
-  App fc <$> liftWhereTm name env t <*> liftWhereTm name env u
+liftWhereTm name env (App fc t u q) =
+  App fc <$> liftWhereTm name env t <*> liftWhereTm name env u <*> pure q
 liftWhereTm name env (Pi fc nm icit quant t u) = do
   t <- liftWhereTm name env t
   u <- liftWhereTm name ((quant, Nothing) :: env) u
@@ -43,9 +43,8 @@ liftWhereTm name env tm@(Case fc t alts) = do
 liftWhereTm name env (LetRec fc nm ty t u) = do
   -- let l = length env
   qn <- getName name nm
-  -- I'll erase this one, since we're replacing all of the usages
-  let qs = Zero :: map fst env
-  let env' = ((Zero, Just (qn, qs)) :: env)
+  let qs = Many :: map fst env
+  let env' = ((Many, Just (qn, qs)) :: env)
   -- environment should subst this function (see next case)
   t' <- liftWhereTm qn env' t
   -- TODO we could have subst in this var and dropped the extra argument
@@ -69,13 +68,13 @@ liftWhereTm name env (LetRec fc nm ty t u) = do
 
 -- And where it lands
 liftWhereTm name env tm@(Bnd fc k) = case getAt (cast k) env of
-  Just (_, Just (qn, v)) => pure $ apply (length' env) (length' v) (Ref fc qn)
+  Just (quant, Just (qn, v)) => pure $ apply (length' env) (length' v) (Ref fc qn) quant
   _ => pure tm
   where
-    apply : Int → Int → Tm → Tm
-    apply l 0 tm = tm
+    apply : Int → Int → Tm → Quant → Tm
+    apply l 0 tm q = tm
     -- (l - k) is like lvl2ix, but with k one bigger
-    apply l k tm = App fc (apply l (k - 1) tm) (Bnd fc (l - k))
+    apply l k tm q = App fc (apply l (k - 1) tm q) (Bnd fc (l - k)) q
 liftWhereTm name env tm = pure tm
 
 liftWhereFn : {{Ref2 Defs St}} → QName × Def → M Unit

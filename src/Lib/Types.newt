@@ -62,7 +62,7 @@ data Tm : U where
   Ref : FC -> QName -> Tm
   Meta : FC -> QName -> Tm
   Lam : FC -> Name -> Icit -> Quant -> Tm -> Tm
-  App : FC -> Tm -> Tm -> Tm
+  App : FC -> Tm -> Tm -> Quant -> Tm
   UU   : FC -> Tm
   Pi  : (fc : FC) -> (nm : Name) -> Icit -> Quant -> (a : Tm) -> (b : Tm) -> Tm
   Case : FC -> Tm -> List CaseAlt -> Tm
@@ -83,7 +83,7 @@ instance HasFC Tm where
   getFC (Ref fc str) = fc
   getFC (Meta fc k) = fc
   getFC (Lam fc str _ _ t) = fc
-  getFC (App fc t u) = fc
+  getFC (App fc t u _) = fc
   getFC (UU fc) = fc
   getFC (Pi fc str icit quant t u) = fc
   getFC (Case fc t xs) = fc
@@ -100,7 +100,7 @@ instance Show Tm where
   show (Delay _ t) = "(Delay \{show t})"
   show (Ref _ str) = "(Ref \{show str})"
   show (Lam _ nm icit rig t) = "(\\ \{show rig}\{nm}  => \{show  t})"
-  show (App _ t u) = "(\{show t} \{show u})"
+  show (App _ t u _) = "(\{show t} \{show u})"
   show (Meta _ i) = "(Meta \{show i})"
   show (Lit _ l) = "(Lit \{show l})"
   show (UU _) = "U"
@@ -143,7 +143,7 @@ pprint' p names (Meta _ (QN qns baseName)) = text "?\{baseName}"
 pprint' p names (Lam _ nm icit quant t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> pprint' 0 (nm :: names) t
 -- TODO would be nice to make Meta app prettier, we could funArgs it, but might not be able
 -- to drop them because we do want to show if the meta is applied to _extra_ args
-pprint' p names (App _ t u) = parens 0 p $ pprint' 0 names t <+> pprint' 1 names u
+pprint' p names (App _ t u _) = parens 0 p $ pprint' 0 names t <+> pprint' 1 names u
 pprint' p names (UU _) = text "U"
 pprint' p names (Pi _ nm Auto rig t u) = parens 0 p $
   text "{{" ++ text (show rig) <+> text nm <+> text ":" <+> pprint' 0 names t <+> text "}}" <+> text "->" <+> pprint' 0 (nm :: names) u
@@ -179,11 +179,16 @@ Val : U
 Closure : U
 Env : U
 
+-- Constatine has Icit in here too, I'm considering that as not part of core,
+-- but I suspect I'll want it later. Maybe for diagnostics or reusing data.
+VSpine : U
+VSpine = SnocList (Val × Quant)
+
 data Val : U where
-  VVar : FC -> (nm : String) -> (k : Int) -> (sp : SnocList Val) -> Val
-  VRef : FC -> (nm : QName) -> (sp : SnocList Val) -> Val
+  VVar : FC -> (nm : String) -> (k : Int) -> (sp : VSpine) -> Val
+  VRef : FC -> (nm : QName) -> (sp : VSpine) -> Val
   VCase : FC -> (sc : Val) -> Env -> List CaseAlt -> Val
-  VMeta : FC -> QName -> (sp : SnocList Val) -> Val
+  VMeta : FC -> QName -> (sp : VSpine) -> Val
   VLam : FC -> Name -> Icit -> Quant -> Closure -> Val
   VPi : FC -> Name -> Icit -> Quant -> (a : Val) -> (b : Closure) -> Val
   -- not substing let, like idris
@@ -372,7 +377,7 @@ instance HasFC EditorInfo where
   getFC (MissingCases fc _ _) = fc
 
 -- modules are "modules"
--- currentMod represents the current module
+-- currentMod represents the current module (to save a map lookup)
 -- when we switch modules, load imports into ops and hints
 -- as we process the decls, update ops and currentMod.ops
 record TopContext where
@@ -385,7 +390,8 @@ record TopContext where
   ops : Operators
   freshIx : Int
 
--- we'll use this for typechecking, but need to keep a TopContext around too.
+-- For erasure, is the erased marker present in the environment
+data Marker = Present | Absent
 
 record Context where
   constructor MkCtx
@@ -394,22 +400,23 @@ record Context where
   -- I was going to recombine them, but realized I'd have to regenerate env for eval
   env : Env                  -- Values in scope
   -- TODO add fc, maybe add BD and make this a proper type
-  types : List (String × Val) -- types and names in scope
+  types : List (String × Val × Quant) -- types and names in scope
   -- so we'll try "bds" determines length of local context
   bds : List BD          -- bound or defined
 
   -- FC to use for errors if we don't have a better option
   ctxFC : FC
+  marker : Marker
 
 -- add a binding to environment
-extend : Context -> String -> Val -> Context
-extend (MkCtx lvl env types bds ctxFC) name ty =
-  MkCtx (1 + lvl) (VVar emptyFC name lvl Lin :: env) ((name,ty) :: types) (Bound :: bds) ctxFC
+extend : Context -> String -> Val -> Quant → Context
+extend (MkCtx lvl env types bds ctxFC mark) name ty quant =
+  MkCtx (1 + lvl) (VVar emptyFC name lvl Lin :: env) ((name, ty, quant) :: types) (Bound :: bds) ctxFC mark
 
 -- add a def to the environment
-define : Context -> String -> Val -> Val -> Context
-define (MkCtx lvl env types bds ctxFC) name val ty =
-  MkCtx (1 + lvl) (val :: env) ((name,ty) :: types) (Defined :: bds) ctxFC
+define : Context -> String -> Val -> Val → Quant -> Context
+define (MkCtx lvl env types bds ctxFC mark) name val ty quant =
+  MkCtx (1 + lvl) (val :: env) ((name, ty, quant) :: types) (Defined :: bds) ctxFC mark
 
 instance Show MetaEntry where
   show (Unsolved pos k ctx ty kind) = "Unsolved \{show pos} \{show k} \{show kind} : \{show ty} \{show ctx.bds} cs"
@@ -417,11 +424,14 @@ instance Show MetaEntry where
   show OutOfScope = "OutOfScope"
 
 withPos : Context -> FC -> Context
-withPos (MkCtx lvl env types bds ctxFC) fc = (MkCtx lvl env types bds fc)
+withPos ctx fc = { ctxFC := fc } ctx
 
 names : Context -> List String
 names ctx = map fst ctx.types
 
+-- Enter an erased section
+enterMarker : Context → Context
+enterMarker = { marker := Present }
 
 record M a where
   constructor MkM
@@ -538,7 +548,7 @@ lookupMeta ix@(QN ns nm) = do
         Just entry => return entry
 
 mkCtx : FC -> Context
-mkCtx fc = MkCtx 0 Nil Nil Nil fc
+mkCtx fc = MkCtx 0 Nil Nil Nil fc Absent
 
 -- Used by Syntax and Elab
 

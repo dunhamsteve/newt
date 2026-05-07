@@ -10,32 +10,26 @@ import Data.IORef
 import Data.SnocList
 import Data.SortedMap
 
-
 eval : Env -> Tm -> M Val
-
--- REVIEW everything is evaluated whether it's needed or not
--- It would be nice if the environment were lazy.
--- e.g. case is getting evaluated when passed to a function because
--- of dependencies in pi-types, even if the dependency isn't used
 
 infixl 8 _$$_
 
 _$$_ : Closure -> Val -> M Val
 _$$_ (MkClosure env tm) u = eval (u :: env) tm
 
-vapp : Val -> Val -> M Val
-vapp (VLam _ _ _ _ t) u = t $$ u
-vapp (VVar fc nm k sp) u = pure $ VVar fc nm k (sp :< u)
-vapp (VRef fc nm sp) u = pure $ VRef fc nm (sp :< u)
-vapp (VMeta fc k sp) u = pure $ VMeta fc k (sp :< u)
+vapp : Val -> Val ->  Quant -> M Val
+vapp (VLam _ _ _ _ t) u q = t $$ u
+vapp (VVar fc nm k sp) u q = pure $ VVar fc nm k (sp :< (u,q))
+vapp (VRef fc nm sp) u q = pure $ VRef fc nm (sp :< (u,q))
+vapp (VMeta fc k sp) u q = pure $ VMeta fc k (sp :< (u,q))
 -- not really impossible, could be a stuck VCase.
-vapp t u = error' "impossible in vapp \{show t} to \{show u}\n"
+vapp t u q = error' "impossible in vapp \{show t} to \{show u}\n"
 
-vappSpine : Val -> SnocList Val -> M Val
+vappSpine : Val -> VSpine -> M Val
 vappSpine t Lin = pure t
-vappSpine t (xs :< x) = do
+vappSpine t (xs :< (x,q)) = do
   rest <- vappSpine t xs
-  vapp rest x
+  vapp rest x q
 
 lookupVar : Env -> Int -> Maybe Val
 lookupVar env k = let l = cast $ length env in
@@ -116,8 +110,8 @@ evalCase env sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
       _ => pure Nothing
   where
     -- put constructor args into scope
-    pushArgs : Env -> List Val -> List String -> M (Maybe Val)
-    pushArgs env (arg :: args) (nm :: nms) = pushArgs (arg :: env) args nms
+    pushArgs : Env -> List (Val × Quant) -> List String -> M (Maybe Val)
+    pushArgs env ((arg,q) :: args) (nm :: nms) = pushArgs (arg :: env) args nms
     pushArgs env Nil Nil = Just <$> eval env t
     pushArgs env args Nil = fatalError "Extra args \{show args}"
     pushArgs env Nil rest = pure Nothing
@@ -144,10 +138,10 @@ eval env (Force fc t) = do
     VDelay fc t' => pure t'
     t' => pure $ VForce fc t'
 eval env (Delay fc t) = VDelay fc <$> eval env t
-eval env (App _ t u) = do
+eval env (App _ t u q) = do
   t' <- eval env t
   u' <- eval env u
-  vapp t' u'
+  vapp t' u' q
 eval env (UU fc) = pure (VU fc)
 eval env (Erased fc) = pure (VErased fc)
 eval env (Meta fc i) = do
@@ -189,12 +183,12 @@ eval env tm@(Case fc sc alts) = do
 
 quote : (lvl : Int) -> Val -> M Tm
 
-quoteSp : (lvl : Int) -> Tm -> SnocList Val -> M Tm
+quoteSp : (lvl : Int) -> Tm -> VSpine -> M Tm
 quoteSp lvl t Lin = pure t
-quoteSp lvl t (xs :< x) = do
+quoteSp lvl t (xs :< (x, q)) = do
   t' <- quoteSp lvl t xs
   x' <- quote lvl x
-  pure $ App emptyFC t' x'
+  pure $ App emptyFC t' x' q
 
 normAlt : Env → Int → CaseAlt → M CaseAlt
 normAlt env l (CaseDefault tm) = do
@@ -273,9 +267,14 @@ zonkBind : TopContext -> Int -> Env -> Tm -> M Tm
 zonkBind top l env tm = zonk top (1 + l) (VVar (getFC tm) "_" l Lin :: env) tm
 
 -- REVIEW FC might be dicey here
-appSpine : Tm -> List Tm -> Tm
+appSpine : Tm -> List (Tm × Quant) -> Tm
 appSpine t Nil = t
-appSpine t (x :: xs) = appSpine (App (getFC t) t x) xs
+appSpine t ((x,q) :: xs) = appSpine (App (getFC t) t x q) xs
+
+eval' : Env → Tm × Quant → M (Val × Quant)
+eval' env (t,q) = do
+  v <- eval env t
+  pure (v,q)
 
 -- REVIEW When metas are subst in, the fc point elsewhere
 -- We might want to update when it is solved and update recursively?
@@ -289,7 +288,7 @@ tweakFC fc (Ref fc1 nm) = Ref fc nm
 tweakFC fc (UU fc1) = UU fc
 tweakFC fc (Meta fc1 k) = Meta fc k
 tweakFC fc (Lam fc1 nm icit rig t) = Lam fc nm icit rig t
-tweakFC fc (App fc1 t u) = App fc t u
+tweakFC fc (App fc1 t u q) = App fc t u q
 tweakFC fc (Pi fc1 nm icit x t u) = Pi fc nm icit x t u
 tweakFC fc (Case fc1 t xs) = Case fc t xs
 tweakFC fc (Let fc1 nm t u) = Let fc nm t u
@@ -297,18 +296,19 @@ tweakFC fc (LetRec fc1 nm ty t u) = LetRec fc nm ty t u
 tweakFC fc (Lit fc1 lit) = Lit fc lit
 tweakFC fc (Erased fc1) = Erased fc
 
-zonkApp : TopContext -> Int -> Env -> Tm -> List Tm -> M Tm
-zonkApp top l env (App fc t u) sp = do
+zonkApp : TopContext -> Int -> Env -> Tm -> List (Tm × Quant) -> M Tm
+zonkApp top l env (App fc t u q) sp = do
   u' <- zonk top l env u
-  zonkApp top l env t (u' :: sp)
+  zonkApp top l env t ((u', q):: sp)
 zonkApp top l env t@(Meta fc k) sp = do
   meta <- lookupMeta k
   case meta of
     (Solved _ j v) => do
       debug "zonk for \{show k} env \{show env}"
       debug "spine \{show sp}"
-      sp' <- traverse (eval env) sp
+      sp' <- traverse (eval' env) sp
       debug $  "zonk meta \{show k} -> \{show v} spine \{show sp'}"
+      -- FIXME find quants...
       foo <- vappSpine v (Lin <>< sp')
       debug $  "-> result is \{show foo}"
       if length' env /= l
@@ -318,13 +318,15 @@ zonkApp top l env t@(Meta fc k) sp = do
       debug "quoted \{show res}"
       pure res
     _ => pure $ appSpine t sp
+  where
+
 zonkApp top l env t sp = do
   debug "zonk2 for \{show t} env \{show env}"
   debug "spine \{show sp}"
   t' <- zonk top l env t
   -- inlining
   let (Just tm) = inlineDef t' | _ => pure $ appSpine t' sp
-  sp' <- traverse (eval env) sp
+  sp' <- traverse (eval' env) sp
   vtm <- eval env tm
   catchError (do
     debug $  "zonk will app \{show t'} @ \{show sp} ~> \{show vtm} @ \{show sp'}"
@@ -360,7 +362,7 @@ zonk top l env t =
   (Force fc t) => Force fc <$> zonk top l env t
   (Delay fc t) => Delay fc <$> zonk top l env t
   (Lam fc nm icit rig u) => Lam fc nm icit rig <$> (zonk top (1 + l) env' u)
-  (App fc _ _) => zonkApp top l env t Nil
+  (App fc _ _ q) => zonkApp top l env t Nil
   (Pi fc nm icit rig a b) => Pi fc nm icit rig <$> zonk top l env a <*> zonkBind top (l + 1) env' b
   (Let fc nm t u) => Let fc nm <$> zonk top l env t <*> zonkBind top (l + 1) env' u
   (LetRec fc nm ty t u) => LetRec fc nm <$> zonk top l env ty <*> zonkBind top (l + 1) env' t <*> zonkBind top (l + 1) env' u
@@ -374,3 +376,4 @@ zonk top l env t =
   Bnd fc ix => pure $ Bnd fc ix
   Ref fc ix => pure $ Ref fc ix
   Erased fc => pure $ Erased fc
+

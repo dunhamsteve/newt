@@ -500,7 +500,8 @@ process names = do
   -- Maybe move this dance into liftWhere
   ref <- newIORef entries
   let foo = MkRef ref -- for the autos below
-  eraseEntries
+  -- 25ms
+  -- eraseEntries
   liftWhere
   entries <- readIORef ref
   -- Now working with defs

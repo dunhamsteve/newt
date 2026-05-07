@@ -12,25 +12,25 @@ EEnv = List (String × Quant × Maybe Tm)
 -- TODO look into removing Nothing below, can we recover all of the types?
 -- Idris does this in `chk` for linearity checking.
 
-erase : EEnv -> Tm -> List (FC × Tm) -> M Tm
+erase : EEnv -> Tm -> List (FC × Tm × Quant) -> M Tm
 
 -- App a spine using type
-eraseSpine : EEnv -> Tm -> List (FC × Tm) -> (ty : Maybe Tm) -> M Tm
+eraseSpine : EEnv -> Tm -> List (FC × Tm × Quant) -> (ty : Maybe Tm) -> M Tm
 eraseSpine env tm Nil _ = pure tm
-eraseSpine env t ((fc, arg) :: args) (Just (Pi fc1 str icit Zero a b)) = do
+eraseSpine env t ((fc, arg, q) :: args) (Just (Pi fc1 str icit Zero a b)) = do
   let u = Erased (getFC arg)
-  eraseSpine env (App fc t u) args (Just b)
-eraseSpine env t ((fc, arg) :: args) (Just (Pi fc1 str icit Many a b)) = do
+  eraseSpine env (App fc t u Zero) args (Just b)
+eraseSpine env t ((fc, arg, q) :: args) (Just (Pi fc1 str icit Many a b)) = do
   u <- erase env arg Nil
   -- TODO this seems wrong, we need to subst u into b to get the type
-  eraseSpine env (App fc t u) args (Just b)
+  eraseSpine env (App fc t u Many) args (Just b)
 -- eraseSpine env t ((fc, arg) :: args) (Just ty) = do
 --   -- Prelude Either and IO instance of <*> have Bnd here, possibly pattern matching
 --   -- unifying in the wrong direction? we should have something like a -> b
 --   error fc "ceci n'est pas une ∏ \{showTm ty} arg \{show arg}" -- e.g. Bnd 1
-eraseSpine env t ((fc, arg) :: args) _ = do
+eraseSpine env t ((fc, arg, q) :: args) _ = do
   u <- erase env arg Nil
-  eraseSpine env (App fc t u) args Nothing
+  eraseSpine env (App fc t u q) args Nothing
 
 doAlt : EEnv -> CaseAlt -> M CaseAlt
 -- REVIEW we're sticking Erased on RHS for impossible, might want a runtime error or elide the case.
@@ -55,7 +55,7 @@ doAlt env (CaseLit lit t) = CaseLit lit <$> erase env t Nil
 -- build stack, see what to do when we hit a non-app
 -- This is a little fuzzy because we don't have all of the types.
 erase env t sp = case t of
-  (App fc u v) => erase env u ((fc,v) :: sp)
+  (App fc u v q) => erase env u ((fc,v,q) :: sp)
   (Force fc t) => do
      t <- erase env t Nil
      eraseSpine env (Force fc t) sp Nothing
@@ -93,10 +93,8 @@ erase env t sp = case t of
   (Bnd fc k) => do
     case getAt (cast k) env of
       Nothing => error fc "Erase: bad index \{show k}"
-      Just (nm, Zero, ty) => error fc "used erased value \{show nm} (FIXME FC may be wrong here)"
+      Just (nm, Zero, ty) => error fc "used erased value \{show nm}" -- (FIXME FC may be wrong here)"
       Just (nm, Many, ty) => eraseSpine env t sp ty
   (UU fc) => eraseSpine env t sp (Just $ UU fc)
   (Lit fc lit) => eraseSpine env t sp Nothing
   Erased fc => error fc "erased value in relevant context" -- eraseSpine env t sp Nothing
-
-

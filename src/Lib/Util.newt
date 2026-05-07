@@ -10,11 +10,11 @@ piArity : Tm -> Nat
 piArity (Pi _ _ _ quant _ b) = S (piArity b)
 piArity _ = Z
 
-funArgs : Tm -> (Tm × List Tm)
+funArgs : Tm -> (Tm × List (Tm × Quant))
 funArgs tm = go tm Nil
   where
-    go : Tm -> List Tm -> (Tm × List Tm)
-    go (App _ t u) args = go t (u :: args)
+    go : Tm -> List (Tm × Quant) -> (Tm × List (Tm × Quant))
+    go (App _ t u p) args = go t ((u,p) :: args)
     go t args = (t, args)
 
 data Binder : U where
