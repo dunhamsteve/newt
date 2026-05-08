@@ -9,12 +9,49 @@ import Lib.Util
 import Lib.Ref2
 import Data.SortedMap
 
+-- What are defs used for, can we drop the lookup?
+
+-- DCon - need tags, info, quantities
+-- ...
+-- But when we reference a Fn, we need to look it up, since we're using the Lam count
+
+-- SAVE one lookup if CaseCons has qs
+
 -- REVIEW Separate pass for constructor magic?
 -- ConCase SuccCon will be replaced by Default CLet,
 -- but we would need to fix up zero, since we collapse extra constructors into a default case.
 -- But should be ok because CLitAlt doesn't bind.
 
+-- need to drop CLam .. Zero and CApp .. Zero
+-- Also CConAlt and CLet are binders
+
+-- [ ] First add env with as-is behavior (no drops, but lvl / ix dance)
+-- [ ] Then drop the non-erased args in the new way
+
+-- funArgs : Tm -> (Tm × List Tm)
+-- funArgs tm = go tm Nil
+--   where
+--     go : Tm -> List Tm -> (Tm × List Tm)
+--     go (App _ t u Many) args = go t (u :: args)
+--     go (App _ t u Zero) args = go t args
+--     go t args = (t, args)
+--
+
 CExp : U
+
+-- Used for thinning, indexed by Tm deBruijn index
+-- An entry points to a deBruijn level in the output
+-- clvl is the depth of the output
+record CEnv where
+  cenv : List (Maybe Int)
+  clvl : Int
+
+emptyCEnv : CEnv
+emptyCEnv = MkCEnv Nil 0
+
+push : CEnv → Quant → CEnv
+push (MkCEnv cenv clvl) x = MkCEnv (Just clvl :: cenv) (clvl + 1)
+push (MkCEnv cenv clvl) Zero = MkCEnv (Nothing :: cenv) clvl
 
 data CAlt : U where
   CConAlt : Nat → String → ConInfo → List String → List Quant → CExp → CAlt
@@ -53,13 +90,18 @@ data CExp : U where
   CThunk : CExp → CExp
   CForce : CExp → CExp
 
+getEnv : Int → CEnv → M CExp
+getEnv k (MkCEnv cenv clvl) = case getAt' k cenv of
+  Nothing => fatalError "Ferret \{show k} > \{show $ length' cenv} .. \{show cenv}"
+  Just (Just x) => pure $ CBnd $ lvl2ix clvl x
+  Just Nothing => fatalError "Ferret2 \{show k} Nothing .. \{show cenv}"
+
+
 -- I'm counting Lam in the term for arity.  This matches what I need in
 -- code gen.
-
 lamArity : Tm -> List Quant
 lamArity (Lam _ _ _ quant t) = quant :: (lamArity t)
 lamArity _ = Nil
-
 
 -- This is how much we want to curry at top level
 -- leading lambda Arity is used for function defs and metas
@@ -69,6 +111,7 @@ arityForName fc nm = do
   defs <- getRef Defs
   case lookupMap' nm defs of
     Nothing => error fc "Name \{show nm} not in scope"
+    -- we really shouldn't be hitting Axiom (undefined function) in codegen
     (Just Axiom) => pure Nil
     (Just (PrimOp _)) => pure $ Many :: Many :: Nil
     (Just (TCon arity strs)) => pure $ replicate (cast arity) Many
@@ -76,25 +119,13 @@ arityForName fc nm = do
     (Just (Fn t)) => pure $ lamArity t
     (Just (PrimTCon arity)) => pure $ replicate (cast arity) Many
     (Just (PrimFn t arity used)) => pure $ replicate arity Many
-  where
-
 
 any : ∀ a. (a → Bool) → List a → Bool
 any f Nil = False
 any f (x :: xs) = if f x then True else any f xs
 
--- apply an expression at an arity to a list of args
--- CAppRef will specify any missing args, for eta conversion later
--- and any extra args get individual CApp.
 apply : QName -> List CExp -> List Quant -> M CExp
--- out of args, make one up (fix that last arg)
 apply qn args quants = pure $ CAppRef qn args quants
-  -- go (CAppRef qn args quants) args quants
-  where
-    go : CExp -> List CExp -> List Quant → M CExp
-    go t (arg :: args) (q :: qs) = go t args qs
-    go t Nil _ = pure t
-    go t (arg :: args) Nil = go (CApp t arg) args Nil
 
 lookupDef : {{Ref2 Defs St}} → FC → QName → M Def
 lookupDef fc nm = do
@@ -108,13 +139,22 @@ getBody (CConAlt _ _ _ _ _ t) = t
 getBody (CLitAlt _ t) = t
 getBody (CDefAlt t) = t
 
-compileTerm : {{Ref2 Defs St}} → Tm -> M CExp
-compileTerm (Bnd _ k) = pure $ CBnd k
+compileTerm : {{Ref2 Defs St}} → CEnv → Tm → M CExp
+
+-- applyRef : {{Ref2 Defs St}} → FC → QName → List Tm → M CExp
+-- applyRef fc nm args = ?
+
+compileTerm env (Bnd _ k) = getEnv k env
+ -- do
+ --  CBnd k' <- getEnv k env
+ --    | _ => fatalError "impossible"
+ --  when (k' /= k) $ putStrLn "Mismatch! \{show k} \{show k'} \{show env.clvl} \{show env.cenv} "
+ --  pure $ CBnd k
 -- can't reuse CLam / CApp because of deBruijn, but backends may want to memoize anyway
-compileTerm (Force fc t) = CForce <$> compileTerm t
-compileTerm (Delay fc t) = CThunk <$> compileTerm t
+compileTerm env (Force fc t) = CForce <$> compileTerm env t
+compileTerm env (Delay fc t) = CThunk <$> compileTerm env t
 -- need to eta expand to arity
-compileTerm t@(Ref fc nm@(QN _ tag)) = do
+compileTerm env t@(Ref fc nm@(QN _ tag)) = do
   arity <- arityForName fc nm
   defs <- getRef Defs
   case arity of
@@ -126,20 +166,21 @@ compileTerm t@(Ref fc nm@(QN _ tag)) = do
         Just (DCon ix TrueCon _ _) => pure $ CLit $ LBool True
         Just (DCon _ ZeroCon _ _) => pure $ CLit $ LInt 0
         Just (DCon _ SuccCon _ _) =>
+          -- TODO add a test case for unapplied constructors
+          -- maybe this is just a function, a closure is overkill
+          -- neither this nor the one below are hit in the newt source
           pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
         _ => pure $ CRef nm
     _ => apply nm Nil arity
 
-compileTerm (Meta fc k) = error fc "Compiling meta \{show k}"
-compileTerm (Lam _ nm _ _ t) = CLam nm <$> compileTerm t
-compileTerm tm@(App _ _ _ _) = case funArgs tm of
-  (Meta _ k, args) => do
-        error (getFC tm) "Compiling an unsolved meta \{show tm}"
-        -- info (getFC tm) "Compiling an unsolved meta \{show tm}"
-        -- pure $ CAppRef  "Meta\{show k}" Nil 0
+compileTerm env (Meta fc k) = error fc "Compiling meta \{show k}"
+compileTerm env (Lam _ nm _ _ t) = CLam nm <$> compileTerm (push env Many) t
+compileTerm env (Lam _ nm _ Zero t) = compileTerm (push env Zero)  t
+compileTerm env tm@(App _ _ _ _) = case funArgs tm of
+  (Meta _ k, args) => error (getFC tm) "Compiling an unsolved meta \{show tm}"
   (t@(Ref fc nm), args) => do
         defs <- getRef Defs
-        args' <- traverse compileTerm' args
+        args' <- traverse (compileTerm' ) args
         arity <- arityForName fc nm
         case lookupMap' nm defs : Maybe Def of
           Just (DCon _ SuccCon _ _) => applySucc args'
@@ -156,8 +197,8 @@ compileTerm tm@(App _ _ _ _) = case funArgs tm of
   -- REVIEW maybe we want a different constructor for non-Ref applications?
   (t, args) => do
         debug "apply other \{render 90 $ pprint Nil t}"
-        t' <- compileTerm t
-        args' <- traverse compileTerm' args
+        t' <- compileTerm env t
+        args' <- traverse (compileTerm') args
         pure $ foldl CApp t' args'
   where
     applySucc : List CExp → M CExp
@@ -167,26 +208,31 @@ compileTerm tm@(App _ _ _ _) = case funArgs tm of
 
     compileTerm' : Tm × Quant → M CExp
     compileTerm' (tm, Zero) = pure CErased
-    compileTerm' (tm, Many) = compileTerm tm
+    compileTerm' (tm, Many) = compileTerm env tm
 
-compileTerm (UU _) = pure $ CRef (QN "" "U")
-compileTerm (Pi _ nm icit rig t u) = do
-  t' <- compileTerm t
-  u' <- compileTerm u
+compileTerm env (UU _) = do
+  putStrLn "GOT UU!!!"
+  pure $ CRef (QN "" "U")
+compileTerm env (Pi _ nm icit rig t u) = do
+  putStrLn "GOT Pi!!"
+  t' <- compileTerm env t
+  u' <- compileTerm env u
   pure $ CAppRef (QN primNS "PiType") (t' :: CLam nm u' :: Nil) (Many :: Many :: Nil)
-compileTerm (Case fc t alts) = do
-  t' <- compileTerm t
+compileTerm env (Case fc t alts) = do
+  t' <- compileTerm env t
   alts' <- for alts $ \case
-    CaseDefault tm => CDefAlt <$> compileTerm tm
+    CaseDefault tm => CDefAlt <$> compileTerm env tm
     -- we use the base name for the tag, some primitives assume this
     CaseCons qn@(QN ns nm) args tm => do
       defs <- getRef Defs
       def <- lookupDef emptyFC qn
       case def of
-        DCon ix info qs _ => CConAlt ix nm info args qs <$> compileTerm tm
+        DCon ix info qs _ => do
+          let env = foldl push env qs
+          CConAlt ix nm info args qs <$> compileTerm env tm
         _ => error fc "\{show nm} is not a data constructor"
 
-    CaseLit lit tm => CLitAlt lit <$> compileTerm tm
+    CaseLit lit tm => CLitAlt lit <$> compileTerm env tm
   pure $ CCase t' $ fancyCons t' alts'
   where
     numAltP : CAlt → Bool
@@ -233,24 +279,25 @@ compileTerm (Case fc t alts) = do
         then doNumCon sc alts
         else map enumAlt alts
 
-compileTerm (Lit _ lit) = pure $ CLit lit
-compileTerm (Let _ nm t u) = do
-  t' <- compileTerm t
-  u' <- compileTerm u
+compileTerm env (Lit _ lit) = pure $ CLit lit
+compileTerm env (Let _ nm t u) = do
+  t' <- compileTerm env t
+  u' <- compileTerm (push env Many) u
   pure $ CLet nm t' u'
-compileTerm (LetRec _ nm _ t u) = do
-  t' <- compileTerm t
-  u' <- compileTerm u
+compileTerm env (LetRec _ nm _ t u) = do
+  let env' = push env Many
+  t' <- compileTerm env' t
+  u' <- compileTerm env' u
   pure $ CLetRec nm t' u'
-compileTerm (Erased _) = pure CErased
+compileTerm env (Erased _) = pure CErased
 
-compileFun : {{Ref2 Defs St}} → Tm -> M CExp
-compileFun tm = go tm Lin
+compileFun : {{Ref2 Defs St}} → CEnv → Tm -> M CExp
+compileFun env tm = go env tm Lin
   where
-    go : Tm -> SnocList (Quant × String) -> M CExp
-    go (Lam _ nm _ quant t) acc = go t (acc :< (quant, nm))
-    go tm Lin = compileTerm tm
-    go tm args = CFun (args <>> Nil) <$> compileTerm tm
+    go : CEnv → Tm -> SnocList (Quant × String) -> M CExp
+    go env (Lam _ nm _ quant t) acc = go (push env quant) t (acc :< (quant, nm))
+    go env tm Lin = compileTerm env tm
+    go env tm args = CFun (args <>> Nil) <$> compileTerm env tm
 
 compilePop : QName → M CExp
 compilePop qn = do
@@ -285,4 +332,4 @@ defToCExp (qn, DCon ix info arity _)   = pure (qn, compileDCon ix qn info arity)
 defToCExp (qn, TCon arity conNames) = pure (qn, compileDCon Z qn NormalCon (replicate (cast arity) Many))
 defToCExp (qn, PrimTCon arity) = pure (qn, compileDCon Z qn NormalCon (replicate (cast arity) Many))
 defToCExp (qn, PrimFn src _ deps) = pure (qn, CRaw src deps)
-defToCExp (qn, Fn tm)          = (_,_ qn) <$> compileFun tm
+defToCExp (qn, Fn tm)          = (_,_ qn) <$> compileFun emptyCEnv tm

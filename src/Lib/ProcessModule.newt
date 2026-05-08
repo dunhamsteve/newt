@@ -149,6 +149,8 @@ processModule importFC repo stk modns = do
   top <- getTop
   -- print errors (for batch processing case)
   for_ (reverse top.currentMod.modErrors) $ showError src >=> putStrLn
+  -- let (Nil) = top.currentMod.modErrors
+  --   | _ => fatalError "Stop"
 
   -- update modules with result, leave the rest of context in case this is top file
   top <- getTop

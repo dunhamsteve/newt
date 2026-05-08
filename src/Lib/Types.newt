@@ -228,9 +228,9 @@ instance Show Val where
   show (VVar _ nm k Lin) = "\{show nm}:\{show k}"
   show (VForce _ t) = "(%force \{show t})"
   show (VDelay _ t) = "(%delay \{show t})"
-  show (VVar _ nm k sp) = "(\{show nm}:\{show k} \{unwords $ map show (sp <>> Nil)})"
+  show (VVar _ nm k sp) = "(\{show nm}:\{show k} \{unwords $ map show $ map fst (sp <>> Nil)})"
   show (VRef _ nm Lin) = show nm
-  show (VRef _ nm sp) = "(\{show nm} \{unwords $ map show (sp <>> Nil)})"
+  show (VRef _ nm sp) = "(\{show nm} \{unwords $ map show $ map fst (sp <>> Nil)})"
   show (VMeta _ ix sp) = "(%meta \{show ix} [\{show $ snoclen sp} sp])"
   show (VLam _ str icit quant x) = "(%lam \{show quant}\{str} \{showClosure x})"
   show (VPi fc str Implicit rig x y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{showClosure  y})"

@@ -35,10 +35,12 @@ liftWhereTm name env tm@(Case fc t alts) = do
     liftWhereAlt : CaseAlt → M CaseAlt
     liftWhereAlt (CaseDefault tm) = CaseDefault <$> liftWhereTm name env tm
     liftWhereAlt (CaseLit l tm) = CaseLit l <$> liftWhereTm name env tm
-    liftWhereAlt (CaseCons qn args tm) =
+    liftWhereAlt (CaseCons qn args tm) = do
       -- TODO - can we pull quantities off of these arguments?
       -- We should switch to SnocList first, the args are backwards here
-      CaseCons qn args <$> liftWhereTm name ((map (const (Many, Nothing)) args) ++ env) tm
+      top <- getTop
+      let (Just (MkEntry _ name type (DCon _ _ qs str) _)) = lookup qn top | _ => fatalError "\{show qn} not dcon"
+      CaseCons qn args <$> liftWhereTm name ((map (\ q => (q, Nothing)) $ reverse qs) ++ env) tm
 -- This is where the magic happens
 liftWhereTm name env (LetRec fc nm ty t u) = do
   -- let l = length env
@@ -68,13 +70,14 @@ liftWhereTm name env (LetRec fc nm ty t u) = do
 
 -- And where it lands
 liftWhereTm name env tm@(Bnd fc k) = case getAt (cast k) env of
-  Just (quant, Just (qn, v)) => pure $ apply (length' env) (length' v) (Ref fc qn) quant
+  Just (quant, Just (qn, v)) => pure $ apply (length' env) (length' v) (Ref fc qn) v
   _ => pure tm
   where
-    apply : Int → Int → Tm → Quant → Tm
+    apply : Int → Int → Tm → List Quant → Tm
     apply l 0 tm q = tm
+    apply l _ tm Nil = tm
     -- (l - k) is like lvl2ix, but with k one bigger
-    apply l k tm q = App fc (apply l (k - 1) tm q) (Bnd fc (l - k)) q
+    apply l k tm (q :: qs) = App fc (apply l (k - 1) tm qs) (Bnd fc (l - k)) q
 liftWhereTm name env tm = pure tm
 
 liftWhereFn : {{Ref2 Defs St}} → QName × Def → M Unit
