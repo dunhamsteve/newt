@@ -15,10 +15,10 @@
     complaining that `Lazy` is not a type constructor.
   - Put a match on `Delay` there (add `Delay` to surface syntax). Eliminator forces the function
   - Can be manually done today by breaking out another `case` for the lazy value (scrutinee is forced)
-- [ ] Look into Constatine Theocaris erasure thing
-  - https://cthe.me/erasure-sogat.pdf
+- [x] Look into Constatine Theocaris erasure thing
+  - https://arxiv.org/abs/2605.00655
   - Can this technique work for async, too?
-  - We will want this to get rid of erased args in C backend
+  - We will leverage this to get rid of erased args in C backend
 - [ ] C backend
   - [-] Rework the Javascript AST to be more generic semi-A-Normal form (WIP)
   - [ ] Generated code accepted by C compiler

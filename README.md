@@ -80,4 +80,8 @@ The sugar for `do` blocks uses the `>>=` operator, which is defined on the `Mona
 
 "Elaboration Zoo" by András Kovács was my primary resource for typechecking and elaboration. In particular pattern unification and handling of implicits is based on it.
 
+"[Type Theory with Erasure](https://arxiv.org/abs/2605.00655)" by Constatine Theocharis and Edwin Brady. I followed the "implicit" sample implementation for a later version of Erasure. The original implementation was somewhat ad-hoc and not integrated with type-checking.
+
+
+
 There were many other resources and papers that I used to learn how dependent typed languages are built.
