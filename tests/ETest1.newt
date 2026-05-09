@@ -1,0 +1,27 @@
+module ETest1
+
+-- test.er
+
+id : (0 A : U) → A → A
+id = \A a => a
+
+test : U
+test = id U (U → U)
+
+-- fib.er
+
+-- this was `let 0`
+Nat : U
+Nat = (0 A : U) → A → (A → A) → A
+
+zero : Nat
+zero = \A z s => z
+
+succ : Nat → Nat
+-- Existing code is broken here
+-- and the new stuff too? what?
+succ = \ n A z s => s (n A z s)
+
+-- also `let 0`, we need it for this to be valid
+-- rec : {0 A : U} → (0 a : A) → (A → A) → (0 n : Nat) → A
+-- rec = \ {A} z s n => n A z s

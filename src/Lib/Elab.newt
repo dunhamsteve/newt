@@ -393,16 +393,16 @@ rename meta ren lvl (VLit fc lit) = pure (Lit fc lit)
 -- If we we need this, follow the model of VLam
 rename meta ren lvl tm = error (getFC tm) "Unhandled term in `rename`: \{show tm}"
 
-lams : Nat -> List String -> Tm -> Tm
+lams : Nat -> List (String × Val × Quant) -> Tm -> Tm
 lams Z _ tm = tm
 -- REVIEW do we want a better FC, icity?, rig?
-lams (S k) Nil tm = Lam emptyFC "arg_\{show k}" Explicit Many (lams k Nil tm)
-lams (S k) (x :: xs) tm = Lam emptyFC x Explicit Many (lams k xs tm)
+lams (S k) Nil tm = fatalError "Fatal: too many args in lams"
+lams (S k) ((x, _, q) :: xs) tm = Lam emptyFC x Explicit q (lams k xs tm)
 
 unify : Env -> UnifyMode -> Val -> Val  -> M UnifyResult
 
-.boundNames : Context -> List String
-ctx.boundNames = map snd $ filter (\x => fst x == Bound) $ zip ctx.bds (map fst ctx.types)
+.boundNames : Context -> List (String × Val × Quant)
+ctx.boundNames = map snd $ filter (\x => fst x == Bound) $ zip ctx.bds ctx.types
 
 -- run action if mcmode allows it, ratcheting as necessary
 maybeCheck : M Unit -> M Unit
@@ -628,10 +628,10 @@ unify env mode t u = do
     solve' env nm sp sol = do
       case mode of
         UPattern => do
-          putStrLn "pattern solve \{show nm} \{show sp} =?= \{show sol}"
+          debug "pattern solve \{show nm} \{show sp} =?= \{show sol}"
           pure neutral
         USpine => do
-          putStrLn "spine match \{show nm}"
+          debug "spine match \{show nm}"
           throwError $ Postpone (getFC sol) "spine match"
         _ => solve env nm sp sol >> pure neutral
 
@@ -1113,7 +1113,6 @@ checkWhere ctx decls body ty = do
   clauses' <- traverse makeClause clauses
   vty <- eval ctx.env funTy
   debug "\{name} vty is \{show vty}"
-  -- TODO ERASE rig on the declaration
   let ctx' = extend ctx name vty Many
 
   -- if I lift, I need to namespace it, add args, and add args when
@@ -1541,7 +1540,7 @@ check ctx tm ty = do
           pure $ MkClause (getFC pat) ((PC scnm pat' scty) :: Nil) Nil rawRHS
       -- buildCase expects scrutinee to be a name in the context, so we need to let it.
       -- if it's a Bnd and not shadowed we could skip the let, but that's messy.
-      -- TODO check rig on this
+      -- scrutinee was checked at Many above
       let ctx' = withPos (extend ctx scnm scty Many) (getFC tm)
       case lazyType ty of
         Nothing => do
@@ -1666,21 +1665,19 @@ infer ctx (RApp fc t u icit) = do
         pure (Auto, t, tty)
 
   (q,a,b) <- do
-    tty' <- forceMeta tty
+    tty' <- forceType ctx.env tty
     case tty' of
       (VPi fc' str icit' rig a b) => if icit' == icit then pure (rig,a,b)
           else error fc "IcitMismatch \{show icit} \{show icit'}"
 
       -- If it's not a VPi, try to unify it with a VPi
-      -- TODO test case to cover this.
+      -- We have to assume it's a Many VPi
       tty => do
         debug "unify PI for \{show tty} at \{show $ getFC tty}"
-        a <- freshMeta ctx fc (VU emptyFC) Normal >>= eval ctx.env
-        -- FIXME ERASE Many is not necessarily right, same guess as I had below
-        b <- MkClosure ctx.env <$> freshMeta (extend ctx "_" a Many) fc (VU emptyFC) Normal
-        -- FIXME - I had to guess Many here.  What are the side effects?
+        a <- freshMeta (enterMarker ctx) fc (VU emptyFC) Normal >>= eval ctx.env
+        b <- MkClosure ctx.env <$> freshMeta (extend (enterMarker ctx) "_" a Many) fc (VU emptyFC) Normal
         unifyCatch fc ctx tty (VPi fc "_" icit Many a b)
-        pure (Many, a,b)
+        pure (Many, a, b)
 
   u <- checkIn ctx q u a
   u' <- eval ctx.env u
