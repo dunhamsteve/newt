@@ -5,7 +5,7 @@ import Data.List1
 import Data.SortedMap
 import Lib.Common
 import Lib.Compile.JS
-import Lib.Compile.CC
+--import Lib.Compile.CC
 import Lib.Compile.Scheme
 import Lib.Parser
 import Lib.Elab
@@ -38,15 +38,15 @@ writeScheme fn = do
     | Left err => throwError $ E (MkFC fn $ MkBounds 0 0 0 0) err
   pure MkUnit
 
-writeC : String -> M Unit
-writeC fn = do
-  docs <- compileC
-  let src = unlines $
-        map (render 90 ∘ noAlt') docs
-  (Right _) <- liftIO {M} $ writeFile fn src
-    | Left err => throwError $ E (MkFC fn $ MkBounds 0 0 0 0) err
-  pure MkUnit
-
+-- writeC : String -> M Unit
+-- writeC fn = do
+--   docs <- compileC
+--   let src = unlines $
+--         map (render 90 ∘ noAlt') docs
+--   (Right _) <- liftIO {M} $ writeFile fn src
+--     | Left err => throwError $ E (MkFC fn $ MkBounds 0 0 0 0) err
+--   pure MkUnit
+--
 writeJS : String -> M Unit
 writeJS fn = do
   docs <- compileJavascript
@@ -199,7 +199,7 @@ main' = do
     Nothing => pure MkUnit
     Just name =>
       if isSuffixOf ".ss" name then writeScheme name
-      else if isSuffixOf ".c" name then writeC name
+      -- else if isSuffixOf ".c" name then writeC name
       else if isSuffixOf ".js" name then writeJS name
       else exitFailure "Unknown extension for output file \{show name} - I only know .c, .js, and .ss"
 

@@ -84,7 +84,7 @@ data CExp : U where
   CLoop : List CExp → List Quant → CExp
   CErased : CExp
   -- Data / type constructor
-  CConstr : Nat → Name → List CExp → List Quant → ConInfo → CExp
+  CConstr : Nat → Name → List CExp → ConInfo → CExp
   -- Raw javascript for `pfunc`
   CRaw : String -> List QName -> CExp
   -- Need this for magic Nat
@@ -200,11 +200,11 @@ compileTerm env tm@(App fc _ _ _) = case manyFunArgs tm of
           -- Inline these two, maybe all of them?
           Just (DCon tag ConsCon qs _) =>
             if length' qs == length' args
-              then pure $ CConstr tag nm.baseName args' qs ConsCon
+              then pure $ CConstr tag nm.baseName args' ConsCon
               else apply nm args' arity
           Just (DCon tag NilCon qs _) =>
             if length' qs == length' args
-              then pure $ CConstr tag nm.baseName args' qs NilCon
+              then pure $ CConstr tag nm.baseName args' NilCon
               else apply nm args' arity
           _ => apply nm args' arity
   -- REVIEW maybe we want a different constructor for non-Ref applications?
@@ -343,8 +343,8 @@ compileDCon ix (QN _ nm) info arity =
   let args = mkArgs (S Z) arity
       alen = length' arity
   in case filter (/= Zero) arity of
-    Nil => CConstr ix nm Nil Nil info
-    arity => CFun args $ CConstr ix nm (map (\k => CBnd $ alen - k - 1) (range 0 alen)) arity info
+    Nil => CConstr ix nm Nil info
+    arity => CFun args $ CConstr ix nm (map (\k => CBnd $ alen - k - 1) (range 0 alen)) info
   where
     mkArgs : Nat → List Quant → List (Quant × String)
     mkArgs k (quant :: args) = (quant, "h\{show k}") :: mkArgs (S k) args

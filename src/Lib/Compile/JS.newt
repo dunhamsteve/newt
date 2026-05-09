@@ -12,7 +12,6 @@ import Lib.Compile.LiftWhere
 import Lib.Compile.LiftLambda
 import Lib.TCO
 import Lib.Ref2
-import Lib.Compile.Erasure
 import Data.String
 import Data.SnocList
 import Data.Int
@@ -110,10 +109,8 @@ litToJS (LInt i) = LitInt i
 -- Stuff nm.h1, nm.h2, ... into environment for constructor match
 conAltEnv : JSExp -> Int -> JSEnv -> List Quant -> JSEnv
 conAltEnv sc k env Nil = env
-conAltEnv sc k env (Many :: xs) = conAltEnv sc (1 + k) (push env (Dot sc k )) xs
-conAltEnv sc k env (Zero :: xs) =
-  fatalError "Zaro"
-  -- conAltEnv sc k (push env JUndefined) xs
+conAltEnv sc k env (Many :: xs) = conAltEnv sc (1 + k) (push env (Dot sc k)) xs
+conAltEnv sc k env (Zero :: xs) = fatalError "Zaro"
 
 
 -- given a name, find a similar one that doesn't shadow in Env
@@ -144,10 +141,7 @@ freshNames nms env = go nms env Lin
     go ((Many, n) :: ns) env acc =
       let (n', env') = freshName' n env
       in go ns env' (acc :< n')
-    go ((Zero, n) :: ns) env acc =
-      fatalError "Fresh Zero"
-      -- let env' = push env JUndefined
-      -- in go ns env' acc
+    go ((Zero, n) :: ns) env acc = fatalError "Zero in freshNames"
 
 -- These expressions are added to the environment rather than assigned to a name
 simpleJSExp : JSExp → Bool
@@ -242,9 +236,7 @@ termToJS env (CLetLoop args body) f =
     go off ((Many, n) :: ns) env acc =
       let (n', env') = freshName' n env
       in go off ns env' (acc :< JConst n' (getEnv off env.jsenv))
-    go off ((Zero, n) :: ns) env acc =
-      let env' = push env JUndefined
-      in go off ns env' acc
+    go off ((Zero, n) :: ns) env acc = fatalError "Zero in termToJS"
 
 termToJS env (CLetRec nm CErased u) f = termToJS (push env JUndefined) u f
 termToJS env (CLetRec nm t u) f =
@@ -255,13 +247,11 @@ termToJS env (CLetRec nm t u) f =
   in case termToJS env' t (JAssign nm') of
     (JAssign _ exp) => JSnoc (JConst nm' exp) (termToJS env' u f)
     t' => JSnoc (JLet nm' t') (termToJS env' u f)
-    -- FIXME Clean out Zero cases
-termToJS env (CConstr ix _ args qs info) f = go args qs 1 (\ args => f $ DataCon (cast ix) args)
+termToJS env (CConstr ix _ args info) f = go args 1 (\ args => f $ DataCon (cast ix) args)
   where
-    go : ∀ e. List CExp -> List Quant -> Int -> (List JSExp -> JSStmt e) -> JSStmt e
-    go (t :: ts) (Many :: qs) ix k = termToJS env t $ \ t' => go ts qs (ix + 1) $ \ args => k $ t' :: args
-    go (t :: ts) (q :: qs) ix k = go ts qs ix k
-    go _ _ ix k = k Nil
+    go : ∀ e. List CExp -> Int -> (List JSExp -> JSStmt e) -> JSStmt e
+    go (t :: ts)  ix k = termToJS env t $ \ t' => go ts (ix + 1) $ \ args => k $ t' :: args
+    go _ ix k = k Nil
 termToJS {e} env (CLoop args quants) f = runArgs (reverse env.jsenv) args quants
   where
     -- Here we drop the continuation. It _should_ be a JReturn wrapper, because of how we insert JLoop.
@@ -484,17 +474,6 @@ getEntries acc name = do
       foldlM getEntries acc used
     Just entry => pure $ updateMap name entry.def acc
 
-eraseEntries : {{Ref2 Defs St}} → M Unit
-eraseEntries = do
-  defs <- getRef Defs
-  ignore $ traverse go $ toList defs
-  where
-    go : {{Ref2 Defs St}} → (QName × Def) → M Unit
-    go (qn, Fn tm) = do
-      tm' <- erase Nil tm Nil
-      modifyRef Defs $ updateMap qn (Fn tm')
-    go _ = pure MkUnit
-
 -- given a initial function, return a dependency-ordered list of javascript source
 process : List QName → M (List Doc)
 process names = do
@@ -504,8 +483,6 @@ process names = do
   -- Maybe move this dance into liftWhere
   ref <- newIORef entries
   let foo = MkRef ref -- for the autos below
-  -- 25ms
-  -- eraseEntries
   liftWhere
   entries <- readIORef ref
   -- Now working with defs

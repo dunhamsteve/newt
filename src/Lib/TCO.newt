@@ -33,7 +33,7 @@ tailNames (CCase _ alts) = join $ map altTailNames alts
     altTailNames (CLitAlt _ exp) = tailNames exp
 tailNames (CLet _ _ t) = tailNames t
 tailNames (CLetRec _ _ t) = tailNames t
-tailNames (CConstr _ _ args _ _) = Nil
+tailNames (CConstr _ _ args _) = Nil
 tailNames (CBnd _) = Nil
 tailNames (CFun _ tm) = tailNames tm
 tailNames (CLam _ _) = Nil
@@ -52,13 +52,13 @@ rewriteTailCalls nms tm = case tm of
   CAppRef nm args qs =>
       if length' args == length' qs
       then case getTag (S Z) nm nms of
-        Just ix => CConstr ix (show nm) args qs NormalCon
-        Nothing => CConstr Z "return" (tm :: Nil) (Many :: Nil) NormalCon
-      else CConstr Z "return" (tm :: Nil) (Many :: Nil) NormalCon
+        Just ix => CConstr ix (show nm) args NormalCon
+        Nothing => CConstr Z "return" (tm :: Nil) NormalCon
+      else CConstr Z "return" (tm :: Nil) NormalCon
   CLetRec nm t u => CLetRec nm t $ rewriteTailCalls nms u
   CLet nm t u => CLet nm t $ rewriteTailCalls nms u
   CCase sc alts => CCase sc $ map rewriteAlt alts
-  tm => CConstr Z "return" (tm :: Nil) (Many :: Nil) NormalCon
+  tm => CConstr Z "return" (tm :: Nil) NormalCon
   where
       getTag : Nat → QName → List QName → Maybe Nat
       getTag t nm Nil = Nothing
@@ -111,7 +111,7 @@ doOptimize fns = do
       let arglen = length' args
       let conargs = map (\k => CBnd (arglen - k - 1)) (range 0 arglen)
       let conquant = map fst args
-      let arg = CConstr (S ix) (show qn) conargs conquant NormalCon
+      let arg = CConstr (S ix) (show qn) conargs NormalCon
       let body = CAppRef bouncer (CRef recName :: arg :: Nil) (Many :: Many :: Nil)
       pure (qn, CFun args body)
     mkWrap _ (qn, _) = error emptyFC "error in mkWrap: \{show qn} not a CFun"

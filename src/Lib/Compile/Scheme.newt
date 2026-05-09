@@ -11,7 +11,6 @@ import Lib.Compile.LiftWhere
 import Lib.Compile.LiftLambda
 import Lib.TCO
 import Lib.Ref2
-import Lib.Compile.Erasure
 import Data.String
 import Data.Int
 import Data.SortedMap
@@ -66,11 +65,9 @@ scmName qn = scmIdent $ show qn
 
 cexpToScm : SCEnv → CExp → String
 
-argsToScm : SCEnv → List CExp → List Quant → List String
-argsToScm env Nil Nil = Nil
-argsToScm env (e :: es) (Many :: qs) = cexpToScm env e :: argsToScm env es qs
-argsToScm env (e :: es) (Zero :: qs) = argsToScm env es qs
-argsToScm env _ _ = fatalError "Arg count mismatch"
+argsToScm : SCEnv → List CExp → List String
+argsToScm env Nil = Nil
+argsToScm env (e :: es) = cexpToScm env e :: argsToScm env es
 
 withVar : SCEnv → CExp → (String → String) → String
 -- don't rebind a variable
@@ -189,11 +186,11 @@ cexpToScm env (CLetRec nm t u) =
 cexpToScm env (CLetLoop _ _) = fatalError "CLetLoop in scheme codegen"
 cexpToScm env (CLoop _ _) = fatalError "CLoop in scheme codegen"
 cexpToScm env CErased = "#f"
-cexpToScm env (CConstr tag nm args quants NilCon) = "'()"
-cexpToScm env (CConstr tag nm args quants ConsCon) = case argsToScm env args quants of
+cexpToScm env (CConstr tag nm args NilCon) = "'()"
+cexpToScm env (CConstr tag nm args ConsCon) = case argsToScm env args of
   (a :: b :: Nil) => "(cons \{a} \{b})"
   _ => fatalError "Wrong number of args on a ConsCon"
-cexpToScm env (CConstr tag nm args quants info) = "(vector \{show tag} \{unwords $ argsToScm env args quants})"
+cexpToScm env (CConstr tag nm args info) = "(vector \{show tag} \{unwords $ argsToScm env args})"
 -- Should be handled by the caller
 cexpToScm env (CRaw _ _) = fatalError "Stray CRaw"
 -- TODO We still have a couple of these in Compile.CExp, for the magic Nat
@@ -220,17 +217,6 @@ getEntries acc name = do
       foldlM getEntries acc used
     Just entry => pure $ updateMap name entry.def acc
 
-eraseEntries : {{Ref2 Defs St}} → M Unit
-eraseEntries = do
-  defs <- getRef Defs
-  ignore $ traverse go $ toList defs
-  where
-    go : {{Ref2 Defs St}} → (QName × Def) → M Unit
-    go (qn, Fn tm) = do
-      tm' <- erase Nil tm Nil
-      modifyRef Defs $ updateMap qn (Fn tm')
-    go _ = pure MkUnit
-
 -- given a initial function, return a dependency-ordered list of javascript source
 process : List QName → M (List String)
 process names = do
@@ -240,7 +226,6 @@ process names = do
   -- Maybe move this dance into liftWhere
   ref <- newIORef entries
   let foo = MkRef ref -- for the autos below
-  eraseEntries
   liftWhere
   entries <- readIORef ref
   -- Now working with defs

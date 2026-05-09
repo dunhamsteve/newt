@@ -85,7 +85,7 @@ sortedNames defs names =
     getNames deep acc (CRef qn) = (deep, qn) :: acc
     getNames deep acc (CLet _ t u) = getNames deep (getNames deep acc t) u
     getNames deep acc (CLetRec _ t u) = getNames deep (getNames deep acc t) u
-    getNames deep acc (CConstr _ _ ts _ info) = foldl (getNames deep) acc ts
+    getNames deep acc (CConstr _ _ ts info) = foldl (getNames deep) acc ts
     -- if the CRaw is called, then the deps are called
     getNames deep acc (CRaw _ deps) = map (_,_ deep) deps ++ acc
     -- wrote these out so I get an error when I add a new constructor
@@ -115,7 +115,8 @@ sortedNames defs names =
 getNames : Tm -> List QName -> List QName
 getNames (Ref x nm) acc = nm :: acc
 getNames (Lam x str _ _ t) acc = getNames t acc
-getNames (App x t u q) acc = getNames u $ getNames t acc
+getNames (App x t u Many) acc = getNames u $ getNames t acc
+getNames (App x t u Zero) acc = getNames t acc
 getNames (Pi x str icit y t u) acc = getNames u $ getNames t $ QN primNS "PiType" :: acc
 getNames (Let x str t u) acc = getNames u $ getNames t acc
 getNames (LetRec x str _ t u) acc = getNames u $  getNames t acc

@@ -14,7 +14,6 @@ import Lib.Eval
 import Lib.Prettier
 import Lib.Types
 import Lib.Util
-import Lib.Compile.Erasure
 import Lib.Derive
 
 dumpEnv : Context -> M String
@@ -190,10 +189,6 @@ processDef ns fc nm clauses = do
   -- We might want to freeze the autos after this
   -- TODO look at what is not solved at this point and see if we can catch it earlier
   solveAutos
-
-  -- for effect, so we see errors in the editor
-  -- We need to keep the _unerased_ term for checking
-  -- _ <- erase Nil tm Nil
 
   debug "Add def \{nm} \{render 90 $ pprint Nil tm} : \{render 90 $ pprint Nil ty}"
   updateDef (QN ns nm) fc ty (Fn tm)
