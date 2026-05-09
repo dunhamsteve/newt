@@ -28,14 +28,17 @@ import Data.SortedMap
 -- [ ] First add env with as-is behavior (no drops, but lvl / ix dance)
 -- [ ] Then drop the non-erased args in the new way
 
--- funArgs : Tm -> (Tm × List Tm)
--- funArgs tm = go tm Nil
---   where
---     go : Tm -> List Tm -> (Tm × List Tm)
---     go (App _ t u Many) args = go t (u :: args)
---     go (App _ t u Zero) args = go t args
---     go t args = (t, args)
---
+
+-- Collect non-erased arguments
+-- should this be a SnocList?
+manyFunArgs : Tm -> (Tm × List Tm)
+manyFunArgs tm = go tm Nil
+  where
+    go : Tm -> List Tm -> (Tm × List Tm)
+    go (App _ t u Many) args = go t (u :: args)
+    go (App _ t u Zero) args = go t args
+    go t args = (t, args)
+
 
 CExp : U
 
@@ -50,7 +53,7 @@ emptyCEnv : CEnv
 emptyCEnv = MkCEnv Nil 0
 
 push : CEnv → Quant → CEnv
-push (MkCEnv cenv clvl) x = MkCEnv (Just clvl :: cenv) (clvl + 1)
+push (MkCEnv cenv clvl) Many = MkCEnv (Just clvl :: cenv) (clvl + 1)
 push (MkCEnv cenv clvl) Zero = MkCEnv (Nothing :: cenv) clvl
 
 data CAlt : U where
@@ -90,11 +93,15 @@ data CExp : U where
   CThunk : CExp → CExp
   CForce : CExp → CExp
 
+-- no idea how this works, when Show CExp is declared later.
+derive Show CAlt
+derive Show CExp
+
 getEnv : Int → CEnv → M CExp
 getEnv k (MkCEnv cenv clvl) = case getAt' k cenv of
   Nothing => fatalError "Ferret \{show k} > \{show $ length' cenv} .. \{show cenv}"
   Just (Just x) => pure $ CBnd $ lvl2ix clvl x
-  Just Nothing => fatalError "Ferret2 \{show k} Nothing .. \{show cenv}"
+  Just Nothing => fatalError "Ferret2 ix \{show k} depth \{show clvl} Nothing .. \{show cenv}"
 
 
 -- I'm counting Lam in the term for arity.  This matches what I need in
@@ -114,18 +121,22 @@ arityForName fc nm = do
     -- we really shouldn't be hitting Axiom (undefined function) in codegen
     (Just Axiom) => pure Nil
     (Just (PrimOp _)) => pure $ Many :: Many :: Nil
-    (Just (TCon arity strs)) => pure $ replicate (cast arity) Many
+    (Just (TCon arity strs)) => pure arity
     (Just (DCon _ _ arity str)) => pure arity
     (Just (Fn t)) => pure $ lamArity t
-    (Just (PrimTCon arity)) => pure $ replicate (cast arity) Many
-    (Just (PrimFn t arity used)) => pure $ replicate arity Many
+    (Just (PrimTCon arity)) => pure arity
+    (Just (PrimFn t arity used)) => pure $ arity
 
 any : ∀ a. (a → Bool) → List a → Bool
 any f Nil = False
 any f (x :: xs) = if f x then True else any f xs
 
 apply : QName -> List CExp -> List Quant -> M CExp
-apply qn args quants = pure $ CAppRef qn args quants
+apply qn args quants = case filter (/= Zero) quants of
+    Nil => case args of
+       Nil => return $ CRef qn
+       _ => return $ CAppRef qn args Nil
+    quants' => return $ CAppRef qn args quants'
 
 lookupDef : {{Ref2 Defs St}} → FC → QName → M Def
 lookupDef fc nm = do
@@ -174,13 +185,15 @@ compileTerm env t@(Ref fc nm@(QN _ tag)) = do
     _ => apply nm Nil arity
 
 compileTerm env (Meta fc k) = error fc "Compiling meta \{show k}"
-compileTerm env (Lam _ nm _ _ t) = CLam nm <$> compileTerm (push env Many) t
+compileTerm env (Lam _ nm _ Many t) = CLam nm <$> compileTerm (push env Many) t
 compileTerm env (Lam _ nm _ Zero t) = compileTerm (push env Zero)  t
-compileTerm env tm@(App _ _ _ _) = case funArgs tm of
-  (Meta _ k, args) => error (getFC tm) "Compiling an unsolved meta \{show tm}"
+-- Special funArgs is dropping erased
+compileTerm env tm@(App fc _ _ _) = case manyFunArgs tm of
+  (Meta _ k, args) => error fc "Compiling an unsolved meta \{show tm}"
   (t@(Ref fc nm), args) => do
+        -- args are already filtered
         defs <- getRef Defs
-        args' <- traverse (compileTerm' ) args
+        args' <- traverse (compileTerm env) args
         arity <- arityForName fc nm
         case lookupMap' nm defs : Maybe Def of
           Just (DCon _ SuccCon _ _) => applySucc args'
@@ -198,7 +211,7 @@ compileTerm env tm@(App _ _ _ _) = case funArgs tm of
   (t, args) => do
         debug "apply other \{render 90 $ pprint Nil t}"
         t' <- compileTerm env t
-        args' <- traverse (compileTerm') args
+        args' <- traverse (compileTerm env) args
         pure $ foldl CApp t' args'
   where
     applySucc : List CExp → M CExp
@@ -206,9 +219,9 @@ compileTerm env tm@(App _ _ _ _) = case funArgs tm of
     applySucc (t :: Nil) = pure $ CPrimOp "+" (CLit $ LInt 1) t
     applySucc _ = error (getFC tm) "overapplied Succ \{show tm}"
 
-    compileTerm' : Tm × Quant → M CExp
-    compileTerm' (tm, Zero) = pure CErased
-    compileTerm' (tm, Many) = compileTerm env tm
+    -- compileTerm' : Tm × Quant → M CExp
+    -- compileTerm' (tm, Zero) = pure CErased
+    -- compileTerm' (tm, Many) = compileTerm env tm
 
 compileTerm env (UU _) = do
   putStrLn "GOT UU!!!"
@@ -229,12 +242,19 @@ compileTerm env (Case fc t alts) = do
       case def of
         DCon ix info qs _ => do
           let env = foldl push env qs
+          let qs = filter (/= Zero) qs
+          let args = filterArgs qs args
           CConAlt ix nm info args qs <$> compileTerm env tm
         _ => error fc "\{show nm} is not a data constructor"
 
     CaseLit lit tm => CLitAlt lit <$> compileTerm env tm
   pure $ CCase t' $ fancyCons t' alts'
   where
+    filterArgs : List Quant → List String → List String
+    filterArgs (Many :: qs) (x :: xs) = x :: filterArgs qs xs
+    filterArgs (_ :: qs) (x :: xs) = filterArgs qs xs
+    filterArgs _ _ = Nil
+
     numAltP : CAlt → Bool
     numAltP (CConAlt _ _ SuccCon _ _ _) = True
     numAltP (CConAlt _ _ ZeroCon _ _ _) = True
@@ -292,9 +312,14 @@ compileTerm env (LetRec _ nm _ t u) = do
 compileTerm env (Erased _) = pure CErased
 
 compileFun : {{Ref2 Defs St}} → CEnv → Tm -> M CExp
-compileFun env tm = go env tm Lin
+compileFun env tm = do
+  debug "compileFun \{show tm}"
+  res <- go env tm Lin
+  debug "res \{show res}"
+  pure res
   where
     go : CEnv → Tm -> SnocList (Quant × String) -> M CExp
+    go env (Lam _ nm _ Zero t) acc = go (push env Zero) t acc
     go env (Lam _ nm _ quant t) acc = go (push env quant) t (acc :< (quant, nm))
     go env tm Lin = compileTerm env tm
     go env tm args = CFun (args <>> Nil) <$> compileTerm env tm
@@ -310,13 +335,16 @@ compileDCon : Nat → QName → ConInfo → List Quant → CExp
 compileDCon ix (QN _ nm) EnumCon Nil = CLit $ LInt $ cast ix
 compileDCon ix (QN _ nm) TrueCon Nil = CLit $ LBool True
 compileDCon ix (QN _ nm) FalseCon Nil = CLit $ LBool False
-compileDCon ix (QN _ nm) info Nil = CConstr ix nm Nil Nil info
+-- compileDCon ix (QN _ nm) info Nil = CConstr ix nm Nil Nil info
 compileDCon ix (QN _ nm) info arity =
   -- so we're fully applying this here, but dropping the args later?
   -- The weird thing is that lambdas need the
-  let args = mkArgs Z arity
+  let arity = filter (/= Zero) arity in
+  let args = mkArgs (S Z) arity
       alen = length' arity
-  in CFun args $ CConstr ix nm (map (\k => CBnd $ alen - k - 1) (range 0 alen)) arity info
+  in case filter (/= Zero) arity of
+    Nil => CConstr ix nm Nil Nil info
+    arity => CFun args $ CConstr ix nm (map (\k => CBnd $ alen - k - 1) (range 0 alen)) arity info
   where
     mkArgs : Nat → List Quant → List (Quant × String)
     mkArgs k (quant :: args) = (quant, "h\{show k}") :: mkArgs (S k) args
@@ -329,7 +357,9 @@ defToCExp (qn, (PrimOp _)) = (_,_ qn) <$> compilePop qn
 defToCExp (qn, DCon ix info arity _)   = pure (qn, compileDCon ix qn info arity)
 -- We're not using these are runtime at the moment, no typecase
 -- we need to sort out tag number if we do typecase
-defToCExp (qn, TCon arity conNames) = pure (qn, compileDCon Z qn NormalCon (replicate (cast arity) Many))
-defToCExp (qn, PrimTCon arity) = pure (qn, compileDCon Z qn NormalCon (replicate (cast arity) Many))
+defToCExp (qn, TCon arity conNames) = pure (qn, compileDCon Z qn NormalCon arity)
+defToCExp (qn, PrimTCon arity) = pure (qn, compileDCon Z qn NormalCon arity)
 defToCExp (qn, PrimFn src _ deps) = pure (qn, CRaw src deps)
-defToCExp (qn, Fn tm)          = (_,_ qn) <$> compileFun emptyCEnv tm
+defToCExp (qn, Fn tm)          = do
+   debug "COMPILE \{show qn}"
+   (_,_ qn) <$> compileFun emptyCEnv tm

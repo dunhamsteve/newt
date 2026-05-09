@@ -1,5 +1,8 @@
 #!/bin/sh -e
 REV=$(git rev-parse --short HEAD)
+if ! git diff-index --quiet HEAD --; then
+  REV="${REV}-dirty"
+fi
 cat >> src/Revision.newt.new <<EOF
 module Revision
 

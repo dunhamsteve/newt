@@ -1,7 +1,7 @@
 *** Process tests/Quantity.newt
 module Prelude
 module Quantity
-ERROR at tests/Quantity.newt:11:15--11:16: used erased value x$0 (FIXME FC may be wrong here)
+ERROR at tests/Quantity.newt:11:15--11:16: Erased value used in unerased context
   -- This should fail to compile
   bar : ∀ x. Nat
   bar {x} = foo x

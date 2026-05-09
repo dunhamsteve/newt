@@ -36,23 +36,27 @@ liftWhereTm name env tm@(Case fc t alts) = do
     liftWhereAlt (CaseDefault tm) = CaseDefault <$> liftWhereTm name env tm
     liftWhereAlt (CaseLit l tm) = CaseLit l <$> liftWhereTm name env tm
     liftWhereAlt (CaseCons qn args tm) = do
-      -- TODO - can we pull quantities off of these arguments?
-      -- We should switch to SnocList first, the args are backwards here
+      -- TODO add quantity to args
       top <- getTop
       let (Just (MkEntry _ name type (DCon _ _ qs str) _)) = lookup qn top | _ => fatalError "\{show qn} not dcon"
+      let args = map (const "_") qs
       CaseCons qn args <$> liftWhereTm name ((map (\ q => (q, Nothing)) $ reverse qs) ++ env) tm
--- This is where the magic happens
+-- Lift local functions to top level and mark environment
+-- TODO Instead of Nothing, put some magic in to let us thin out the LetRec
 liftWhereTm name env (LetRec fc nm ty t u) = do
-  -- let l = length env
   qn <- getName name nm
-  let qs = Many :: map fst env
-  let env' = ((Many, Just (qn, qs)) :: env)
+  -- Add `nm` to env at Zero, since it will be replaced
+  let qs = Zero :: map fst env
+  let env' = ((Zero, Just (qn, qs)) :: env)
   -- environment should subst this function (see next case)
   t' <- liftWhereTm qn env' t
   -- TODO we could have subst in this var and dropped the extra argument
-  modifyRef Defs (updateMap qn (Fn $ wrapLam qs t'))
+  let fn = (Fn $ wrapLam qs t')
+  modifyRef Defs (updateMap qn fn)
+  -- putStrLn "Lifted \{show qn} \{show fn}"
+  -- putStrLn "Was \{show t}"
 
-  -- The rest
+  -- Process the body
   u' <- liftWhereTm name env' u
   pure $ LetRec fc nm (Erased fc) (Erased fc) u'
   where
@@ -64,11 +68,12 @@ liftWhereTm name env (LetRec fc nm ty t u) = do
       let (Just _) = lookupMap qn' top | _ => pure qn'
       getName qn (ext ++ "'")
 
+    -- FIXME - this seems backwards
     wrapLam : List Quant → Tm → Tm
     wrapLam Nil tm = tm
     wrapLam (q :: qs) tm = wrapLam qs $ Lam fc "_" Explicit q tm
 
--- And where it lands
+-- Substitute call to lifted function
 liftWhereTm name env tm@(Bnd fc k) = case getAt (cast k) env of
   Just (quant, Just (qn, v)) => pure $ apply (length' env) (length' v) (Ref fc qn) v
   _ => pure tm

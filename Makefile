@@ -56,7 +56,7 @@ src/Revision.newt: .PHONY build
 	sh ./scripts/mkrevision
 
 build/newt.js: ${SRCS} src/Revision.newt
-	node bootstrap/newt.js src/Main.newt -o build/newt.js
+	node bootstrap/newt.js bs/Main.newt -o build/newt.js
 
 build/newt2.js: build/newt.js
 	node build/newt.js src/Main.newt -o build/newt2.js

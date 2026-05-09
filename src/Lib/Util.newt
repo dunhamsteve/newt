@@ -6,9 +6,9 @@ import Lib.Types
 import Data.List1
 
 -- pi arity is primitive functions
-piArity : Tm -> Nat
-piArity (Pi _ _ _ quant _ b) = S (piArity b)
-piArity _ = Z
+piArity : Tm -> List Quant
+piArity (Pi _ _ _ quant _ b) = quant :: piArity b
+piArity _ = Nil
 
 funArgs : Tm -> (Tm × List (Tm × Quant))
 funArgs tm = go tm Nil
@@ -46,4 +46,3 @@ getBaseDir fn fc modName = do
       then baseDir dirs ns
       else Left "module name \{joinBy "." modName} doesn't match path \{fn}"
     baseDir Lin _ = Left "module name \{joinBy "." modName} doesn't match path \{fn}"
-

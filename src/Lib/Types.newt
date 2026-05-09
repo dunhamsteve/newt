@@ -326,8 +326,8 @@ instance Show ConInfo where
   show ZeroCon = "[Z]"
   show EnumCon = "[E]"
 
-data Def = Axiom | TCon Int (List QName) | DCon Nat ConInfo (List Quant) QName | Fn Tm | PrimTCon Int
-         | PrimFn String Nat (List QName)
+data Def = Axiom | TCon (List Quant) (List QName) | DCon Nat ConInfo (List Quant) QName | Fn Tm | PrimTCon (List Quant)
+         | PrimFn String (List Quant) (List QName)
          | PrimOp String
 derive Show Def
 

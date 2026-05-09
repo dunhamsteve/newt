@@ -129,7 +129,7 @@ processPrimType ns fc nm ty = do
   log 1 "Ptype \{show nm} : \{show ty}"
   top <- getTop
   ty' <- checkIn (mkCtx fc) Zero (maybe (RU fc) id ty) (VU fc)
-  let arity = cast $ piArity ty'
+  let arity = piArity ty'
   setDef (QN ns nm) fc ty' (PrimTCon arity) Nil
 
 
@@ -193,7 +193,7 @@ processDef ns fc nm clauses = do
 
   -- for effect, so we see errors in the editor
   -- We need to keep the _unerased_ term for checking
-  _ <- erase Nil tm Nil
+  -- _ <- erase Nil tm Nil
 
   debug "Add def \{nm} \{render 90 $ pprint Nil tm} : \{render 90 $ pprint Nil ty}"
   updateDef (QN ns nm) fc ty (Fn tm)
@@ -516,7 +516,7 @@ processData ns fc (nameFC, nm) ty cons = do
   let cnames = map (\x => x.name) entries
 
   log 1 "setDef \{nm}  TCon \{show cnames}"
-  let arity = cast $ piArity tyty
+  let arity = piArity tyty
   updateDef (QN ns nm) fc tyty (TCon arity cnames)
   where
     makeConEntry : (Nat × Tm × String) → TopEntry

@@ -265,7 +265,6 @@ pfunc addString : String → String → String := `(x,y) => x + y`
 instance Concat String where
   _++_ = addString
 
-
 pfunc ltInt : Int → Int → Bool := `(a,b) => a < b`
 pfunc eqInt : Int → Int → Bool := `(a,b) => a == b`
 pfunc ltChar : Char → Char → Bool := `(a,b) => a < b`
@@ -273,7 +272,6 @@ pfunc eqChar : Char → Char → Bool := `(a,b) => a == b`
 pfunc ltString : String → String → Bool := `(a,b) => a < b`
 pfunc eqString : String → String → Bool := `(a,b) => a == b`
 
-pfunc jsShow : ∀ a . a → String := `(_,a) => ''+a`
 instance Eq Int where
   a == b = eqInt a b
 
@@ -284,10 +282,9 @@ instance Eq Char where
   a == b = eqChar a b
 
 ptype Array : U → U
-pfunc listToArray : ∀ a. List a → Array a := `
-(a, l) => {
+pfunc listToArray : ∀ a. List a → Array a := ` (l) => {
   let rval = []
-  while (l.tag !== 'Nil' && l.tag) {
+  while (l.tag) {
     rval.push(l.h1)
     l = l.h2
   }
@@ -295,12 +292,12 @@ pfunc listToArray : ∀ a. List a → Array a := `
 }
 `
 
-pfunc alen : ∀ a. Array a → Int := `(a,arr) => arr.length`
-pfunc aget : ∀ a. Array a → Int → a := `(a, arr, ix) => arr[ix]`
+pfunc alen : ∀ a. Array a → Int := `(arr) => arr.length`
+pfunc aget : ∀ a. Array a → Int → a := `(arr, ix) => arr[ix]`
 pfunc aempty : ∀ a. Unit → Array a := `() => []`
 
-pfunc arrayToList uses (Nil _::_) : ∀ a. Array a → List a := `(a,arr) => {
-  let rval = Prelude_Nil()
+pfunc arrayToList uses (Nil _::_) : ∀ a. Array a → List a := `(arr) => {
+  let rval = Prelude_Nil
   for (let i = arr.length - 1;i >= 0; i--) {
     rval = Prelude__$3A$3A_(arr[i], rval)
   }
@@ -313,7 +310,7 @@ pfunc p_strTail : (s : String) → String := `(s) => s[0]`
 pfunc trim : String → String := `s => s.trim()`
 pfunc split uses (Nil _::_) : String → String → List String := `(s, by) => {
   let parts = s.split(by)
-  let rval = Prelude_Nil()
+  let rval = Prelude_Nil
   parts.reverse()
   parts.forEach(p => { rval = Prelude__$3A$3A_(p, rval) })
   return rval
@@ -325,7 +322,7 @@ pfunc sindex : String → Int → Char := `(s,i) => s[i]`
 pfunc natToInt : Nat → Int := `(n) => n`
 pfunc intToNat : Int → Nat := `(n) => n>0?n:0`
 
-pfunc fastConcat uses (listToArray) : List String → String := `(xs) => Prelude_listToArray(null, xs).join('')`
+pfunc fastConcat uses (listToArray) : List String → String := `(xs) => Prelude_listToArray(xs).join('')`
 
 replicate : ∀ a. Nat → a → List a
 replicate {a} n x = go n Nil
@@ -416,7 +413,7 @@ pfunc chr : Int → Char := `(c) => String.fromCharCode(c)`
 
 pfunc unpack uses (Nil _::_) : String → List Char
   := `(s) => {
-    let acc = Prelude_Nil()
+    let acc = Prelude_Nil
     for (let i = s.length - 1; 0 <= i; i--) acc = Prelude__$3A$3A_(s[i], acc)
     return acc
 }`
@@ -446,7 +443,7 @@ lines str = splitBy str '\n'
 
 
 -- Not as useful as it used to be, we no longer have constructor names
-pfunc debugStr : ∀ a. a → String := `(_, obj) => {
+pfunc debugStr : ∀ a. a → String := `(obj) => {
  return JSON.stringify(obj)
 }`
 
@@ -598,7 +595,7 @@ elem v (x :: xs) = if v == x then True else elem v xs
 -- sum xs = foldl _+_
 
 -- TODO debugStr is not super useful any more.
-pfunc trace uses (debugStr) : ∀ a. String → a → a := `(_, msg, a) => { console.log(msg,Prelude_debugStr(_,a)); return a }`
+pfunc trace uses (debugStr) : ∀ a. String → a → a := `(msg, a) => { console.log(msg,Prelude_debugStr(a)); return a }`
 
 pfunc prim_strace : String → String → String := `(msg, a) => { console.log(msg,a); return a }`
 
@@ -637,23 +634,23 @@ instance Div Double where x / y = divDouble x y
 ptype IOArray : U → U
 
 pfunc newArray uses (MkIORes) : ∀ a. Int → a → IO (IOArray a) :=
-  `(_, n, v) => (w) => Prelude_MkIORes(Prelude_Array(n).fill(v),w)`
-pfunc arrayGet : ∀ a. IOArray a → Int → IO a := `(_, arr, ix) => w => Prelude_MkIORes(arr[ix], w)`
-pfunc arraySet uses (MkIORes MkUnit) : ∀ a. IOArray a → Int → a → IO Unit := `(_, arr, ix, v) => w => {
+  `(n, v) => (w) => Prelude_MkIORes(Prelude_Array(n).fill(v),w)`
+pfunc arrayGet : ∀ a. IOArray a → Int → IO a := `(arr, ix) => w => Prelude_MkIORes(arr[ix], w)`
+pfunc arraySet uses (MkIORes MkUnit) : ∀ a. IOArray a → Int → a → IO Unit := `(arr, ix, v) => w => {
   arr[ix] = v
   return Prelude_MkIORes(Prelude_MkUnit, w)
 }`
-pfunc arraySize uses (MkIORes) : ∀ a. IOArray a → IO Int := `(_, arr) => w => Prelude_MkIORes(arr.length, w)`
+pfunc arraySize uses (MkIORes) : ∀ a. IOArray a → IO Int := `(arr) => w => Prelude_MkIORes(arr.length, w)`
 
-pfunc ioArrayToList uses (Nil _::_ MkIORes) : ∀ a. IOArray a → IO (List a) := `(a,arr) => w => {
-  let rval = Prelude_Nil()
+pfunc ioArrayToList uses (Nil _::_ MkIORes) : ∀ a. IOArray a → IO (List a) := `(arr) => w => {
+  let rval = Prelude_Nil
   for (let i = arr.length - 1;i >= 0; i--) {
     rval = Prelude__$3A$3A_(arr[i], rval)
   }
   return Prelude_MkIORes(rval, w)
 }`
 
-pfunc listToIOArray uses (MkIORes) : ∀ a. List a → IO (Array a) := `(a,list) => w => {
+pfunc listToIOArray uses (MkIORes) : ∀ a. List a → IO (Array a) := `(list) => w => {
   let rval = []
   while (list.tag === '_::_' || list.tag === 1) {
     rval.push(list.h1)
@@ -883,7 +880,7 @@ isAlphaNum c = let o = ord c in
   96 < o && o < 123
 
 ignore : ∀ f a. {{Functor f}} → f a → f Unit
-ignore = map (const MkUnit)
+ignore fa = map (const MkUnit) fa
 
 instance ∀ a. {{Show a}} → Show (Maybe a) where
   show Nothing = "Nothing"
@@ -924,12 +921,12 @@ findIndex' {a} pred xs = go xs 0
     go Nil ix = Nothing
     go (x :: xs) ix = if pred x then Just ix else go xs (ix + 1)
 
-pfunc fatalError : ∀ a. String → a := `(_, msg) => { throw new Error(msg) }`
+pfunc fatalError : ∀ a. String → a := `(msg) => { throw new Error(msg) }`
 
 foldlM : ∀ m a e. {{Monad m}} → (a → e → m a) → a → List e → m a
 foldlM f a xs = foldl (\ ma b => ma >>= flip f b) (return a) xs
 
-pfunc unsafePerformIO : ∀ a. IO a → a := `(a, f) => f().h1`
+pfunc unsafePerformIO : ∀ a. IO a → a := `(f) => f().h1`
 
 pfunc prim_getTime uses (MkIORes): IO Int := `w => Prelude_MkIORes(+new Date(),w)`
 

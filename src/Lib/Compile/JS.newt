@@ -111,7 +111,9 @@ litToJS (LInt i) = LitInt i
 conAltEnv : JSExp -> Int -> JSEnv -> List Quant -> JSEnv
 conAltEnv sc k env Nil = env
 conAltEnv sc k env (Many :: xs) = conAltEnv sc (1 + k) (push env (Dot sc k )) xs
-conAltEnv sc k env (Zero :: xs) = conAltEnv sc k (push env JUndefined) xs
+conAltEnv sc k env (Zero :: xs) =
+  fatalError "Zaro"
+  -- conAltEnv sc k (push env JUndefined) xs
 
 
 -- given a name, find a similar one that doesn't shadow in Env
@@ -143,8 +145,9 @@ freshNames nms env = go nms env Lin
       let (n', env') = freshName' n env
       in go ns env' (acc :< n')
     go ((Zero, n) :: ns) env acc =
-      let env' = push env JUndefined
-      in go ns env' acc
+      fatalError "Fresh Zero"
+      -- let env' = push env JUndefined
+      -- in go ns env' acc
 
 -- These expressions are added to the environment rather than assigned to a name
 simpleJSExp : JSExp → Bool
@@ -252,6 +255,7 @@ termToJS env (CLetRec nm t u) f =
   in case termToJS env' t (JAssign nm') of
     (JAssign _ exp) => JSnoc (JConst nm' exp) (termToJS env' u f)
     t' => JSnoc (JLet nm' t') (termToJS env' u f)
+    -- FIXME Clean out Zero cases
 termToJS env (CConstr ix _ args qs info) f = go args qs 1 (\ args => f $ DataCon (cast ix) args)
   where
     go : ∀ e. List CExp -> List Quant -> Int -> (List JSExp -> JSStmt e) -> JSStmt e

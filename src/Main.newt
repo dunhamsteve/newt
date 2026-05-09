@@ -93,7 +93,6 @@ processFile fn = do
     | Left err => throwError err
   let (Right ((nameFC, modName), _, _)) = partialParse fn parseModHeader emptyMap toks
     | Left (err,toks) => throwError err
-
   let modns = splitBy modName '.'
   base <- getBaseDir fn nameFC modns
 
@@ -101,7 +100,7 @@ processFile fn = do
   let repo = dirFileSource base
   mod <- processModule emptyFC repo Nil modName
   top <- getTop
-
+  log 1 "will show errors"
   showErrors fn mod.modSource
   pure MkUnit
 

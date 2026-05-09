@@ -2,7 +2,7 @@ module Node
 
 import Prelude
 
-pfunc getArgs uses (arrayToList MkIORes) :  IO (List String) := `(w) => Prelude_MkIORes( Prelude_arrayToList(null, process.argv.slice(1)), w)`
+pfunc getArgs uses (arrayToList MkIORes) :  IO (List String) := `(w) => Prelude_MkIORes( Prelude_arrayToList(process.argv.slice(1)), w)`
 pfunc readFile uses (MkIORes Left Right) : (fn : String) -> IO (Either String String) := `(fn) => (w) => {
   let result
   try {
@@ -27,7 +27,7 @@ pfunc writeFile uses (MkIORes MkUnit) : String → String → IO (Either String 
 }`
 
 -- maybe System.exit or something, like the original putStrLn msg >> exitFailure
-pfunc exitFailure : ∀ a. String → a := `(_, msg) => {
+pfunc exitFailure : ∀ a. String → a := `(msg) => {
   console.log(msg);
   process.exit(1);
 }`
