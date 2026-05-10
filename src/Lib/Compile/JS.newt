@@ -38,7 +38,7 @@ data JSExp : U where
   -- Application of a closure
   ApplyCL : JSExp → JSExp → JSExp
   -- Application of a Ref, may create a closure
-  ApplyRef : String → List Quant → List JSExp → JSExp
+  ApplyRef : String → Nat → List JSExp → JSExp
   Var : String -> JSExp
   JFun : List String -> JSStmt Return -> JSExp
   JLam : String -> JSStmt Return -> JSExp
@@ -107,11 +107,9 @@ litToJS (LChar c) = LitString $ pack (c :: Nil)
 litToJS (LInt i) = LitInt i
 
 -- Stuff nm.h1, nm.h2, ... into environment for constructor match
-conAltEnv : JSExp -> Int -> JSEnv -> List Quant -> JSEnv
+conAltEnv : JSExp -> Int -> JSEnv -> List String -> JSEnv
 conAltEnv sc k env Nil = env
-conAltEnv sc k env (Many :: xs) = conAltEnv sc (1 + k) (push env (Dot sc k)) xs
-conAltEnv sc k env (Zero :: xs) = fatalError "Zaro"
-
+conAltEnv sc k env (_ :: xs) = conAltEnv sc (1 + k) (push env (Dot sc k)) xs
 
 -- given a name, find a similar one that doesn't shadow in Env
 freshName : String -> JSEnv -> String
@@ -133,15 +131,14 @@ freshName' nm env =
 
 -- get list of arg names and an environment with either references or undefined
 -- depending on quantity
-freshNames : List (Quant × String) -> JSEnv -> (List String × JSEnv)
+freshNames : List String -> JSEnv -> (List String × JSEnv)
 freshNames nms env = go nms env Lin
   where
-    go : List (Quant × String) -> JSEnv -> SnocList Name -> (List String × JSEnv)
+    go : List String -> JSEnv -> SnocList Name -> (List String × JSEnv)
     go Nil env acc = (acc <>> Nil, env)
-    go ((Many, n) :: ns) env acc =
+    go (n :: ns) env acc =
       let (n', env') = freshName' n env
       in go ns env' (acc :< n')
-    go ((Zero, n) :: ns) env acc = fatalError "Zero in freshNames"
 
 -- These expressions are added to the environment rather than assigned to a name
 simpleJSExp : JSExp → Bool
@@ -231,12 +228,11 @@ termToJS env (CLetLoop args body) f =
   let (lets, env') = go (length' args - 1) args env Lin in
   JWhile $ foldr (\a b => JSnoc a b) (termToJS env' body f) lets
   where
-    go : Int → List (Quant × String) -> JSEnv -> SnocList (JSStmt Plain) -> (List (JSStmt Plain) × JSEnv)
+    go : Int → List String -> JSEnv -> SnocList (JSStmt Plain) -> (List (JSStmt Plain) × JSEnv)
     go off Nil env acc = (acc <>> Nil, env)
-    go off ((Many, n) :: ns) env acc =
+    go off (n :: ns) env acc =
       let (n', env') = freshName' n env
       in go off ns env' (acc :< JConst n' (getEnv off env.jsenv))
-    go off ((Zero, n) :: ns) env acc = fatalError "Zero in termToJS"
 
 termToJS env (CLetRec nm CErased u) f = termToJS (push env JUndefined) u f
 termToJS env (CLetRec nm t u) f =
@@ -252,19 +248,12 @@ termToJS env (CConstr ix _ args info) f = go args 1 (\ args => f $ DataCon (cast
     go : ∀ e. List CExp -> Int -> (List JSExp -> JSStmt e) -> JSStmt e
     go (t :: ts)  ix k = termToJS env t $ \ t' => go ts (ix + 1) $ \ args => k $ t' :: args
     go _ ix k = k Nil
-termToJS {e} env (CLoop args quants) f = runArgs (reverse env.jsenv) args quants
+termToJS {e} env (CLoop args quants) f = runArgs (reverse env.jsenv) args
   where
-    -- Here we drop the continuation. It _should_ be a JReturn wrapper, because of how we insert JLoop.
-    -- But we're not statically checking that.
-    runArgs : List JSExp → List CExp → List Quant → JSStmt e
-    runArgs _ Nil Nil = JContinue
-    runArgs _ Nil _ = fatalError "too few CExp"
-    runArgs (Var x :: rest) (arg :: args) (Many :: qs) =
-      termToJS env arg $ \ arg' => JSnoc (JLoopAssign x arg') $ runArgs rest args qs
-    -- TODO check arg erased
-    runArgs (JUndefined :: rest) (arg :: args) (q :: qs) = runArgs rest args qs
-    runArgs (wat :: rest) (arg :: args) (q :: qs) = fatalError "bad env for quant \{show q}"
-    runArgs a b c = fatalError "FALLBACK \{show $ length' a} \{show $ length' b} \{show $ length' c}"
+    runArgs : List JSExp → List CExp → JSStmt e
+    runArgs (Var x :: rest) (arg :: args) =
+      termToJS env arg $ \ arg' => JSnoc (JLoopAssign x arg') $ runArgs rest args
+    runArgs _ _ = JContinue
 termToJS env (CAppRef nm args quants) f = argsToJS env args $ \ args => f $ ApplyRef (show nm) quants args
 termToJS env (CApp t arg) f = termToJS env t (\ t' => termToJS env arg (\arg' => f (ApplyCL t' arg')))
 termToJS {e} env (CCase t alts) f =
@@ -292,21 +281,21 @@ termToJS {e} env (CCase t alts) f =
     tertiary sc t f k = JIfThen sc t f
 
     termToJSAlt : JSEnv -> JSExp -> CAlt -> JAlt
-    termToJSAlt env nm (CConAlt ix name info args qs u) = JConAlt ix (termToJS (conAltEnv nm 1 env qs) u f)
+    termToJSAlt env nm (CConAlt ix name info args u) = JConAlt ix (termToJS (conAltEnv nm 1 env args) u f)
     -- intentionally reusing scrutinee name here
     termToJSAlt env nm (CDefAlt u) = JDefAlt (termToJS (env) u f)
     termToJSAlt env nm (CLitAlt lit u) = JLitAlt (litToJS lit) (termToJS env u f)
 
-    getQuants : CAlt → List Quant
-    getQuants (CDefAlt _) = Nil
-    getQuants (CLitAlt args _) = Nil
-    getQuants (CConAlt _ _ _ args qs _) = qs
+    -- getQuants : CAlt → List Quant
+    -- getQuants (CDefAlt _) = Nil
+    -- getQuants (CLitAlt args _) = Nil
+    -- getQuants (CConAlt _ _ _ args qs _) = qs
 
     maybeCaseStmt : JSEnv -> JSExp -> List CAlt -> JSStmt e
     -- deleteT23 does this...
     maybeCaseStmt env sc (CDefAlt u :: Nil) = (termToJS env u f)
     -- If there is a single alt, assume it matched
-    maybeCaseStmt env sc ((CConAlt _ _ info args qs u) :: Nil) = (termToJS (conAltEnv sc 1 env qs) u f)
+    maybeCaseStmt env sc ((CConAlt _ _ info args u) :: Nil) = (termToJS (conAltEnv sc 1 env args) u f)
     maybeCaseStmt env sc alts@(CLitAlt _ u :: Nil) = termToJS env u f
     maybeCaseStmt env sc alts@(CDefAlt u :: Nil) = termToJS env u f
     maybeCaseStmt env sc alts = case alts of
@@ -316,10 +305,10 @@ termToJS {e} env (CCase t alts) f =
               e' = termToJS env (getBody alt) f
           in if b then tertiary sc t' e' f else tertiary sc e' t' f
         -- two branch alt becomes tertiary operator
-        CConAlt ix name info args qs t :: CConAlt _ _ _ _ qs' u :: Nil =>
+        CConAlt ix name info args t :: CConAlt _ _ _ args' u :: Nil =>
           let cond = (JPrimOp "==" (Dot sc 0) (LitInt $ cast ix))
-              t' = termToJS (conAltEnv sc 1 env qs) t f
-              u' = termToJS (conAltEnv sc 1 env qs') u f
+              t' = termToJS (conAltEnv sc 1 env args) t f
+              u' = termToJS (conAltEnv sc 1 env args') u f
           in tertiary cond t' u' f
         alts@(alt@(CLitAlt _ _)  :: _) =>
           (JCase (altType alt) sc (map (termToJSAlt env sc) alts))
@@ -378,18 +367,16 @@ expToDoc (ApplyRef x qs xs) = go xs qs
     appRest Nil doc = doc
     appRest (arg :: args) doc = appRest args $ doc ++ text "(" ++ expToDoc arg ++ text ")"
 
-    appArgs : SnocList Doc → List JSExp → List Quant → Doc
-    appArgs acc Nil (q :: qs) =
+    appArgs : SnocList Doc → List JSExp → Nat → Doc
+    appArgs acc Nil (S qs) =
       let n = snoclen' acc
           nm = "eta\{show n}"
        in text "(\{nm}) =>" <+> appArgs (acc :< text nm) Nil qs
-    -- hrm, need (...)(.)(.) for eta case...
-    appArgs acc xs Nil = appRest xs $ jsIdent x ++ text "(" ++ commaSep (acc <>> []) ++ text ")"
-    appArgs acc (x :: xs) (Many :: qs) = appArgs (acc :< expToDoc x) xs qs
-    appArgs acc (x :: xs) (Zero :: qs) = appArgs acc xs qs
+    appArgs acc xs Z = appRest xs $ jsIdent x ++ text "(" ++ commaSep (acc <>> []) ++ text ")"
+    appArgs acc (x :: xs) (S qs) = appArgs (acc :< expToDoc x) xs qs
 
-    go : List JSExp → List Quant → Doc
-    go args Nil = appRest xs $ jsIdent x
+    go : List JSExp → Nat → Doc
+    go args Z = appRest xs $ jsIdent x
     go args qs = appArgs Lin args qs
 
 expToDoc (Var nm) = jsIdent nm
@@ -446,7 +433,7 @@ cexpToDoc exp (qn, ct) =
       -- use iife to turn stmts into expr
       let nm' = show qn ++ "_iife"
           doc1 = stmtToDoc $ JConst nm' $ JFun ["_"] stmt
-          doc2 = stmtToDoc $ JConst (show qn) (ApplyRef nm' [Zero] [JUndefined])
+          doc2 = stmtToDoc $ JConst (show qn) (ApplyRef nm' (S Z) [JUndefined])
        in doc1 </> doExport exp doc2
   where
     doExport : Bool → Doc → Doc
@@ -513,7 +500,7 @@ compileJavascript = do
   defs <- process todo
   case lookup mainName top of
     Just _ => -- tack on call to main function
-      let exec = stmtToDoc $ JPlain $ ApplyRef (show mainName) [Zero] [JUndefined]
+      let exec = stmtToDoc $ JPlain $ ApplyRef (show mainName) (S Z) [JUndefined]
       in pure $ reverse (exec :: defs)
     Nothing => pure $ reverse defs
   where

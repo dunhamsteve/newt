@@ -28,7 +28,7 @@ tailNames (CLetLoop _ _) = Nil
 tailNames (CCase _ alts) = join $ map altTailNames alts
   where
     altTailNames : CAlt → List QName
-    altTailNames (CConAlt _ _ _ _ _ exp) = tailNames exp
+    altTailNames (CConAlt _ _ _ _ exp) = tailNames exp
     altTailNames (CDefAlt exp) = tailNames exp
     altTailNames (CLitAlt _ exp) = tailNames exp
 tailNames (CLet _ _ t) = tailNames t
@@ -50,7 +50,7 @@ tailNames (CPrimOp _ _ _) = Nil
 rewriteTailCalls : List QName → CExp → CExp
 rewriteTailCalls nms tm = case tm of
   CAppRef nm args qs =>
-      if length' args == length' qs
+      if length args == qs
       then case getTag (S Z) nm nms of
         Just ix => CConstr ix (show nm) args NormalCon
         Nothing => CConstr Z "return" (tm :: Nil) NormalCon
@@ -65,7 +65,7 @@ rewriteTailCalls nms tm = case tm of
       getTag t nm (n :: ns) = if n == nm then Just t else getTag (S t) nm ns
 
       rewriteAlt : CAlt -> CAlt
-      rewriteAlt (CConAlt ix nm info args qs t) = CConAlt ix nm info args qs $ rewriteTailCalls nms t
+      rewriteAlt (CConAlt ix nm info args t) = CConAlt ix nm info args $ rewriteTailCalls nms t
       rewriteAlt (CDefAlt t) = CDefAlt $ rewriteTailCalls nms t
       rewriteAlt (CLitAlt lit t) = CLitAlt lit $ rewriteTailCalls nms t
 
@@ -74,7 +74,7 @@ rewriteTailCalls nms tm = case tm of
 rewriteLoop : QName → CExp → CExp
 rewriteLoop qn tm = case tm of
     (CAppRef nm args qs) =>
-      if length' args == length' qs && nm == qn
+      if length args == qs && nm == qn
         then CLoop args qs
         else tm
     (CLetRec nm t u) => CLetRec nm t $ rewriteLoop qn u
@@ -83,7 +83,7 @@ rewriteLoop qn tm = case tm of
     tm => tm
   where
     rewriteAlt : CAlt → CAlt
-    rewriteAlt (CConAlt ix nm info args qs t) = CConAlt ix nm info args qs $ rewriteLoop qn t
+    rewriteAlt (CConAlt ix nm info args t) = CConAlt ix nm info args $ rewriteLoop qn t
     rewriteAlt (CDefAlt t) = CDefAlt $ rewriteLoop qn t
     rewriteAlt (CLitAlt lit t) = CLitAlt lit $ rewriteLoop qn t
 
@@ -102,7 +102,7 @@ doOptimize fns = do
   let nms = map fst fns
   let alts = map (mkAlt nms) $ enumerate splitFuns
   recName <- mkRecName nms
-  let recfun = CFun ((Many, "arg") :: Nil) $ CCase (CBnd 0) alts
+  let recfun = CFun ("arg" :: Nil) $ CCase (CBnd 0) alts
   wrapped <- traverse (mkWrap recName) (enumerate fns)
   pure $ (recName, recfun) :: wrapped
   where
@@ -110,9 +110,9 @@ doOptimize fns = do
     mkWrap recName (ix, qn, CFun args _) = do
       let arglen = length' args
       let conargs = map (\k => CBnd (arglen - k - 1)) (range 0 arglen)
-      let conquant = map fst args
+      -- let conquant = map fst args
       let arg = CConstr (S ix) (show qn) conargs NormalCon
-      let body = CAppRef bouncer (CRef recName :: arg :: Nil) (Many :: Many :: Nil)
+      let body = CAppRef bouncer (CRef recName :: arg :: Nil) (S (S Z))
       pure (qn, CFun args body)
     mkWrap _ (qn, _) = error emptyFC "error in mkWrap: \{show qn} not a CFun"
 
@@ -120,10 +120,10 @@ doOptimize fns = do
     mkRecName Nil = error emptyFC "INTERNAL ERROR: Empty List in doOptimize"
     mkRecName (QN ns nm :: _) = pure $ QN ns "REC_\{nm}"
 
-    mkAlt : List QName → (Nat × QName × List (Quant × Name) × CExp) -> CAlt
-    mkAlt nms (ix, qn, args, tm) = CConAlt (S ix) (show qn) NormalCon (map snd args) (map fst args) (rewriteTailCalls nms tm)
+    mkAlt : List QName → (Nat × QName × List Name × CExp) -> CAlt
+    mkAlt nms (ix, qn, args, tm) = CConAlt (S ix) (show qn) NormalCon args (rewriteTailCalls nms tm)
 
-    splitFun : (QName × CExp) → M (QName × List (Quant × Name) × CExp)
+    splitFun : (QName × CExp) → M (QName × List Name × CExp)
     splitFun (qn, CFun args body) = pure (qn, args, body)
     splitFun (qn, _) = error emptyFC "TCO error: \{show qn} not a function"
 

@@ -55,11 +55,6 @@ sortedNames defs names =
           names = if deep then names else name :: names
       in MkON names done
 
-    getBody : CAlt → CExp
-    getBody (CConAlt _ _ _ _ _ t) = t
-    getBody (CLitAlt _ t) = t
-    getBody (CDefAlt t) = t
-
     -- deep if this qn is being applied to something
     getNames : (deep : Bool) → List (Bool × QName) → CExp →  List (Bool × QName)
     -- liftIO calls a lambda statically
@@ -72,7 +67,8 @@ sortedNames defs names =
     -- REVIEW - True or deep?
     getNames deep acc (CLoop args qs) = foldl (getNames True) acc args
     getNames deep acc (CAppRef nm args qs) =
-      if length' args == length' qs
+      if length args == qs
+        -- REVIEW these cases are the same?
         then case args of
           Nil => (True, nm) :: acc
           ts => foldl (getNames True) ((True, nm) :: acc) ts

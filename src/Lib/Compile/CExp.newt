@@ -57,7 +57,7 @@ push (MkCEnv cenv clvl) Many = MkCEnv (Just clvl :: cenv) (clvl + 1)
 push (MkCEnv cenv clvl) Zero = MkCEnv (Nothing :: cenv) clvl
 
 data CAlt : U where
-  CConAlt : Nat → String → ConInfo → List String → List Quant → CExp → CAlt
+  CConAlt : Nat → String → ConInfo → List String → CExp → CAlt
   -- REVIEW keep var name?
   CDefAlt : CExp -> CAlt
   -- literal
@@ -67,8 +67,10 @@ data CExp : U where
   CBnd : Int -> CExp
   -- How is CLam different from CFun with one arg?
   CLam : Name -> CExp -> CExp
-  CFun : List (Quant × Name) -> CExp -> CExp
-  CAppRef : QName -> List CExp -> List Quant -> CExp
+  CFun : List Name -> CExp -> CExp
+  -- At the moment, there may be extra args here, closure applications
+  CAppRef : QName -> List CExp -> Nat -> CExp
+  -- Only used for closure applications
   CApp : CExp -> CExp -> CExp
   CCase : CExp -> List CAlt -> CExp
   -- Only used for 0-arity top level defs (and Axiom.. probably wrong)
@@ -78,10 +80,10 @@ data CExp : U where
   CLet : Name -> CExp -> CExp -> CExp
   CLetRec : Name -> CExp -> CExp -> CExp
   -- Might be able to use a bunch of flagged lets or something
-  CLetLoop : List (Quant × Name) → CExp → CExp
+  CLetLoop : List Name → CExp → CExp
   -- This is like a CAppRef, self-call
   -- If we know it's a tail call fn, we could handle all of this in codegen...
-  CLoop : List CExp → List Quant → CExp
+  CLoop : List CExp → Nat → CExp
   CErased : CExp
   -- Data / type constructor
   CConstr : Nat → Name → List CExp → ConInfo → CExp
@@ -132,11 +134,11 @@ any f Nil = False
 any f (x :: xs) = if f x then True else any f xs
 
 apply : QName -> List CExp -> List Quant -> M CExp
-apply qn args quants = case filter (/= Zero) quants of
-    Nil => case args of
+apply qn args quants = case length $ filter (/= Zero) quants of
+    Z => case args of
        Nil => return $ CRef qn
-       _ => return $ CAppRef qn args Nil
-    quants' => return $ CAppRef qn args quants'
+       _ => return $ CAppRef qn args Z
+    arity => return $ CAppRef qn args arity
 
 lookupDef : {{Ref2 Defs St}} → FC → QName → M Def
 lookupDef fc nm = do
@@ -146,21 +148,12 @@ lookupDef fc nm = do
     Just def => pure def
 
 getBody : CAlt → CExp
-getBody (CConAlt _ _ _ _ _ t) = t
+getBody (CConAlt _ _ _ _ t) = t
 getBody (CLitAlt _ t) = t
 getBody (CDefAlt t) = t
 
 compileTerm : {{Ref2 Defs St}} → CEnv → Tm → M CExp
-
--- applyRef : {{Ref2 Defs St}} → FC → QName → List Tm → M CExp
--- applyRef fc nm args = ?
-
 compileTerm env (Bnd _ k) = getEnv k env
- -- do
- --  CBnd k' <- getEnv k env
- --    | _ => fatalError "impossible"
- --  when (k' /= k) $ putStrLn "Mismatch! \{show k} \{show k'} \{show env.clvl} \{show env.cenv} "
- --  pure $ CBnd k
 -- can't reuse CLam / CApp because of deBruijn, but backends may want to memoize anyway
 compileTerm env (Force fc t) = CForce <$> compileTerm env t
 compileTerm env (Delay fc t) = CThunk <$> compileTerm env t
@@ -218,11 +211,6 @@ compileTerm env tm@(App fc _ _ _) = case manyFunArgs tm of
     applySucc Nil = pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
     applySucc (t :: Nil) = pure $ CPrimOp "+" (CLit $ LInt 1) t
     applySucc _ = error (getFC tm) "overapplied Succ \{show tm}"
-
-    -- compileTerm' : Tm × Quant → M CExp
-    -- compileTerm' (tm, Zero) = pure CErased
-    -- compileTerm' (tm, Many) = compileTerm env tm
-
 compileTerm env (UU _) = do
   putStrLn "GOT UU!!!"
   pure $ CRef (QN "" "U")
@@ -230,7 +218,7 @@ compileTerm env (Pi _ nm icit rig t u) = do
   putStrLn "GOT Pi!!"
   t' <- compileTerm env t
   u' <- compileTerm env u
-  pure $ CAppRef (QN primNS "PiType") (t' :: CLam nm u' :: Nil) (Many :: Many :: Nil)
+  pure $ CAppRef (QN primNS "PiType") (t' :: CLam nm u' :: Nil) (S (S Z))
 compileTerm env (Case fc t alts) = do
   t' <- compileTerm env t
   alts' <- for alts $ \case
@@ -244,7 +232,7 @@ compileTerm env (Case fc t alts) = do
           let env = foldl push env qs
           let qs = filter (/= Zero) qs
           let args = filterArgs qs args
-          CConAlt ix nm info args qs <$> compileTerm env tm
+          CConAlt ix nm info args <$> compileTerm env tm
         _ => error fc "\{show nm} is not a data constructor"
 
     CaseLit lit tm => CLitAlt lit <$> compileTerm env tm
@@ -256,18 +244,18 @@ compileTerm env (Case fc t alts) = do
     filterArgs _ _ = Nil
 
     numAltP : CAlt → Bool
-    numAltP (CConAlt _ _ SuccCon _ _ _) = True
-    numAltP (CConAlt _ _ ZeroCon _ _ _) = True
+    numAltP (CConAlt _ _ SuccCon _ _) = True
+    numAltP (CConAlt _ _ ZeroCon _ _) = True
     numAltP _ = False
 
     enumAlt : CAlt → CAlt
-    enumAlt (CConAlt ix nm EnumCon args _ tm) = CLitAlt (LInt $ cast ix) tm
-    enumAlt (CConAlt ix nm FalseCon args _ tm) = CLitAlt (LBool False) tm
-    enumAlt (CConAlt ix nm TrueCon args _ tm) = CLitAlt (LBool True) tm
+    enumAlt (CConAlt ix nm EnumCon args tm) = CLitAlt (LInt $ cast ix) tm
+    enumAlt (CConAlt ix nm FalseCon args tm) = CLitAlt (LBool False) tm
+    enumAlt (CConAlt ix nm TrueCon args tm) = CLitAlt (LBool True) tm
     enumAlt alt = alt
 
     isInfo : ConInfo → CAlt → Bool
-    isInfo needle (CConAlt _ _  info _ _ _)  = needle == info
+    isInfo needle (CConAlt _ _  info _ _)  = needle == info
     isInfo _ _ = False
 
     isDef : CAlt → Bool
@@ -278,7 +266,7 @@ compileTerm env (Case fc t alts) = do
     doNumCon : CExp → List CAlt → List CAlt
     doNumCon sc alts =
       let zeroAlt = case find (isInfo ZeroCon) alts of
-            Just (CConAlt _ _ _ _ _ tm) => CLitAlt (LInt 0) tm :: Nil
+            Just (CConAlt _ _ _ _ tm) => CLitAlt (LInt 0) tm :: Nil
             Just tm => fatalError "ERROR zeroAlt mismatch \{debugStr tm}"
             _ => case find isDef alts of
                   Just (CDefAlt tm) => CLitAlt (LInt 0) tm :: Nil
@@ -286,7 +274,7 @@ compileTerm env (Case fc t alts) = do
                   _ => Nil
       in
       let succAlt = case find (isInfo SuccCon) alts of
-            Just (CConAlt _ _ _ _ _ tm) => CDefAlt (CLet "x" (CPrimOp "-" sc (CLit $ LInt 1)) tm) :: Nil
+            Just (CConAlt _ _ _ _ tm) => CDefAlt (CLet "x" (CPrimOp "-" sc (CLit $ LInt 1)) tm) :: Nil
             Just tm => fatalError "ERROR succAlt mismatch \{debugStr tm}"
             _ => case find isDef alts of
               Just alt => alt :: Nil
@@ -318,9 +306,9 @@ compileFun env tm = do
   debug "res \{show res}"
   pure res
   where
-    go : CEnv → Tm -> SnocList (Quant × String) -> M CExp
+    go : CEnv → Tm -> SnocList String -> M CExp
     go env (Lam _ nm _ Zero t) acc = go (push env Zero) t acc
-    go env (Lam _ nm _ quant t) acc = go (push env quant) t (acc :< (quant, nm))
+    go env (Lam _ nm _ quant t) acc = go (push env quant) t (acc :< nm)
     go env tm Lin = compileTerm env tm
     go env tm args = CFun (args <>> Nil) <$> compileTerm env tm
 
@@ -346,8 +334,8 @@ compileDCon ix (QN _ nm) info arity =
     Nil => CConstr ix nm Nil info
     arity => CFun args $ CConstr ix nm (map (\k => CBnd $ alen - k - 1) (range 0 alen)) info
   where
-    mkArgs : Nat → List Quant → List (Quant × String)
-    mkArgs k (quant :: args) = (quant, "h\{show k}") :: mkArgs (S k) args
+    mkArgs : Nat → List Quant → List String
+    mkArgs k (quant :: args) = "h\{show k}" :: mkArgs (S k) args
     mkArgs k Nil = Nil
 
 -- probably want to drop the Ref2 when we can
