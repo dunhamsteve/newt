@@ -156,24 +156,26 @@ getEnv ix env = case getAt' ix env of
   Just e => e
   Nothing => fatalError "Bad bounds \{show ix}"
 
+/-
 -- It would be nice to be able to declare these
-compilePrimOp : String → List CExp → Maybe CExp
-compilePrimOp "Prelude.addString" (x :: y :: Nil) = Just (CPrimOp "+" x y)
-compilePrimOp "Prelude.addInt" (x :: y :: Nil) = Just (CPrimOp "+" x y)
-compilePrimOp "Prelude.mulInt" (x :: y :: Nil) = Just (CPrimOp "*" x y)
-compilePrimOp "Prelude.subInt" (x :: y :: Nil) = Just (CPrimOp "-" x y)
-compilePrimOp "Prelude._&&_" (x :: y :: Nil) = Just (CPrimOp "&&" x y)
-compilePrimOp "Prelude._||_" (x :: y :: Nil) = Just (CPrimOp "||" x y)
+compilePrimOp : String → List CExp → Maybe JSExp
+compilePrimOp "Prelude.addString" (x :: y :: Nil) = Just (JPrimOp "+" x y)
+compilePrimOp "Prelude.addInt" (x :: y :: Nil) = Just (JPrimOp "+" x y)
+compilePrimOp "Prelude.mulInt" (x :: y :: Nil) = Just (JPrimOp "*" x y)
+compilePrimOp "Prelude.subInt" (x :: y :: Nil) = Just (JPrimOp "-" x y)
+compilePrimOp "Prelude._&&_" (x :: y :: Nil) = Just (JPrimOp "&&" x y)
+compilePrimOp "Prelude._||_" (x :: y :: Nil) = Just (JPrimOp "||" x y)
 -- Assumes Bool is in the right order!
-compilePrimOp "Prelude.jsEq" (_ :: x :: y :: Nil) = Just (CPrimOp "==" x y)
-compilePrimOp "Prelude.eqChar" (_ :: x :: y :: Nil) = Just (CPrimOp "==" x y)
-compilePrimOp "Prelude.ltChar" (_ :: x :: y :: Nil) = Just (CPrimOp "<" x y)
-compilePrimOp "Prelude.eqInt" (_ :: x :: y :: Nil) = Just (CPrimOp "==" x y)
-compilePrimOp "Prelude.ltInt" (_ :: x :: y :: Nil) = Just (CPrimOp "<" x y)
-compilePrimOp "Prelude.eqString" (_ :: x :: y :: Nil) = Just (CPrimOp "==" x y)
-compilePrimOp "Prelude.ltString" (_ :: x :: y :: Nil) = Just (CPrimOp "<" x y)
-compilePrimOp "Prelude.divInt" (x :: y :: Nil) = Just (CPrimOp "|" (CPrimOp "/" x y) (CLit $ LInt 0))
+compilePrimOp "Prelude.jsEq" (_ :: x :: y :: Nil) = Just (JPrimOp "==" x y)
+compilePrimOp "Prelude.eqChar" (_ :: x :: y :: Nil) = Just (JPrimOp "==" x y)
+compilePrimOp "Prelude.ltChar" (_ :: x :: y :: Nil) = Just (JPrimOp "<" x y)
+compilePrimOp "Prelude.eqInt" (_ :: x :: y :: Nil) = Just (JPrimOp "==" x y)
+compilePrimOp "Prelude.ltInt" (_ :: x :: y :: Nil) = Just (JPrimOp "<" x y)
+compilePrimOp "Prelude.eqString" (_ :: x :: y :: Nil) = Just (JPrimOp "==" x y)
+compilePrimOp "Prelude.ltString" (_ :: x :: y :: Nil) = Just (JPrimOp "<" x y)
+compilePrimOp "Prelude.divInt" (x :: y :: Nil) = Just (JPrimOp "|" (JPrimOp "/" x y) (CLit $ LInt 0))
 compilePrimOp _ _ = Nothing
+-/
 
 -- This is inspired by A-normalization, look into the continuation monad
 -- There is an index on JSStmt, adopted from Stefan Hoeck's code.
@@ -205,7 +207,7 @@ termToJS env (CFun nms t) f =
   in f $ JFun nms' (termToJS env' t JReturn)
 -- 0-arity
 termToJS env (CRef nm) f = f $ Var (show nm)
-termToJS env (CPrimOp op t u) f = termToJS env t $ \ t => termToJS env u $ \ u => f $ JPrimOp op t u
+-- termToJS env (CPrimOp op t u) f = termToJS env t $ \ t => termToJS env u $ \ u => f $ JPrimOp op t u
 termToJS env (CMeta k) f = f $ LitString "META \{show k}"
 termToJS env (CLit lit) f = f (litToJS lit)
 -- if it's a var, just use the original

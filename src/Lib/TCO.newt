@@ -43,7 +43,6 @@ tailNames CErased = Nil
 tailNames (CLit _) = Nil
 tailNames (CMeta _) = Nil
 tailNames (CRaw _ _) = Nil
-tailNames (CPrimOp _ _ _) = Nil
 
 -- rewrite tail calls to return an object to a trampoline
 -- takes a list of the names in the group and the function body

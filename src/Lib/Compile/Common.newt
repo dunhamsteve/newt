@@ -89,7 +89,6 @@ sortedNames defs names =
     getNames deep acc (CMeta _) = acc
     getNames deep acc (CBnd _) = acc
     getNames deep acc CErased = acc
-    getNames deep acc (CPrimOp op t u) = getNames deep (getNames deep acc t) u
 
     -- recurse on all dependencies, pushing onto acc
     go : List (Bool × QName) → OrderedNames → (Bool × QName) → OrderedNames

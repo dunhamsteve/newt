@@ -173,7 +173,7 @@ cexpToScm env (CConstr tag nm args info) = "(vector \{show tag} \{unwords $ args
 -- Should be handled by the caller
 cexpToScm env (CRaw _ _) = fatalError "Stray CRaw"
 -- TODO We still have a couple of these in Compile.CExp, for the magic Nat
-cexpToScm env (CPrimOp op a b) = "(\{op} \{cexpToScm env a} \{cexpToScm env b})"
+-- cexpToScm env (CPrimOp op a b) = "(\{op} \{cexpToScm env a} \{cexpToScm env b})"
 
 -- returns a QName -> Def of in-use entries
 -- This will be what we work on for optimization passes

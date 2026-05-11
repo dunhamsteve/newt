@@ -65,8 +65,8 @@ data CAlt : U where
 
 data CExp : U where
   CBnd : Int -> CExp
-  -- How is CLam different from CFun with one arg?
   CLam : Name -> CExp -> CExp
+  -- TODO CFun should only live at top level, maybe lift out of CExp
   CFun : List Name -> CExp -> CExp
   -- At the moment, there may be extra args here, closure applications
   CAppRef : QName -> List CExp -> Nat -> CExp
@@ -88,10 +88,8 @@ data CExp : U where
   -- Data / type constructor
   CConstr : Nat → Name → List CExp → ConInfo → CExp
   -- Raw javascript for `pfunc`
+  -- When CFun goes away, this should too  (Say data CDef = CFun .. | CRaw ..)
   CRaw : String -> List QName -> CExp
-  -- Need this for magic Nat
-  -- TODO - use for primitives too
-  CPrimOp : String → CExp → CExp -> CExp
   CThunk : CExp → CExp
   CForce : CExp → CExp
 
@@ -122,7 +120,6 @@ arityForName fc nm = do
     Nothing => error fc "Name \{show nm} not in scope"
     -- we really shouldn't be hitting Axiom (undefined function) in codegen
     (Just Axiom) => pure Nil
-    (Just (PrimOp _)) => pure $ Many :: Many :: Nil
     (Just (TCon arity strs)) => error fc "TCon \{show nm} in codegen" -- pure arity
     (Just (DCon _ _ arity str)) => pure arity
     (Just (Fn t)) => pure $ lamArity t
@@ -146,6 +143,9 @@ lookupDef fc nm = do
   case lookupMap' nm defs of
     Nothing => error fc "\{show nm} not in scope"
     Just def => pure def
+
+addOne : CExp → CExp
+addOne t = CAppRef (QN "Prelude" "addInt") [CLit (LInt 1), t] (S (S Z))
 
 getBody : CAlt → CExp
 getBody (CConAlt _ _ _ _ t) = t
@@ -173,7 +173,7 @@ compileTerm env t@(Ref fc nm@(QN _ tag)) = do
           -- TODO add a test case for unapplied constructors
           -- maybe this is just a function, a closure is overkill
           -- neither this nor the one below are hit in the newt source
-          pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
+          pure $ CLam "x" $ addOne (CBnd 0)
         _ => pure $ CRef nm
     _ => apply nm Nil arity
 
@@ -208,8 +208,8 @@ compileTerm env tm@(App fc _ _ _) = case manyFunArgs tm of
         pure $ foldl CApp t' args'
   where
     applySucc : List CExp → M CExp
-    applySucc Nil = pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
-    applySucc (t :: Nil) = pure $ CPrimOp "+" (CLit $ LInt 1) t
+    applySucc Nil = pure $ CLam "x" $ addOne (CBnd 0)
+    applySucc (t :: Nil) = pure $ addOne t
     applySucc _ = error (getFC tm) "overapplied Succ \{show tm}"
 compileTerm env (UU fc) = error fc "UU in codegen"
 compileTerm env (Pi fc nm icit rig t u) = error fc "Pi in codegen"
@@ -271,7 +271,7 @@ compileTerm env (Case fc t alts) = do
                   _ => Nil
       in
       let succAlt = case find (isInfo SuccCon) alts of
-            Just (CConAlt _ _ _ _ tm) => CDefAlt (CLet "x" (CPrimOp "-" sc (CLit $ LInt 1)) tm) :: Nil
+            Just (CConAlt _ _ _ _ tm) => CDefAlt (CLet "x" (CAppRef (QN "Prelude" "subInt") [sc, CLit (LInt 1)] (S (S Z))) tm) :: Nil
             Just tm => fatalError "ERROR succAlt mismatch \{debugStr tm}"
             _ => case find isDef alts of
               Just alt => alt :: Nil
@@ -338,7 +338,6 @@ compileDCon ix (QN _ nm) info arity =
 -- probably want to drop the Ref2 when we can
 defToCExp : {{Ref2 Defs St}} → (QName × Def) -> M (QName × CExp)
 defToCExp (qn, Axiom)      = error emptyFC "\{show qn} is Axiom" -- pure (qn, CErased)
-defToCExp (qn, (PrimOp _)) = (_,_ qn) <$> compilePop qn
 defToCExp (qn, DCon ix info arity _)   = pure (qn, compileDCon ix qn info arity)
 -- We're not using these are runtime at the moment, no typecase
 -- we need to sort out tag number if we do typecase
