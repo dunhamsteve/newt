@@ -1,0 +1,10 @@
+module NatLike
+
+import Prelude
+import Data.Fin
+
+
+main : IO Unit
+main = do
+  printLn $ the (Fin (S (S Z))) (FS FZ)
+

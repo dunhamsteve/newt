@@ -1,7 +1,7 @@
 
 ## TODO
 
-- [ ] Constraint error messages have bad FC
+- [x] Constraint error messages have bad FC
   - point to say a constructor def and not the code with the constraint
   - e.g. change a `List String` to `String` in a dcon arg
   - and wrong file, even. A problem in LSP
@@ -55,7 +55,7 @@
   - [x] FC for duplicate `data`, `record`, `class` name is wrong (points to `data`)
   - [x] FC on bad import should point to the name
   - [x] Current module overrides imports
-  - [ ] Duplicate data constructors point to `data`
+  - [ ] Duplicate data constructor errors point to `data`
   - [ ] Allow Qualified names in surface syntax
   - Don't disambiguate on type for now
 - [ ] Could we disambiguate just Data constructors on type?
@@ -92,7 +92,7 @@
 - [x] Dependent records (I guess I missed that bit)
 - [x] Arguments on records
 - [ ] Add sugar for type aliases (maybe infer arguments)
-  - Lean has this, we maybe could run infer on the RHS and call it a day? We would need a simple LHS, though.
+  - Lean has this as `abbrev`, we maybe could run infer on the RHS and call it a day? We would need a simple LHS, though.
 - [ ] see if we can get a better error if `for` is used instead of `for_` in do blocks
 - [ ] Remove erased args from primitive functions
   - But we need separate `+` functions rather than the magic `∀ a. a -> a -> a` to support other backends

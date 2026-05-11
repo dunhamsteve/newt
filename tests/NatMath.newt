@@ -1,0 +1,9 @@
+module NatMath
+
+import Prelude
+
+
+main : IO Unit
+main = do
+  printLn $ S (S Z) - S (S (S Z))
+  printLn $ S (S (S Z)) - S Z

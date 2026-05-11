@@ -413,7 +413,6 @@ processShortData ns fc lhs sigs = do
     mkDecl args acc tm = error (getFC tm) "Expected contructor application, got: \{show tm}"
 
 -- Identify Nat-like, enum-like, etc
--- TODO handle erased fields
 populateConInfo : List TopEntry → List TopEntry
 populateConInfo entries =
   let (Nothing) = traverse checkEnum entries
@@ -438,30 +437,48 @@ populateConInfo entries =
        go _ = 0
     countFields _ = 0
 
+    runtimeFields : Tm → List Tm × Tm
+    runtimeFields type = go type Lin
+      where
+        go : Tm → SnocList Tm → List Tm × Tm
+        go (Pi fc nm _ Zero a b) tele = go b tele
+        go (Pi fc nm _ Many a b) tele = go b (tele :< a)
+        go tl tele = (tele <>> Nil, tl)
+
+    splitApp : Tm → Tm × List Tm
+    splitApp tm = go tm Lin
+      where
+        go : Tm → SnocList Tm → Tm × List Tm
+        go (App _ t u Zero) tele = go t tele
+        go (App _ t u Many) tele = go t (tele :< u)
+        go tm tele = (tm, tele <>> Nil)
+
     setInfo : TopEntry → ConInfo → TopEntry
     setInfo (MkEntry fc nm dty (DCon ix _ arity hn) flags) info = MkEntry fc nm dty (DCon ix info arity hn) flags
     setInfo x _ = x
 
     checkEnum : TopEntry → Maybe TopEntry
-    checkEnum (MkEntry fc nm dty (DCon ix _ Nil hn) flags) = Just $ MkEntry fc nm dty (DCon ix EnumCon Nil hn) flags
-    checkEnum _ = Nothing
+    checkEnum entry = case countFields entry of
+       0 => Just $ setInfo entry EnumCon -- MkEntry fc nm dty (DCon ix EnumCon Nil hn) flags
+       _ => Nothing
 
     isZero : TopEntry → Bool
-    isZero (MkEntry fc nm dty (DCon _ _ Nil hn) flags) = True
-    isZero _ = False
+    isZero entry = countFields entry == 0
 
-    -- TODO - handle indexes, erased fields, etc
     isSucc : TopEntry → Bool
-    isSucc (MkEntry fc nm dty@(Pi _ _ _ _ (Ref _ a) (Ref _ b)) (DCon _ _ (Many :: Nil) hn) _) = a == b
+    isSucc entry@(MkEntry fc nm dty@(Pi _ _ _ _ _ b) (DCon _ _ _ hn) _)  = case runtimeFields dty of
+      ([a],b) => case (splitApp a, splitApp b) of
+        ((Ref _ a, _), (Ref _ b, _)) => a == b
+        (a,b) => False
+      _ => False
     isSucc _ = False
 
     -- assumes we've filtered down to two entries
     checkNat : List TopEntry → Maybe (List TopEntry)
     checkNat entries = do
-      succ <- find isSucc entries
       zero <- find isZero entries
+      succ <- find isSucc entries
       pure $ setInfo zero ZeroCon :: setInfo succ SuccCon :: Nil
-
 
     -- assumes we've filtered down to two entries
     checkCons : List TopEntry → Maybe (List TopEntry)

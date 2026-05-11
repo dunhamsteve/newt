@@ -123,7 +123,7 @@ arityForName fc nm = do
     -- we really shouldn't be hitting Axiom (undefined function) in codegen
     (Just Axiom) => pure Nil
     (Just (PrimOp _)) => pure $ Many :: Many :: Nil
-    (Just (TCon arity strs)) => pure arity
+    (Just (TCon arity strs)) => error fc "TCon \{show nm} in codegen" -- pure arity
     (Just (DCon _ _ arity str)) => pure arity
     (Just (Fn t)) => pure $ lamArity t
     (Just (PrimTCon arity)) => pure arity
@@ -161,7 +161,7 @@ compileTerm env (Delay fc t) = CThunk <$> compileTerm env t
 compileTerm env t@(Ref fc nm@(QN _ tag)) = do
   arity <- arityForName fc nm
   defs <- getRef Defs
-  case arity of
+  case filter (/= Zero) arity of
     Nil =>
       -- Translate special constructors (Enum, Bool-like, Nat-like)
       case lookupMap' nm defs : Maybe Def of
@@ -211,14 +211,11 @@ compileTerm env tm@(App fc _ _ _) = case manyFunArgs tm of
     applySucc Nil = pure $ CLam "x" $ CPrimOp "+" (CLit $ LInt 1) (CBnd 0)
     applySucc (t :: Nil) = pure $ CPrimOp "+" (CLit $ LInt 1) t
     applySucc _ = error (getFC tm) "overapplied Succ \{show tm}"
-compileTerm env (UU _) = do
-  putStrLn "GOT UU!!!"
-  pure $ CRef (QN "" "U")
-compileTerm env (Pi _ nm icit rig t u) = do
-  putStrLn "GOT Pi!!"
-  t' <- compileTerm env t
-  u' <- compileTerm env u
-  pure $ CAppRef (QN primNS "PiType") (t' :: CLam nm u' :: Nil) (S (S Z))
+compileTerm env (UU fc) = error fc "UU in codegen"
+compileTerm env (Pi fc nm icit rig t u) = error fc "Pi in codegen"
+  -- t' <- compileTerm env t
+  -- u' <- compileTerm env u
+  -- pure $ CAppRef (QN primNS "PiType") (t' :: CLam nm u' :: Nil) (S (S Z))
 compileTerm env (Case fc t alts) = do
   t' <- compileTerm env t
   alts' <- for alts $ \case
@@ -320,10 +317,10 @@ compilePop qn = do
 
 -- What are the Defs used for above? (Arity for name)
 compileDCon : Nat → QName → ConInfo → List Quant → CExp
-compileDCon ix (QN _ nm) EnumCon Nil = CLit $ LInt $ cast ix
-compileDCon ix (QN _ nm) TrueCon Nil = CLit $ LBool True
-compileDCon ix (QN _ nm) FalseCon Nil = CLit $ LBool False
--- compileDCon ix (QN _ nm) info Nil = CConstr ix nm Nil Nil info
+compileDCon ix (QN _ nm) EnumCon _ = CLit $ LInt $ cast ix
+compileDCon ix (QN _ nm) TrueCon _ = CLit $ LBool True
+compileDCon ix (QN _ nm) FalseCon _ = CLit $ LBool False
+compileDCon ix (QN _ nm) ZeroCon _ = CLit $ LInt 0
 compileDCon ix (QN _ nm) info arity =
   -- so we're fully applying this here, but dropping the args later?
   -- The weird thing is that lambdas need the

@@ -19,9 +19,9 @@ St = SortedMap QName Def
 data Ref2 : (l : U) → U → U where
   MkRef : ∀ a . {0 x : U} → IORef a → Ref2 x a
 
-getRef : ∀ io a. {{HasIO io}} → (l : U) → {{Ref2 l a}} → io a
+getRef : ∀ io a. {{HasIO io}} → (0 l : U) → {{Ref2 l a}} → io a
 getRef l {{MkRef a}} = readIORef a
 
-modifyRef : ∀ io a. {{HasIO io}} → (l : U) → {{Ref2 l a}} → (a → a) → io Unit
+modifyRef : ∀ io a. {{HasIO io}} → (0 l : U) → {{Ref2 l a}} → (a → a) → io Unit
 -- TODO inference needs liftIO here
 modifyRef l {{MkRef a}} f = liftIO $ modifyIORef a f
