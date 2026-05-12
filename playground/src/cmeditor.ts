@@ -27,6 +27,7 @@ const keywords = [
   "of",
   "data",
   "derive",
+  "alias",
   "U",
   "do",
   "ptype",

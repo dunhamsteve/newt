@@ -717,11 +717,27 @@ parseDerive = do
   name <- withFC uident
   pure $ DDerive loc className name
 
+parseAlias : Parser Decl
+parseAlias = do
+  loc <- getPos
+  keyword "alias"
+  nm <- withFC uident
+  args <- many (ident <|> ebind)
+  keyword "="
+  rhs <- typeExpr
+  pure $ DAlias loc nm (join args) rhs
+  where
+    ident : Parser Telescope
+    ident = do
+      fc <- getPos
+      nm <- token Ident
+      pure [(BI fc nm Explicit Many, RImplicit fc) ]
+
 parseDecl : Parser Decl
 parseDecl = parseMixfix <|> parsePType <|> parsePFunc
   <|> parseNorm <|> parseData <|> parseShortData
   <|> parseClass <|> parseInstance <|> parseRecord
-  <|> parseExport <|> parseDerive
+  <|> parseExport <|> parseDerive <|> parseAlias
   -- We'll put the backtracing stuff last, but there is a commit issue in parseDef
   <|> parseSig <|> parseDef
 

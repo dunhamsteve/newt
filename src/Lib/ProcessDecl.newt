@@ -593,6 +593,26 @@ processDerive ns fc (clFC, clName) (fc, name) = do
         for_ decls $ processDecl ns
     _ => error fc "derive \{clName} is not supported"
 
+processAlias : FC → FC × String → Telescope → Raw → M Unit
+processAlias fc (fc', nm) args rhs = do
+  top <- getTop
+  let ns = top.currentMod.modName
+  let ty = mkty args
+  processTypeSig ns fc [nm] ty
+  let lhs = mklhs args
+  processDef ns fc (nm) [(lhs, Just rhs)]
+  pure MkUnit
+  where
+    mklhs : Telescope → Raw
+    mklhs Nil = RVar fc' nm
+    mklhs ((BI fc name icit quant, _) :: rest) =
+      RApp fc (mklhs rest) (RVar fc name) Explicit
+
+    mkty : Telescope → Raw
+    mkty Nil = RU fc
+    mkty ((bi, ty) :: ns) = RPi (getFC bi) bi ty $ mkty ns
+
+
 processExports : String → FC → List (FC × String) → M Unit
 processExports ns fc names = do
   top <- getTop
@@ -606,6 +626,7 @@ processExports ns fc names = do
 -- currently mixfix registration is handled in the parser
 -- since we now run a decl at a time we could do it here.
 processDecl ns (PMixFix _ _ _ _)  = pure MkUnit
+processDecl ns (DAlias fc nm args rhs)  = processAlias fc nm args rhs
 processDecl ns (DDerive fc tclass name)  = processDerive ns fc tclass name
 processDecl ns (TypeSig fc names tm) = processTypeSig ns fc names tm
 processDecl ns (PType fc nm ty) = processPrimType ns fc nm ty

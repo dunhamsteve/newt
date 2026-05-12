@@ -89,6 +89,7 @@ data Decl
   | FunDef FC Name (List (Raw × Maybe Raw))
   | DCheck FC Raw Raw
   | DDerive FC (FC × String) (FC × String)
+  | DAlias FC (FC × String) Telescope Raw
   -- TODO maybe add Telescope (before `:`) and auto-add to constructors...
   | Data FC (FC × Name) Raw (Maybe $ List Decl)
   | ShortData FC Raw (List Raw)
@@ -103,6 +104,7 @@ data Decl
 
 instance HasFC Decl where
   getFC (TypeSig x strs tm) = x
+  getFC (DAlias x _ _ _) = x
   getFC (Exports x _) = x
   getFC (FunDef x str xs) = x
   getFC (DCheck x tm tm1) = x
@@ -224,6 +226,7 @@ pipeSep = folddoc (\a b => a <+/> text "|" <+> b)
 
 instance Pretty Decl where
   pretty (TypeSig _ nm ty) = spread (map text nm) <+> text ":" <+> nest 2 (pretty ty)
+  pretty (DAlias _ nm args tm) = text "alias" <+> text (snd nm) <+> spread (map prettyBind args) <+> text "=" <+> pretty tm
   pretty (DDerive _ x y) = text "derive" <+> text (snd x) <+> text (snd y)
   pretty (FunDef _ nm clauses) = stack $ map prettyPair clauses
     where

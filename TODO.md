@@ -91,7 +91,7 @@
   - One idea is to throw the checks onto some sort of TODO list and run whatever works. (I think Idris may have a heuristic where it checks arguments backwards in some cases.)
 - [x] Dependent records (I guess I missed that bit)
 - [x] Arguments on records
-- [ ] Add sugar for type aliases (maybe infer arguments)
+- [x] Add sugar for type aliases (maybe infer arguments)
   - Lean has this as `abbrev`, we maybe could run infer on the RHS and call it a day? We would need a simple LHS, though.
 - [ ] see if we can get a better error if `for` is used instead of `for_` in do blocks
 - [ ] Remove erased args from primitive functions
