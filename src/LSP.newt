@@ -188,7 +188,6 @@ getSymbols = do
       getKind (Fn _) = 12
       getKind (PrimTCon _) = 23
       getKind (PrimFn _ _ _) = 12
-      getKind (PrimOp _) = 12
 
       -- highlight where hx!
       go : List Json → List TopEntry → M (List Json)
