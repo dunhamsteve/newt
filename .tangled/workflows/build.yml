@@ -13,5 +13,7 @@ dependencies:
 steps:
   - name: "build newt"
     command: "make newt3"
+  - name: "build lsp"
+    command: "make lsp"
   - name: "test"
     command: "make test"

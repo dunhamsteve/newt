@@ -84,7 +84,5 @@ playground/src/newt.js: build/lsp.js
 	cp build/lsp.js $@
 
 newt-vscode-lsp/dist/lsp.js: newt-vscode-lsp/src/lsp.ts newt-vscode-lsp/src/newt.js
-	(cd newt-vscode-lsp && node esbuild.js)
+	(cd newt-vscode-lsp && npm i && node esbuild.js)
 	chmod +x $@
-
-

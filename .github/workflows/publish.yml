@@ -32,6 +32,9 @@ jobs:
           ./build
           vite build
           # vite build --base /newt
+      - name: build LSP
+        run: |
+          make lsp
       - name: build todomvc
         run: |
           cd todomvc
@@ -55,8 +58,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
-
-
-
-
