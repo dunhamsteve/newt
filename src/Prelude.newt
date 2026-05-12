@@ -49,7 +49,7 @@ instance Eq Nat where
 
 data Maybe a = Just a | Nothing
 
-fromMaybe : ∀ a. a → Maybe a → a
+fromMaybe : ∀ a. Lazy a → Maybe a → a
 fromMaybe a Nothing = a
 fromMaybe _ (Just a) = a
 

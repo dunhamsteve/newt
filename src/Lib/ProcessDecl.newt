@@ -459,7 +459,7 @@ populateConInfo entries =
 
     checkEnum : TopEntry → Maybe TopEntry
     checkEnum entry = case countFields entry of
-       0 => Just $ setInfo entry EnumCon -- MkEntry fc nm dty (DCon ix EnumCon Nil hn) flags
+       0 => Just $ setInfo entry EnumCon
        _ => Nothing
 
     isZero : TopEntry → Bool
