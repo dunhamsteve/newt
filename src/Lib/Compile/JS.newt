@@ -156,27 +156,6 @@ getEnv ix env = case getAt' ix env of
   Just e => e
   Nothing => fatalError "Bad bounds \{show ix}"
 
-/-
--- It would be nice to be able to declare these
-compilePrimOp : String → List CExp → Maybe JSExp
-compilePrimOp "Prelude.addString" (x :: y :: Nil) = Just (JPrimOp "+" x y)
-compilePrimOp "Prelude.addInt" (x :: y :: Nil) = Just (JPrimOp "+" x y)
-compilePrimOp "Prelude.mulInt" (x :: y :: Nil) = Just (JPrimOp "*" x y)
-compilePrimOp "Prelude.subInt" (x :: y :: Nil) = Just (JPrimOp "-" x y)
-compilePrimOp "Prelude._&&_" (x :: y :: Nil) = Just (JPrimOp "&&" x y)
-compilePrimOp "Prelude._||_" (x :: y :: Nil) = Just (JPrimOp "||" x y)
--- Assumes Bool is in the right order!
-compilePrimOp "Prelude.jsEq" (_ :: x :: y :: Nil) = Just (JPrimOp "==" x y)
-compilePrimOp "Prelude.eqChar" (_ :: x :: y :: Nil) = Just (JPrimOp "==" x y)
-compilePrimOp "Prelude.ltChar" (_ :: x :: y :: Nil) = Just (JPrimOp "<" x y)
-compilePrimOp "Prelude.eqInt" (_ :: x :: y :: Nil) = Just (JPrimOp "==" x y)
-compilePrimOp "Prelude.ltInt" (_ :: x :: y :: Nil) = Just (JPrimOp "<" x y)
-compilePrimOp "Prelude.eqString" (_ :: x :: y :: Nil) = Just (JPrimOp "==" x y)
-compilePrimOp "Prelude.ltString" (_ :: x :: y :: Nil) = Just (JPrimOp "<" x y)
-compilePrimOp "Prelude.divInt" (x :: y :: Nil) = Just (JPrimOp "|" (JPrimOp "/" x y) (CLit $ LInt 0))
-compilePrimOp _ _ = Nothing
--/
-
 -- This is inspired by A-normalization, look into the continuation monad
 -- There is an index on JSStmt, adopted from Stefan Hoeck's code.
 --
@@ -363,8 +342,31 @@ expToDoc (Raw str) = text str
 -- TODO add precedence
 expToDoc (ApplyCL x@(JLam _ _) xs) = text "(" ++ expToDoc x ++ text ")" ++ text "(" ++ nest 2 (expToDoc xs) ++ text ")"
 expToDoc (ApplyCL x xs) = expToDoc x ++ text "(" ++ nest 2 (expToDoc xs) ++ text ")"
-expToDoc (ApplyRef x qs xs) = go xs qs
+expToDoc (ApplyRef nm qs xs) =
+  if qs /= (S (S Z)) then go xs qs
+  else case xs of
+      [x,y] => case nm of
+        "Prelude.addString"  => opdoc "+" x y
+        "Prelude.addInt"  => opdoc "+" x y
+        "Prelude.mulInt"  => opdoc "*" x y
+        "Prelude.subInt"  => opdoc "-" x y
+        "Prelude._&&_"  => opdoc "&&" x y
+        "Prelude._||_"  => opdoc "||" x y
+        -- Assumes Bool is in the right order!
+        "Prelude.jsEq"  => opdoc "==" x y
+        "Prelude.eqChar"  => opdoc "==" x y
+        "Prelude.ltChar"  => opdoc "<" x y
+        "Prelude.eqInt"  => opdoc "==" x y
+        "Prelude.ltInt"  => opdoc "<" x y
+        "Prelude.eqString"  => opdoc "==" x y
+        "Prelude.ltString"  => opdoc "<" x y
+        "Prelude.divInt"  => text "(" ++ (opdoc "/" x y) ++ text "|0)"
+        _ => go xs qs
+      _ => go xs qs
   where
+    opdoc : String → JSExp → JSExp → Doc
+    opdoc op x y = text "(" ++ expToDoc x <+> text op <+> expToDoc y ++ text ")"
+
     appRest : List JSExp → Doc → Doc
     appRest Nil doc = doc
     appRest (arg :: args) doc = appRest args $ doc ++ text "(" ++ expToDoc arg ++ text ")"
@@ -374,11 +376,11 @@ expToDoc (ApplyRef x qs xs) = go xs qs
       let n = snoclen' acc
           nm = "eta\{show n}"
        in text "(\{nm}) =>" <+> appArgs (acc :< text nm) Nil qs
-    appArgs acc xs Z = appRest xs $ jsIdent x ++ text "(" ++ commaSep (acc <>> []) ++ text ")"
+    appArgs acc xs Z = appRest xs $ jsIdent nm ++ text "(" ++ commaSep (acc <>> []) ++ text ")"
     appArgs acc (x :: xs) (S qs) = appArgs (acc :< expToDoc x) xs qs
 
     go : List JSExp → Nat → Doc
-    go args Z = appRest xs $ jsIdent x
+    go args Z = appRest xs $ jsIdent nm
     go args qs = appArgs Lin args qs
 
 expToDoc (Var nm) = jsIdent nm
