@@ -232,8 +232,8 @@ ptype World
 
 data IORes a = MkIORes a World
 
-IO : U -> U
-IO a = World -> IORes a
+-- `alias` is sugar for a function that returns a type
+alias IO a = World -> IORes a
 
 instance Monad IO where
   bind ma mab = \ w => case ma w of

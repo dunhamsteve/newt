@@ -336,8 +336,7 @@ ptype World
 
 data IORes a = MkIORes a World
 
-IO : U → U
-IO a = World → IORes a
+alias IO a = World → IORes a
 
 instance Monad IO where
   bind ma mab = \ w => case ma w of

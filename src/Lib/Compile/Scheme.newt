@@ -19,8 +19,7 @@ import Data.SnocList
 import Lib.Compile.Common
 
 -- FIXME SnocList
-SCEnv : U
-SCEnv = List String
+alias SCEnv = List String
 
 getEnv : Int → SCEnv → String
 getEnv ix env = case getAt' ix env of

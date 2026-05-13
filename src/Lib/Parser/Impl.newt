@@ -9,8 +9,7 @@ import Data.List1
 import Data.SortedMap
 import Lib.Types
 
-TokenList : U
-TokenList = List BTok
+alias TokenList = List BTok
 
 -- Result of a parse
 
@@ -228,4 +227,3 @@ keyword kw = indented $ keyword' kw
 
 symbol : String -> Parser Unit
 symbol = keyword
-

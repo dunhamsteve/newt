@@ -9,8 +9,7 @@ import Data.SortedMap
 data Defs : U where
 
 -- St holds our code while we're optimizing
-St : U
-St = SortedMap QName Def
+alias St = SortedMap QName Def
 
 -- This is inspired by Idris.
 -- Mainly to get an extra state variable into M

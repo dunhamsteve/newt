@@ -183,8 +183,7 @@ record OpDef where
   rule : List String
 
 
-Operators : U
-Operators = SortedMap String OpDef
+alias Operators = SortedMap String OpDef
 
 isUpperName : String → Bool
 isUpperName nm = isUpper $ strIndex nm 0

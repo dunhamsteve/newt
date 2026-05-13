@@ -11,8 +11,7 @@ import Data.SnocList
 import Data.IORef
 import Monad.State
 
-ExpMap : U
-ExpMap = SortedMap QName CExp
+alias ExpMap = SortedMap QName CExp
 
 liftLambdaTm : QName → SnocList Name → CExp → State ExpMap CExp
 -- CBnd
@@ -74,5 +73,3 @@ liftLambdaFn _ = pure MkUnit
 liftLambda : ExpMap → M ExpMap
 liftLambda defs = do
   pure $ snd $ (traverse liftLambdaFn $ toList defs).runState defs
-
-

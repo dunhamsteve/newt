@@ -192,8 +192,7 @@ pArg = do
     <|> (\x => (Auto, fc, x)) <$> dbraces typeExpr
     <|> (\x => (Explicit, fc, x)) <$> atom
 
-AppSpine : U
-AppSpine = List (Icit × FC × Raw)
+alias AppSpine = List (Icit × FC × Raw)
 
 pratt : Operators -> Int -> String -> Raw -> AppSpine -> Parser (Raw × AppSpine)
 pratt ops prec stop left spine = do

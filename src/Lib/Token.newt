@@ -34,8 +34,7 @@ record Token where
 instance Show Token where
   show (Tok k v) = "<\{show k}:\{show v}>"
 
-BTok : U
-BTok = WithBounds Token
+alias BTok = WithBounds Token
 
 value : BTok → String
 value (MkBounded (Tok _ s) _) = s

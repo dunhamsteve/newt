@@ -8,8 +8,7 @@ import Data.SnocList
 import Data.SortedMap
 import Data.String
 
-Name : U
-Name = String
+alias Name = String
 
 data Icit = Implicit | Explicit | Auto
 derive Show Icit
@@ -181,8 +180,7 @@ Env : U
 
 -- Constatine has Icit in here too, I'm considering that as not part of core,
 -- but I suspect I'll want it later. Maybe for diagnostics or reusing data.
-VSpine : U
-VSpine = SnocList (Val × Quant)
+alias VSpine = SnocList (Val × Quant)
 
 data Val : U where
   VVar : FC -> (nm : String) -> (k : Int) -> (sp : VSpine) -> Val
@@ -366,8 +364,7 @@ record ModContext where
 emptyModCtx : String → String → ModContext
 emptyModCtx modName source = MkModCtx modName source emptyMap (MC emptyMap Nil Nil 0 NoCheck) emptyMap Nil Nil Nil
 
-HintTable : U
-HintTable = SortedMap QName (List (QName × Tm))
+alias HintTable = SortedMap QName (List (QName × Tm))
 
 
 -- DERIVE - HasFC would be an example of a user-defined derived

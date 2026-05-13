@@ -81,8 +81,7 @@ instance HasFC Raw where
 
 data Import = MkImport FC (FC × Name)
 
-Telescope : U
-Telescope = List (BindInfo × Raw)
+alias Telescope = List (BindInfo × Raw)
 
 data Decl
   = TypeSig FC (List Name) Raw

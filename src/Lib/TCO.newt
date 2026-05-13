@@ -126,8 +126,7 @@ doOptimize fns = do
     splitFun (qn, CFun args body) = pure (qn, args, body)
     splitFun (qn, _) = error emptyFC "TCO error: \{show qn} not a function"
 
-ExpMap : U
-ExpMap = SortedMap QName CExp
+alias ExpMap = SortedMap QName CExp
 
 tailCallOpt : ExpMap → M ExpMap
 tailCallOpt expMap = do

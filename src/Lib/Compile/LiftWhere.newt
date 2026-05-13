@@ -10,8 +10,8 @@ import Data.IORef
 
 -- track quantity, depth, and whether we need to replace Bnd with a top level call.
 -- We _could_ keep track of the support and elide that as well.
-LiftEnv : U
-LiftEnv = List (Quant × Maybe (QName × List Quant))
+
+alias LiftEnv = List (Quant × Maybe (QName × List Quant))
 
 liftWhereTm : {{Ref2 Defs St}} → QName → LiftEnv → Tm → M Tm
 liftWhereTm name env (Lam fc nm icit quant t) =
