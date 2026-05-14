@@ -61,8 +61,8 @@ lspFileSource = do
     let (Nothing) = lookupMap' fn st.files
         | Just src => pure (fn,src)
     let fn' = case split fn "file://" of
-        x :: fn :: _ => fn
-        _ => fn
+          x :: fn :: _ => fn
+          _ => fn
     (Right src) <- liftIO {M} $ readFile fn'
         | Left err => throwError $ E fc "error reading \{fn}: \{show err}"
     pure (fn,src)

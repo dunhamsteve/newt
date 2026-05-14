@@ -318,7 +318,6 @@ zonkApp top l env t@(Meta fc k) sp = do
       debug "quoted \{show res}"
       pure res
     _ => pure $ appSpine t sp
-  where
 
 zonkApp top l env t sp = do
   debug "zonk2 for \{show t} env \{show env}"
@@ -376,4 +375,3 @@ zonk top l env t =
   Bnd fc ix => pure $ Bnd fc ix
   Ref fc ix => pure $ Ref fc ix
   Erased fc => pure $ Erased fc
-

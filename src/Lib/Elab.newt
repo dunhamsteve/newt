@@ -294,8 +294,8 @@ updateMeta ix f = do
   let (Just me) = lookupMap' ix mc.metas | Nothing => pure MkUnit
   me <- f me
   let autos = case me of
-    Solved _ _ _ => filter (_/=_ ix) mc.autos
-    _ => mc.autos
+        Solved _ _ _ => filter (_/=_ ix) mc.autos
+        _ => mc.autos
   setMetaContext $ {metas $= updateMap ix me; autos := autos} mc
 
 -- Try to solve autos that reference the meta ix
@@ -482,7 +482,7 @@ solve env m sp t = do
         addConstraint env fc (VMeta fc m sp) t
       err => throwError (E (getFC err) "\{errorMsg err} for \{show ix} \{show sp} =?= \{show t}")
     )
-   where
+  where
      isReferenced : QName → MConstraint → Bool
      isReferenced ix (MkMc _ deps _ _ _) = elem ix deps
 
@@ -683,8 +683,8 @@ freshMeta ctx fc ty kind = do
   let qn = QN top.currentMod.modName "$m\{show mc.next}"
   let newmeta = Unsolved fc qn ctx ty kind
   let autos = case kind of
-      AutoSolve => qn :: mc.autos
-      _ => mc.autos
+        AutoSolve => qn :: mc.autos
+        _ => mc.autos
   setMetaContext $ { metas $= updateMap qn newmeta; autos := autos; next $= 1 +} mc
   if (kind == AutoSolve) then
     case ty of
@@ -1461,8 +1461,8 @@ updateRec ctx fc clauses arg ty = do
   args' <- foldlM doClause args clauses
   let tm = foldl (\ acc tm => RApp (getFC tm) acc tm Explicit) (RVar fc conname) $ map snd args'
   let tm = case arg of
-    Just arg => tm
-    Nothing => RLam fc (BI fc "$ru" Explicit Many) tm
+        Just arg => tm
+        Nothing => RLam fc (BI fc "$ru" Explicit Many) tm
   check ctx tm ty
   where
     app : FC → Raw → Raw → Raw

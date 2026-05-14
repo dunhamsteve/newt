@@ -329,9 +329,9 @@ processInstance ns instfc ty decls = do
        let nm' = "\{instname},\{nm}"
        -- we're working with a Tm, so we define directly instead of processDecl
        let (Just (FunDef fc name xs)) = find (\x => case x : Decl of
-        (FunDef y name xs) => name == nm
-        _ => False) decls
-          | _ => error instfc "no definition for \{nm}"
+              (FunDef y name xs) => name == nm
+              _ => False) decls
+                | _ => error instfc "no definition for \{nm}"
 
        -- REVIEW if we want to Hint this
        setDef (QN ns nm') fc ty' Axiom Nil
@@ -416,9 +416,9 @@ processShortData ns fc lhs sigs = do
 populateConInfo : List TopEntry → List TopEntry
 populateConInfo entries =
   let (Nothing) = traverse checkEnum entries
-    -- Boolean
-    | Just (a :: b :: Nil) => (setInfo a FalseCon :: setInfo b TrueCon :: Nil)
-    | Just entries => entries in
+      -- Boolean
+      | Just (a :: b :: Nil) => (setInfo a FalseCon :: setInfo b TrueCon :: Nil)
+      | Just entries => entries in
   case entries of
     a :: Nil => case countFields a of
       0 => setInfo a NilCon :: Nil
@@ -552,7 +552,7 @@ processRecord ns recordFC (nameFC, nm) tele cname decls = do
   let tcType = teleToPi tele (RU recordFC)
   let tail = foldl (\ acc bi => case bi : BindInfo × Raw of (BI fc nm icit _, _) => RApp fc acc (RVar fc nm) icit) (RVar nameFC nm) tele
   let dcType = teleToPi (impTele tele) $
-    foldr (\ x acc => case x : FC × String × Raw of (fc, nm, ty) =>  RPi fc (BI fc nm Explicit Many) ty acc  ) tail fields
+        foldr (\ x acc => case x : FC × String × Raw of (fc, nm, ty) =>  RPi fc (BI fc nm Explicit Many) ty acc  ) tail fields
 
   log 1 "tcon type \{render 90 $ pretty tcType}"
   log 1 "dcon type \{render 90 $ pretty dcType}"

@@ -565,8 +565,8 @@ parseImport = do
   (nameFC, ident) <- withFC uident
   (restFC,rest) <- withFC $ many $ token Projection
   let nameFC = case rest of
-    Nil => nameFC
-    (_ :: _) => nameFC + restFC
+        Nil => nameFC
+        (_ :: _) => nameFC + restFC
   let name = joinBy "" (ident :: rest)
   pure $ MkImport fc (nameFC, name)
 

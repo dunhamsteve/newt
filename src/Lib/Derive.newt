@@ -66,8 +66,8 @@ deriveEq fc name = do
 
       let left = equate (a,b)
       let right = case map equate $ zip anames bnames of
-        Nil => rvar "True"
-        (hd :: tl) => foldr (\a b => buildApp "_&&_" (a :: b :: Nil)) hd tl
+            Nil => rvar "True"
+            (hd :: tl) => foldr (\a b => buildApp "_&&_" (a :: b :: Nil)) hd tl
 
       pure (left, Just right)
 
@@ -120,10 +120,9 @@ deriveShow fc name = do
       let left = buildApp "show" $ buildApp nm anames :: Nil
       let shows = map (\ nm => RApp fc (rvar "show") nm Explicit) anames
       let right = case anames of
-        Nil => lstring nm
-        _ =>
-          let parts = makeList $ lstring ("(" ++ nm) :: shows in
-          buildApp "_++_" $ buildApp "joinBy" (lstring " " :: parts :: Nil)  :: lstring ")" :: Nil
+            Nil => lstring nm
+            _ =>
+              let parts = makeList $ lstring ("(" ++ nm) :: shows in
+              buildApp "_++_" $ buildApp "joinBy" (lstring " " :: parts :: Nil)  :: lstring ")" :: Nil
 
       pure (left, Just right)
-

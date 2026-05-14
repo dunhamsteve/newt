@@ -147,11 +147,11 @@ replHelp : M Unit
 replHelp =
   for_ commands $ \cmd => do
     let args = case cmd of
-      MkCmd _ _ ArgNone _ => ""
-      MkCmd _ _ ArgQName _ => " Lib.Types"
-      MkCmd _ _ ArgOptInt _ => " [ 1 ]"
-      MkCmd _ _ ArgIdent _ => " map"
-      MkCmd _ _ ArgString _ => " \"name\""
+          MkCmd _ _ ArgNone _ => ""
+          MkCmd _ _ ArgQName _ => " Lib.Types"
+          MkCmd _ _ ArgOptInt _ => " [ 1 ]"
+          MkCmd _ _ ArgIdent _ => " map"
+          MkCmd _ _ ArgString _ => " \"name\""
     case cmd of
       (MkCmd kw desc _ _) => putStrLn "\{kw}\{args} - \{desc}"
 
