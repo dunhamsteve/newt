@@ -9,7 +9,7 @@ import Lib.Compile.CExp
 import Lib.TopContext
 import Lib.Compile.LiftWhere
 import Lib.Compile.LiftLambda
-import Lib.TCO
+import Lib.Compile.TCO
 import Lib.Ref2
 import Data.String
 import Data.Int

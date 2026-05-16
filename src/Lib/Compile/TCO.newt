@@ -1,4 +1,4 @@
-module Lib.TCO
+module Lib.Compile.TCO
 
 import Prelude
 import Data.Graph

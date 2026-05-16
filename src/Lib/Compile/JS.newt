@@ -10,7 +10,7 @@ import Lib.Compile.Common
 import Lib.TopContext
 import Lib.Compile.LiftWhere
 import Lib.Compile.LiftLambda
-import Lib.TCO
+import Lib.Compile.TCO
 import Lib.Ref2
 import Data.String
 import Data.SnocList
@@ -242,7 +242,7 @@ termToJS {e} env (CCase t alts) f =
     (Var nm) => maybeCaseStmt env (Var nm) alts
     t' =>
       -- TODO with inlining, we hit cases where the let gets pulled forward more than once
-      -- two cases as separate args, se we need actual unique names. For now, we're calling
+      -- two cases as separate args, so we need actual unique names. For now, we're calling
       -- incr when processing App, as a stopgap, we probably need a fresh names state monad
       -- also TODO find out when the case builder pulls out sc$ for us and when we do
       -- _sc here.  It seems like nm doesn't get used in the CDefAlt case.

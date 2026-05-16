@@ -93,19 +93,16 @@ data CExp : U where
   CThunk : CExp → CExp
   CForce : CExp → CExp
 
--- no idea how this works, when Show CExp is declared later.
 derive Show CAlt
 derive Show CExp
 
 getEnv : Int → CEnv → M CExp
 getEnv k (MkCEnv cenv clvl) = case getAt' k cenv of
-  Nothing => fatalError "Ferret \{show k} > \{show $ length' cenv} .. \{show cenv}"
   Just (Just x) => pure $ CBnd $ lvl2ix clvl x
-  Just Nothing => fatalError "Ferret2 ix \{show k} depth \{show clvl} Nothing .. \{show cenv}"
+  Just Nothing => error emptyFC "debruijn index \{show k} got erased value in env \{show cenv}"
+  Nothing => error emptyFC "Bad debruijn index \{show k} len \{show $ length' cenv} env: \{show cenv}"
 
-
--- I'm counting Lam in the term for arity.  This matches what I need in
--- code gen.
+-- I'm counting Lam in the term for arity.  This matches what I need in code gen.
 lamArity : Tm -> List Quant
 lamArity (Lam _ _ _ quant t) = quant :: (lamArity t)
 lamArity _ = Nil
