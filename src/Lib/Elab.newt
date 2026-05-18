@@ -1570,6 +1570,17 @@ check ctx tm ty = do
                 pure $ Lam fc nm' icit rig sc
               else
                 error fc "Icity issue checking \{show t} at \{show ty}"
+    -- Unify unsolved metas with appropriate Pi of metas
+    (t@(RLam fc (BI _ nm icit quant) tm), tty@(VMeta _ _ _)) => do
+        debug "unify PI for \{show tty} at \{show $ getFC tty}"
+        a <- freshMeta (enterMarker ctx) fc (VU emptyFC) Normal >>= eval ctx.env
+        b <- MkClosure ctx.env <$> freshMeta (extend (enterMarker ctx) nm a quant) fc (VU emptyFC) Normal
+        unifyCatch fc ctx tty (VPi fc "_" icit quant a b)
+        let var = VVar fc nm (length' ctx.env) Lin
+        ty' <- b $$ var
+        let ctx' = extend ctx nm a quant
+        tm' <- check ctx' tm ty'
+        pure $ Lam fc nm icit quant tm'
     (t@(RLam fc (BI _ nm icit quant) tm), ty) => do
               pty <- prvalCtx ty
               -- TODO I'm hitting this with an unsolved meta
@@ -1581,7 +1592,7 @@ check ctx tm ty = do
       vty <- eval ctx.env ty'
       v' <- check ctx v vty
       vv <- eval ctx.env v'
-      -- TODO ERASE allow rig on Let (here and check -> checkIn above)
+      -- TODO allow rig on Let (here and check -> checkIn above)
       let ctx' = define ctx nm vv vty Many
       sc' <- check ctx' sc rty
       pure $ Let fc nm v' sc'
@@ -1639,8 +1650,6 @@ infer ctx (RVar fc nm) = go 0 ctx.types
           checkMarker fc ctx q
           vty <- eval Nil ty
           pure (Ref fc name, vty)
-        -- TODO check quantity, once we have it on top level defs
-
         -- Can we soften this without introducing a meta for the type
         -- a meta might be additional errors, but also could lead to narrowing of possible names...
         -- especially when we hit this for .foo

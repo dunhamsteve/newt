@@ -1,0 +1,43 @@
+module ETest1
+
+-- https://github.com/kontheocharis/erasure-impl/blob/master/examples/fib.er
+
+-- test.er
+
+id : (0 A : U) → A → A
+id = \A a => a
+
+test : U
+test = id U (U → U)
+
+-- fib.er
+
+0 Nat : U
+Nat = (0 A : U) → A → (A → A) → A
+
+zero : Nat
+zero = \A z s => z
+
+succ : Nat → Nat
+succ = \ n A z s => s (n A z s)
+
+0 rec : {0 A : U} → (0 a : A) → (A → A) → (0 n : Nat) → A
+rec = \ {A} z s n => n A z s
+
+0 add : (0 a : Nat) -> Nat -> Nat
+add = \ a n => rec a succ n
+
+0 mul : (0 n : Nat) -> Nat -> Nat
+mul = \a n => rec zero (add a) n
+
+0 one : _
+one = succ zero
+
+0 two : _
+two = succ one
+
+0 exp : (0 a : Nat) -> Nat -> Nat
+exp = \a n => rec one (mul a) n
+
+0 test2 : _
+test2 = exp two (exp two two)

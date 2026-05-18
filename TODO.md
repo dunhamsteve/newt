@@ -1,6 +1,7 @@
 
 ## TODO
 
+- [ ] Port test suite from erasure-impl
 - [x] Constraint error messages have bad FC
   - point to say a constructor def and not the code with the constraint
   - e.g. change a `List String` to `String` in a dcon arg
@@ -45,6 +46,7 @@
   - It may help avoid reverse-engineering the class when processing implementation
 - [ ] Put a copy of the `Def` on `Ref` terms
   - It may be Axiom for forward/recursive functions, but it would get us DCon and TCon info without lookup - and may save passing around the Ref2 (+lookup) during Compilation.
+  - We can do lookup for Axiom
 - [x] Restore "add missing cases" for LSP mode
 - [x] Case split for LSP mode
 - [x] Require lowercase pattern variables
@@ -436,4 +438,3 @@ Unsolved meta 355 Normal type U -> U 2 constraints
   * (m355 (%var0 (%meta 358 [1 sp])) =?= (Maybe Card)
 ```
 There is some information here, but it's obtuse.  One issue is that I'm taking an Agda-inspired approach to search (try every option and see if exactly one works with our constraints) rather than Idris (assume the determinant on an interface is injective and solve `m344 %var0` with `Maybe`).
-
