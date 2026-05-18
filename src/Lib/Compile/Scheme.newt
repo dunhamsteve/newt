@@ -183,14 +183,14 @@ getEntries acc name = do
     Nothing => do
       putStrLn "bad name \{show name}"
       pure acc
-    Just (MkEntry _ name type def@(Fn exp) _) => case lookupMap' name acc of
+    Just (MkEntry _ _ name type def@(Fn exp) _) => case lookupMap' name acc of
       Just _ => pure acc
       Nothing => do
         top <- getTop
         exp <- zonk top 0 Nil exp
         let acc = updateMap name (Fn exp) acc
         foldlM getEntries acc $ getNames exp Nil
-    Just (MkEntry _ name type def@(PrimFn _ _ used) _) =>
+    Just (MkEntry _ _ name type def@(PrimFn _ _ used) _) =>
       let acc = updateMap name def acc in
       foldlM getEntries acc used
     Just entry => pure $ updateMap name entry.def acc
@@ -241,7 +241,7 @@ compileScheme = do
   where
     getExports : List QName → List TopEntry → List QName
     getExports acc Nil = acc
-    getExports acc ((MkEntry fc name@(QN ns nm) type def eflags) :: rest) =
+    getExports acc ((MkEntry fc _ name@(QN ns nm) type def eflags) :: rest) =
       let acc = if elem Export eflags then name :: acc else acc
       in getExports acc rest
 

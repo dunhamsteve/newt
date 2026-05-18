@@ -192,7 +192,7 @@ getSymbols = do
       -- highlight where hx!
       go : List Json → List TopEntry → M (List Json)
       go acc Nil = pure $ reverse acc
-      go acc ((MkEntry fc name type def eflags) :: rest) =
+      go acc ((MkEntry fc q name type def eflags) :: rest) =
         let range = fcToRange fc in
         let kind = getKind def in
         let diag = JsonObj

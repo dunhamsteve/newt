@@ -17,7 +17,7 @@ import Data.Fin
 
 data Ty = TyInt | TyBool | TyFun Ty Ty
 
-interpTy : Ty → U
+0 interpTy : Ty → U
 interpTy TyInt = Int
 interpTy TyBool = Bool
 interpTy (TyFun x y) = interpTy x → interpTy y

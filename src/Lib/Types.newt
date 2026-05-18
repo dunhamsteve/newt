@@ -335,13 +335,14 @@ derive Eq EFlag
 record TopEntry where
   constructor MkEntry
   fc : FC
+  quant : Quant
   name : QName
   type : Tm
   def : Def
   eflags : List EFlag
 
 instance Show TopEntry where
-  show (MkEntry fc name type def flags) = "\{show name} : \{show type} := \{show def} \{show flags}"
+  show (MkEntry fc q name type def flags) = "\{show q}\{show name} : \{show type} := \{show def} \{show flags}"
 
 data EditorInfo
   = CaseSplit FC Context String Val
@@ -543,8 +544,8 @@ lookupMeta ix@(QN ns nm) = do
           return OutOfScope
         Just entry => return entry
 
-mkCtx : FC -> Context
-mkCtx fc = MkCtx 0 Nil Nil Nil fc Absent
+mkCtx : FC -> Quant -> Context
+mkCtx fc q = MkCtx 0 Nil Nil Nil fc (if q == Many then Absent else Present)
 
 -- Used by Syntax and Elab
 

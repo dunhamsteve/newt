@@ -555,7 +555,7 @@ typeExpr
 
 
 parseSig : Parser Decl
-parseSig = TypeSig <$> getPos <*> try (some (ident <|> uident <|> token Projection) <* keyword ":") <*> typeExpr
+parseSig = try (TypeSig <$> getPos <*> quantity <*> some (ident <|> uident <|> token Projection) <* keyword ":") <*> typeExpr
 
 parseImport : Parser Import
 parseImport = do

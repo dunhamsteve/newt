@@ -80,13 +80,7 @@ _<><_ : ∀ a. SnocList a → List a → SnocList a
 xs <>< Nil = xs
 xs <>< (y :: ys) = (xs :< y) <>< ys
 
--- This is now handled by the parser, and LHS becomes `f a`.
--- infixr 0 _$_
--- _$_ : ∀ a b. (a → b) → a → b
--- f $ a = f a
-
 infixr 8 _×_
-infixr 2 _,_ -- deprecated decl, it is special now
 data a × b = (a,b)
 
 fst : ∀ a b. a × b → a
@@ -130,7 +124,7 @@ sym Refl = Refl
 
 data Void : U where
 
-¬ : U → U
+0 ¬ : U → U
 ¬ x = x → Void
 
 data Dec : U → U where

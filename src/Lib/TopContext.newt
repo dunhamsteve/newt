@@ -43,7 +43,7 @@ lookupRaw raw top =
         Nothing => go nss
 
 instance Show TopContext where
-  show top = "\nContext:\n [\{ joinBy "\n" $ map (show ∘ snd) $ toList top.currentMod.modDefs}]"
+  show top = "\nContext:\n [\{ unlines $ map (show ∘ snd) $ toList top.currentMod.modDefs}]"
 
 emptyTop : TopContext
 emptyTop = MkTop emptyMap emptyMap (emptyModCtx "" "") 0 emptyMap 0
@@ -51,24 +51,24 @@ emptyTop = MkTop emptyMap emptyMap (emptyModCtx "" "") 0 emptyMap 0
 setFlag : QName → FC → EFlag → M Unit
 setFlag name fc flag = do
   top <- getTop
-  let (Just (MkEntry fc nm ty def flags)) = lookupMap' name top.currentMod.modDefs
+  let (Just (MkEntry fc q nm ty def flags)) = lookupMap' name top.currentMod.modDefs
     | Nothing => error fc "\{show name} not declared"
-  modifyTop { currentMod $= { modDefs $= (updateMap name (MkEntry fc name ty def (flag :: flags)))} }
+  modifyTop { currentMod $= { modDefs $= (updateMap name (MkEntry fc q name ty def (flag :: flags)))} }
 
-setDef : QName -> FC -> Tm -> Def → List EFlag -> M Unit
-setDef name fc ty def flags = do
+setDef : QName -> FC -> Quant -> Tm -> Def → List EFlag -> M Unit
+setDef name fc q ty def flags = do
   top <- getTop
   let (Nothing) = lookupMap' name top.currentMod.modDefs
-    | Just (MkEntry fc' nm' ty' def' _) => error fc "\{show name} is already defined at \{show fc'}"
+    | Just (MkEntry fc' q nm' ty' def' _) => error fc "\{show name} is already defined at \{show fc'}"
 
-  modifyTop {currentMod $= { modDefs $= (updateMap name (MkEntry fc name ty def flags))} }
+  modifyTop {currentMod $= { modDefs $= (updateMap name (MkEntry fc q name ty def flags))} }
 
 updateDef : QName -> FC -> Tm -> Def -> M Unit
 updateDef name fc ty def = do
   top <- getTop
-  let (Just (MkEntry fc' nm' ty' def' flags)) = lookupMap' name top.currentMod.modDefs
+  let (Just (MkEntry fc' q nm' ty' def' flags)) = lookupMap' name top.currentMod.modDefs
     | Nothing => error fc "\{show name} not declared"
-  modifyTop { currentMod $= { modDefs := updateMap name (MkEntry fc' name ty def flags) top.currentMod.modDefs } }
+  modifyTop { currentMod $= { modDefs := updateMap name (MkEntry fc' q name ty def flags) top.currentMod.modDefs } }
 
 typeName : Tm → Maybe QName
 typeName (Pi fc nm Explicit rig t u) = Nothing

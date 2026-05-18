@@ -38,7 +38,7 @@ liftWhereTm name env tm@(Case fc t alts) = do
     liftWhereAlt (CaseCons qn args tm) = do
       -- TODO add quantity to args
       top <- getTop
-      let (Just (MkEntry _ name type (DCon _ _ qs str) _)) = lookup qn top | _ => fatalError "\{show qn} not dcon"
+      let (Just (MkEntry _ _ name type (DCon _ _ qs str) _)) = lookup qn top | _ => fatalError "\{show qn} not dcon"
       let args = map (const "_") qs
       CaseCons qn args <$> liftWhereTm name ((map (\ q => (q, Nothing)) $ reverse qs) ++ env) tm
 -- Lift local functions to top level and mark environment

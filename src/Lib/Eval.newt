@@ -58,7 +58,7 @@ tryEval : Env -> Val -> M (Maybe Val)
 tryEval env (VRef fc k sp) = do
   top <- getTop
   case lookup k top of
-      Just (MkEntry _ name ty (Fn tm) _) =>
+      Just (MkEntry _ q name ty (Fn tm) _) =>
         catchError (
             do
             debug $  "app \{show name} to \{show sp}"
@@ -105,7 +105,7 @@ evalCase env sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
       debug $  "ECase \{show nm} \{show sp} \{show nms} \{show t}"
       pushArgs env (sp <>> Nil) nms
     else case lookup nm top of
-      (Just (MkEntry _ str type (DCon _ _ k str1) _)) => evalCase env sc xs
+      (Just (MkEntry _ _ str type (DCon _ _ k str1) _)) => evalCase env sc xs
       -- bail for a stuck function
       _ => pure Nothing
   where
@@ -341,7 +341,7 @@ zonkApp top l env t sp = do
     -- lookup name and return Def if flagged inline
     inlineDef : Tm → Maybe Tm
     inlineDef (Ref _ nm) = case lookup nm top of
-      Just (MkEntry _ _ ty (Fn tm) flags) => if elem Inline flags then Just tm else Nothing
+      Just (MkEntry _ _ _ ty (Fn tm) flags) => if elem Inline flags then Just tm else Nothing
       _ => Nothing
     inlineDef _ = Nothing
 

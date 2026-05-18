@@ -560,16 +560,16 @@ unify env mode t u = do
                 _ => error fc "vref mismatch"
       where
         spineMode : Maybe TopEntry → UnifyMode
-        spineMode (Just (MkEntry _ name ty (DCon _ _ _ _) _) ) = mode
-        spineMode (Just (MkEntry _ name ty (PrimTCon _) _) ) = mode
-        spineMode (Just (MkEntry _ name ty (TCon _ _) _) ) = mode
+        spineMode (Just (MkEntry _ q name ty (DCon _ _ _ _) _) ) = mode
+        spineMode (Just (MkEntry _ q name ty (PrimTCon _) _) ) = mode
+        spineMode (Just (MkEntry _ q name ty (TCon _ _) _) ) = mode
         spineMode _ = if mode == UNormal then USpine else mode
 
     unifyRef t         u@(VRef fc' k' sp') = do
       debug "expand \{show t} =?= %ref \{show k'}"
       top <- getTop
       case lookup k' top of
-        Just (MkEntry _ name ty (Fn tm) _) => do
+        Just (MkEntry _ q name ty (Fn tm) _) => do
           vtm <- eval Nil tm
           appvtm <- vappSpine vtm sp'
           unify env mode t appvtm
@@ -579,7 +579,7 @@ unify env mode t u = do
       debug "expand %ref \{show k} \{show sp} =?= \{show u}"
       top <- getTop
       case lookup k top of
-        Just (MkEntry _ name ty (Fn tm) _) => do
+        Just (MkEntry _ q name ty (Fn tm) _) => do
           vtm <- eval Nil tm
           tmsp <- vappSpine vtm sp
           unify env mode tmsp u
@@ -782,7 +782,7 @@ lookupDCon : QName -> M (QName × Int × Tm)
 lookupDCon nm = do
   top <- getTop
   case lookup nm top of
-    (Just (MkEntry _ name type (DCon _ _ k str) _)) => pure (name, length' k, type)
+    (Just (MkEntry _ q name type (DCon _ _ k str) _)) => pure (name, length' k, type)
     Just _ => error emptyFC "Internal Error: \{show nm} is not a DCon"
     Nothing => error emptyFC "Internal Error: DCon \{show nm} not found"
 
@@ -796,7 +796,7 @@ getConstructors ctx scfc (VRef fc nm _) = do
     lookupTCon str = do
       top <- getTop
       case lookup nm top of
-        (Just (MkEntry _ name type (TCon _ names) _)) => pure names
+        (Just (MkEntry _ q name type (TCon _ names) _)) => pure names
         _ => error scfc "Not a type constructor: \{show nm}"
 
 getConstructors ctx scfc tm = do
@@ -1039,7 +1039,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
               -- TODO can we check this when we make the PatCon?
               top <- getTop
               case lookup nm top of
-                  (Just (MkEntry _ name type (DCon _ _ k tcname) _)) =>
+                  (Just (MkEntry _ q name type (DCon _ _ k tcname) _)) =>
                     if (tcname /= sctynm)
                       then error fc "Constructor is a \{show tcname} expected a \{show sctynm}"
                       else pure Nothing
@@ -1067,7 +1067,7 @@ mkPat (tm, icit) = do
   top <- getTop
   case splitArgs tm Nil of
     ((RVar fc nm), b) => case lookupRaw nm top of
-                (Just (MkEntry _ name type (DCon _ _ k str) _)) => do
+                (Just (MkEntry _ _ name type (DCon _ _ k str) _)) => do
                   -- TODO check arity, also figure out why we need reverse
                   bpat <- traverse (mkPat) b
                   pure $ PatCon (getFC tm) icit name bpat Nothing
@@ -1099,9 +1099,10 @@ checkWhere : Context -> List Decl -> Raw -> Val -> M Tm
 checkWhere ctx decls body ty = do
   -- we're going to be very proscriptive here, no forward declaration
   -- need multiple defs in letrec if we want to loosen this
-  let (TypeSig sigFC (name :: Nil) rawtype :: decls) = decls
+  let (TypeSig sigFC q (name :: Nil) rawtype :: decls) = decls
     | x :: _ => error (getFC x) "expected type signature"
     | _ => check ctx body ty
+  let (Many) = q | _ => error sigFC "Zero quantity not supported in where clauses"
   funTy <- checkIn ctx Zero rawtype (VU sigFC)
   debug "where clause \{name} : \{rpprint (names ctx) funTy}"
   let (FunDef defFC name' clauses :: decls') = decls
@@ -1493,10 +1494,10 @@ updateRec ctx fc clauses arg ty = do
     getTele : Maybe Raw → Val → M (QName × List (String × Raw))
     getTele (Just arg) (VRef fc nm sp) = do
       top <- getTop
-      let (Just (MkEntry _ _ _ (TCon _ (conname :: Nil)) _)) = lookup nm top
+      let (Just (MkEntry _ _ _ _ (TCon _ (conname :: Nil)) _)) = lookup nm top
         | Just _ => error fc "\{show nm} is not a record"
         | _ => error fc "\{show nm} not in scope"
-      let (Just (MkEntry _ _ ty (DCon _ _ _ _) _)) = lookup conname top
+      let (Just (MkEntry _ _ _ ty (DCon _ _ _ _) _)) = lookup conname top
         | _ => error fc "\{show conname} not a dcon"
       pure (conname, collect arg ty)
     getTele Nothing (VPi _ _ _ _ a b) = do
@@ -1633,8 +1634,9 @@ infer ctx (RVar fc nm) = go 0 ctx.types
     go i Nil = do
       top <- getTop
       case lookupRaw nm top of
-        Just (MkEntry _ name ty def _) => do
+        Just (MkEntry _ q name ty def _) => do
           debug "lookup \{show name} as \{show def}"
+          checkMarker fc ctx q
           vty <- eval Nil ty
           pure (Ref fc name, vty)
         -- TODO check quantity, once we have it on top level defs
@@ -1685,10 +1687,10 @@ infer ctx (RApp fc t u icit) = do
   pure (App fc t u q, bappu)
 
 infer ctx (RU fc) = do
-  -- checkMarker ctx fc
+  -- checkMarker fc ctx Zero
   pure (UU fc, VU fc) -- YOLO
 infer ctx (RPi fc (BI fc nm icit quant) ty ty2) = do
-  -- checkMarker ctx fc
+  -- checkMarker fc ctx Zero
   ty' <- checkIn ctx Zero ty (VU fc)
   vty' <- eval ctx.env ty'
   ty2' <- checkIn (extend ctx nm vty' quant) Zero ty2 (VU fc)

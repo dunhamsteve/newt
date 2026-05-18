@@ -84,7 +84,7 @@ data Import = MkImport FC (FC × Name)
 alias Telescope = List (BindInfo × Raw)
 
 data Decl
-  = TypeSig FC (List Name) Raw
+  = TypeSig FC Quant (List Name) Raw
   | FunDef FC Name (List (Raw × Maybe Raw))
   | DCheck FC Raw Raw
   | DDerive FC (FC × String) (FC × String)
@@ -102,7 +102,7 @@ data Decl
 
 
 instance HasFC Decl where
-  getFC (TypeSig x strs tm) = x
+  getFC (TypeSig x _ strs tm) = x
   getFC (DAlias x _ _ _) = x
   getFC (Exports x _) = x
   getFC (FunDef x str xs) = x
@@ -224,7 +224,7 @@ pipeSep = folddoc (\a b => a <+/> text "|" <+> b)
 
 
 instance Pretty Decl where
-  pretty (TypeSig _ nm ty) = spread (map text nm) <+> text ":" <+> nest 2 (pretty ty)
+  pretty (TypeSig _ q nm ty) = text (show q) ++ spread (map text nm) <+> text ":" <+> nest 2 (pretty ty)
   pretty (DAlias _ nm args tm) = text "alias" <+> text (snd nm) <+> spread (map prettyBind args) <+> text "=" <+> pretty tm
   pretty (DDerive _ x y) = text "derive" <+> text (snd x) <+> text (snd y)
   pretty (FunDef _ nm clauses) = stack $ map prettyPair clauses
@@ -297,7 +297,7 @@ substRaw ss t = case t of
       substClause (a,b) = (substRaw ss a, map (substRaw ss) b)
 
       substDecl : Decl → Decl
-      substDecl (TypeSig fc nms ty) = TypeSig fc nms (substRaw ss ty)
+      substDecl (TypeSig fc q nms ty) = TypeSig fc q nms (substRaw ss ty)
       substDecl (FunDef fc nm clauses) = FunDef fc nm $ map substClause clauses
       substDecl d = d -- shouldn't happen
 

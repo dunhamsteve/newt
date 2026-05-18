@@ -25,7 +25,7 @@ data Desc : U where
 deriveEq : FC → String → M (List Decl)
 deriveEq fc name = do
   top <- getTop
-  let (Just (MkEntry fc qname type (TCon _ names) eflags)) = lookupRaw name top
+  let (Just (MkEntry fc q qname type (TCon _ names) eflags)) = lookupRaw name top
     | Just _ => throwError $ E fc "\{name} is not a type constructor"
     | _ => throwError $ ENotInScope fc name
   dcons <- traverse lookupDCon names
@@ -77,7 +77,7 @@ deriveEq fc name = do
 deriveShow : FC → String → M (List Decl)
 deriveShow fc name = do
   top <- getTop
-  let (Just (MkEntry fc qname type (TCon _ names) eflags)) = lookupRaw name top
+  let (Just (MkEntry fc q qname type (TCon _ names) eflags)) = lookupRaw name top
     | Just _ => throwError $ E fc "\{name} is not a type constructor"
     | _ => throwError $ ENotInScope fc name
   dcons <- traverse lookupDCon names

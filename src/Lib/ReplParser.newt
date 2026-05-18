@@ -40,7 +40,7 @@ replQN = do
 
 data ArgType = ArgNone | ArgString | ArgIdent | ArgOptInt | ArgQName
 
-argCon : ArgType → U
+0 argCon : ArgType → U
 argCon ArgNone = ReplCommand
 argCon ArgOptInt = Maybe Int → ReplCommand
 argCon ArgIdent = String → ReplCommand
