@@ -7,11 +7,14 @@ RUNOUT=${RUNOUT:="node"}
 mkdir -p tmp
 total=0
 failed=0
-for fn in tests/*.newt ; do
+tests=$(find tests -name '*.newt')
+for fn in $tests; do
   total=$((total + 1))
   echo Test $fn
   bn=$(basename $fn)
-  if [ -f ${fn}.golden ]; then
+  if [ -f ${fn}.skip ]; then
+    continue
+  elif [ -f ${fn}.golden ]; then
     $NEWT $fn -o $OUTFILE > tmp/${bn}.compile
   else
     # we've dropped support for compiling things without main for now.

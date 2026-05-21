@@ -158,10 +158,10 @@ makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
   let phead = pack head
   let fc' = MkFC uri (MkBounds nextrow 0 nextrow 0)
   let srest =
-    case splitKind of
-      EqSplit => joinBy "" $ map (\ap => phead ++ ap ++ before ++ "= ?\n") rest
-      FatArrowSplit => joinBy "" $ map (\ap => phead ++ ap ++ before ++ "=> ?\n") rest
-      MonadSplit => joinBy "" $ map (\ap => "  | \{pack head}\{ap}\{before}=> ?\n") rest
+        case splitKind of
+          EqSplit => joinBy "" $ map (\ap => phead ++ ap ++ before ++ "= ?\n") rest
+          FatArrowSplit => joinBy "" $ map (\ap => phead ++ ap ++ before ++ "=> ?\n") rest
+          MonadSplit => joinBy "" $ map (\ap => "  | \{pack head}\{ap}\{before}=> ?\n") rest
 
   putStrLn "Split \{show line} HD '\{show head}' TL '\{show tail}'"
   putStrLn srest
@@ -295,4 +295,3 @@ getActions repo modns row col = do
       Right (Just res) <- tryError $ getAction x
         | _ => go acc xs
       go (res :: acc) xs
-

@@ -1,4 +1,4 @@
-module ETest1
+module EFib
 
 -- https://github.com/kontheocharis/erasure-impl/blob/master/examples/fib.er
 
