@@ -1,5 +1,5 @@
 syn keyword newtInfix infix infixl infixr
-syn keyword newtKW data where let in case of derive module import if then else alias
+syn keyword newtKW data where let in case of derive module import if then else alias class instance
 syn match newtType "\<[A-Z][a-zA-Z0-9]*\>"
 syn region newtBlockComment start="/-" end="-/"
 syn match newtLineComment "--.*$" contains=@Spell

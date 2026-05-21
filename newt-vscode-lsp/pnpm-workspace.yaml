@@ -1,0 +1,6 @@
+allowBuilds:
+  esbuild: set this to true or false
+minimumReleaseAgeExclude:
+  - diff@8.0.3
+  - serialize-javascript@7.0.3
+  - serialize-javascript@7.0.5

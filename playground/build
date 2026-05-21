@@ -1,9 +1,9 @@
-#!/bin/bash
+#!/bin/bash -e
 mkdir -p public
 echo build lsp.js
 (cd .. && make lsp)
 echo build newt worker
-esbuild src/worker.ts --minify --bundle --format=esm --platform=browser > public/worker.js
-esbuild src/frame.ts --bundle --format=esm --platform=browser > public/frame.js
+./node_modules/.bin/esbuild src/worker.ts --minify --bundle --format=esm --platform=browser > public/worker.js
+./node_modules/.bin/esbuild src/frame.ts --bundle --format=esm --platform=browser > public/frame.js
 cp -r static/* public
 (cd samples && zip -r ../public/files.zip .)

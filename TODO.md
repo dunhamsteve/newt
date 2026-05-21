@@ -28,6 +28,7 @@
   - [ ] consider moving caselet, etc. desugaring out of the parser
 - [x] Scheme backend
 - [x] Smart encoding of lists (and cons cells?) in scheme
+- [ ] consider postponing `case` if scrutinee type is an unsolved meta
 - [ ] in batch mode, stop at first erroring module
 - [ ] maybe `let case` instead of `let (...)` (which is a little subtle)
   - Or simply put a term in there and treat as a variable iff it is lowercase and non-applied
@@ -46,7 +47,7 @@
   - It may help avoid reverse-engineering the class when processing implementation
 - [ ] Put a copy of the `Def` on `Ref` terms
   - It may be Axiom for forward/recursive functions, but it would get us DCon and TCon info without lookup - and may save passing around the Ref2 (+lookup) during Compilation.
-  - We can do lookup for Axiom
+  - We can do lookup for Axiom via helper
 - [x] Restore "add missing cases" for LSP mode
 - [x] Case split for LSP mode
 - [x] Require lowercase pattern variables

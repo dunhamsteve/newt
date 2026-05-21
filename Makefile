@@ -6,6 +6,10 @@ all: build/newt.js
 
 newt2: build/newt2.js
 
+# I occasionally want this to debug or look at codegen
+pretty: build/newt2.js
+	prettier -w build/newt2.js --ignore-path junk.js
+
 newt3: build/newt3.js
 
 test: build/newt.js
@@ -36,7 +40,7 @@ profile: .PHONY build/newt.js build/newt2.js
 	rm -f isolate*
 
 bench: .PHONY build/newt2.js build/newt.so
-	hyperfine 'node build/newt2.js src/Main.newt -o out.js'  'scheme --program build/newt.so src/Main.newt -o out.js' > build/bench.txt
+	hyperfine 'node build/newt.js src/Main.newt -o out.js' 'node build/newt2.js src/Main.newt -o out.js'  'scheme --program build/newt.so src/Main.newt -o out.js' > build/bench.txt
 	cat build/bench.txt
 
 clean:
