@@ -577,10 +577,6 @@ instance Show Pattern where
   show (PatWild _ icit) = "(PatWild " ++ show icit ++ ")"
   show (PatLit _ lit) = "(PatLit " ++ show lit ++ ")"
 
-data Constraint = PC String Pattern Val
-instance Show Constraint where
-  show (PC nm pat ty) = show (nm,pat,ty)
-
 -- Lazy because `let` would do work at the top of a `M a`
 profile : ∀ a. String → Lazy (M a) → M a
 profile desc work = do

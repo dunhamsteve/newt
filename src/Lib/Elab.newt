@@ -740,6 +740,27 @@ instance Show Bind where
 
 ---------------- Case builder
 
+data Constraint = PC String Pattern Val
+instance Show Constraint where
+  show (PC nm pat ty) = show (nm,pat,ty)
+
+-- Maybe this moves to Elab..
+record Clause where
+  constructor MkClause
+  clauseFC : FC
+  -- I'm including the type of the left, so we can check pats and get the list of possibilities
+  -- But maybe rethink what happens on the left.
+  -- It's a VVar k or possibly a pattern.
+  -- a pattern either is zipped out, dropped (non-match) or is assigned to rhs
+  -- if we can do all three then we can have a VVar here.
+  cons : List Constraint
+  pats : List Pattern
+  -- We'll need some context to typecheck this
+  -- it has names from Pats, which will need types in the env
+  expr : Maybe Raw
+
+derive Show Clause
+
 record Problem where
   constructor MkProb
   clauses : List Clause
@@ -809,7 +830,7 @@ getConstructors ctx scfc tm = do
 -- So Γ |- (a : A) -> (b : B) -> C  --> Γ, (a : A), (b : B) |- C[fresh_a/a,fresh_b/b] and "fresh_a", "fresh_b"
 extendPi : Context -> Val -> SnocList Bind -> VSpine -> M (Context × Val × List Bind × VSpine)
 extendPi ctx (VPi x str icit rig a b) nms sc = do
-    let nm = fresh str -- "pat"
+    let nm = fresh str
     let ctx' = extend ctx nm a rig
     let v = VVar emptyFC str (length' ctx.env) Lin
     tyb <- b $$ v
@@ -1313,7 +1334,7 @@ checkDups fc = go Nil
 buildTree ctx (MkProb Nil ty) = error emptyFC "no clauses"
 buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ str icit rig a b)) = do
   let l = length' ctx.env
-  let nm = fresh str -- "pat"
+  let nm = fresh str
   let ctx' = extend ctx nm a rig
   -- type of the rest
   clauses <- traverse (introClause nm icit a) prob.clauses
