@@ -36,8 +36,7 @@ out g = g.out
 op : Gate → Op
 op g = g.op
 
-Wire : U
-Wire = String × Int
+alias Wire = String × Int
 
 parseFile : String → Either String (List Wire × List Gate)
 parseFile text = do
@@ -64,8 +63,7 @@ parseFile text = do
       Right $ MkG in1 in2 op out
 
 
-State : U
-State = SortedMap String Int
+alias State = SortedMap String Int
 
 
 mkFire : List Gate → SortedMap String (List String)

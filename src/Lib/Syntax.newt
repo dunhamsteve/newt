@@ -7,7 +7,7 @@ import Data.List
 import Lib.Prettier
 import Lib.Types
 
-Raw : U
+data Raw : U
 
 -- could be a pair, but I suspect stuff will be added?
 
@@ -25,7 +25,8 @@ instance HasFC DoStmt where
   getFC (DoArrow fc _ _ _) = fc
   getFC (DoLet fc _ _) = fc
 
-Decl : U
+data Decl : U
+
 data Raw : U where
   RVar : (fc : FC) -> (nm : Name) -> Raw
   RLam : (fc : FC) -> BindInfo -> (sc : Raw) -> Raw

@@ -13,8 +13,7 @@ gridPoints text = go 0 0 (unpack text) Nil
     go row col ('\n' :: cs) points = go (row + 1) 0 cs points
     go row col (c :: cs) points = go row (col + 1) cs ((c,row,col) :: points)
 
-Grid : U
-Grid = SortedMap Point Char
+alias Grid = SortedMap Point Char
 
 getDir : Char → Maybe Point
 getDir '^' = Just (0 - 1, 0)
@@ -29,8 +28,7 @@ getGrid text = foldl update EmptyMap $ gridPoints text
     update : Grid → Char × Point → Grid
     update grid (c,pt) = updateMap pt c grid
 
-Problem : U
-Problem = Grid × List Point
+alias Problem = Grid × List Point
 
 parseFile : String → Either String Problem
 parseFile text =

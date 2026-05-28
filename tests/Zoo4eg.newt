@@ -4,7 +4,7 @@ id : {A : U} -> A -> A
 id = \x => x   -- elaborated to \{A} x. x
 
 -- implicit arg types can be omitted
-const : {A B : U} -> A -> B -> A
+const : {0 A B : U} -> A -> B -> A
 const = \x y => x
 
 -- function arguments can be grouped:
@@ -20,7 +20,7 @@ the = \_ x => x
 
 -- implicit args can be explicitly given
 -- NB kovacs left off the type (different syntax), so I put a hole in there
-argTest1 : _
+0 argTest1 : _
 argTest1 = const {U} {U} U
 
 -- I've decided not to do = in the {} for now.
@@ -28,10 +28,10 @@ argTest1 = const {U} {U} U
 
 -- again no type, this hits a lambda in infer.
 -- I think we need to create two metas and make a pi of them.
-insert2 : _
+0 insert2 : _
 insert2 = (\{A} x => the A x) U -- (\{A} x => the A x) {U} U
 
-Bool : U
+0 Bool : U
 Bool = (B : _) -> B -> B -> B
 
 true : Bool
@@ -40,7 +40,7 @@ true = \B t f => t
 false : Bool
 false = \B t f => f
 
-List : U -> U
+0 List : U -> U
 List = \A => (L : _) -> (A -> L -> L) -> L -> L
 
 nil : {A : U} -> List A
@@ -67,7 +67,7 @@ comp = \f g a => f (g a)
 -- compExample : List Bool
 -- compExample = comp (cons true) (cons false) nil
 
-Nat : U
+0 Nat : U
 Nat = (N : U) -> (N -> N) -> N -> N
 
 mul : Nat -> Nat -> Nat
@@ -79,15 +79,19 @@ ten = \N s z => (s (s (s (s (s (s (s (s (s (s z))))))))))
 hundred : _
 hundred = mul ten ten
 
+-- needed to add the 0 quantities below because we're
+-- requiring types to be erased
+
 -- Leibniz equality
-Eq : {A : U} -> A -> A -> U
-Eq = \{A} x y => (P : A -> U) -> P x -> P y
+0 Eq : {A : U} -> A -> A -> U
+Eq = \{A} x y => (0 P : A -> U) -> P x -> P y
 
 refl : {A : U} {x : A} -> Eq x x
 refl = \_ px => px
 
-sym : {A x y : _} -> Eq {A} x y -> Eq y x
+sym : {0 A x y : _} -> Eq {A} x y -> Eq y x
 sym = \p => p (\y => Eq y x) refl
 
 eqtest : Eq (mul ten ten) hundred
 eqtest = refl
+

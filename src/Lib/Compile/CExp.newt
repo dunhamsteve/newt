@@ -40,7 +40,7 @@ manyFunArgs tm = go tm Nil
     go t args = (t, args)
 
 
-CExp : U
+data CExp : U
 
 -- Used for thinning, indexed by Tm deBruijn index
 -- An entry points to a deBruijn level in the output

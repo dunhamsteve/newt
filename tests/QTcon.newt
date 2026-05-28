@@ -1,0 +1,17 @@
+module QTcon
+
+data Unit = MkUnit
+
+-- expect quantity error
+foo : U
+foo = Unit
+
+Bar : U
+
+data Bar = MkBar
+
+-- expect quantity error
+bar : U
+bar = Bar
+
+

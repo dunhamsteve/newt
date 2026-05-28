@@ -1,0 +1,15 @@
+*** Process tests/QTcon.newt
+module QTcon
+ERROR at tests/QTcon.newt:7:7--7:11: Erased value used in unerased context
+  -- expect quantity error
+  foo : U
+  foo = Unit
+        ^^^^
+
+ERROR at tests/QTcon.newt:9:1--9:4: Type constructor forward declaration at wrong quantity
+  foo = Unit
+  
+  Bar : U
+  ^^^
+
+ERROR at tests/QTcon.newt:1:1--1:1: Compile failed

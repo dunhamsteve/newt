@@ -5,8 +5,7 @@ import Node
 import Aoc
 import SortedMap
 
-Grid : U
-Grid = SortedMap Point Char
+alias Grid = SortedMap Point Char
 
 loadData : String → Grid
 loadData text = go (unpack text) 0 0 EmptyMap
@@ -30,8 +29,7 @@ instance Eq Dir where
 instance Ord Dir where
   compare a b = compare (show a) (show b)
 
-Done : U
-Done = SortedMap (Point × Dir) Unit
+alias Done = SortedMap (Point × Dir) Unit
 
 turn : Dir → Dir
 turn North = East

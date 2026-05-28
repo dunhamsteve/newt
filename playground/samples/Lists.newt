@@ -52,7 +52,7 @@ trans : ∀ A. {0 a b c : A} -> a ≡ b -> b ≡ c -> a ≡ c
 trans Refl x = x
 
 -- This lets us replace a with b inside an expression if a ≡ b
-replace : ∀ A a b. (P : A -> U) -> a ≡ b -> P a -> P b
+replace : ∀ A a b. (0 P : A -> U) -> a ≡ b -> P a -> P b
 replace p Refl x = x
 
 -- if a ≡ b then f a ≡ f b

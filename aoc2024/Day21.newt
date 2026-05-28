@@ -29,8 +29,7 @@ move (r, c) East   = (r, c + 1)
 move (r, c) South  = (r + 1, c)
 move (r, c) West   = (r, c - 1)
 
-Costs : U
-Costs = SortedMap (Point × Point) Int
+alias Costs = SortedMap (Point × Point) Int
 
 -- linked list of keypads
 record Keypad where

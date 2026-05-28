@@ -17,9 +17,7 @@ indexOf? {a} z xs = go Z z xs
     go ix z (x :: xs) =
       if z == x then Just ix else go (S ix) z xs
 
--- TODO move to Aoc library
-Point : U
-Point = Int × Int
+alias Point = Int × Int
 
 instance Add Point where
   (a,b) + (c,d) = (a + c, b + d)

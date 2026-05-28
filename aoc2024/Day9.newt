@@ -5,8 +5,7 @@ import Node
 import Aoc
 import SortedMap
 
-File : U
-File = Int × Int × Int
+alias File = Int × Int × Int
 
 parse : String -> List File
 parse cs = go 0 (unpack $ trim cs) Nil
@@ -37,11 +36,9 @@ min : Int → Int → Int
 min a b = if a < b then a else b
 
 -- I really do want records...
-Node : U
-Node = Int × Int × File
+alias Node = Int × Int × File
 
-FileSystem : U
-FileSystem = SortedMap Int Node
+alias FileSystem = SortedMap Int Node
 
 mkfs : List File → FileSystem
 mkfs = foldl go EmptyMap

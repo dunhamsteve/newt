@@ -28,8 +28,7 @@ record Model where
   filter : FilterState
   edit : EditState
 
-ElCon : U
-ElCon = List (Attr Msg) → List (VNode Msg) → VNode Msg
+alias ElCon = List (Attr Msg) → List (VNode Msg) → VNode Msg
 
 -- Attributes
 

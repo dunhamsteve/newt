@@ -6,8 +6,7 @@ import Aoc
 import Data.SortedMap
 import Monad.State
 
-Graph : U
-Graph = SortedMap String (List String)
+alias Graph = SortedMap String (List String)
 
 part1 : Graph →  Int
 part1 g = fst $ (count "you").runState emptyMap

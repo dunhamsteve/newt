@@ -4,8 +4,7 @@ import Prelude
 import Node
 import Aoc
 
-Range : U
-Range = Int × Int
+alias Range = Int × Int
 
 record Problem where
   constructor MkP

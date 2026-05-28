@@ -5,8 +5,7 @@ import Node
 import Aoc
 import SortedMap
 
-Ant : U
-Ant = Char × Int × Int
+alias Ant = Char × Int × Int
 
 -- This should be a utility...
 parse : String → List Ant

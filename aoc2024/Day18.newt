@@ -33,8 +33,7 @@ move (r, c) East   = (r, c + 1)
 move (r, c) South  = (r + 1, c)
 move (r, c) West   = (r, c - 1)
 
-Visited : U
-Visited = SortedMap Point Int
+alias Visited = SortedMap Point Int
 
 minPath : SortedMap Point Char → Int → Int
 minPath st size = go EmptyMap ((0,0,0):: Nil) Lin

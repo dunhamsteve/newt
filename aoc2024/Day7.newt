@@ -4,8 +4,7 @@ import Prelude
 import Node
 import Aoc
 
-Prob : U
-Prob = Int × List Int
+alias Prob = Int × List Int
 
 cases : Int → Int → List Int → Bool
 cases goal acc Nil = goal == acc

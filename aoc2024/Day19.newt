@@ -4,8 +4,7 @@ import Prelude
 import Node
 import Aoc
 
-Rules : U
-Rules = List (List Char)
+alias Rules = List (List Char)
 
 data Problem : U where
   MkP : Rules → Rules → Problem
@@ -15,8 +14,7 @@ parseFile text =
   let (a :: b :: Nil) = split (trim text) "\n\n" | xs => Left $ (show $ length xs) ++ " parts"
   in Right (MkP (map unpack $ split a ", ") (map unpack $ lines b))
 
-State : U
-State = List (Int × List Char)
+alias State = List (Int × List Char)
 
 matches : Rules -> List Char -> Int
 matches rules text = go (map (_,_ 1) rules) text

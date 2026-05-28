@@ -17,8 +17,7 @@ gridPoints text = go 0 0 (unpack text) Nil
     go row col (c :: cs) points = go row (col + 1) cs ((c,row,col) :: points)
 
 -- TODO add parameter a and pass Char -> a into getGrid
-Grid : U
-Grid = SortedMap Point Int
+alias Grid = SortedMap Point Int
 
 digitToInt : Char → Int
 digitToInt c = ord c - 48

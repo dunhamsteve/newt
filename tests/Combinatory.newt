@@ -16,14 +16,14 @@ data Type : U where
   ι : Type
   _~>_ : Type -> Type -> Type
 
-A : U
+0 A : U
 A = Unit
 
-Val : Type -> U
+0 Val : Type -> U
 Val ι = A
 Val (x ~> y) = Val x -> Val y
 
-Ctx : U
+0 Ctx : U
 Ctx = List Type
 
 data Ref : Type -> Ctx -> U where

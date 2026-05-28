@@ -80,8 +80,7 @@ step mach@(M a b c mem ip out) =
     combo 6 = c
     combo n = itobi n
 
-Cand : U
-Cand = BigInt ×  SnocList Int ×  List Int
+alias Cand = BigInt ×  SnocList Int ×  List Int
 
 part2 : Machine -> Maybe BigInt
 part2 mach@(M a b c mem ip out) = go ((itobi 0,(Lin <>< mem), Nil) :: Nil)

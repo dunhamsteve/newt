@@ -5,8 +5,7 @@ import Node
 import Aoc
 import Data.SortedMap
 
-XYZ : U
-XYZ = (Int × Int × Int)
+alias XYZ = (Int × Int × Int)
 
 -- don't need sqrt for sorting
 dist2 : XYZ → XYZ → Int

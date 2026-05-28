@@ -3,8 +3,7 @@ module Parser
 import Prelude
 import Aoc
 
-Parser : U → U
-Parser a = List Char → Either String (a × List Char)
+alias Parser a = List Char → Either String (a × List Char)
 
 instance Monad Parser where
   return a = \ cs => Right (a, cs)

@@ -495,12 +495,13 @@ processData ns fc (nameFC, nm) ty cons = do
   let mc = top.currentMod.modMetaCtx
   tyty <- check (mkCtx fc Zero) ty (VU fc)
   case lookup (QN ns nm) top of
-    Just (MkEntry _ _ name type Axiom _) => do
+    Just (MkEntry fdeclFC q name type Axiom _) => do
+      let (Zero) = q | _ => error fdeclFC "Type constructor forward declaration at wrong quantity"
       tyty' <- eval Nil tyty
       type' <- eval Nil type
       unifyCatch fc (mkCtx fc Zero) tyty' type'
     Just _ => error nameFC "\{show nm} already declared"
-    Nothing => setDef (QN ns nm) fc Many tyty Axiom Nil
+    Nothing => setDef (QN ns nm) fc Zero tyty Axiom Nil
   -- check cons, return list of type,con
   allCons <- join <$> (for cons $ \x => case x of
       (TypeSig fc q names tm) => do
@@ -638,6 +639,6 @@ processDecl ns (Instance instfc ty decls) = processInstance ns instfc ty decls
 processDecl ns (ShortData fc lhs sigs) = processShortData ns fc lhs sigs
 processDecl ns (Data fc nm ty (Just cons)) = processData ns fc nm ty cons
 -- TODO distinguish from function signatures
-processDecl ns (Data fc (_, nm) ty Nothing) = processTypeSig ns fc Many [nm] ty
+processDecl ns (Data fc (_, nm) ty Nothing) = processTypeSig ns fc Zero [nm] ty
 processDecl ns (Record recordFC nm tele cname decls) = processRecord ns recordFC nm tele cname decls
 processDecl ns (Exports fc names) = processExports ns fc names

@@ -20,7 +20,7 @@ data _+_ : U -> U -> U where
 
 infix 4 _<=_
 
-_<=_ : Nat -> Nat -> U
+0 _<=_ : Nat -> Nat -> U
 Z <= y = Unit
 S x <= Z = Void
 S x <= S y = x <= y
@@ -39,7 +39,7 @@ data Bnd : U where
 
 infix 4 _<<=_
 
-_<<=_ : Bnd -> Bnd -> U
+0 _<<=_ : Bnd -> Bnd -> U
 Bot <<= _ = Unit
 N x <<= N y = x <= y
 _ <<= Top = Unit
@@ -64,10 +64,10 @@ infixr 1 _,_
 data Sg : (A : U) -> (A -> U) -> U where
   _,_ : {A : U} {B : A -> U} -> (a : A) -> B a -> Sg A B
 
-_*_ : U -> U -> U
+0 _*_ : U -> U -> U
 a * b = Sg a (\ _ => b)
 
-TooBig : Bnd -> Bnd -> Nat -> U
+0 TooBig : Bnd -> Bnd -> Nat -> U
 TooBig l u h = Sg Nat (\ x => T23 l (N x) h * T23 (N x) u h)
 
 insert : ∀ l u h. Intv l u -> T23 l u h -> TooBig l u h + T23 l u h

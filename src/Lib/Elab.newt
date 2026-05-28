@@ -1717,10 +1717,10 @@ infer ctx (RApp fc t u icit) = do
   pure (App fc t u q, bappu)
 
 infer ctx (RU fc) = do
-  -- checkMarker fc ctx Zero
+  checkMarker fc ctx Zero
   pure (UU fc, VU fc) -- YOLO
 infer ctx (RPi fc (BI fc nm icit quant) ty ty2) = do
-  -- checkMarker fc ctx Zero
+  checkMarker fc ctx Zero
   ty' <- checkIn ctx Zero ty (VU fc)
   vty' <- eval ctx.env ty'
   ty2' <- checkIn (extend ctx nm vty' quant) Zero ty2 (VU fc)

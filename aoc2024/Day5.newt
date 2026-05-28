@@ -20,8 +20,7 @@ parse text = do
   let updates = map (nums' ",") $ split b "\n"
   Just $ MkProb rules updates
 
-RuleMap : U
-RuleMap = SortedMap Int (List Int)
+alias RuleMap = SortedMap Int (List Int)
 
 getDisallowed : Int → RuleMap → List Int
 getDisallowed key rmap = fromMaybe Nil (map snd $ lookupMap key rmap)

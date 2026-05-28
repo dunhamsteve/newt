@@ -3,7 +3,7 @@ module Zoo3eg
 id : (A : _) -> A -> A
 id = \ A x => x
 
-List : U -> U
+0 List : U -> U
 List = \ A => (L : _) -> (A -> L -> L) -> L -> L
 
 nil : (A : _) -> List A
@@ -12,7 +12,7 @@ nil = \ A L cons nil => nil
 cons : (A : _) -> A -> List A -> List A
 cons = \A x xs L cons nil => cons x (xs _ cons nil)
 
-Bool : U
+0 Bool : U
 Bool = (B : _) -> B -> B -> B
 
 true : Bool
@@ -24,7 +24,7 @@ false = \ B t f => f
 not : Bool -> Bool
 not = \ b B t f => b B f t
 
-Eq : (A : _) -> A -> A -> U
+0 Eq : (A : _) -> A -> A -> U
 Eq = \A x y => (P : A -> U) -> P x -> P y
 
 refl : (A : _) (x : A) -> Eq A x x
@@ -33,7 +33,7 @@ refl = \ A x p px => px
 list1 : List Bool
 list1 = cons _ true (cons _ false (nil _))
 
-Nat : U
+0 Nat : U
 Nat = (N : U) -> (N -> N) -> N -> N
 
 five : Nat

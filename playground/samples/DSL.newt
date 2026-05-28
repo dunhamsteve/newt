@@ -64,13 +64,13 @@ infixr 4 _,_
 data Both : U → U → U where
   _,_ :  ∀ a b. a → b → Both a b
 
-typ : E → U
+0 typ : E → U
 typ Zero = Empty
 typ One = Unit
 typ (Add x y) = Either (typ x) (typ y)
 typ (Mul x y) = Both (typ x) (typ y)
 
-Bool : U
+0 Bool : U
 Bool = typ two
 
 false : Bool
@@ -79,7 +79,7 @@ false = Left MkUnit
 true : Bool
 true = Right MkUnit
 
-BothBoolBool : U
+0 BothBoolBool : U
 BothBoolBool = typ four
 
 ex1 : BothBoolBool

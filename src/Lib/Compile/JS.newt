@@ -20,8 +20,8 @@ import Data.IORef
 
 data StKind = Plain | Return | Assign String
 
-JSStmt : StKind -> U
-JSExp : U
+data JSStmt : StKind -> U
+data JSExp : U
 
 data CaseType = CaseInd | CaseBool | CaseChar | CaseInt | CaseStr
 
@@ -71,8 +71,7 @@ data JSStmt : StKind -> U where
   JLoopAssign : (nm : String) → JSExp → JSStmt Plain
   JContinue : ∀ a. JSStmt a
 
-0 Cont : StKind → U
-Cont e = JSExp -> JSStmt e
+alias Cont e = JSExp -> JSStmt e
 
 -- JSEnv contains `Var` for binders or `Dot` for destructured data. It
 -- used to translate binders

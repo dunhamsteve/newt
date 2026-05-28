@@ -6,7 +6,7 @@ id = \ A x => x
 const : (A B : U) -> A -> B -> A
 const = \A B x y => x
 
-Nat : U
+0 Nat : U
 Nat = (N : U) -> (N -> N) -> N -> N
 
 zero : Nat

@@ -5,11 +5,10 @@ import Node
 import Aoc
 import SortedMap
 
-Graph Edge EdgeSet VSet : U
-Graph = SortedMap String (List String)
-Edge = String × String
-EdgeSet = SortedMap Edge Unit
-VSet = SortedMap String Unit
+alias Graph = SortedMap String (List String)
+alias Edge = String × String
+alias EdgeSet = SortedMap Edge Unit
+alias VSet = SortedMap String Unit
 
 addEdge : Graph -> String × String -> Graph
 addEdge g (a,b) = updateMap a (b :: fromMaybe Nil (snd <$> lookupMap a g)) g

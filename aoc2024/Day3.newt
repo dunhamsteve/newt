@@ -4,8 +4,7 @@ import Prelude
 import Node
 import Aoc
 
-Parser : U → U
-Parser a = List Char → Maybe (a × List Char)
+alias Parser a = List Char → Maybe (a × List Char)
 
 instance Monad Parser where
   return a = \ cs => Just (a, cs)

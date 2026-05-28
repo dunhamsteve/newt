@@ -59,9 +59,8 @@ stepN : Int → BigInt → BigInt
 stepN 0 s = s
 stepN n s = stepN (n - 1) (step s)
 
-Key KeyMap : U
-Key = Int
-KeyMap = SortedMap Key Int
+alias Key = Int
+alias KeyMap = SortedMap Key Int
 
 bananas : Int → BigInt → SnocList Int → List Int
 bananas 0 s acc = acc <>> Nil

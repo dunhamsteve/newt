@@ -13,8 +13,7 @@ gridPoints text = go 0 0 (unpack text) Nil
     go row col ('\n' :: cs) points = go (row + 1) 0 cs points
     go row col (c :: cs) points = go row (col + 1) cs ((c,row,col) :: points)
 
-Grid : U → U
-Grid a = SortedMap Point a
+alias Grid a = SortedMap Point a
 
 getGrid : ∀ a. String → (Char → a) → Grid a
 getGrid {a} text f = foldl update EmptyMap $ gridPoints text
@@ -50,8 +49,7 @@ turn East West = 2000
 turn West East = 2000
 turn _ _ = 1000
 
-DPoint : U
-DPoint = Point × Dir
+alias DPoint = Point × Dir
 
 move : DPoint → DPoint
 move ((r,c), North) = ((r - 1, c), North)
@@ -77,8 +75,7 @@ instance Ord Dir where
 instance Eq Dir where
   a == b = dirVal a == dirVal b
 
-Cand : U
-Cand = Int × Point × Dir
+alias Cand = Int × Point × Dir
 
 min : Int → Int → Int
 min x y = if x < y then x else y

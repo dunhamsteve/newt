@@ -48,7 +48,7 @@ insertT23 key value (Node3 t1 k1 t2 k2 t3) =
       Right (a,b,c) => Right (Node2 t1 k1 t2, k2, Node2 a b c)
 
 -- This is cribbed from Idris. Deleting nodes takes a bit of code.
-Hole : Nat → U → U → U
+0 Hole : Nat → U → U → U
 Hole Z k v = Unit
 Hole (S n) k v = T23 n k v
 

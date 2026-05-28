@@ -32,7 +32,7 @@ data BindInfo : U where
 instance HasFC BindInfo where
   getFC (BI fc _ _ _) = fc
 
-Tm : U
+0 Tm : U
 
 data Literal = LString String | LInt Int | LChar Char | LBool Bool
 
@@ -47,7 +47,7 @@ data CaseAlt : U where
   CaseCons : (name : QName) -> (args : List String) -> Tm ->  CaseAlt
   CaseLit : Literal -> Tm ->  CaseAlt
 
-Def : U
+0 Def : U
 
 instance Eq Literal where
   LString x == LString y = x == y
@@ -163,7 +163,7 @@ pprint' p names (Erased _) = text "ERASED"
 pprint : List String -> Tm -> Doc
 pprint names tm = pprint' 0 names tm
 
-Val : U
+0 Val : U
 
 -- IS/TypeTheory.idr is calling this a Kripke function space
 -- Yaffle, IS/TypeTheory use a function here.
@@ -175,8 +175,8 @@ Val : U
 
 -- Yaffle is vars -> vars here
 
-Closure : U
-Env : U
+0 Closure : U
+0 Env : U
 
 -- Constatine has Icit in here too, I'm considering that as not part of core,
 -- but I suspect I'll want it later. Maybe for diagnostics or reusing data.
@@ -244,7 +244,7 @@ instance Show Val where
 
 showClosure (MkClosure xs t) = "(%cl [\{show $ length xs} env] \{show t})"
 
-Context : U
+0 Context : U
 
 data MetaKind = Normal | User | AutoSolve | ErrorHole
 

@@ -7,7 +7,7 @@ module EFib
 id : (0 A : U) → A → A
 id = \A a => a
 
-test : U
+0 test : U
 test = id U (U → U)
 
 -- fib.er

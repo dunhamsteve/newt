@@ -18,14 +18,13 @@ data Bnd : U where
   val : P → Bnd
   top : Bnd
 
-Rel : U → U
-Rel a = a × a → U
+alias Rel a = a × a → U
 
 L : P × P → U
 
 -- FIXME Rel Bnd needs to be expanded
 -- LH LB : Rel Bnd → U
-LH LB : Bnd × Bnd → U
+0 LH LB : Bnd × Bnd → U
 LH (bot, _) = Unit
 LH (val x, val y) = L (x, y)
 LH _ = Void

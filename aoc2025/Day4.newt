@@ -13,8 +13,7 @@ gridPoints text = go 0 0 (unpack text) Nil
     go row col ('\n' :: cs) points = go (row + 1) 0 cs points
     go row col (c :: cs) points = go row (col + 1) cs ((c,row,col) :: points)
 
-Grid : U
-Grid = SortedMap Point Int
+alias Grid = SortedMap Point Int
 
 getGrid : String → Grid
 getGrid text = foldl update (EmptyMap compare) $ gridPoints text
