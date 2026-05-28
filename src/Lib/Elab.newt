@@ -19,6 +19,7 @@ vprint ctx v = do
   tm <- quote (length' ctx.env) v
   pure $ render 90 $ pprint (names ctx) tm
 
+-- Check that target is Many or we are in an erased context
 checkMarker : FC → Context → Quant → M Unit
 checkMarker fc _ Many = pure MkUnit
 checkMarker fc (MkCtx lvl env types bds ctxFC Present) Zero = pure MkUnit
@@ -32,7 +33,6 @@ collectDecl ((FunDef fc nm cl) :: rest@(FunDef _ nm' cl' :: xs)) =
   else (FunDef fc nm cl :: collectDecl rest)
 collectDecl (x :: xs) = x :: collectDecl xs
 
--- REVIEW - do we need both showCtx and dumpCtx?
 showCtx : Context -> M String
 showCtx ctx =
   unlines ∘ reverse <$> go (names ctx) 0 (reverse $ zip ctx.env ctx.types) Nil
@@ -44,7 +44,6 @@ showCtx ctx =
     go : List String -> Int -> List (Val × String × Val × Quant) -> List String -> M (List String)
     go _ _ Nil acc = pure acc
     go names k ((v, n, ty, q) :: xs) acc = if isVar k v
-      -- TODO - use Doc and add <+/> as appropriate to printing
       then do
         tty <- quote ctx.lvl ty
         go names (1 + k) xs ("  \{show q}\{n} : \{rpprint names tty}" :: acc)
@@ -52,18 +51,6 @@ showCtx ctx =
         tm <- quote ctx.lvl v
         tty <- quote ctx.lvl ty
         go names (1 + k) xs ("  \{show q}\{n} = \{rpprint names tm} : \{rpprint names tty}" :: acc)
-
-dumpCtx : Context -> M String
-dumpCtx ctx = do
-  let names = (map fst ctx.types)
-  -- I want to know which ones are defines. I should skip the `=` bit if they match, I'll need indices in here too.
-  env <- for (reverse $ zip ctx.env ctx.types) $ \case
-    (v, n, ty, q) => do
-      sty <- vprint ctx ty
-      sv <- vprint ctx v
-      pure "  \{show q}\{n} : \{sty} = \{sv}"
-  let msg = unlines (reverse env) -- ++ "  -----------\n" ++ "  goal \{rpprint names ty'}"
-  pure msg
 
 -- return Bnd and type for name
 lookupName : Context -> String -> Maybe (Tm × Val × Quant)
@@ -419,7 +406,7 @@ maybeCheck action = do
 
 solve env m sp t = do
   let sp' = map fst sp
-  -- FIXME use the quanties
+  -- FIXME use the quantities
   meta@(Unsolved metaFC ix ctx_ ty kind) <- lookupMeta m
     | _ => error (getFC t) "Meta \{show m} already solved! [solve]"
   debug "SOLVE \{show m} \{show kind} lvl \{show $ length' env} sp \{show sp} is \{show t}"
@@ -487,14 +474,11 @@ solve env m sp t = do
      isReferenced ix (MkMc _ deps _ _ _) = elem ix deps
 
 
--- TODO remove that unused Bool
-unifySpine : Env -> UnifyMode -> Bool -> SnocList (Val × Quant) -> SnocList (Val × Quant) -> M UnifyResult
-unifySpine env mode False _ _ = error emptyFC "unify failed at head" -- unreachable now
-unifySpine env mode True Lin Lin = pure (MkResult Nil)
-unifySpine env mode True (xs :< (x, q)) (ys :< (y, q')) =
-  -- I had idiom brackets here, technically fairly easy to desugar, but not adding at this time
-  _<+>_ <$> unify env mode x y <*> unifySpine env mode True xs ys
-unifySpine env mode True _ _ = error emptyFC "meta spine length mismatch"
+unifySpine : Env -> UnifyMode -> SnocList (Val × Quant) -> SnocList (Val × Quant) -> M UnifyResult
+unifySpine env mode Lin Lin = pure (MkResult Nil)
+unifySpine env mode (xs :< (x, q)) (ys :< (y, q')) =
+  _<+>_ <$> unify env mode x y <*> unifySpine env mode xs ys
+unifySpine env mode _ _ = error emptyFC "meta spine length mismatch"
 
 unify env mode t u = do
   debug "Unify lvl \{show $ length env}"
@@ -547,7 +531,7 @@ unify env mode t u = do
       let spineMode = spineMode $ lookup k top
       -- we need to postpone if there are metas in the spines
       if k == k'
-        then unifySpine env spineMode (k == k') sp sp'
+        then unifySpine env spineMode sp sp'
         else do
           -- We only really need to know if it has a meta at the moment
           case join (map (getMetas ∘ fst) $ sp <>> Nil) ++ join (map (getMetas ∘ fst) $ sp' <>> Nil) : List QName of
@@ -588,7 +572,7 @@ unify env mode t u = do
 
     unifyVar : Val -> Val -> M UnifyResult
     unifyVar t'@(VVar fc n₁ k sp)  u'@(VVar fc' n₂ k' sp')  =
-      if k == k' then unifySpine env mode (k == k') sp sp'
+      if k == k' then unifySpine env mode sp sp'
       else error fc "Failed to unify \{show t'} and \{show u'}"
 
     unifyVar t'@(VVar fc nm k Lin) u = do
@@ -638,7 +622,7 @@ unify env mode t u = do
     unifyMeta : Val -> Val -> M UnifyResult
     -- flex/flex
     unifyMeta t@(VMeta fc k sp) t'@(VMeta fc' k' sp') =
-      if k == k' then unifySpine env mode (k == k') sp sp'
+      if k == k' then unifySpine env mode sp sp'
       -- TODO, might want to try the other way, too.
       else if snoclen sp < snoclen sp'
         then solve' env k' sp' (VMeta fc k sp) >> pure neutral
@@ -649,7 +633,7 @@ unify env mode t u = do
 
     unifyPattern : Val -> Val -> M UnifyResult
     unifyPattern t'@(VVar fc n₁ k sp)  u'@(VVar fc' n₂ k' sp')  =
-      if k == k' then unifySpine env mode (k == k') sp sp'
+      if k == k' then unifySpine env mode sp sp'
       else case (sp, sp') of
         (Lin,Lin) => if k < k'
           then pure $ MkResult ((k, u') :: Nil)
@@ -1730,7 +1714,7 @@ infer ctx (RLet fc nm ty v sc) = do
   vty <- eval ctx.env ty'
   v' <- check ctx v vty
   vv <- eval ctx.env v'
-  -- TODO allow rig on let
+  -- TODO allow rig on let (what use case?)
   let ctx' = define ctx nm vv vty Many
   (sc',scty) <- infer ctx' sc
   pure (Let fc nm v' sc', scty)
@@ -1754,3 +1738,4 @@ infer ctx (RLit fc (LInt i)) = pure (Lit fc (LInt i), VRef fc intType Lin)
 infer ctx (RLit fc (LChar c)) = pure (Lit fc (LChar c), VRef fc charType Lin)
 infer ctx (RAs fc _ _) = error fc "@ can only be used in patterns"
 infer ctx tm = error (getFC tm) "Implement infer \{show tm}"
+
