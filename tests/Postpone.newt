@@ -1,0 +1,24 @@
+module Postpone
+
+-- section 1.2 - Principles of Dependent Type Theory
+-- triggered a need for postponement checking `foo` below
+-- unification "errors" of a pi type against a stuck function
+-- killed progress where the meta would later be solved
+
+import Prelude
+import Data.Vect
+
+0 nary : U → Nat → U
+nary a Z = a
+nary a (S n) = a → nary a n
+
+apply : ∀ A n. nary A n → Vect n A → A
+apply x VNil = x
+apply f (x :- xs) = apply (f x) xs
+
+-- There is an occurs check on A, can we postpone?
+-- Why can't it solve n? It should be the size of the Vect
+-- unification failure on stuck function, probably have to postpone
+foo : apply _+_ (S Z :- S Z :- VNil) ≡ _
+foo = Refl
+

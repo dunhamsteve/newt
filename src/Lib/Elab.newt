@@ -473,6 +473,9 @@ solve env m sp t = do
      isReferenced : QName → MConstraint → Bool
      isReferenced ix (MkMc _ deps _ _ _) = elem ix deps
 
+checkPostpone : FC → Val → M Unit
+checkPostpone fc (VCase _ (VMeta _ qn sp) _ _) = throwError $ Postpone fc "postponed stuck meta \{show qn}"
+checkPostpone fc _ = return MkUnit
 
 unifySpine : Env -> UnifyMode -> SnocList (Val × Quant) -> SnocList (Val × Quant) -> M UnifyResult
 unifySpine env mode Lin Lin = pure (MkResult Nil)
@@ -556,6 +559,7 @@ unify env mode t u = do
         Just (MkEntry _ q name ty (Fn tm) _) => do
           vtm <- eval Nil tm
           appvtm <- vappSpine vtm sp'
+          checkPostpone fc' appvtm
           unify env mode t appvtm
         _ => error fc' "unify failed \{show t} =?= \{show u} [no Fn]"
 
