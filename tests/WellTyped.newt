@@ -61,10 +61,7 @@ add : ∀ n. {0 ctxt : Vect n Ty} → Expr ctxt (TyFun TyInt (TyFun TyInt TyInt)
 add = Lam (Lam (Op _+_ (Var Stop) (Var (Pop Stop))))
 
 fact : ∀ n. {0 ctxt : Vect n Ty} → Expr ctxt (TyFun TyInt TyInt)
--- TODO the `Bool =?= interpTy ...` is stuck on ?m14
--- I think we may need to need to delay the constraint until m14 is solved?
--- But I think I have code to do that already
-fact = Lam (If (Op {_} {_} {TyBool} _==_ (Var Stop) (Val 0))
+fact = Lam (If (Op _==_ (Var Stop) (Val 0))
                (Val 1)
                (Op _*_ (App fact (Op _-_ (Var Stop) (Val 1)))
                        (Var Stop)))

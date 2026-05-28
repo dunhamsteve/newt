@@ -473,6 +473,8 @@ solve env m sp t = do
      isReferenced : QName → MConstraint → Bool
      isReferenced ix (MkMc _ deps _ _ _) = elem ix deps
 
+-- check if we're stuck on a meta and throw a postpone
+-- TODO we may need to wire this into more places in unfication, but I need test cases
 checkPostpone : FC → Val → M Unit
 checkPostpone fc (VCase _ (VMeta _ qn sp) _ _) = throwError $ Postpone fc "postponed stuck meta \{show qn}"
 checkPostpone fc _ = return MkUnit
