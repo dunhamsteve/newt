@@ -24,7 +24,7 @@ tag_ : ∀ msg. String → List (VNode msg)→ VNode msg
 tag_ tag es = ENode tag Nil es
 
 pfunc runApp : ∀ msg model. Element → model → (update : msg → model → model) → (view : model → VNode msg) → Unit :=  `
-(_msg, _model, node, init, update, view) => {
+(node, init, update, view) => {
     function replace(parent, node, child) {
         if (node) {
             parent.insertBefore(child, node);
