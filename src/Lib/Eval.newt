@@ -76,9 +76,25 @@ tryEval env (VRef fc k sp) = do
               VLetRec _ _ _ _ _ => pure Nothing
               v => pure $ Just v)
             (const $ pure Nothing)
+      Just (MkEntry _ q (QN "Prelude" "unpack") ty (PrimFn _ _ _) _) =>
+        case sp of
+          (Lin :< ((VLit fc (LString s)) , _)) => return $ Just $ quoteChars fc $ unpack s
+          _ => pure Nothing
+      Just _ => do
+        debug "tryEval blocked on non-function \{show k}"
+        pure Nothing
       _ => do
         debug "tryEval blocked on undefined \{show k}"
         pure Nothing
+  where
+    charType : Val
+    charType = VRef emptyFC (QN "Prim" "Char") Lin
+
+    quoteChars : FC → List Char → Val
+    quoteChars fc Nil = VRef fc (QN "Prelude" "Nil") (Lin :< (charType, Zero))
+    quoteChars fc (c :: cs) = VRef fc (QN "Prelude" "_::_") (Lin :< (charType, Zero) :< (VLit fc (LChar c), Many) :< (quoteChars fc cs, Many))
+
+
 tryEval _ _ = pure Nothing
 
 -- Force far enough to compare types
@@ -102,7 +118,7 @@ evalCase env sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
   top <- getTop
   if nm == name
     then do
-      debug $  "ECase \{show nm} \{show sp} \{show nms} \{show t}"
+      debug $  "ECase \{show nm}\n  sp \{show sp}\n nms \{show nms}\n   t \{show t}"
       pushArgs env (sp <>> Nil) nms
     else case lookup nm top of
       (Just (MkEntry _ _ str type (DCon _ _ k str1) _)) => evalCase env sc xs
@@ -113,12 +129,14 @@ evalCase env sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
     pushArgs : Env -> List (Val × Quant) -> List String -> M (Maybe Val)
     pushArgs env ((arg,q) :: args) (nm :: nms) = pushArgs (arg :: env) args nms
     pushArgs env Nil Nil = Just <$> eval env t
-    pushArgs env args Nil = fatalError "Extra args \{show args}"
-    pushArgs env Nil rest = pure Nothing
+    pushArgs env args Nil = fatalError "Extra args \{show args} on \{show name}"
+    pushArgs env Nil rest = fatalError "Missing args \{show rest} on \{show name}"
 
 evalCase env sc (CaseDefault u :: xs) = Just <$> eval env u
+evalCase env sc@(VLit fc l) (CaseLit l'  u :: xs) =
+  if l == l' then Just <$> eval env u else evalCase env sc xs
 evalCase env sc cc = do
-  debug $  "CASE BAIL sc \{show sc} vs " -- \{show cc}"
+  debug $  "CASE BAIL sc \{show sc} vs \{show cc}"
   debug $  "env is \{show env}"
   pure Nothing
 

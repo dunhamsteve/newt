@@ -1,0 +1,56 @@
+module Printf
+
+-- Example from "Principles of Dependent Type Theory" by Carlo Angiuli and Daniel Gratzer
+
+import Prelude
+
+data Token : U where
+  TCh : Char → Token
+  TInt : Token
+  TNat : Token
+  TChr : Token
+  TStr : Token
+
+lex : List Char → List Token
+lex [] = []
+lex ('%' :: '%' :: cs) = TCh '%' :: lex cs
+lex ('%' :: 'd' :: cs) = TInt :: lex cs
+lex ('%' :: 'u' :: cs) = TNat :: lex cs
+lex ('%' :: 'c' :: cs) = TChr :: lex cs
+lex ('%' :: 's' :: cs) = TStr :: lex cs
+lex (c :: cs) = TCh c :: lex cs
+
+0 args : List Token → U
+args [] = String
+args (TCh _ :: toks) = args toks
+args (TInt :: toks) = Int → args toks
+args (TNat :: toks) = Nat → args toks
+args (TChr :: toks) = Char → args toks
+args (TStr :: toks) = String → args toks
+
+0 printfType : String → U
+printfType s = args (lex (unpack s))
+
+sprintf : (s : String) → printfType s
+sprintf s = go (lex $ unpack s) ""
+  where
+    go : (toks : List Token) → String → args toks
+    go [] acc = acc
+    go (TCh c :: ts) acc = go ts (acc ++ pack [c])
+    go (TInt :: ts) acc = \ i => go ts (acc ++ show i)
+    go (TNat :: ts) acc = \ n => go ts (acc ++ show n)
+    go (TStr :: ts) acc = \ s => go ts (acc ++ s)
+    go (TChr :: ts) acc = \ c => go ts (acc ++ pack [c])
+
+test1 : unpack "123" ≡ ['1', '2', '3']
+test1 = Refl
+
+test : lex (unpack "%s %u") ≡ [ TStr, TCh ' ', TNat ]
+test = Refl
+
+main : IO Unit
+main = do
+  putStrLn $ sprintf "%s %u" "hi" (S (S Z))
+  putStrLn $ sprintf "nat %u then int %d then char %c" (S Z) 42 '&'
+  putStrLn $ sprintf "%d%% of %s%c" 3 "GD" 'P'
+

@@ -1,6 +1,8 @@
 module Postpone
 
--- section 1.2 - Principles of Dependent Type Theory
+-- example from section 1.2 - "Principles of Dependent Type Theory"
+-- by Carlo Angiuli and Daniel Gratzer
+
 -- triggered a need for postponement checking `foo` below
 -- unification "errors" of a pi type against a stuck function
 -- killed progress where the meta would later be solved
