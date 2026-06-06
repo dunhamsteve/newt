@@ -327,6 +327,9 @@ withLets task = do
   pure res
 
 zonkApp : TopContext -> Int -> Env -> Tm -> List (Tm × Quant) -> M Tm
+-- skipping these gains us 2.5% time
+zonkApp top l env (App fc t u Zero) sp =
+  zonkApp top l env t ((u, Zero):: sp)
 zonkApp top l env (App fc t u q) sp = do
   u' <- zonk top l env u
   zonkApp top l env t ((u', q):: sp)
