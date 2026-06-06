@@ -7,6 +7,7 @@
   - e.g. change a `List String` to `String` in a dcon arg
   - and wrong file, even. A problem in LSP
 - [x] Fix unification issue (postpone App/App with metas)
+- [ ] Write up / commit editor support
 - [ ] Literate programming? Allow markdown files?
 - [ ] Build single name map on import
   - Check performance - cost to build this vs not walking $n$ maps
@@ -26,10 +27,13 @@
   - [ ] Runtime implementation
 - [ ] code formatter
   - [ ] consider moving caselet, etc. desugaring out of the parser
+  - comments stored aside (location, whether it is a tail or standalone) and re-integrated
+  - how do we want to handle `$` and parens?
 - [x] Scheme backend
 - [x] Smart encoding of lists (and cons cells?) in scheme
 - [ ] consider postponing `case` if scrutinee type is an unsolved meta
 - [ ] in batch mode, stop at first erroring module
+  - We could also gain performance by not collecting LSP data in batch mode
 - [ ] maybe `let case` instead of `let (...)` (which is a little subtle)
   - Or simply put a term in there and treat as a variable iff it is lowercase and non-applied
 - [x] Use looping for TCO
@@ -165,7 +169,7 @@
     - Repeat the line with each, applied to args
     - For `<-` or `let` we'd want to fudge some `|` lines
     - [ ] `let` has issues for multiline split / add missing
-    - [ ] `derive` has phantom splits in it
+    - [ ] `derive` has phantom split actions in it
 - [x] Support "Add missing cases"
   - This has been hakced together
   - LSP version now.
