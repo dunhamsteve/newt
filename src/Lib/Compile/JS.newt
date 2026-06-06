@@ -266,11 +266,6 @@ termToJS {e} env (CCase t alts) f =
     termToJSAlt env nm (CDefAlt u) = JDefAlt (termToJS (env) u f)
     termToJSAlt env nm (CLitAlt lit u) = JLitAlt (litToJS lit) (termToJS env u f)
 
-    -- getQuants : CAlt → List Quant
-    -- getQuants (CDefAlt _) = Nil
-    -- getQuants (CLitAlt args _) = Nil
-    -- getQuants (CConAlt _ _ _ args qs _) = qs
-
     maybeCaseStmt : JSEnv -> JSExp -> List CAlt -> JSStmt e
     -- deleteT23 does this...
     maybeCaseStmt env sc (CDefAlt u :: Nil) = (termToJS env u f)

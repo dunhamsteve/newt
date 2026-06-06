@@ -1,0 +1,12 @@
+module IfType
+
+import Prelude
+
+-- The if isn't getting reduced on the RHS
+foo : (b : Bool) → if b then String else Int
+foo True = "woo"
+foo False = 42
+
+main : IO Unit
+main = putStrLn $ foo True
+

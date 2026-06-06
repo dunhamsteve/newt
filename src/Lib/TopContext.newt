@@ -46,7 +46,7 @@ instance Show TopContext where
   show top = "\nContext:\n [\{ unlines $ map (show ∘ snd) $ toList top.currentMod.modDefs}]"
 
 emptyTop : TopContext
-emptyTop = MkTop emptyMap emptyMap (emptyModCtx "" "") 0 emptyMap 0
+emptyTop = MkTop emptyMap emptyMap (emptyModCtx "" "") 0 emptyMap 0 NormalElab
 
 setFlag : QName → FC → EFlag → M Unit
 setFlag name fc flag = do

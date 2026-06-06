@@ -173,10 +173,13 @@ eval env (Pi fc x icit rig a b) = do
   pure $ VPi fc x icit rig a' (MkClosure env b)
 eval env (Let fc nm t u) = do
   t' <- eval env t
-  --
-  if True
-    then pure $ VLet fc nm t' (MkClosure env u)
-    else eval (t' :: env) u
+  -- We want to keep it as a let if inlining (maybe that should be separate from eval)
+  -- We probably want to use the Let during typechecking (although Idris doesn't)
+  -- The "IfType" test needs the NormalElab case for an inline if/then/else in a type
+  top <- getTop
+  case top.elabMode of
+    NormalElab => eval (t' :: env) u
+    KeepLets => pure $ VLet fc nm t' (MkClosure env u)
 eval env (LetRec fc nm ty t u) = do
   -- Used for `where`, we'd probably need to treat this like Lam.
   error fc "eval letrec"
@@ -314,6 +317,15 @@ tweakFC fc (LetRec fc1 nm ty t u) = LetRec fc nm ty t u
 tweakFC fc (Lit fc1 lit) = Lit fc lit
 tweakFC fc (Erased fc1) = Erased fc
 
+withLets : ∀ a. M a → M a
+withLets task = do
+  top <- getTop
+  let mode = top.elabMode
+  modifyTop { elabMode := KeepLets }
+  res <- task
+  modifyTop { elabMode := mode }
+  pure res
+
 zonkApp : TopContext -> Int -> Env -> Tm -> List (Tm × Quant) -> M Tm
 zonkApp top l env (App fc t u q) sp = do
   u' <- zonk top l env u
@@ -375,11 +387,12 @@ zonkAlt top l env (CaseCons name args t) = CaseCons name args <$> go l env args 
 zonk top l env t =
   let env' = VVar emptyFC "_" l Lin :: env in
   case t of
+  -- REVIEW - Can we avoid inlining erased values for performance?
   (Meta fc k) => zonkApp top l env t Nil
   (Force fc t) => Force fc <$> zonk top l env t
   (Delay fc t) => Delay fc <$> zonk top l env t
   (Lam fc nm icit rig u) => Lam fc nm icit rig <$> (zonk top (1 + l) env' u)
-  (App fc _ _ q) => zonkApp top l env t Nil
+  (App fc _ _ q) => withLets $ zonkApp top l env t Nil
   (Pi fc nm icit rig a b) => Pi fc nm icit rig <$> zonk top l env a <*> zonkBind top (l + 1) env' b
   (Let fc nm t u) => Let fc nm <$> zonk top l env t <*> zonkBind top (l + 1) env' u
   (LetRec fc nm ty t u) => LetRec fc nm <$> zonk top l env ty <*> zonkBind top (l + 1) env' t <*> zonkBind top (l + 1) env' u

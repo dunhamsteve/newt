@@ -373,6 +373,9 @@ instance HasFC EditorInfo where
   getFC (CaseSplit fc _ _ _) = fc
   getFC (MissingCases fc _ _) = fc
 
+-- KeepLets is used in inlining
+data ElabMode = NormalElab | KeepLets
+
 -- modules are "modules"
 -- currentMod represents the current module (to save a map lookup)
 -- when we switch modules, load imports into ops and hints
@@ -386,6 +389,9 @@ record TopContext where
   verbose : Int -- command line flag increments this
   ops : Operators
   freshIx : Int
+  -- I didn't want to pass another argument through eval (maybe an auto?)
+  -- used to switch behavior for inlining
+  elabMode : ElabMode
 
 -- For erasure, is the erased marker present in the environment
 data Marker = Present | Absent
