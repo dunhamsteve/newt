@@ -48,7 +48,6 @@ clean:
 
 audit: .PHONY
 	(cd playground && npm audit)
-	(cd newt-vscode && npm audit)
 	(cd newt-vscode-lsp && npm audit)
 
 ##
