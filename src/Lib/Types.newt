@@ -191,7 +191,7 @@ data Val : U where
   VPi : FC -> Name -> Icit -> Quant -> (a : Val) -> (b : Closure) -> Val
   -- not substing let, like idris
   VLet : FC -> Name -> Val -> Closure -> Val
-  VLetRec : FC -> Name -> Val -> Val -> Val -> Val
+  VLetRec : FC -> Name -> Val -> Closure -> Closure -> Val
   VU : FC -> Val
   VErased : FC -> Val
   VLit : FC -> Literal -> Val
@@ -238,7 +238,7 @@ instance Show Val where
   show (VU _) = "U"
   show (VLit _ lit) = show lit
   show (VLet _ nm a (MkClosure env b)) = "(%let \{show nm} = \{show a} in \{show b}"
-  show (VLetRec _ nm ty a b) = "(%letrec \{show nm} : \{show ty} = \{show a} in \{show b}"
+  show (VLetRec _ nm ty (MkClosure _ a) (MkClosure _ b)) = "(%letrec \{show nm} : \{show ty} = \{show a} in \{show b}"
   show (VErased _) = "ERASED"
 
 

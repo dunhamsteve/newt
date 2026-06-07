@@ -200,6 +200,9 @@ processDef ns fc nm clauses = do
   -- IO,bind is explicit here because the complexity has a 100 in it.
   let name = show $ QN ns nm
   if complexity tm < 15 || name == "Prelude.Prelude.Monad Prelude.IO,bind" || name == "Prelude._>>=_"
+    -- This is blowing out the stack somewhere _and_ IO,bind is not getting inlined inside all of this
+    -- maybe replace zonk with a specialized eval
+    -- || name == "Lib.Types.Prelude.Monad Lib.Types.M,bind"
     then setFlag (QN ns nm) fc Inline
     else pure MkUnit
 

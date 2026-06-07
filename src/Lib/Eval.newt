@@ -69,10 +69,6 @@ tryEval env (VRef fc k sp) = do
             case val of
               VCase _ _ _ _ => pure Nothing
               VLam _ _ _ _ _ => pure Nothing
-              -- For now? There is a spot in Compile.newt that has
-              -- two applications of fresh that is getting unfolded even
-              -- though it has the same head and spine.  Possibly because it's
-              -- coming out of a let and is instantly applied
               VLetRec _ _ _ _ _ => pure Nothing
               v => pure $ Just v)
             (const $ pure Nothing)
@@ -180,9 +176,12 @@ eval env (Let fc nm t u) = do
   case top.elabMode of
     NormalElab => eval (t' :: env) u
     KeepLets => pure $ VLet fc nm t' (MkClosure env u)
+-- LetRec is used for `where` clauses
+-- we need to handle this for inlining/zonking.
+-- TODO It probably needs a different approach for NormalElab (see Let)
 eval env (LetRec fc nm ty t u) = do
-  -- Used for `where`, we'd probably need to treat this like Lam.
-  error fc "eval letrec"
+  ty' <- eval env ty
+  pure $ VLetRec fc nm ty' (MkClosure env t) (MkClosure env u)
 -- Here, we assume env has everything. We push levels onto it during type checking.
 -- I think we could pass in an l and assume everything outside env is free and
 -- translate to a level
@@ -253,7 +252,9 @@ quote l (VLet fc nm t u) = do
   pure $ Let fc nm t' u'
 quote l (VLetRec fc nm ty t u) = do
   ty' <- quote l ty
+  t  <- t $$ VVar fc nm l Lin
   t' <- quote (1 + l) t
+  u <- u $$ VVar fc nm l Lin
   u' <- quote (1 + l) u
   pure $ LetRec fc nm ty' t' u'
 quote l (VU fc) = pure (UU fc)

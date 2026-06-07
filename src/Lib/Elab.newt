@@ -102,7 +102,7 @@ getMetas (VCase _ sc _ alts) = join $ getMetas sc :: map getAltMetas alts
     getAltMetas (CaseDefault t) = getTMetas t
     getAltMetas (CaseCons name args t) = getTMetas t
     getAltMetas (CaseLit _ t) = getTMetas t
-getMetas (VLetRec _ _ ty t u) = getMetas ty ++ getMetas t ++ getMetas u
+getMetas (VLetRec _ _ ty (MkClosure _ t) (MkClosure _ u)) = getMetas ty ++ getTMetas t ++ getTMetas u
 getMetas _ = []
 
 forceMeta : Val -> M Val
