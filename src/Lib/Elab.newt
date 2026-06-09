@@ -538,16 +538,19 @@ unify env mode t u = do
       if k == k'
         then unifySpine env spineMode sp sp'
         else do
+          let (CheckAll) = top.currentMod.modMetaCtx.mcmode | _ => error fc "vref mismatch"
+          when (isConstr (lookup k top) && isConstr (lookup k' top)) $ error fc "vref mismatch"
           -- We only really need to know if it has a meta at the moment
           case join (map (getMetas ∘ fst) $ sp <>> Nil) ++ join (map (getMetas ∘ fst) $ sp' <>> Nil) : List QName of
             Nil => error fc "vref mismatch \{show t'} =?= \{show u'}"
-            _ => do
-              top <- getTop
-              -- otherwise we get false positives checking autos.
-              case top.currentMod.modMetaCtx.mcmode of
-                CheckAll => throwError $ Postpone fc "postponed"
-                _ => error fc "vref mismatch"
+            _ =>  throwError $ Postpone fc "postponed"
       where
+        isConstr : Maybe TopEntry → Bool
+        isConstr (Just (MkEntry fc quant name type (DCon _ _ _ _) eflags)) = True
+        isConstr (Just (MkEntry fc quant name type (TCon _ _) eflags)) = True
+        isConstr (Just (MkEntry fc quant name type (PrimTCon _) eflags)) = True
+        isConstr _ = False
+
         spineMode : Maybe TopEntry → UnifyMode
         spineMode (Just (MkEntry _ q name ty (DCon _ _ _ _) _) ) = mode
         spineMode (Just (MkEntry _ q name ty (PrimTCon _) _) ) = mode

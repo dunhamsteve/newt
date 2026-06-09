@@ -1,0 +1,7 @@
+module Postpone2
+
+import Prelude
+
+-- Error should be about SnocList vs List
+foo : ∀ a. SnocList a → Int
+foo xs = length' xs
