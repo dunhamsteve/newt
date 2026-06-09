@@ -380,8 +380,8 @@ zonkApp top l env t sp = do
     inlineDef _ = Nothing
 
 zonkAlt : TopContext -> Int -> Env -> CaseAlt -> M CaseAlt
-zonkAlt top l env (CaseDefault t) = CaseDefault <$> zonkBind top l env t
-zonkAlt top l env (CaseLit lit t) = CaseLit lit <$> zonkBind top l env t
+zonkAlt top l env (CaseDefault t) = CaseDefault <$> zonk top l env t
+zonkAlt top l env (CaseLit lit t) = CaseLit lit <$> zonk top l env t
 zonkAlt top l env (CaseCons name args t) = CaseCons name args <$> go l env args t
   where
     go : Int -> Env -> List String -> Tm -> M Tm
