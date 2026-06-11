@@ -328,7 +328,7 @@ data Def = Axiom | TCon (List Quant) (List QName) | DCon Nat ConInfo (List Quant
          | PrimFn String (List Quant) (List QName)
 derive Show Def
 
-data EFlag = Hint | Inline | Export
+data EFlag = Hint | Inline | Export | InstCon
 derive Show EFlag
 derive Eq EFlag
 
@@ -373,8 +373,8 @@ instance HasFC EditorInfo where
   getFC (CaseSplit fc _ _ _) = fc
   getFC (MissingCases fc _ _) = fc
 
--- KeepLets is used in inlining
-data ElabMode = NormalElab | KeepLets
+-- InlineEval is used in inlining
+data ElabMode = NormalEval | InlineEval
 
 -- modules are "modules"
 -- currentMod represents the current module (to save a map lookup)

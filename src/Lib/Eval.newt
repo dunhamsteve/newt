@@ -58,7 +58,14 @@ tryEval : Env -> Val -> M (Maybe Val)
 tryEval env (VRef fc k sp) = do
   top <- getTop
   case lookup k top of
-      Just (MkEntry _ q name ty (Fn tm) _) =>
+      -- when doing eval for inlining this was too aggressive
+      -- Now in inline mode we only reduce functions that are
+      -- Inline or InstCon. If we inline InstCon globally, the
+      -- code blows up, so we only do it when we're eliminating
+      Just (MkEntry _ q name ty (Fn tm) flags) => do
+        -- we only want to expand inline and instance dicts
+        let (True) = checkInline flags top.elabMode
+          | _ => pure Nothing
         catchError (
             do
             debug $  "app \{show name} to \{show sp}"
@@ -83,6 +90,13 @@ tryEval env (VRef fc k sp) = do
         debug "tryEval blocked on undefined \{show k}"
         pure Nothing
   where
+    checkInline : List EFlag → ElabMode → Bool
+    checkInline _ NormalEval = True
+    checkInline Nil _ = False
+    checkInline (Inline :: _) _ = True
+    checkInline (InstCon :: _) _ = True
+    checkInline (_ :: flags) mode = checkInline flags mode
+
     charType : Val
     charType = VRef emptyFC (QN "Prim" "Char") Lin
 
@@ -171,14 +185,14 @@ eval env (Let fc nm t u) = do
   t' <- eval env t
   -- We want to keep it as a let if inlining (maybe that should be separate from eval)
   -- We probably want to use the Let during typechecking (although Idris doesn't)
-  -- The "IfType" test needs the NormalElab case for an inline if/then/else in a type
+  -- The "IfType" test needs the NormalEval case for an inline if/then/else in a type
   top <- getTop
   case top.elabMode of
-    NormalElab => eval (t' :: env) u
-    KeepLets => pure $ VLet fc nm t' (MkClosure env u)
+    NormalEval => eval (t' :: env) u
+    InlineEval => pure $ VLet fc nm t' (MkClosure env u)
 -- LetRec is used for `where` clauses
 -- we need to handle this for inlining/zonking.
--- TODO It probably needs a different approach for NormalElab (see Let)
+-- TODO It probably needs a different approach for NormalEval (see Let)
 eval env (LetRec fc nm ty t u) = do
   ty' <- eval env ty
   pure $ VLetRec fc nm ty' (MkClosure env t) (MkClosure env u)
@@ -322,7 +336,7 @@ withLets : ∀ a. M a → M a
 withLets task = do
   top <- getTop
   let mode = top.elabMode
-  modifyTop { elabMode := KeepLets }
+  modifyTop { elabMode := InlineEval }
   res <- task
   modifyTop { elabMode := mode }
   pure res

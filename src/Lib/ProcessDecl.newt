@@ -355,6 +355,7 @@ processInstance ns instfc ty decls = do
   log 1 "\{render 90 $ pretty sigDecl}"
   log 1 $ render 80 $ pretty decl
   processDecl ns decl
+  setFlag (QN ns instname) instfc InstCon
   where
     -- try to extract types of individual fields from the typeclass dcon
     -- We're assuming they don't depend on each other.
