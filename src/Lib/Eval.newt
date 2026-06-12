@@ -303,11 +303,16 @@ zonkBind : TopContext -> Int -> Env -> Tm -> M Tm
 zonkBind top l env tm = zonk top (1 + l) (VVar (getFC tm) "_" l Lin :: env) tm
 
 -- REVIEW FC might be dicey here
-appSpine : Tm -> List (Tm × Quant) -> Tm
-appSpine t Nil = t
-appSpine t ((x,q) :: xs) = appSpine (App (getFC t) t x q) xs
+zonkSpine : Int → Env → Tm → List (Tm × Quant) → M Tm
+zonkSpine l env t Nil = pure t
+zonkSpine l env t ((x,q) :: xs) = do
+  top <- getTop
+  x <- zonk top l env x
+  zonkSpine l env (App (getFC t) t x q) xs
 
 eval' : Env → Tm × Quant → M (Val × Quant)
+-- these get tossed anyway
+eval' env (t,Zero) = return (VErased (getFC t), Zero)
 eval' env (t,q) = do
   v <- eval env t
   pure (v,q)
@@ -341,13 +346,12 @@ withLets task = do
   modifyTop { elabMode := mode }
   pure res
 
+alias QuantVal = Val × Quant
+
 zonkApp : TopContext -> Int -> Env -> Tm -> List (Tm × Quant) -> M Tm
 -- skipping these gains us 2.5% time
-zonkApp top l env (App fc t u Zero) sp =
-  zonkApp top l env t ((u, Zero):: sp)
-zonkApp top l env (App fc t u q) sp = do
-  u' <- zonk top l env u
-  zonkApp top l env t ((u', q):: sp)
+zonkApp top l env (App fc t u Zero) sp = zonkApp top l env t ((Erased fc, Zero):: sp)
+zonkApp top l env (App fc t u q) sp = zonkApp top l env t ((u, q):: sp)
 zonkApp top l env t@(Meta fc k) sp = do
   meta <- lookupMeta k
   case meta of
@@ -356,7 +360,6 @@ zonkApp top l env t@(Meta fc k) sp = do
       debug "spine \{show sp}"
       sp' <- traverse (eval' env) sp
       debug $  "zonk meta \{show k} -> \{show v} spine \{show sp'}"
-      -- FIXME find quants...
       foo <- vappSpine v (Lin <>< sp')
       debug $  "-> result is \{show foo}"
       if length' env /= l
@@ -364,32 +367,42 @@ zonkApp top l env t@(Meta fc k) sp = do
         else pure MkUnit
       res <- tweakFC fc <$> quote l foo
       debug "quoted \{show res}"
-      pure res
-    _ => pure $ appSpine t sp
+      zonk top l env res
+    _ => zonkSpine l env t sp
+
 
 zonkApp top l env t sp = do
   debug "zonk2 for \{show t} env \{show env}"
   debug "spine \{show sp}"
   t' <- zonk top l env t
   -- inlining
-  let (Just tm) = inlineDef t' | _ => pure $ appSpine t' sp
+  let (Just (tm,ty)) = inlineDef t' | _ => zonkSpine l env t' sp
   sp' <- traverse (eval' env) sp
   vtm <- eval env tm
   catchError (do
     debug $  "zonk will app \{show t'} @ \{show sp} ~> \{show vtm} @ \{show sp'}"
-    res <- vappSpine vtm (Lin <>< sp')
+    let (sp', args) = splitSpine ty Lin sp'
+    debug $ "TYPE \{show ty}"
+    debug $ "SPLIT \{show sp'} AND \{show args}"
+    res <- vappSpine vtm sp'
     debug "result is \{show res}"
     t' <- quote l res
-    x <- zonk top l env t'
-    pure x)
+    t' <- quoteSp l t' (Lin <>< args)
+    zonk top l env t')
     (\err => do
       debug "result err \{show err}"
-      pure $ appSpine t' sp)
+      zonkSpine l env t' sp)
   where
+    -- peel off enough args for the function, hoping to avoid the errors from app of case or let
+    splitSpine : Tm → SnocList QuantVal → List QuantVal → SnocList QuantVal × List QuantVal
+    splitSpine t sp Nil = (sp, Nil)
+    splitSpine (Pi fc nm _ _ a b) sp (arg :: args) = splitSpine b (sp :< arg) args
+    splitSpine t sp args = (sp, args)
+
     -- lookup name and return Def if flagged inline
-    inlineDef : Tm → Maybe Tm
+    inlineDef : Tm → Maybe (Tm × Tm)
     inlineDef (Ref _ nm) = case lookup nm top of
-      Just (MkEntry _ _ _ ty (Fn tm) flags) => if elem Inline flags then Just tm else Nothing
+      Just (MkEntry _ _ _ ty (Fn tm) flags) => if elem Inline flags then Just (tm, ty) else Nothing
       _ => Nothing
     inlineDef _ = Nothing
 
@@ -399,21 +412,27 @@ zonkAlt top l env (CaseLit lit t) = CaseLit lit <$> zonk top l env t
 zonkAlt top l env (CaseCons name args t) = CaseCons name args <$> go l env args t
   where
     go : Int -> Env -> List String -> Tm -> M Tm
-    go l env Nil tm = zonk top l env t
+    go l env Nil tm = zonk top l env tm
     go l env (x :: xs) tm = go (1 + l) (VVar (getFC tm) x l Lin :: env) xs tm
 
 zonk top l env t =
-  let env' = VVar emptyFC "_" l Lin :: env in
   case t of
-  -- REVIEW - Can we avoid inlining erased values for performance?
   (Meta fc k) => zonkApp top l env t Nil
   (Force fc t) => Force fc <$> zonk top l env t
   (Delay fc t) => Delay fc <$> zonk top l env t
-  (Lam fc nm icit rig u) => Lam fc nm icit rig <$> (zonk top (1 + l) env' u)
+  (Lam fc nm icit rig u) =>
+    let env' = VVar emptyFC "_" l Lin :: env in
+    Lam fc nm icit rig <$> (zonk top (1 + l) env' u)
   (App fc _ _ q) => withLets $ zonkApp top l env t Nil
-  (Pi fc nm icit rig a b) => Pi fc nm icit rig <$> zonk top l env a <*> zonkBind top (l + 1) env' b
-  (Let fc nm t u) => Let fc nm <$> zonk top l env t <*> zonkBind top (l + 1) env' u
-  (LetRec fc nm ty t u) => LetRec fc nm <$> zonk top l env ty <*> zonkBind top (l + 1) env' t <*> zonkBind top (l + 1) env' u
+  (Pi fc nm icit rig a b) =>
+    let env' = VVar emptyFC "_" l Lin :: env in
+    Pi fc nm icit rig <$> zonk top l env a <*> zonkBind top (l + 1) env' b
+  (Let fc nm t u) =>
+    let env' = VVar emptyFC "_" l Lin :: env in
+    Let fc nm <$> zonk top l env t <*> zonkBind top (l + 1) env' u
+  (LetRec fc nm ty t u) =>
+    let env' = VVar emptyFC "_" l Lin :: env in
+    LetRec fc nm <$> zonk top l env ty <*> zonkBind top (l + 1) env' t <*> zonkBind top (l + 1) env' u
   (Case fc sc alts) => do
       sc' <- zonk top l env sc
       alts' <- traverse (zonkAlt top l env) alts
