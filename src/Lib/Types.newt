@@ -291,6 +291,11 @@ data MetaEntry
   | Solved FC QName Val
   | OutOfScope
 
+instance HasFC MetaEntry where
+  getFC (Unsolved fc _ _ _ _) = fc
+  getFC (Solved fc _ _) = fc
+  getFC OutOfScope = emptyFC
+
 -- The purpose of this is to only check one level of constraints when trying an Auto solution
 -- The idea being we narrow it down to the likely solution, and let any consequent type error
 -- bubble up to the user, rather than have a type error wipe out all solutions.
@@ -395,6 +400,8 @@ record TopContext where
 
 -- For erasure, is the erased marker present in the environment
 data Marker = Present | Absent
+
+derive Show Marker
 
 record Context where
   constructor MkCtx

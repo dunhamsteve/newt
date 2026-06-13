@@ -25,6 +25,12 @@ checkMarker fc _ Many = pure MkUnit
 checkMarker fc (MkCtx lvl env types bds ctxFC Present) Zero = pure MkUnit
 checkMarker fc (MkCtx lvl env types bds ctxFC Absent) Zero = throwError $ E fc "Erased value used in unerased context"
 
+checkMarker' : FC → Val → Marker → Quant → M Unit
+checkMarker' fc val _ Many = pure MkUnit
+checkMarker' fc val Present Zero = pure MkUnit
+checkMarker' fc val Absent Zero = throwError $ E (getFC val) "Erased value \{show val} used in unerased context"
+
+
 -- collectDecl collects multiple Def for one function into one
 collectDecl : List Decl -> List Decl
 collectDecl Nil = Nil
@@ -335,20 +341,24 @@ invert lvl sp = go sp Nil
         else go xs (k :: acc)
     go (xs :< v) _ = error (getFC v) "non-variable in pattern \{show v}"
 
-rename : QName -> List Int -> Int -> Val  -> M Tm
+rename : QName -> Marker -> List Int -> Int -> Val  -> M Tm
 
-renameSpine : QName -> List Int -> Int -> Tm -> SnocList (Val × Quant) -> M Tm
-renameSpine meta ren lvl tm Lin = pure tm
-renameSpine meta ren lvl tm (xs :< (x, q)) = do
-  xtm <- rename meta ren lvl x
-  xs' <- renameSpine meta ren lvl tm xs
+renameSpine : QName -> Marker -> List Int -> Int -> Tm -> SnocList (Val × Quant) -> M Tm
+renameSpine meta mark ren lvl tm Lin = pure tm
+renameSpine meta mark ren lvl tm (xs :< (x, q)) = do
+  let mark' = if q == Zero then Present else mark
+  xtm <- rename meta mark' ren lvl x
+  xs' <- renameSpine meta mark ren lvl tm xs
   pure $ App emptyFC xs' xtm q
 
-rename meta ren lvl (VVar fc nm k sp) = case findIndex' (_==_ k) ren of
+-- I think we need to check quantity here.
+rename meta mark ren lvl (VVar fc nm k sp) = case findIndex' (_==_ k) ren of
   Nothing => error fc "scope/skolem thinger VVar \{show k} ren \{show ren}"
-  Just x => renameSpine meta ren lvl (Bnd fc x) sp
-rename meta ren lvl (VRef fc nm sp) = renameSpine meta ren lvl (Ref fc nm) sp
-rename meta ren lvl (VMeta fc ix sp) = do
+  Just x => renameSpine meta mark ren lvl (Bnd fc x) sp
+rename meta mark ren lvl (VRef fc nm sp) = do
+  -- FIXME lookup quantity of VRef - we should keep this on the VRef..
+  renameSpine meta mark ren lvl (Ref fc nm) sp
+rename meta mark ren lvl (VMeta fc ix sp) = do
   -- So sometimes we have an unsolved meta in here which reference vars out of scope.
   debug "rename Meta \{show ix} spine \{show sp}"
   if ix == meta
@@ -360,25 +370,28 @@ rename meta ren lvl (VMeta fc ix sp) = do
         Solved fc _ val => do
           debug "rename: \{show ix} is solved"
           val' <- vappSpine val sp
-          rename meta ren lvl val'
+          rename meta mark ren lvl val'
         _ => do
           debug "rename: \{show ix} is unsolved"
-          catchError (renameSpine meta ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc (errorMsg err))
-rename meta ren lvl (VLam fc n icit rig t) = do
+          catchError (renameSpine meta mark ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc (errorMsg err))
+rename meta mark ren lvl (VLam fc n icit rig t) = do
   tapp <- t $$ VVar fc n lvl Lin
-  scope <- rename meta (lvl :: ren) (1 + lvl) tapp
+  scope <- rename meta mark (lvl :: ren) (1 + lvl) tapp
   pure (Lam fc n icit rig scope)
-rename meta ren lvl (VPi fc n icit rig ty tm) = do
-  ty' <- rename meta ren lvl ty
+rename meta mark ren lvl v@(VPi fc n icit rig ty tm) = do
+  checkMarker' fc v mark Zero
+  ty' <- rename meta mark ren lvl ty
   tmapp <- tm $$ VVar emptyFC n lvl Lin
-  scope' <- rename meta (lvl :: ren) (1 + lvl) tmapp
+  scope' <- rename meta mark (lvl :: ren) (1 + lvl) tmapp
   pure (Pi fc n icit rig ty' scope')
-rename meta ren lvl (VU fc) = pure (UU fc)
-rename meta ren lvl (VErased fc) = pure (Erased fc)
-rename meta ren lvl (VLit fc lit) = pure (Lit fc lit)
+rename meta mark ren lvl v@(VU fc) = do
+  checkMarker' fc v mark Zero
+  pure (UU fc)
+rename meta mark ren lvl (VErased fc) = pure (Erased fc)
+rename meta mark ren lvl (VLit fc lit) = pure (Lit fc lit)
 -- for now, we don't do solutions with case, let, letrec in them
 -- If we we need this, follow the model of VLam
-rename meta ren lvl tm = error (getFC tm) "Unhandled term in `rename`: \{show tm}"
+rename meta mark ren lvl tm = error (getFC tm) "Unhandled term in `rename`: \{show tm}"
 
 lams : Nat -> List (String × Val × Quant) -> Tm -> Tm
 lams Z _ tm = tm
@@ -430,7 +443,8 @@ solve env m sp t = do
   hack <- quote l t
   t <- eval env hack
   catchError (do
-    tm <- rename m ren l t
+    -- REVIEW - the one from the creation context, right?
+    tm <- rename m ctx_.marker ren l t
 
     let tm = lams (snoclen sp) (reverse ctx_.boundNames) tm
     top <- getTop
@@ -670,7 +684,7 @@ freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
 freshMeta ctx fc ty kind = do
   top <- getTop
   let mc = top.currentMod.modMetaCtx
-  debug "fresh meta \{show mc.next} : \{show ty} (\{show kind})"
+  debug "fresh meta \{show mc.next} : \{show ty} (\{show kind}, \{show ctx.marker})"
   -- need the ns here
   -- we were fudging this for v1
   let qn = QN top.currentMod.modName "$m\{show mc.next}"
@@ -718,7 +732,7 @@ insert ctx tm ty = do
       bapp <- b $$ mv
       insert ctx (App (getFC tm) tm m rig) bapp
     VPi fc x Implicit rig a b => do
-      m <- freshMeta ctx (getFC tm) a Normal
+      m <- freshMeta (enterMarker ctx) (getFC tm) a Normal
       debug "INSERT \{rpprint (names ctx) m} : \{show a}"
       debug "TM \{rpprint (names ctx) tm}"
       mv <- eval ctx.env m
@@ -1729,7 +1743,7 @@ infer ctx (RLet fc nm ty v sc) = do
   pure (Let fc nm v' sc', scty)
 
 infer ctx (RLam _ (BI fc nm icit quant) tm) = do
-  a <- freshMeta ctx fc (VU emptyFC) Normal >>= eval ctx.env
+  a <- freshMeta (enterMarker ctx) fc (VU emptyFC) Normal >>= eval ctx.env
   let ctx' = extend ctx nm a quant
   (tm', b) <- infer ctx' tm
   debug "make lam for \{show nm} scope \{rpprint (names ctx) tm'} : \{show b}"
@@ -1737,7 +1751,7 @@ infer ctx (RLam _ (BI fc nm icit quant) tm) = do
   pure (Lam fc nm icit quant tm', VPi fc nm icit quant a (MkClosure ctx.env tyb))
 
 infer ctx (RImplicit fc) = do
-  ty <- freshMeta ctx fc (VU emptyFC) Normal
+  ty <- freshMeta (enterMarker ctx) fc (VU emptyFC) Normal
   vty <- eval ctx.env ty
   tm <- freshMeta ctx fc vty Normal
   pure (tm, vty)
