@@ -270,30 +270,32 @@ processClass ns classFC (nameFC, nm) tele decls = do
     mkApp acc (BI fc nm icit _, _) = RApp fc acc (RVar fc nm) icit
 
 processInstance :  String → FC → Raw → Maybe (List Decl) → M Unit
-processInstance ns instfc ty decls = do
+processInstance ns instfc rawty decls = do
   log 1 "-----"
-  log 1 "Instance \{render 90 $ pretty ty}"
+  log 1 "Instance \{render 90 $ pretty rawty}"
   top <- getTop
-  let tyFC = getFC ty
+  let tyFC = getFC rawty
 
-  vty <- check (mkCtx instfc Zero) ty (VU instfc)
+  let emptyCtx = mkCtx tyFC Zero
+  ty <- check emptyCtx rawty (VU instfc)
   -- Here `tele` holds arguments to the instance
-  let (codomain, tele) = splitTele vty
+  let (codomain, tele) = splitTele ty
   -- env represents the environment of those arguments
   let env = tenv (length tele)
   debug "codomain \{render 90 $ pprint Nil codomain}"
   debug "tele is \{show tele}"
 
-  -- ok so we need a name, a hack for now.
-  -- Maybe we need to ask the user (e.g. `instance someName : Monad Foo where`)
-  -- or use "Monad\{show $ length' defs}"
+  -- a hack for a unique name
   let instname = render 90 $ pprint Nil codomain
-  let sigDecl = TypeSig instfc Many (instname :: Nil) ty
-  -- This needs to be declared before processing the defs, but the defs need to be
-  -- declared before this - side effect is that a duplicate def is noted at the first
+  let sigDecl = TypeSig instfc Many (instname :: Nil) rawty
+  -- The instance needs to be declared before processing the defs, but the defs need to be
+  -- defined before this - side effect is that a duplicate def is noted at the first
   -- member
   case lookup (QN ns instname) top of
-    Just _ => pure MkUnit -- TODO check that the types match
+    Just entry => do
+      vty' <- eval Nil entry.type
+      vty <- eval Nil ty
+      unifyCatch tyFC emptyCtx vty vty'
     Nothing => do
       -- only add once
       processDecl ns sigDecl
@@ -497,13 +499,14 @@ processData ns fc (nameFC, nm) ty cons = do
   log 1 "Data \{nm}"
   top <- getTop
   let mc = top.currentMod.modMetaCtx
-  tyty <- check (mkCtx fc Zero) ty (VU fc)
+  let emptyCtx = mkCtx fc Zero
+  tyty <- check emptyCtx ty (VU fc)
   case lookup (QN ns nm) top of
     Just (MkEntry fdeclFC q name type Axiom _) => do
       let (Zero) = q | _ => error fdeclFC "Type constructor forward declaration at wrong quantity"
       tyty' <- eval Nil tyty
       type' <- eval Nil type
-      unifyCatch fc (mkCtx fc Zero) tyty' type'
+      unifyCatch fc emptyCtx tyty' type'
     Just _ => error nameFC "\{show nm} already declared"
     Nothing => setDef (QN ns nm) fc Zero tyty Axiom Nil
   -- check cons, return list of type,con
