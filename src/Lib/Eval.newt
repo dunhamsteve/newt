@@ -19,11 +19,12 @@ _$$_ (MkClosure env tm) u = eval (u :: env) tm
 
 vapp : Val -> Val ->  Quant -> M Val
 vapp (VLam _ _ _ _ t) u q = t $$ u
+vapp (VPi _ _ _ _ _ t) u q = t $$ u
 vapp (VVar fc nm k sp) u q = pure $ VVar fc nm k (sp :< (u,q))
 vapp (VRef fc nm sp) u q = pure $ VRef fc nm (sp :< (u,q))
 vapp (VMeta fc k sp) u q = pure $ VMeta fc k (sp :< (u,q))
 -- not really impossible, could be a stuck VCase.
-vapp t u q = error' "impossible in vapp \{show t} to \{show u}\n"
+vapp t u q = error' "unhandled vapp \{show t} to \{show u}\n"
 
 vappSpine : Val -> VSpine -> M Val
 vappSpine t Lin = pure t

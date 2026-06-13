@@ -1,0 +1,14 @@
+module Erase.Pair
+
+data Pair : (A : U) → (B : U) → U where
+  MkPair : {A : U} {B : U} → A → B → Pair A B
+
+blah : Pair Int Int
+blah = MkPair 1 2
+
+id : {A : U} → A → A
+id x = x
+
+
+bar : Int
+bar = id 1

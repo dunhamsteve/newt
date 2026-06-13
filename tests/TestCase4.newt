@@ -5,27 +5,27 @@ data Nat : U where
   S : Nat -> Nat
 
 data Vect : Nat -> U -> U where
-  Nil : {a : U} -> Vect Z a
-  _::_ : {a : U} -> {k : Nat} -> a -> Vect k a -> Vect (S k) a
+  Nil : {0 a : U} -> Vect Z a
+  _::_ : {0 a : U} -> {0 k : Nat} -> a -> Vect k a -> Vect (S k) a
 
 infixr 5 _::_
 
-head : {a : U} {k : Nat} -> Vect (S k) a -> a
+head : {0 a : U} {0 k : Nat} -> Vect (S k) a -> a
 head (x :: xs) = x
 
 -- These came from a Conor McBride lecture where they use SHE
 
-vapp : {s t : U} {k : Nat} -> Vect k (s -> t) -> Vect k s -> Vect k t
+vapp : {0 s t : U} {0 k : Nat} -> Vect k (s -> t) -> Vect k s -> Vect k t
 vapp (f :: fs) (t :: ts) = f t :: vapp fs ts
 vapp Nil Nil = Nil
 
-vec : { a : U } -> (n : Nat) -> a -> Vect n a
+vec : {0 a : U } -> (n : Nat) -> a -> Vect n a
 vec Z x = Nil
 vec (S k) x = x :: vec k x
 
 -- And then typeclass, which I don't have yet. I'll add a few underlying functions
 
-fmap : {a b : U} {n : Nat} -> (a -> b) -> Vect n a -> Vect n b
+fmap : {0 a b : U} {0 n : Nat} -> (a -> b) -> Vect n a -> Vect n b
 fmap f Nil = Nil
 fmap f (x :: xs) = (f x :: fmap f xs)
 
@@ -39,17 +39,18 @@ _<*>_ = vapp
 
 -- I'll add foldl
 
-foldl : {acc el : U} {n : Nat} -> (acc -> el -> acc) -> acc -> Vect n el -> acc
+foldl : {0 acc el : U} {0 n : Nat} -> (acc -> el -> acc) -> acc -> Vect n el -> acc
 foldl f acc Nil = acc
 foldl f acc (x :: xs) = foldl f (f acc x) xs
 
-zipWith : {a b c : U} {m : Nat} -> (a -> b -> c) -> Vect m a -> Vect m b -> Vect m c
+zipWith : {0 a b c : U} {0 m : Nat} -> (a -> b -> c) -> Vect m a -> Vect m b -> Vect m c
 zipWith f Nil Nil = Nil
 zipWith f (x :: xs) (y :: ys) = f x y :: zipWith f xs ys
 
-transpose : {a : U} {m n : Nat} -> Vect m (Vect n a) -> Vect n (Vect m a)
+transpose : {0 a : U} {m n : Nat} -> Vect m (Vect n a) -> Vect n (Vect m a)
 transpose {a} {Z} {n} Nil = vec n Nil
-transpose {a} {S z} {n} (_::_ {a'} {j} x xs) = zipWith (_::_) x (transpose xs)
+-- FIXME CaseTree - erased k is chosen over z
+transpose {a} {S z} {n} (_::_ {a'} {j} x xs) = zipWith (_::_) x (transpose {_} {z} {_}  xs)
 
 
 

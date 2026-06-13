@@ -62,7 +62,7 @@ data T23 : Bnd -> Bnd -> Nat -> U where
 infixl 5 _*_
 infixr 1 _,_
 data Sg : (A : U) -> (A -> U) -> U where
-  _,_ : {A : U} {B : A -> U} -> (a : A) -> B a -> Sg A B
+  _,_ : {0 A : U} {0 B : A -> U} -> (a : A) -> B a -> Sg A B
 
 0 _*_ : U -> U -> U
 a * b = Sg a (\ _ => b)

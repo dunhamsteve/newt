@@ -6,10 +6,10 @@ id = \ A x => x
 0 List : U -> U
 List = \ A => (L : _) -> (A -> L -> L) -> L -> L
 
-nil : (A : _) -> List A
+nil : (0 A : _) -> List A
 nil = \ A L cons nil => nil
 
-cons : (A : _) -> A -> List A -> List A
+cons : (0 A : _) -> A -> List A -> List A
 cons = \A x xs L cons nil => cons x (xs _ cons nil)
 
 0 Bool : U
@@ -27,7 +27,7 @@ not = \ b B t f => b B f t
 0 Eq : (A : _) -> A -> A -> U
 Eq = \A x y => (P : A -> U) -> P x -> P y
 
-refl : (A : _) (x : A) -> Eq A x x
+refl : (0 A : _) (0 x : A) -> Eq A x x
 refl = \ A x p px => px
 
 list1 : List Bool

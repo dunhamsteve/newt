@@ -327,23 +327,23 @@ addConstraint env fc tm' tm = do
       _ => expand mc ns acc
 
 -- return renaming, the position is the new VVar
-invert : Int -> SnocList Val -> M (List Int)
+invert : Int -> SnocList (Val × Quant) -> M (List (Int × Quant))
 invert lvl sp = go sp Nil
   where
-    go : SnocList Val -> List Int -> M (List Int)
+    go : SnocList (Val × Quant) -> List (Int × Quant) -> M (List (Int × Quant))
     go Lin acc = pure $ reverse acc
-    go (xs :< VVar fc nm k Lin) acc = do
-      if elem k acc
+    go (xs :< (VVar fc nm k Lin, q)) acc = do
+      if elem (k,q) acc
         then do
           debug "\{show k} \{show acc}"
           -- when does this happen?
           error fc "non-linear pattern: \{show sp}"
-        else go xs (k :: acc)
-    go (xs :< v) _ = error (getFC v) "non-variable in pattern \{show v}"
+        else go xs ((k,q) :: acc)
+    go (xs :< v) _ = error (getFC $ fst v) "non-variable in pattern \{show v}"
 
-rename : QName -> Marker -> List Int -> Int -> Val  -> M Tm
+rename : QName -> Marker -> List (Int × Quant) -> Int -> Val  -> M Tm
 
-renameSpine : QName -> Marker -> List Int -> Int -> Tm -> SnocList (Val × Quant) -> M Tm
+renameSpine : QName -> Marker -> List (Int × Quant)-> Int -> Tm -> SnocList (Val × Quant) -> M Tm
 renameSpine meta mark ren lvl tm Lin = pure tm
 renameSpine meta mark ren lvl tm (xs :< (x, q)) = do
   let mark' = if q == Zero then Present else mark
@@ -352,11 +352,26 @@ renameSpine meta mark ren lvl tm (xs :< (x, q)) = do
   pure $ App emptyFC xs' xtm q
 
 -- I think we need to check quantity here.
-rename meta mark ren lvl (VVar fc nm k sp) = case findIndex' (_==_ k) ren of
-  Nothing => error fc "scope/skolem thinger VVar \{show k} ren \{show ren}"
-  Just x => renameSpine meta mark ren lvl (Bnd fc x) sp
+rename meta mark ren lvl v@(VVar fc nm k sp) = go 0 ren
+  where
+    go : Int → List (Int × Quant) → M Tm
+    go x Nil = error fc "scope/skolem thinger VVar \{show k} ren \{show ren}"
+    go x ((k',q) :: rest) = if k' == k
+      then do
+        checkMarker' fc v mark q
+        renameSpine meta mark ren lvl (Bnd fc x) sp
+      else go (x + 1) rest
+rename meta Absent ren lvl v@(VRef fc nm sp) = do
+  top <- getTop
+  case lookup nm top of
+    Just (MkEntry fc q name type def eflags) => do
+      checkMarker' fc v Absent q
+      renameSpine meta Absent ren lvl (Ref fc nm) sp
+
+    _ => renameSpine meta Absent ren lvl (Ref fc nm) sp
+
 rename meta mark ren lvl (VRef fc nm sp) = do
-  -- FIXME lookup quantity of VRef - we should keep this on the VRef..
+  -- FIXME lookup quantity of VRef (if mark absent) - we should keep this on the VRef..
   renameSpine meta mark ren lvl (Ref fc nm) sp
 rename meta mark ren lvl (VMeta fc ix sp) = do
   -- So sometimes we have an unsolved meta in here which reference vars out of scope.
@@ -376,13 +391,13 @@ rename meta mark ren lvl (VMeta fc ix sp) = do
           catchError (renameSpine meta mark ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc (errorMsg err))
 rename meta mark ren lvl (VLam fc n icit rig t) = do
   tapp <- t $$ VVar fc n lvl Lin
-  scope <- rename meta mark (lvl :: ren) (1 + lvl) tapp
+  scope <- rename meta mark ((lvl,rig) :: ren) (1 + lvl) tapp
   pure (Lam fc n icit rig scope)
 rename meta mark ren lvl v@(VPi fc n icit rig ty tm) = do
   checkMarker' fc v mark Zero
   ty' <- rename meta mark ren lvl ty
   tmapp <- tm $$ VVar emptyFC n lvl Lin
-  scope' <- rename meta mark (lvl :: ren) (1 + lvl) tmapp
+  scope' <- rename meta mark ((lvl,rig) :: ren) (1 + lvl) tmapp
   pure (Pi fc n icit rig ty' scope')
 rename meta mark ren lvl v@(VU fc) = do
   checkMarker' fc v mark Zero
@@ -418,12 +433,10 @@ maybeCheck action = do
     NoCheck => pure MkUnit
 
 solve env m sp t = do
-  let sp' = map fst sp
-  -- FIXME use the quantities
-  meta@(Unsolved metaFC ix ctx_ ty kind) <- lookupMeta m
+  meta@(Unsolved metaFC ix ctx ty kind) <- lookupMeta m
     | _ => error (getFC t) "Meta \{show m} already solved! [solve]"
-  debug "SOLVE \{show m} \{show kind} lvl \{show $ length' env} sp \{show sp} is \{show t}"
-  let size = length $ filter (\x => x == Bound) ctx_.bds
+  debug "SOLVE \{show m} \{show kind} lvl \{show $ length' env} sp \{show sp} is \{show t} mark \{show ctx.marker}"
+  let size = length $ filter (\x => x == Bound) ctx.bds
   debug "\{show m} size is \{show size} sps \{show $ snoclen sp}"
   let (True) = snoclen sp == size
     | _ => do
@@ -435,7 +448,7 @@ solve env m sp t = do
   debug "meta \{show meta}"
 
   -- tests/UnifyPi.newt - Solution is non-linear, but is solved later
-  Right ren <- tryError $ invert l sp'
+  Right ren <- tryError $ invert l sp
     | Left err => do
         debug "postpone constraint \{show err}"
         addConstraint env (getFC t) (VMeta (getFC t) m sp) t
@@ -443,10 +456,8 @@ solve env m sp t = do
   hack <- quote l t
   t <- eval env hack
   catchError (do
-    -- REVIEW - the one from the creation context, right?
-    tm <- rename m ctx_.marker ren l t
-
-    let tm = lams (snoclen sp) (reverse ctx_.boundNames) tm
+    tm <- rename m ctx.marker ren l t
+    let tm = lams (snoclen sp) (reverse ctx.boundNames) tm
     top <- getTop
     soln <- eval Nil tm
 
@@ -725,16 +736,16 @@ insert ctx tm ty = do
   ty' <- forceMeta ty
   case ty' of
     VPi fc x Auto rig a b => do
-      m <- freshMeta ctx (getFC tm) a AutoSolve
+      m <- freshMeta (enterMarker' rig ctx) (getFC tm) a AutoSolve
       debug "INSERT Auto \{rpprint (names ctx) m} : \{show a}"
       debug "TM \{rpprint (names ctx) tm}"
       mv <- eval ctx.env m
       bapp <- b $$ mv
       insert ctx (App (getFC tm) tm m rig) bapp
     VPi fc x Implicit rig a b => do
-      m <- freshMeta (enterMarker ctx) (getFC tm) a Normal
-      debug "INSERT \{rpprint (names ctx) m} : \{show a}"
-      debug "TM \{rpprint (names ctx) tm}"
+      m <- freshMeta (enterMarker' rig ctx) (getFC tm) a Normal
+      debug "INSERT \{rpprint (names ctx) m} : \{show a} rig \{show rig} mark \{show ctx.marker}"
+      debug "FOR TM \{rpprint (names ctx) tm}"
       mv <- eval ctx.env m
       bapp <- b $$ mv
       insert ctx (App (getFC tm) tm m rig) bapp

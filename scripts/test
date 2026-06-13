@@ -8,6 +8,7 @@ mkdir -p tmp
 total=0
 failed=0
 tests=$(find tests -name '*.newt')
+faillist=()
 for fn in $tests; do
   total=$((total + 1))
   echo Test $fn
@@ -26,7 +27,8 @@ for fn in $tests; do
         echo "Compile failure mismatch for $fn"
         diff ${fn}.fail tmp/${bn}.compile
         failed=$((failed + 1))
-        if [ x$1 = "x--fix" ]; then
+        faillist+=$fn
+        if [ x$1 = "x-u" ]; then
           cp tmp/${bn}.compile ${fn}.fail
         fi
         continue
@@ -34,6 +36,7 @@ for fn in $tests; do
   elif [ $cerr != "0" ]; then
     echo Compile failed for $fn
     failed=$((failed + 1))
+    faillist+="\n$fn"
     cat tmp/${bn}.compile
 
     continue
@@ -44,18 +47,22 @@ for fn in $tests; do
     if [ $? != "0" ]; then
       echo Run failed for $fn
       failed=$((failed + 1))
+      faillist+="\n$fn"
       continue
     fi
     if ! diff -q tmp/${bn}.out ${fn}.golden; then
       echo "Output mismatch for $fn"
       diff ${fn}.golden tmp/${bn}.out
       failed=$((failed + 1))
-      if [ x$1 = "x--fix" ]; then
+      if [ x$1 = "x-u" ]; then
         cp tmp/${bn}.out ${fn}.golden
       fi
     fi
   fi
 done
 echo "Total tests: $total"
-echo "Failed tests: $failed"
+if [ "$failed" -ne 0 ]; then
+  echo "Failed $failed tests: $faillist"
+  echo "-u to update"
+fi
 

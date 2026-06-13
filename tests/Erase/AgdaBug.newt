@@ -1,0 +1,22 @@
+module Erase.AgdaBug
+
+0 Nat : U
+Nat = (0 A : U) -> A -> (A -> A) -> A
+
+zero : Nat
+zero = \A z s => z
+succ : Nat -> Nat
+succ = \n A z s => s (n A z s)
+
+bing :
+  (0 A : U) ->
+  (F : U -> U) ->
+  (0 eq : {0 A : U} -> A -> A -> U) ->
+  (refl : {0 A : U} -> {0 a : A} -> eq a a) -> Nat
+bing = \A F eq refl => (
+    -- Agda can't figure out that this meta is unsolvable:
+    -- https://github.com/agda/agda/issues/5703
+    let x : U = _ in
+    let unsolved : eq x (F A) = refl in
+    zero
+  )

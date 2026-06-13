@@ -9,7 +9,7 @@ plus Z y = y
 plus (S x) y = S (plus x y)
 
 data Eq : {A : U} -> A -> A -> U where
-  Refl : {A : U} -> {x : A} -> Eq x x
+  Refl : {0 A : U} -> {0 x : A} -> Eq x x
 
 two : Eq (plus (S Z) (S Z)) (S (S Z))
 two = Refl

@@ -1,6 +1,8 @@
 
 ## TODO
 
+- [ ] Add missing args code action?
+  - (useful both for refactoring and type constructor and autocomplete)
 - [ ] Port test suite from erasure-impl
 - [x] Constraint error messages have bad FC
   - point to say a constructor def and not the code with the constraint
@@ -78,6 +80,7 @@
 - [ ] `local` for `where`-like `let` clauses? (I want a `where` that closes over more stuff)
   - I can do `let f : ... = \ a b c => ...`. But it doesn't work for recursion and cases are awkward.
 - [ ] Erasure issue during AoC from case building replacing a non-erased value with erased.
+  - [ ] see TestCase4 for an example
 - [x] Add Foldable
 - [ ] Maybe return constraints instead of solving metas during unification
   - We already return non-meta constraints for work on the LHS.
@@ -113,7 +116,6 @@
   - Removes assumptions of hack in Compile.newt, but might not support other backends
   - Alternate solution would be to pull from Prelude and hard code for all backends
   - POper added to physical syntax types, but not implemented
-- [ ] Fix issue with erasure checking: `tests/aside/Quantity.newt`.
 - [x] Remove erased fields from constructor data
 - [ ] Teach magic nat / magic enum about erased args
 - [x] Update LiftLambda.newt for arg removal changes
@@ -387,13 +389,13 @@
   - uses `-o` option
 - [ ] detect extra clauses in case statements
 - [ ] add test framework
-- [ ] decide what to do for erasure
+- [x] decide what to do for erasure
   - I'm going to try explicit annotation, forall/∀ is erased
   - [x] Parser side
   - [x] push down to value/term
   - [x] check quantity
   - [x] erase in output
-- [ ] remove erased top level arguments
+- [x] remove erased top level arguments
   - maybe have something shaped like `List Bool` for `arity`
 - [x] top level at point in vscode
 - [x] repl

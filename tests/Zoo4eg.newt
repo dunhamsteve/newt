@@ -43,10 +43,10 @@ false = \B t f => f
 0 List : U -> U
 List = \A => (L : _) -> (A -> L -> L) -> L -> L
 
-nil : {A : U} -> List A
+nil : {0 A : U} -> List A
 nil = \L cons nil => nil
 
-cons : {A : U} -> A -> List A -> List A
+cons : {0 A : U} -> A -> List A -> List A
 cons = \ x xs L cons nil => cons x (xs L cons nil)
 
 map : {A B : U} -> (A -> B) -> List A -> List B
@@ -86,7 +86,7 @@ hundred = mul ten ten
 0 Eq : {A : U} -> A -> A -> U
 Eq = \{A} x y => (0 P : A -> U) -> P x -> P y
 
-refl : {A : U} {x : A} -> Eq x x
+refl : {0 A : U} {0 x : A} -> Eq x x
 refl = \_ px => px
 
 sym : {0 A x y : _} -> Eq {A} x y -> Eq y x

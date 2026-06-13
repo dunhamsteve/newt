@@ -443,6 +443,10 @@ names ctx = map fst ctx.types
 enterMarker : Context → Context
 enterMarker = { marker := Present }
 
+enterMarker' : Quant → Context → Context
+enterMarker' Zero = { marker := Present }
+enterMarker' Many ctx = ctx
+
 record M a where
   constructor MkM
   runM : TopContext -> IO (Either Error (TopContext × a))

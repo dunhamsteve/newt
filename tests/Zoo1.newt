@@ -15,12 +15,12 @@ data Unit : U where
   MkUnit : Unit
 
 data List : U -> U where
-  Nil : {a : U} -> List a
-  Cons : {a : U} -> a -> List a -> List a
+  Nil : {0 a : U} -> List a
+  Cons : {0 a : U} -> a -> List a -> List a
 
 data Maybe : U -> U where
-  Just : {a : U} -> a -> Maybe a
-  Nothing : {a : U} -> Maybe a
+  Just : {0 a : U} -> a -> Maybe a
+  Nothing : {0 a : U} -> Maybe a
 
 
 ----------------------------------
