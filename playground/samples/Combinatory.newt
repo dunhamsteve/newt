@@ -9,7 +9,7 @@ data Unit : U where
 infixr 7 _::_
 data List : U -> U where
   Nil : {A : U} -> List A
-  _::_ : {A : U} -> A -> List A -> List A
+  _::_ : {0 A : U} -> A -> List A -> List A
 
 infixr 6 _~>_
 data Type : U where
