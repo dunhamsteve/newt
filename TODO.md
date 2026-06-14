@@ -1,6 +1,7 @@
 
 ## TODO
 
+- [x] LSP actions in code playground
 - [ ] Add missing args code action?
   - (useful both for refactoring and type constructor and autocomplete)
 - [ ] Port test suite from erasure-impl

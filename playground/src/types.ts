@@ -1,9 +1,9 @@
 import { EditorView } from "codemirror";
 import { Diagnostic } from "@codemirror/lint";
-import { HoverResult } from "./ipc";
+import { CodeAction, HoverResult } from "./ipc";
 
 export interface CompileReq {
-  id: string
+  id: string;
   type: "compileRequest";
   fileName: string;
   src: string;
@@ -11,7 +11,7 @@ export interface CompileReq {
 }
 
 export interface CompileRes {
-  id: string
+  id: string;
   type: "compileResult";
   output: string;
   javascript: string;
@@ -19,20 +19,25 @@ export interface CompileRes {
 }
 
 export interface ConsoleList {
-  type: 'setConsole'
+  type: "setConsole";
   messages: string[];
 }
 export interface ConsoleItem {
-  type: 'pushConsole'
+  type: "pushConsole";
   message: string;
 }
 
 export interface ExecCode {
-  type: 'exec'
-  src: string
+  type: "exec";
+  src: string;
 }
 
-export type Message = CompileReq | CompileRes | ConsoleList | ConsoleItem | ExecCode
+export type Message =
+  | CompileReq
+  | CompileRes
+  | ConsoleList
+  | ConsoleItem
+  | ExecCode;
 // editor.(createModel / setModel / getModels) to switch files
 // TODO - remember files and allow switching?
 // static zip filesystem with user changes overlaid via localStorage
@@ -54,23 +59,27 @@ export interface TopData {
   context: TopEntry[];
 }
 export interface EditorDelegate {
-  getEntry(word: string, row: number, col: number): Promise<HoverResult | null>
-  onChange(value: string): unknown
-  getFileName(): string
-  lint(view: EditorView): Promise<Diagnostic[]> | Diagnostic[]
+  getEntry(word: string, row: number, col: number): Promise<HoverResult | null>;
+  getActions(
+    word: string,
+    row: number,
+    col: number,
+  ): Promise<CodeAction[] | null>;
+  onChange(value: string): unknown;
+  getFileName(): string;
+  lint(view: EditorView): Promise<Diagnostic[]> | Diagnostic[];
 }
 export interface Marker {
-  severity: 'error' | 'info' | 'warning'
-  message: string
-  startColumn: number
-  startLineNumber: number
-  endColumn: number
-  endLineNumber: number
+  severity: "error" | "info" | "warning";
+  message: string;
+  startColumn: number;
+  startLineNumber: number;
+  endColumn: number;
+  endLineNumber: number;
 }
 export interface AbstractEditor {
   setValue: (_: string) => unknown;
   getValue: () => string;
-  setMarkers: (_: Marker[]) => unknown
-  setDark(isDark: boolean): unknown
+  setMarkers: (_: Marker[]) => unknown;
+  setDark(isDark: boolean): unknown;
 }
-

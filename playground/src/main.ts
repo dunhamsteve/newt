@@ -5,19 +5,14 @@ import { h, render, VNode } from "preact";
 import { ChangeEvent } from "preact/compat";
 import { archive, preload } from "./preload.ts";
 import { b64decode, b64encode } from "./base64";
-import {
-  AbstractEditor,
-  EditorDelegate,
-  TopData,
-  Marker,
-} from "./types.ts";
+import { AbstractEditor, EditorDelegate, TopData, Marker } from "./types.ts";
 import { CMEditor, scheme } from "./cmeditor.ts";
 import { deflate } from "./deflate.ts";
 import { inflate } from "./inflate.ts";
 import { IPC, Position } from "./ipc.ts";
 import helpText from "./help.md?raw";
-import { basicSetup, EditorView} from "codemirror";
-import {Compartment, EditorState} from "@codemirror/state";
+import { basicSetup, EditorView } from "codemirror";
+import { Compartment, EditorState } from "@codemirror/state";
 import { javascript } from "@codemirror/lang-javascript";
 import { oneDark } from "@codemirror/theme-one-dark";
 
@@ -26,47 +21,49 @@ let topData: undefined | TopData;
 const ipc = new IPC();
 
 function mdline2nodes(s: string) {
-  let cs: (VNode<any>|string)[] = []
-  let toks = s.matchAll(/\*\*(.*?)\*\*|\*(.*?)\*|_(.*?)_|!\[(.*?)\]\((.*?)\)|:(\w+):|[^*]+|\*/g);
+  let cs: (VNode<any> | string)[] = [];
+  let toks = s.matchAll(
+    /\*\*(.*?)\*\*|\*(.*?)\*|_(.*?)_|!\[(.*?)\]\((.*?)\)|:(\w+):|[^*]+|\*/g,
+  );
   for (let tok of toks) {
-       tok[1] && cs.push(h('b',{},tok[1]))
-    || tok[2] && cs.push(h('em',{},tok[2]))
-    || tok[3] && cs.push(h('em',{},tok[0].slice(1,-1)))
-    || tok[5] && cs.push(h('img',{src: tok[5], alt: tok[4]}))
-    || tok[6] && cs.push(h(Icon, {name: tok[6]}))
-    || cs.push(tok[0])
+    (tok[1] && cs.push(h("b", {}, tok[1]))) ||
+      (tok[2] && cs.push(h("em", {}, tok[2]))) ||
+      (tok[3] && cs.push(h("em", {}, tok[0].slice(1, -1)))) ||
+      (tok[5] && cs.push(h("img", { src: tok[5], alt: tok[4] }))) ||
+      (tok[6] && cs.push(h(Icon, { name: tok[6] }))) ||
+      cs.push(tok[0]);
   }
-  return cs
+  return cs;
 }
 
 function bundle(js: string) {
-  js = js.replace(/^import.*\n/g, '');
-  js = js.replace(/\nexport /g, '\n');
+  js = js.replace(/^import.*\n/g, "");
+  js = js.replace(/\nexport /g, "\n");
   return js;
 }
 
-function md2nodes(md: string)  {
-  let rval: VNode[] = []
-  let list: VNode[] | undefined
+function md2nodes(md: string) {
+  let rval: VNode[] = [];
+  let list: VNode[] | undefined;
   for (let line of md.split("\n")) {
-    if (line.startsWith('- ')) {
+    if (line.startsWith("- ")) {
       if (!list) {
-        list = []
-        rval.push(h('ul', {}, list))
+        list = [];
+        rval.push(h("ul", {}, list));
       }
-      list.push(h('li', {}, mdline2nodes(line.slice(2))))
-      continue
+      list.push(h("li", {}, mdline2nodes(line.slice(2))));
+      continue;
     }
-    list = undefined
-    if (line.startsWith('# ')) {
-      rval.push(h('h2', {}, mdline2nodes(line.slice(2))))
-    } else if (line.startsWith('## ')) {
-      rval.push(h('h3', {}, mdline2nodes(line.slice(3))))
+    list = undefined;
+    if (line.startsWith("# ")) {
+      rval.push(h("h2", {}, mdline2nodes(line.slice(2))));
+    } else if (line.startsWith("## ")) {
+      rval.push(h("h3", {}, mdline2nodes(line.slice(3))));
     } else {
-      rval.push(h('div', {}, mdline2nodes(line)))
+      rval.push(h("div", {}, mdline2nodes(line)));
     }
   }
-  return rval
+  return rval;
 }
 
 // iframe for running newt output
@@ -76,7 +73,7 @@ iframe.style.display = "none";
 document.body.appendChild(iframe);
 
 async function refreshJS() {
-if (!state.javascript.value) {
+  if (!state.javascript.value) {
     let src = state.editor.value!.getValue();
     console.log("SEND TO", iframe.contentWindow);
     const fileName = state.currentFile.value;
@@ -88,7 +85,7 @@ if (!state.javascript.value) {
 }
 
 async function refreshScheme() {
-if (!state.scheme.value) {
+  if (!state.scheme.value) {
     let src = state.editor.value!.getValue();
     console.log("SEND TO", iframe.contentWindow);
     const fileName = state.currentFile.value;
@@ -100,7 +97,7 @@ if (!state.scheme.value) {
 }
 
 async function runOutput() {
-  await refreshJS()
+  await refreshJS();
   const src = state.javascript.value;
   console.log("RUN", iframe.contentWindow);
   try {
@@ -137,19 +134,18 @@ window.addEventListener("message", (ev) => {
 });
 
 async function copyToClipboard(ev: Event) {
-ev.preventDefault();
-    let src = state.editor.value!.getValue();
-    let hash = `#code/${b64encode(deflate(new TextEncoder().encode(src)))}`;
-    window.location.hash = hash;
-    await navigator.clipboard.writeText(window.location.href);
-    state.toast.value = "URL copied to clipboard";
-    setTimeout(() => (state.toast.value = ""), 2_000);
+  ev.preventDefault();
+  let src = state.editor.value!.getValue();
+  let hash = `#code/${b64encode(deflate(new TextEncoder().encode(src)))}`;
+  window.location.hash = hash;
+  await navigator.clipboard.writeText(window.location.href);
+  state.toast.value = "URL copied to clipboard";
+  setTimeout(() => (state.toast.value = ""), 2_000);
 }
 
 // We could push this into the editor
 document.addEventListener("keydown", (ev) => {
-  if ((ev.metaKey || ev.ctrlKey) && ev.code == "KeyS")
-    copyToClipboard(ev);
+  if ((ev.metaKey || ev.ctrlKey) && ev.code == "KeyS") copyToClipboard(ev);
 });
 
 function getSavedCode() {
@@ -231,11 +227,17 @@ interface EditorProps {
 }
 const language: EditorDelegate = {
   async getEntry(word, row, col) {
-    let fileName = state.currentFile.value
-    let res = await ipc.sendMessage("hoverInfo", [fileName, row, col])
-    console.log('HOVER', res, 'for', row, col)
-    if (res == true) return null
-    return res || null
+    let fileName = state.currentFile.value;
+    let res = await ipc.sendMessage("hoverInfo", [fileName, row, col]);
+    console.log("HOVER", res, "for", row, col);
+    if (res == true) return null;
+    return res || null;
+  },
+  async getActions(word, row, col) {
+    let fileName = state.currentFile.value;
+    let res = await ipc.sendMessage("codeActionInfo", [fileName, row, col]);
+    console.log("ACTIONS", res, "for", row, col);
+    return res;
   },
   onChange(_value) {
     // we're using lint() now
@@ -252,7 +254,7 @@ const language: EditorDelegate = {
     let module = src.match(/module\s+([^\s]+)/)?.[1];
     if (module) {
       // This causes problems with stuff like aoc/...
-      state.currentFile.value = './' + module.replace(".", "/") + ".newt";
+      state.currentFile.value = "./" + module.replace(".", "/") + ".newt";
     }
     // This is a little flashy
     // state.javascript.value = ''
@@ -263,18 +265,24 @@ const language: EditorDelegate = {
       let res = await ipc.sendMessage("typeCheck", [fileName]);
       let diags: Diagnostic[] = [];
       for (let marker of res.diags) {
-        let {start,end} = marker.range
+        let { start, end } = marker.range;
         let xlate = (pos: Position): number =>
-          view.state.doc.line(pos.line + 1).from + pos.character
+          view.state.doc.line(pos.line + 1).from + pos.character;
 
         // TODO double check the last two are right
-        const SEVERITY: Diagnostic["severity"][] = [ "error", "error", "warning", "info", "hint"]
+        const SEVERITY: Diagnostic["severity"][] = [
+          "error",
+          "error",
+          "warning",
+          "info",
+          "hint",
+        ];
         console.error({
           from: xlate(start),
           to: xlate(end),
           severity: SEVERITY[marker.severity ?? 1],
           message: marker.message,
-        })
+        });
         diags.push({
           from: xlate(start),
           to: xlate(end),
@@ -282,9 +290,9 @@ const language: EditorDelegate = {
           message: marker.message,
         });
       }
-      setOutput(res.output)
-      state.javascript.value = ""
-      state.scheme.value = ""
+      setOutput(res.output);
+      state.javascript.value = "";
+      state.scheme.value = "";
       return diags;
     } catch (e) {
       console.log("ERR", e);
@@ -308,9 +316,9 @@ function Editor({ initialValue }: EditorProps) {
 }
 
 interface ViewerProps {
-  language: 'javascript' | 'scheme'
+  language: "javascript" | "scheme";
 }
-function SourceViewer({language}: ViewerProps) {
+function SourceViewer({ language }: ViewerProps) {
   const text = state[language].value;
 
   // return h("div", { id: "javascript" }, text);
@@ -325,8 +333,10 @@ function SourceViewer({language}: ViewerProps) {
       parent: container,
       extensions: [
         basicSetup,
-        themeRef.current.of(state.dark.value ? oneDark : EditorView.baseTheme({})),
-        language == 'javascript' ? javascript() : scheme(),
+        themeRef.current.of(
+          state.dark.value ? oneDark : EditorView.baseTheme({}),
+        ),
+        language == "javascript" ? javascript() : scheme(),
         EditorState.readOnly.of(true),
         EditorView.editable.of(false),
       ],
@@ -341,7 +351,7 @@ function SourceViewer({language}: ViewerProps) {
   if (ev) {
     ev.dispatch({
       effects: themeRef.current?.reconfigure(
-        isDark ? oneDark : EditorView.baseTheme({})
+        isDark ? oneDark : EditorView.baseTheme({}),
       ),
       changes: { from: 0, to: ev.state.doc.length, insert: text },
     });
@@ -355,7 +365,7 @@ function Result() {
 }
 
 function Help() {
-  return h("div", { id: "help" }, md2nodes(helpText))
+  return h("div", { id: "help" }, md2nodes(helpText));
 }
 
 function Console() {
@@ -363,12 +373,12 @@ function Console() {
   return h(
     "div",
     { id: "console" },
-    messages.map((msg) => h("div", { className: "message" }, msg))
+    messages.map((msg) => h("div", { className: "message" }, msg)),
   );
 }
 
 function Tabs() {
-  const selected = state.selected.value
+  const selected = state.selected.value;
   const Tab = (label: string) => {
     let onClick = () => {
       state.selected.value = label;
@@ -394,10 +404,10 @@ function Tabs() {
       body = h(Result, {});
       break;
     case SCHEME:
-      body = h(SourceViewer, {language: 'scheme'});
+      body = h(SourceViewer, { language: "scheme" });
       break;
     case JAVASCRIPT:
-      body = h(SourceViewer, {language:'javascript'});
+      body = h(SourceViewer, { language: "javascript" });
       break;
     case CONSOLE:
       body = h(Console, {});
@@ -421,7 +431,7 @@ function Tabs() {
       Tab(CONSOLE),
       Tab(HELP),
     ),
-    h("div", { className: "tabBody" }, body)
+    h("div", { className: "tabBody" }, body),
   );
 }
 
@@ -436,13 +446,13 @@ preload.then(() => {
   }
 });
 
-function Icon({name}: {name: string}) {
-  return h('svg', {'class':'icon'}, h('use', {href:`#${name}`}))
+function Icon({ name }: { name: string }) {
+  return h("svg", { class: "icon" }, h("use", { href: `#${name}` }));
 }
 
 function EditWrap() {
   const options = state.files.value.map((value) =>
-    h("option", { value }, value)
+    h("option", { value }, value),
   );
 
   const selectFile = async (ev: ChangeEvent) => {
@@ -463,17 +473,35 @@ function EditWrap() {
         "select",
         { onChange: selectFile, value: "" },
         h("option", { value: "" }, "-- load sample --"),
-        options
+        options,
       ),
       // h("a", { href: 'https://github.com/dunhamsteve/newt', target: '_blank', title: "github" }, h('img', {src: state.dark.value ? github : github_light})),
-      h("a", { href: 'https://github.com/dunhamsteve/newt', target: '_blank', title: "github" }, h('svg', {'class':'icon'}, h('use', {href:'#github'}))),
+      h(
+        "a",
+        {
+          href: "https://github.com/dunhamsteve/newt",
+          target: "_blank",
+          title: "github",
+        },
+        h("svg", { class: "icon" }, h("use", { href: "#github" })),
+      ),
       h("div", { style: { flex: "1 1" } }),
-      h("div", {},
-        h("button", { onClick: copyToClipboard, title: "copy url" },  h('svg', {'class':'icon'}, h('use', {href:'#share'}))),
-        h("button", { onClick: runOutput, title: "run program" }, h('svg', {'class':'icon'}, h('use', {href:'#play'}))),
-      )
+      h(
+        "div",
+        {},
+        h(
+          "button",
+          { onClick: copyToClipboard, title: "copy url" },
+          h("svg", { class: "icon" }, h("use", { href: "#share" })),
+        ),
+        h(
+          "button",
+          { onClick: runOutput, title: "run program" },
+          h("svg", { class: "icon" }, h("use", { href: "#play" })),
+        ),
+      ),
     ),
-    h("div", { className: "tabBody" }, h(Editor, { initialValue: value }))
+    h("div", { className: "tabBody" }, h(Editor, { initialValue: value })),
   );
 }
 
@@ -488,20 +516,12 @@ function App() {
     toast = h("p", { className: "toast" }, h("div", {}, state.toast.value));
   }
   let className = `wrapper`;
-  return h(
-    "div",
-    { className },
-    toast,
-    h(EditWrap, {}),
-    h(Tabs, {})
-  );
+  return h("div", { className }, toast, h(EditWrap, {}), h(Tabs, {}));
 }
 
 render(h(App, {}), document.getElementById("app")!);
 
-const processOutput = (
-  output: string
-) => {
+const processOutput = (output: string) => {
   console.log("process output", output);
   let markers: Marker[] = [];
   let lines = output.split("\n");
@@ -511,14 +531,14 @@ const processOutput = (
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const match = line.match(
-      /(INFO|ERROR) at ([^:]+):(\d+):(\d+)--(\d+):(\d+):\s*(.*)/
+      /(INFO|ERROR) at ([^:]+):(\d+):(\d+)--(\d+):(\d+):\s*(.*)/,
     );
     if (match) {
       let [_full, kind, file, line, col, eline, ecol, message] = match;
       let startLineNumber = +line;
       let startColumn = +col;
       let endLineNumber = +eline;
-      let endColumn = +ecol
+      let endColumn = +ecol;
       // FIXME - pass the real path in
       if (file.startsWith("./")) file = file.slice(2);
       if (fn && fn !== file) {

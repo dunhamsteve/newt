@@ -5,18 +5,31 @@ import {
   indentLess,
   toggleLineComment,
 } from "@codemirror/commands";
-import { EditorView, hoverTooltip, keymap, Tooltip } from "@codemirror/view";
-import { Compartment, Prec } from "@codemirror/state";
+import {
+  EditorView,
+  hoverTooltip,
+  keymap,
+  Panel,
+  showPanel,
+  Tooltip,
+} from "@codemirror/view";
+import {
+  ChangeSpec,
+  Compartment,
+  Prec,
+  StateEffect,
+  StateField,
+} from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { linter } from "@codemirror/lint";
 import {
-  bracketMatching,
   indentService,
   LanguageSupport,
   StreamLanguage,
   StringStream,
 } from "@codemirror/language";
 import { ABBREV } from "./abbrev.js";
+import { CodeAction, Position, TextEdit } from "./ipc.js";
 
 // prettier flattened this...
 const keywords = [
@@ -162,7 +175,16 @@ export function scheme() {
 const schemeLanguage: StreamLanguage<State> = StreamLanguage.define({
   startState: () => null,
   token(stream, st) {
-    const keywords = ["define", "let", "case", "cond", "import", "include", "lambda", "else"];
+    const keywords = [
+      "define",
+      "let",
+      "case",
+      "cond",
+      "import",
+      "include",
+      "lambda",
+      "else",
+    ];
     if (stream.eatSpace()) return null;
     if (stream.match("--")) {
       stream.skipToEnd();
@@ -175,7 +197,7 @@ const schemeLanguage: StreamLanguage<State> = StreamLanguage.define({
     }
     // unhandled
     stream.next();
-    return null
+    return null;
   },
   languageData: {
     commentTokens: {
@@ -188,7 +210,118 @@ const schemeLanguage: StreamLanguage<State> = StreamLanguage.define({
 function newt() {
   return new LanguageSupport(newtLanguage2);
 }
+// https://codemirror.net/examples/panel/
+//
+export function applyWorkspaceEdit(view: EditorView, edits: TextEdit[]) {
+  const state = view.state;
 
+  const posToOffset = (pos: Position) => {
+    // CodeMirror lines start at 1
+    const line = state.doc.line(pos.line + 1);
+    // Add the character offset to the line's start position
+    return line.from + pos.character;
+  };
+
+  const changes: ChangeSpec[] = edits.map((edit) => ({
+    from: posToOffset(edit.range.start),
+    to: posToOffset(edit.range.end),
+    insert: edit.newText,
+  }));
+
+  view.dispatch({ changes });
+}
+
+function actionsPanel(delegate: EditorDelegate) {
+  const actionsTheme = EditorView.baseTheme({
+    ".cm-actions-panel": {
+      padding: "5px, 10px",
+      backgroundColor: "#fffa8f",
+      fontFamily: "monospace",
+    },
+  });
+  let dom = document.createElement("div");
+  function runAction(view: EditorView, ix: number) {
+    let action = actions[ix];
+    console.log("FIRE", action);
+    if (action?.edit?.changes) {
+      for (let k in action.edit.changes) {
+        applyWorkspaceEdit(view, action.edit.changes[k]);
+      }
+      dom.textContent = "";
+    }
+  }
+  const actionsKeymap = [
+    {
+      key: "F1",
+      run(view: EditorView) {
+        view.dispatch({
+          effects: toggleActions.of(!view.state.field(actionsPanelState)),
+        });
+        return true;
+      },
+    },
+    { key: "C-1", run: (view: EditorView) => (runAction(view, 0), true) },
+    { key: "C-2", run: (view: EditorView) => (runAction(view, 1), true) },
+    { key: "C-3", run: (view: EditorView) => (runAction(view, 2), true) },
+    { key: "C-4", run: (view: EditorView) => (runAction(view, 3), true) },
+    { key: "C-5", run: (view: EditorView) => (runAction(view, 4), true) },
+  ];
+  let actions: CodeAction[] = [];
+
+  function createActionsPanel(view: EditorView): Panel {
+    dom.textContent = "TODO";
+    dom.className = "cm-actions-panel";
+    async function updateActions() {
+      let pos = view.state.selection.ranges[0].from;
+      let cursor = view.state.doc.lineAt(pos);
+      let line = cursor.number - 1;
+      let col = pos - cursor.from;
+      let res = await delegate.getActions("", line, col);
+      console.log("ACTIONS", res);
+      actions = res || [];
+      dom.innerHTML = "";
+      actions.forEach((act, ix) => {
+        let div = document.createElement("div");
+        div.textContent = `${ix + 1}: ${act.title}`;
+        div.onclick = () => runAction(view, ix);
+        div.style.padding = "2px";
+        dom.appendChild(div);
+      });
+      if (!actions.length) {
+        let div = document.createElement("div");
+        div.textContent = "No actions";
+        div.style.padding = "2px";
+        dom.appendChild(div);
+      }
+    }
+    updateActions();
+    return {
+      top: false,
+      dom,
+      async update(update) {
+        console.log("UPDATE", update);
+        if (update.selectionSet) {
+          console.log("SELECT", view.state.selection);
+          updateActions();
+        } else if (update.docChanged) {
+          updateActions();
+        }
+      },
+    };
+  }
+
+  const toggleActions = StateEffect.define<boolean>();
+  const actionsPanelState = StateField.define<boolean>({
+    create: () => true,
+    update(value, tr) {
+      for (let e of tr.effects) if (e.is(toggleActions)) value = e.value;
+      return value;
+    },
+    provide: (f) => showPanel.from(f, (on) => (on ? createActionsPanel : null)),
+  });
+
+  return [actionsPanelState, keymap.of(actionsKeymap), actionsTheme];
+}
 export class CMEditor implements AbstractEditor {
   view: EditorView;
   delegate: EditorDelegate;
@@ -202,6 +335,7 @@ export class CMEditor implements AbstractEditor {
       parent: container,
       extensions: [
         basicSetup,
+        actionsPanel(delegate),
         linter((view) => this.delegate.lint(view)),
         // For indent on return
         indentService.of((ctx, pos) => {
@@ -238,7 +372,7 @@ export class CMEditor implements AbstractEditor {
               preventDefault: true,
               run: indentLess,
             },
-          ])
+          ]),
         ),
         EditorView.updateListener.of((update) => {
           let doc = update.state.doc;
@@ -264,34 +398,34 @@ export class CMEditor implements AbstractEditor {
             }
           });
         }),
-          this.theme.of(EditorView.baseTheme({})),
-          hoverTooltip(async (view, pos) => {
-            let cursor = this.view.state.doc.lineAt(pos);
-            let line = cursor.number - 1;
-            let col = pos - cursor.from;
-            // let range = this.view.state.wordAt(pos);
-            console.log('getting hover for ',line, col);
-            let entry = await this.delegate.getEntry('', line, col)
+        this.theme.of(EditorView.baseTheme({})),
+        hoverTooltip(async (view, pos) => {
+          let cursor = this.view.state.doc.lineAt(pos);
+          let line = cursor.number - 1;
+          let col = pos - cursor.from;
+          // let range = this.view.state.wordAt(pos);
+          console.log("getting hover for ", line, col);
+          let entry = await this.delegate.getEntry("", line, col);
 
-            if (entry) {
-              let rval: Tooltip = {
-                // TODO pull in position from LSP (currently it only has the jump-to FC)
-                pos,
-                above: true,
-                create: () => {
-                  let dom = document.createElement("div");
-                  dom.className = "tooltip";
-                  dom.textContent = entry.info;
-                  return { dom };
-                },
-              };
-              return rval;
-            }
+          if (entry) {
+            let rval: Tooltip = {
+              // TODO pull in position from LSP (currently it only has the jump-to FC)
+              pos,
+              above: true,
+              create: () => {
+                let dom = document.createElement("div");
+                dom.className = "tooltip";
+                dom.textContent = entry.info;
+                return { dom };
+              },
+            };
+            return rval;
+          }
 
-            // we'll iterate the syntax tree for word.
-            // let entry = delegate.getEntry(word, line, col)
-            return null;
-          }),
+          // we'll iterate the syntax tree for word.
+          // let entry = delegate.getEntry(word, line, col)
+          return null;
+        }),
         newt(),
       ],
     });
@@ -299,7 +433,7 @@ export class CMEditor implements AbstractEditor {
   setDark(isDark: boolean) {
     this.view.dispatch({
       effects: this.theme.reconfigure(
-        isDark ? oneDark : EditorView.baseTheme({})
+        isDark ? oneDark : EditorView.baseTheme({}),
       ),
     });
   }
