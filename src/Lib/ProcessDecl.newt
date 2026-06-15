@@ -145,27 +145,15 @@ processPrimFn ns fc nm used ty src = do
   let arity = piArity ty'
   setDef (QN ns nm) fc Many ty' (PrimFn src arity used') Nil
 
--- Heuristic for whether a function is simple enough to inline
--- I'm trying to get ++ and + inlined as javascript +
-complexity : Tm → Int
-complexity (Ref _ _) = 1
-complexity (Meta _ _) = 1 -- what's a good score for this, it's not inlined yet.
--- don't inline lambda, it captures extra stuff
--- e.g. emptyMap was capturing top and leaking memory...
-complexity (Lam _ _ _ _ sc) = 100 + complexity sc
--- Ignore metas - they may be erased and likely are much smaller when substituted
-complexity (App _ t u _) = go t (complexity u)
-  where
-    go : Tm → Int → Int
-    go (App _ t u _) acc = go t (acc + complexity u)
-    go (Meta _ _) acc = 1
-    go t acc = acc + complexity t
-complexity (Bnd _ _) = 1
-complexity (UU _) = 0
-complexity (Lit _ _) = 0
--- These turn into a projection
-complexity (Case _ sc (CaseCons _ _ t :: Nil)) = 1 + complexity sc + complexity t
-complexity _ = 100
+-- identity, lambdas in front of ref, application of args, unprocessed
+-- we'd like to pick up String ++ and identity functions at least
+shouldInline : Tm → Bool
+shouldInline (Lam _ _ _ _ sc) = shouldInline sc
+shouldInline (Bnd _ _) = True
+shouldInline (Ref _ _) = True
+shouldInline (App _ t u Zero) = shouldInline t
+shouldInline (App _ t (Bnd _ _) Many) = shouldInline t
+shouldInline _ = False
 
 processDef :  String → FC → String → List (Raw × Maybe Raw) → M Unit
 processDef ns fc nm clauses = do
@@ -192,18 +180,14 @@ processDef ns fc nm clauses = do
 
   debug "Add def \{nm} \{render 90 $ pprint Nil tm} : \{render 90 $ pprint Nil ty}"
   updateDef (QN ns nm) fc ty (Fn tm)
-  -- putStrLn "complexity \{show (QN ns nm)} \{show $ complexity tm}"
-  -- putStrLn $ show tm
-  -- TODO we need some protection against inlining a function calling itself.
-  -- We need better heuristics, maybe fuel and deciding while inlining.
-  -- someday users will tag functions as inline, so maybe an explicit loop check
-  -- IO,bind is explicit here because the complexity has a 100 in it.
   let name = show $ QN ns nm
-  if complexity tm < 15 || name == "Prelude.Prelude.Monad Prelude.IO,bind" || name == "Prelude._>>=_"
-    -- This is blowing out the stack somewhere _and_ IO,bind is not getting inlined inside all of this
-    -- maybe replace zonk with a specialized eval
-    -- || name == "Lib.Types.Prelude.Monad Lib.Types.M,bind"
-    then setFlag (QN ns nm) fc Inline
+  if shouldInline tm
+     || name == "Prelude.Prelude.Monad Prelude.IO,bind"
+     || name == "Prelude._>>=_"
+     -- || name == "Prelude.Prelude.Concat Prim.String,_++_"
+    then do
+      debug "inline flag \{name}"
+      setFlag (QN ns nm) fc Inline
     else pure MkUnit
 
 processCheck :  String → FC → Raw → Raw → M Unit
