@@ -147,6 +147,8 @@ processPrimFn ns fc nm used ty src = do
 
 -- identity, lambdas in front of ref, application of args, unprocessed
 -- we'd like to pick up String ++ and identity functions at least
+-- important that we don't inline emptyTop - it has a lambda inside it (not top level)
+-- which picks up the locals and leaks memory
 shouldInline : Tm → Bool
 shouldInline (Lam _ _ _ _ sc) = shouldInline sc
 shouldInline (Bnd _ _) = True
