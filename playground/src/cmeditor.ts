@@ -282,15 +282,15 @@ function actionsPanel(delegate: EditorDelegate) {
       dom.innerHTML = "";
       actions.forEach((act, ix) => {
         let div = document.createElement("div");
-        div.textContent = `${ix + 1}: ${act.title}`;
+        div.textContent = `c-${ix + 1}: ${act.title}`;
         div.onclick = () => runAction(view, ix);
-        div.style.padding = "2px";
+        div.style.padding = "2px 5px";
         dom.appendChild(div);
       });
       if (!actions.length) {
         let div = document.createElement("div");
-        div.textContent = "No actions";
-        div.style.padding = "2px";
+        div.textContent = "\xa0";
+        div.style.padding = "2px 5px";
         dom.appendChild(div);
       }
     }
