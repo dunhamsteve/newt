@@ -291,6 +291,7 @@ function actionsPanel(delegate: EditorDelegate) {
         let div = document.createElement("div");
         div.textContent = "\xa0";
         div.style.padding = "2px 5px";
+        div.style.display = "inline-block";
         dom.appendChild(div);
       }
     }
