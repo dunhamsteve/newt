@@ -20,6 +20,9 @@
     complaining that `Lazy` is not a type constructor.
   - Put a match on `Delay` there (add `Delay` to surface syntax). Eliminator forces the function
   - Can be manually done today by breaking out another `case` for the lazy value (scrutinee is forced)
+- [ ] play with documentation extraction?
+  - lean uses `/--` and `/-!` I think I prefer something like this over the `|||` in Idris.
+- [ ] consider `.newt.md` support.
 - [x] Look into Constatine Theocaris erasure thing
   - https://arxiv.org/abs/2605.00655
   - Can this technique work for async, too?

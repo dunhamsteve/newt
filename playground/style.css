@@ -3,6 +3,7 @@
   --tab-select-color: #555;
   --text-color: black;
   --tab-text-color: #555;
+  --actions-bg: #f5f5f5;
 }
 body {
   overflow: hidden;
@@ -26,6 +27,7 @@ svg.icon {
     --tab-select-color: #eee;
     --tab-text-color: #aaa;
     --text-color: white;
+    --actions-bg: #282c34;
     background-color: black;
     color-scheme: dark;
   }
@@ -166,4 +168,8 @@ svg.icon {
 }
 .cm-editor {
   height: 100%;
+}
+.cm-actions-panel {
+  color: var(--text-color);
+  background-color: var(--actions-bg);
 }

@@ -234,9 +234,9 @@ export function applyWorkspaceEdit(view: EditorView, edits: TextEdit[]) {
 function actionsPanel(delegate: EditorDelegate) {
   const actionsTheme = EditorView.baseTheme({
     ".cm-actions-panel": {
-      padding: "5px, 10px",
-      backgroundColor: "#fffa8f",
-      fontFamily: "monospace",
+      // padding: "5px 10px",
+      // backgroundColor: "#fffa8f",
+      // fontFamily: "monospace",
     },
   });
   let dom = document.createElement("div");
