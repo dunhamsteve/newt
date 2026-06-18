@@ -8,7 +8,9 @@ The editor will typecheck the file with newt and render errors as the file is ch
 
 **Output** - Displays the compiler output, which is also used to render errors and info annotations in the editor.
 
-**JS** - Displays the javascript translation of the file
+**JS** - Displays the extracted javascript code
+
+**Scheme** - Displays the extracted scheme code
 
 **Console** - Displays the console output from running the javascript
 
@@ -24,4 +26,4 @@ The editor will typecheck the file with newt and render errors as the file is ch
 
 *C-s or M-s* - Embed the current file in the URL and copy to clipboard
 
-
+*f1* - Toggle actions panel

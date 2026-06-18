@@ -21,7 +21,7 @@ import {
   StateField,
 } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { linter } from "@codemirror/lint";
+import { linter, setDiagnosticsEffect } from "@codemirror/lint";
 import {
   indentService,
   LanguageSupport,
@@ -210,15 +210,13 @@ const schemeLanguage: StreamLanguage<State> = StreamLanguage.define({
 function newt() {
   return new LanguageSupport(newtLanguage2);
 }
-// https://codemirror.net/examples/panel/
-//
+
 export function applyWorkspaceEdit(view: EditorView, edits: TextEdit[]) {
   const state = view.state;
 
   const posToOffset = (pos: Position) => {
     // CodeMirror lines start at 1
     const line = state.doc.line(pos.line + 1);
-    // Add the character offset to the line's start position
     return line.from + pos.character;
   };
 
@@ -230,24 +228,18 @@ export function applyWorkspaceEdit(view: EditorView, edits: TextEdit[]) {
 
   view.dispatch({ changes });
 }
-
+// https://codemirror.net/examples/panel/
 function actionsPanel(delegate: EditorDelegate) {
-  const actionsTheme = EditorView.baseTheme({
-    ".cm-actions-panel": {
-      // padding: "5px 10px",
-      // backgroundColor: "#fffa8f",
-      // fontFamily: "monospace",
-    },
-  });
+  // style.css has light/dark styling
+  // const actionsTheme = EditorView.baseTheme({ ".cm-actions-panel": {} });
   let dom = document.createElement("div");
   function runAction(view: EditorView, ix: number) {
     let action = actions[ix];
-    console.log("FIRE", action);
     if (action?.edit?.changes) {
       for (let k in action.edit.changes) {
         applyWorkspaceEdit(view, action.edit.changes[k]);
       }
-      dom.textContent = "";
+      setActions([]);
     }
   }
   const actionsKeymap = [
@@ -267,7 +259,26 @@ function actionsPanel(delegate: EditorDelegate) {
     { key: "C-5", run: (view: EditorView) => (runAction(view, 4), true) },
   ];
   let actions: CodeAction[] = [];
-
+  function setActions(acts: CodeAction[], view?: EditorView) {
+    actions = acts;
+    dom.innerHTML = "";
+    if (view)
+      actions.forEach((act, ix) => {
+        let div = document.createElement("div");
+        div.textContent = `c-${ix + 1}: ${act.title}`;
+        div.onclick = () => runAction(view, ix);
+        div.style.padding = "2px 5px";
+        div.style.display = "inline-block";
+        dom.appendChild(div);
+      });
+    if (!actions.length) {
+      let div = document.createElement("div");
+      div.textContent = "\xa0";
+      div.style.padding = "2px 5px";
+      div.style.display = "inline-block";
+      dom.appendChild(div);
+    }
+  }
   function createActionsPanel(view: EditorView): Panel {
     dom.textContent = "TODO";
     dom.className = "cm-actions-panel";
@@ -278,22 +289,7 @@ function actionsPanel(delegate: EditorDelegate) {
       let col = pos - cursor.from;
       let res = await delegate.getActions("", line, col);
       console.log("ACTIONS", res);
-      actions = res || [];
-      dom.innerHTML = "";
-      actions.forEach((act, ix) => {
-        let div = document.createElement("div");
-        div.textContent = `c-${ix + 1}: ${act.title}`;
-        div.onclick = () => runAction(view, ix);
-        div.style.padding = "2px 5px";
-        dom.appendChild(div);
-      });
-      if (!actions.length) {
-        let div = document.createElement("div");
-        div.textContent = "\xa0";
-        div.style.padding = "2px 5px";
-        div.style.display = "inline-block";
-        dom.appendChild(div);
-      }
+      setActions(res || [], view);
     }
     updateActions();
     return {
@@ -301,12 +297,23 @@ function actionsPanel(delegate: EditorDelegate) {
       dom,
       async update(update) {
         console.log("UPDATE", update);
+        let refresh = false;
+        for (let tr of update.transactions) {
+          // refresh if we've gotten new diagnostics
+          for (let eff of tr.effects) {
+            refresh ||= eff.is(setDiagnosticsEffect);
+          }
+        }
+        // refresh is selection changed
         if (update.selectionSet) {
           console.log("SELECT", view.state.selection);
-          updateActions();
+          refresh = true;
         } else if (update.docChanged) {
-          updateActions();
+          console.log("CHANGE");
+          // This is too early
+          // updateActions();
         }
+        if (refresh) updateActions();
       },
     };
   }
@@ -315,13 +322,17 @@ function actionsPanel(delegate: EditorDelegate) {
   const actionsPanelState = StateField.define<boolean>({
     create: () => true,
     update(value, tr) {
-      for (let e of tr.effects) if (e.is(toggleActions)) value = e.value;
+      for (let e of tr.effects) {
+        if (e.is(toggleActions)) value = e.value;
+        if (e.is(setDiagnosticsEffect)) {
+          console.warn(`setDiagnostics`, e);
+        }
+      }
       return value;
     },
     provide: (f) => showPanel.from(f, (on) => (on ? createActionsPanel : null)),
   });
-
-  return [actionsPanelState, keymap.of(actionsKeymap), actionsTheme];
+  return [actionsPanelState, keymap.of(actionsKeymap)];
 }
 export class CMEditor implements AbstractEditor {
   view: EditorView;
