@@ -26,7 +26,7 @@ lsp: newt-vscode-lsp/dist/lsp.js playground/src/newt.js
 
 # build / install new LSP vscode extension
 vscode-lsp vscode: lsp
-	cd newt-vscode-lsp && vsce package && code --install-extension *.vsix
+	cd newt-vscode-lsp && pnpx vsce package && code --install-extension *.vsix
 
 playground: .PHONY
 	cd playground && ./build

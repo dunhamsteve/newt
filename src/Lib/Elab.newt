@@ -1167,7 +1167,7 @@ checkWhere ctx decls body ty = do
 
 -- checks the body after we're done with a case tree branch
 checkDone : FC -> Context -> List Constraint -> Maybe Raw -> Val -> M Tm
-checkDone fc ctx Nil Nothing ty = error fc "impossible clause needs () on RHS"
+checkDone fc ctx Nil Nothing ty = error fc "impossible clause needs () on LHS"
 checkDone fc ctx Nil (Just body) ty = do
   debug "DONE-> check body \{show body} at \{show ty}"
   -- TODO better dump context function
