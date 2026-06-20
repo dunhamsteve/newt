@@ -16,6 +16,22 @@ alias ExpMap = SortedMap QName CExp
 liftLambdaTm : QName → SnocList Name → CExp → State ExpMap CExp
 -- CBnd
 liftLambdaTm name env (CFun nms t) = CFun nms <$> liftLambdaTm name (env <>< nms) t
+liftLambdaTm name env (CForce t) = CForce <$> liftLambdaTm name env t
+liftLambdaTm name env (CThunk t) = CThunk <$> liftLambdaTm name env t
+liftLambdaTm name env (CLetLoop nms t) = CLetLoop nms <$> liftLambdaTm name env t
+liftLambdaTm name env (CConstr tag nm args info) = do
+  args <- traverse (liftLambdaTm name env) args
+  pure $ CConstr tag nm args info
+liftLambdaTm name env (CLoop tms n) = do
+  tms <- traverse (liftLambdaTm name env) tms
+  pure $ CLoop tms n
+-- At the moment, some of these are partially applied
+-- We assume the backend will handle that, the lambda lifting
+-- is for explicit lambdas
+liftLambdaTm name env (CAppRef nm args arity) = do
+  -- this is where the ! notation would come in handy
+  args <- traverse (liftLambdaTm name env) args
+  pure $ CAppRef nm args arity
 liftLambdaTm name env (CApp t u) =
   CApp <$> liftLambdaTm name env t <*> liftLambdaTm name env u
 liftLambdaTm name env (CLet nm v sc) = do
@@ -62,7 +78,14 @@ liftLambdaTm name@(QN ns nm) env tm@(CLam nm t) = do
     makeApp : Nat → List CExp
     makeApp Z = Nil
     makeApp (S k) = CBnd (cast k) :: makeApp k
-liftLambdaTm name env tm = pure tm
+liftLambdaTm name env t = pure t
+liftLambdaTm name env (CLit _) = ?
+liftLambdaTm name env (CMeta _) = ?
+liftLambdaTm name env (CErased) = ?
+liftLambdaTm name env (CRef _) = ?
+liftLambdaTm name env (CBnd _) = ?
+liftLambdaTm name env (CRaw _ _) = ?
+-- liftLambdaTm name env tm = pure tm
 
 liftLambdaFn : QName × CExp → State ExpMap Unit
 liftLambdaFn (name, tm) = do
