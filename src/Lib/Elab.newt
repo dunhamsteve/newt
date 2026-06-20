@@ -443,7 +443,8 @@ solve env m sp t = do
       let l = length' env
       debug "meta \{show m} (\{show ix}) applied to \{show $ snoclen sp} args instead of \{show size}"
       debug "CONSTRAINT \{show ix} \{show sp} =?= \{show t}"
-      addConstraint env (getFC t) (VMeta (getFC t) m sp) t
+      -- FC might depend on which direction the solution occurred in?
+      addConstraint env metaFC (VMeta (getFC t) m sp) t
   let l = length' env
   debug "meta \{show meta}"
 

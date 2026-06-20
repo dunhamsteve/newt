@@ -1,0 +1,14 @@
+module ConstraintErr
+
+import Prelude
+
+-- test case, double splits on second line
+
+plus : Nat → Nat → Nat → Nat
+plus Z n Z = ?
+plus l n m  = ?
+
+-- test case two, constraint FC is in prelude
+
+foo : IO Int
+foo = (1 +) <$> pure
