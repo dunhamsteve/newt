@@ -583,6 +583,22 @@ elem : ∀ a. {{Eq a}} → a → List a → Bool
 elem v Nil = False
 elem v (x :: xs) = if v == x then True else elem v xs
 
+lefts : ∀ a b. List (Either a b) → List a
+lefts {a} {b} xs = go Lin xs
+  where
+    go : SnocList a → List (Either a b) → List a
+    go acc Nil = acc <>> Nil
+    go acc (Left x :: xs) = go (acc :< x) xs
+    go acc (_ :: xs) = go acc xs
+
+rights : ∀ a b. List (Either a b) → List b
+rights {a} {b} xs = go Lin xs
+  where
+    go : SnocList b → List (Either a b) → List b
+    go acc Nil = acc <>> Nil
+    go acc (Right x :: xs) = go (acc :< x) xs
+    go acc (_ :: xs) = go acc xs
+
 -- TODO no empty value on my `Add`, I need a group..
 -- sum : ∀ a. {{Add a}} → List a → a
 -- sum xs = foldl _+_

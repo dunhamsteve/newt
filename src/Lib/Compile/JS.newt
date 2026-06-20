@@ -25,6 +25,8 @@ data JSExp : U
 
 data CaseType = CaseInd | CaseBool | CaseChar | CaseInt | CaseStr
 
+derive Show CaseType
+
 data JAlt : U where
   JConAlt : ∀ e. Nat -> JSStmt e -> JAlt
   JDefAlt : ∀ e. JSStmt e -> JAlt
@@ -33,6 +35,7 @@ data JAlt : U where
 data JSExp : U where
   DataCon : Int -> List JSExp -> JSExp
   LitString : String -> JSExp
+  LitChar : Char -> JSExp
   LitBool : Bool -> JSExp
   LitInt : Int -> JSExp
   -- Application of a closure
@@ -42,7 +45,6 @@ data JSExp : U where
   Var : String -> JSExp
   JFun : List String -> JSStmt Return -> JSExp
   JLam : String -> JSStmt Return -> JSExp
-  JPrimOp : String → JSExp → JSExp → JSExp
   JUndefined : JSExp
   JTernary : JSExp → JSExp → JSExp → JSExp
   Index : JSExp -> JSExp -> JSExp
@@ -73,6 +75,9 @@ data JSStmt : StKind -> U where
 
 alias Cont e = JSExp -> JSStmt e
 
+mkAppRef : String → JSExp → JSExp → JSExp
+mkAppRef nm x y = ApplyRef nm (S (S Z)) [x,y]
+
 -- JSEnv contains `Var` for binders or `Dot` for destructured data. It
 -- used to translate binders
 record JSEnv where
@@ -102,7 +107,7 @@ altType _ = CaseInd
 litToJS : Literal -> JSExp
 litToJS (LString str) = LitString str
 litToJS (LBool b) = LitBool b
-litToJS (LChar c) = LitString $ pack (c :: Nil)
+litToJS (LChar c) = LitChar c
 litToJS (LInt i) = LitInt i
 
 -- Stuff nm.h1, nm.h2, ... into environment for constructor match
@@ -281,7 +286,7 @@ termToJS {e} env (CCase t alts) f =
           in if b then tertiary sc t' e' f else tertiary sc e' t' f
         -- two branch alt becomes tertiary operator
         CConAlt ix name info args t :: CConAlt _ _ _ args' u :: Nil =>
-          let cond = (JPrimOp "==" (Dot sc 0) (LitInt $ cast ix))
+          let cond = (mkAppRef "Prelude.eqInt" (Dot sc 0) (LitInt $ cast ix))
               t' = termToJS (conAltEnv sc 1 env args) t f
               u' = termToJS (conAltEnv sc 1 env args') u f
           in tertiary cond t' u' f
@@ -324,6 +329,7 @@ stmtToDoc : ∀ e. JSStmt e -> Doc
 
 expToDoc : JSExp -> Doc
 expToDoc (LitBool b) = if b then text "true" else text "false"
+expToDoc (LitChar c) = text $ quoteString $ pack [c]
 expToDoc (JTernary sc t f) = bracket "(" (expToDoc sc <+> text "?" <+> expToDoc t <+> text ":" <+> expToDoc f )")"
 expToDoc (DataCon tag vals) = text "{" <+> text "tag:" <+> text (show tag) ++ text "," <+> folddoc (\ a e => a ++ text ", " <+/> e) (map entry $ enumerate vals) <+> text "}"
   where
@@ -337,9 +343,9 @@ expToDoc (Raw str) = text str
 expToDoc (ApplyCL x@(JLam _ _) xs) = text "(" ++ expToDoc x ++ text ")" ++ text "(" ++ nest 2 (expToDoc xs) ++ text ")"
 expToDoc (ApplyCL x xs) = expToDoc x ++ text "(" ++ nest 2 (expToDoc xs) ++ text ")"
 expToDoc (ApplyRef nm qs xs) =
-  if qs /= (S (S Z)) then go xs qs
-  else case xs of
-      [x,y] => case nm of
+  case xs of
+    [x,y] => if cast qs == 2
+      then case nm of
         "Prelude.addString"  => opdoc "+" x y
         "Prelude.addInt"  => opdoc "+" x y
         "Prelude.mulInt"  => opdoc "*" x y
@@ -356,7 +362,15 @@ expToDoc (ApplyRef nm qs xs) =
         "Prelude.ltString"  => opdoc "<" x y
         "Prelude.divInt"  => text "(" ++ (opdoc "/" x y) ++ text "|0)"
         _ => go xs qs
-      _ => go xs qs
+      else go xs qs
+    [x] => if cast qs == 1 then
+      case nm of
+        "Prelude.incrInt" => opdoc "+" (LitInt 1) x
+        "Prelude.intToNat" => expToDoc x
+        "Prelude.natToInt" => expToDoc x
+        _ => go xs qs
+      else go xs qs
+    _ => go xs qs
   where
     opdoc : String → JSExp → JSExp → Doc
     opdoc op x y = text "(" ++ expToDoc x <+> text op <+> expToDoc y ++ text ")"
@@ -386,7 +400,6 @@ expToDoc JUndefined = text "null"
 expToDoc (Index obj ix) = expToDoc obj ++ text "[" ++ expToDoc ix ++ text "]"
 expToDoc (Dot obj 0) = expToDoc obj ++ text ".tag"
 expToDoc (Dot obj k) = expToDoc obj ++ text ".h\{show k}"
-expToDoc (JPrimOp op t u) = parens 0 1 (expToDoc t) <+> text op <+> parens 0 1 (expToDoc u)
 
 stmtWithBreak : ∀ e. JSStmt e → Doc
 stmtWithBreak (JSnoc x y) = stmtToDoc x </> stmtWithBreak y
@@ -507,3 +520,4 @@ compileJavascript = do
     getExports acc ((MkEntry fc _ name@(QN ns nm) type def eflags) :: rest) =
       let acc = if elem Export eflags then name :: acc else acc
       in getExports acc rest
+
