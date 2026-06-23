@@ -23,6 +23,7 @@
 - [ ] play with documentation extraction?
   - lean uses `/--` and `/-!` I think I prefer something like this over the `|||` in Idris.
 - [ ] consider `.newt.md` support.
+- [ ] Collect remaining cases on default / variable patterns for more precise case split
 - [x] Look into Constatine Theocaris erasure thing
   - https://arxiv.org/abs/2605.00655
   - Can this technique work for async, too?
@@ -35,6 +36,7 @@
   - [ ] consider moving caselet, etc. desugaring out of the parser
   - comments stored aside (location, whether it is a tail or standalone) and re-integrated
   - how do we want to handle `$` and parens?
+- [ ] Idris `!` / Lean `<-` notation.
 - [x] Scheme backend
 - [x] Smart encoding of lists (and cons cells?) in scheme
 - [ ] consider postponing `case` if scrutinee type is an unsolved meta

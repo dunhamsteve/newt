@@ -13,11 +13,34 @@ import Monad.State
 
 alias ExpMap = SortedMap QName CExp
 
-liftLambdaTm : QName → SnocList Name → CExp → State ExpMap CExp
--- CBnd
-liftLambdaTm name env (CFun nms t) = CFun nms <$> liftLambdaTm name (env <>< nms) t
-liftLambdaTm name env (CForce t) = CForce <$> liftLambdaTm name env t
-liftLambdaTm name env (CThunk t) = CThunk <$> liftLambdaTm name env t
+-- True if deBruijn sees the entry, False if we've added it
+alias LiftEnv = SnocList Bool
+
+pushArgs : LiftEnv → List String → LiftEnv
+pushArgs env Nil = env
+pushArgs env (x :: xs) = pushArgs (env :< True) xs
+
+envNames : LiftEnv → List String
+envNames env = go env Nil
+  where
+    go : SnocList Bool → List String → List String
+    go Lin acc = acc
+    go (xs :< _) acc = go xs ("_" :: acc)
+
+getName : QName → String → State ExpMap QName
+getName qn@(QN ns nm) ext = do
+  top <- get
+  let qn' = QN ns (nm ++ "." ++ ext)
+  let (Just _) = lookupMap qn' top | _ => pure qn'
+  getName qn (ext ++ "'")
+
+makeApp : Int → SnocList Bool → List CExp → List CExp
+makeApp k Lin acc = acc
+makeApp k (xs :< True) acc = makeApp (k + 1) xs (CBnd k :: acc)
+makeApp k (xs :< _ ) acc = makeApp k xs (CErased :: acc)
+
+liftLambdaTm : QName → LiftEnv → CExp → State ExpMap CExp
+liftLambdaTm name env (CFun nms t) = CFun nms <$> liftLambdaTm name (pushArgs env nms) t
 liftLambdaTm name env (CLetLoop nms t) = CLetLoop nms <$> liftLambdaTm name env t
 liftLambdaTm name env (CConstr tag nm args info) = do
   args <- traverse (liftLambdaTm name env) args
@@ -25,9 +48,6 @@ liftLambdaTm name env (CConstr tag nm args info) = do
 liftLambdaTm name env (CLoop tms n) = do
   tms <- traverse (liftLambdaTm name env) tms
   pure $ CLoop tms n
--- At the moment, some of these are partially applied
--- We assume the backend will handle that, the lambda lifting
--- is for explicit lambdas
 liftLambdaTm name env (CAppRef nm args arity) = do
   -- this is where the ! notation would come in handy
   args <- traverse (liftLambdaTm name env) args
@@ -36,12 +56,12 @@ liftLambdaTm name env (CApp t u) =
   CApp <$> liftLambdaTm name env t <*> liftLambdaTm name env u
 liftLambdaTm name env (CLet nm v sc) = do
   v <- liftLambdaTm name env v
-  sc <- liftLambdaTm name (env :< nm) sc
+  sc <- liftLambdaTm name (env :< True) sc
   pure $ CLet nm v sc
 liftLambdaTm name env (CLetRec nm v sc) = do
   -- references should be removed by liftWhere
-  v <- liftLambdaTm name (env :< nm) v
-  sc <- liftLambdaTm name (env :< nm) sc
+  v <- liftLambdaTm name (env :< True) v
+  sc <- liftLambdaTm name (env :< True) sc
   pure $ CLetRec nm v sc
 
 liftLambdaTm name env tm@(CCase t alts) = do
@@ -54,38 +74,43 @@ liftLambdaTm name env tm@(CCase t alts) = do
     liftLambdaAlt (CDefAlt tm) = CDefAlt <$> liftLambdaTm name env tm
     liftLambdaAlt (CLitAlt l tm) = CLitAlt l <$> liftLambdaTm name env tm
     liftLambdaAlt (CConAlt ix nm info args tm) =
-      CConAlt ix nm info args <$> liftLambdaTm name (env <>< args) tm
+      CConAlt ix nm info args <$> liftLambdaTm name (pushArgs env args) tm
+liftLambdaTm name env (CForce t) = liftLambdaTm name env $ CApp t CErased
+liftLambdaTm name env (CThunk t) = do
+  -- term skips the arg
+  t' <- liftLambdaTm name (env :< False) t
+  qn <- getName name "lifted"
+  let names = envNames (env :< True)
+  modify $ updateMap qn (CFun names t')
+  pure $ CAppRef qn (makeApp 0 env Nil) (length names)
 liftLambdaTm name@(QN ns nm) env tm@(CLam nm t) = do
   let (nms, t) = splitLam tm Lin
-  t' <- liftLambdaTm name (env <>< nms) t
-  let env' = env <>> nms
-  -- TODO - maybe a better name here?
+  t' <- liftLambdaTm name (pushArgs env nms) t
+  -- extra args for closure
+  let env' = pushArgs env nms
   qn <- getName name "lifted"
-  modify $ updateMap qn (CFun env' t')
-  pure $ CAppRef qn (makeApp (snoclen env)) (length env')
+  let names = envNames env'
+  modify $ updateMap qn (CFun names t')
+  pure $ CAppRef qn (makeApp  0 env Nil) (length names)
   where
-    getName : QName → String → State ExpMap QName
-    getName qn@(QN ns nm) ext = do
-      top <- get
-      let qn' = QN ns (nm ++ "." ++ ext)
-      let (Just _) = lookupMap qn' top | _ => pure qn'
-      getName qn (ext ++ "'")
-
     splitLam : CExp → SnocList Name → List Name × CExp
     splitLam (CLam nm t) acc = splitLam t (acc :< nm)
     splitLam t acc = (acc <>> Nil, t)
 
-    makeApp : Nat → List CExp
-    makeApp Z = Nil
-    makeApp (S k) = CBnd (cast k) :: makeApp k
+liftLambdaTm name env (CBnd ix) = pure $ go (cast ix) 0 env
+  where
+    go : Nat → Int → SnocList Bool → CExp
+    go ix k (xs :< False) = go ix (1 + k) xs
+    go Z k (_ :< True) = CBnd k
+    go (S ix) k (xs :< _) = go ix (1 + k) xs
+    go _ _ Lin = fatalError "bad ix \{show ix} in lambda lift"
+
 liftLambdaTm name env t = pure t
 liftLambdaTm name env (CLit _) = ?
 liftLambdaTm name env (CMeta _) = ?
 liftLambdaTm name env (CErased) = ?
 liftLambdaTm name env (CRef _) = ?
-liftLambdaTm name env (CBnd _) = ?
 liftLambdaTm name env (CRaw _ _) = ?
--- liftLambdaTm name env tm = pure tm
 
 liftLambdaFn : QName × CExp → State ExpMap Unit
 liftLambdaFn (name, tm) = do
@@ -96,3 +121,4 @@ liftLambdaFn _ = pure MkUnit
 liftLambda : ExpMap → M ExpMap
 liftLambda defs = do
   pure $ snd $ (traverse liftLambdaFn $ toList defs).runState defs
+

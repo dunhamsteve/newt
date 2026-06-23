@@ -366,7 +366,7 @@ expToDoc (ApplyRef nm qs xs) =
     [x] => if cast qs == 1 then
       case nm of
         "Prelude.incrInt" => opdoc "+" (LitInt 1) x
-        "Prelude.intToNat" => expToDoc x
+        -- "Prelude.intToNat" => expToDoc x
         "Prelude.natToInt" => expToDoc x
         _ => go xs qs
       else go xs qs
