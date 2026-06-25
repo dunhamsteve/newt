@@ -40,8 +40,9 @@ profile: .PHONY build/newt.js build/newt2.js
 	rm -f isolate*
 
 bench: .PHONY build/newt2.js build/newt.so
-	hyperfine 'node build/newt.js src/Main.newt -o out.js' 'node build/newt2.js src/Main.newt -o out.js'  'scheme --program build/newt.so src/Main.newt -o out.js' > build/bench.txt
-	cat build/bench.txt
+	FN=bench-$(shell git describe --always --dirty).txt; \
+	hyperfine 'node build/newt.js src/Main.newt -o out.js' 'node build/newt2.js src/Main.newt -o out.js'  'scheme --program build/newt.so src/Main.newt -o out.js' > build/$$FN; \
+	cat build/$$FN
 
 clean:
 	rm  build/*
