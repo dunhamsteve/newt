@@ -16,7 +16,7 @@ import Lib.Types
 
 vprint : Context -> Val -> M String
 vprint ctx v = do
-  tm <- quote (length' ctx.env) v
+  tm <- quote ctx.lvl v
   pure $ render 90 $ pprint (names ctx) tm
 
 -- Check that target is Many or we are in an erased context
@@ -789,7 +789,7 @@ record Problem where
 -- Might have to move this if Check reaches back in...
 -- this is kinda sketchy, we can't use it twice at the same depth with the same name.
 fresh : {{ctx : Context}} -> String -> String
-fresh {{ctx}} base = base ++ "$" ++ show (length' ctx.env)
+fresh {{ctx}} base = base ++ "$" ++ show ctx.lvl
 
 -- The result is a casetree as a Tm
 buildTree : Context -> Problem -> M Tm
@@ -850,9 +850,9 @@ extendPi : Context -> Val -> SnocList Bind -> VSpine -> M (Context × Val × Lis
 extendPi ctx (VPi x str icit rig a b) nms sc = do
     let nm = fresh str
     let ctx' = extend ctx nm a rig
-    let v = VVar emptyFC str (length' ctx.env) Lin
+    let v = VVar emptyFC str ctx.lvl Lin
     tyb <- b $$ v
-    extendPi ctx' tyb (nms :< MkBind nm icit a) (sc :< (VVar x str (length' ctx.env) Lin, rig))
+    extendPi ctx' tyb (nms :< MkBind nm icit a) (sc :< (VVar x str ctx.lvl Lin, rig))
 extendPi ctx ty nms sc = pure (ctx, ty, nms <>> Nil, sc)
 
 -- turn vars into lets for forced values.
@@ -878,7 +878,7 @@ updateContext ctx ((k, val) :: cs) =
   -- We were turning Bound into Defined
   if isSelf k val then updateContext ctx cs
   else
-  let ix = cast $ lvl2ix (length' ctx.env) k in
+  let ix = cast $ lvl2ix ctx.lvl k in
   case getAt ix ctx.env of
     (Just (VVar _ _ k' Lin)) =>
       if k' /= k
@@ -956,7 +956,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         when (length vars /= snoclen sp) $ error emptyFC "\{show $ length vars} vars /= \{show $ snoclen sp}"
 
         -- constrain arguments to spine of dotted value
-        let lvl = length' ctx'.env - length' vars
+        let lvl = ctx'.lvl - length' vars
         let scons = constrainSpine lvl (sp <>> Nil)
         ctx' <- updateContext ctx' scons
 
@@ -982,7 +982,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         -- Constrain the scrutinee's variable to be dcon applied to args
         let (Just x) = findIndex' ((_==_ scnm) ∘ fst) ctx'.types
           | Nothing => error ctx.ctxFC "\{scnm} not is scope?"
-        let lvl = lvl2ix (length' ctx'.env) x
+        let lvl = lvl2ix ctx'.lvl x
         let scon = (lvl, VRef ctx.ctxFC dcName sc) -- (DCon arity dcName)
 
         debug "scty \{show scty}"
@@ -1175,7 +1175,7 @@ checkDone fc ctx Nil (Just body) ty = do
   -- Hack to try to get Combinatory working
   -- we're trying to subst in solutions here.
   env' <- for ctx.env $ \ val => do
-    ty <- quote (length' ctx.env) val
+    ty <- quote ctx.lvl val
     -- This is not getting vars under lambdas
     eval ctx.env ty
   types' <- for ctx.types $ \case
@@ -1191,7 +1191,7 @@ checkDone fc ctx Nil (Just body) ty = do
   -- unblocked by lets in the env. (Tree.newt:cmp)
   -- The case eval code only works in the Tm -> Val case at the moment.
   -- we don't have anything like `vapp` for case
-  ty <- quote (length' ctx.env) ty
+  ty <- quote ctx.lvl ty
   ty <- eval ctx.env ty
 
   debug "check at \{show ty}"
@@ -1266,7 +1266,7 @@ buildLitCase ctx prob fc scnm scty lit = do
   -- Constrain the scrutinee's variable to be lit value
   let (Just ix) = findIndex' ((_==_ scnm) ∘ fst) ctx.types
     | Nothing => error ctx.ctxFC "\{scnm} not is scope?"
-  let lvl = lvl2ix (length' ctx.env) ix
+  let lvl = lvl2ix ctx.lvl ix
   let scon = (lvl, VLit fc lit)
   ctx' <- updateContext ctx (scon :: Nil)
   let clauses = mapMaybe rewriteClause prob.clauses
@@ -1351,7 +1351,7 @@ checkDups fc = go Nil
 -- if one clause is short on patterns.
 buildTree ctx (MkProb Nil ty) = error emptyFC "no clauses"
 buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ str icit rig a b)) = do
-  let l = length' ctx.env
+  let l = ctx.lvl
   let nm = fresh str
   let ctx' = extend ctx nm a rig
   -- type of the rest
@@ -1590,13 +1590,13 @@ check ctx tm ty = do
     (t@(RLam fc (BI _ nm icit _) tm), ty@(VPi fc' nm' icit' rig a b)) => do
             debug "icits \{nm} \{show icit} \{nm'} \{show icit'}"
             if icit == icit' then do
-                let var = VVar fc nm (length' ctx.env) Lin
+                let var = VVar fc nm ctx.lvl Lin
                 let ctx' = extend ctx nm a rig
                 bapp <- b $$ var
                 tm' <- check ctx' tm bapp
                 pure $ Lam fc nm icit rig tm'
               else if icit' /= Explicit then do
-                let var = VVar fc nm' (length' ctx.env) Lin
+                let var = VVar fc nm' ctx.lvl Lin
                 ty' <- b $$ var
                 -- use nm' here if we want them automatically in scope
                 sc <- check (extend ctx nm' a rig) t ty'
@@ -1609,7 +1609,7 @@ check ctx tm ty = do
         a <- freshMeta (enterMarker ctx) fc (VU emptyFC) Normal >>= eval ctx.env
         b <- MkClosure ctx.env <$> freshMeta (extend (enterMarker ctx) nm a quant) fc (VU emptyFC) Normal
         unifyCatch fc ctx tty (VPi fc "_" icit quant a b)
-        let var = VVar fc nm (length' ctx.env) Lin
+        let var = VVar fc nm ctx.lvl Lin
         ty' <- b $$ var
         let ctx' = extend ctx nm a quant
         tm' <- check ctx' tm ty'
@@ -1635,14 +1635,14 @@ check ctx tm ty = do
     (tm, ty@(VPi fc nm' Implicit rig a b)) => do
       let names = map fst ctx.types
       debug "elab.insert: Add implicit lambda {\{nm'} : \{show a}} to \{show tm} "
-      let var = VVar fc nm' (length' ctx.env) Lin
+      let var = VVar fc nm' ctx.lvl Lin
       ty' <- b $$ var
       sc <- check (extend ctx nm' a rig) tm ty'
       pure $ Lam (getFC tm) nm' Implicit rig sc
 
     (tm, ty@(VPi fc nm' Auto rig a b)) => do
       debug "elab.insert: Add auto lambda {\{nm'} : \{show a}} to \{show tm}"
-      let var = VVar fc nm' (length' ctx.env) Lin
+      let var = VVar fc nm' ctx.lvl Lin
       ty' <- b $$ var
       debugM $ do
         pty' <- prvalCtx {{(extend ctx nm' a rig)}} ty'

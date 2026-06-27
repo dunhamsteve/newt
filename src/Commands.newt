@@ -195,7 +195,7 @@ getCaseSplit row col fc@(MkFC uri (MkBounds sr sc er ec)) ctx nm scty = do
   -- It's getting vars for the type
   scty <- unlet ctx.env scty
   cons <- getConstructors ctx fc scty
-  ty <- quote (length' ctx.env) scty
+  ty <- quote ctx.lvl scty
   cons <- filterM (checkCase ctx nm scty) cons
   let names = map fst cons
   putStrLn "Make splits for \{show names}"
