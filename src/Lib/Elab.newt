@@ -30,7 +30,6 @@ checkMarker' fc val _ Many = pure MkUnit
 checkMarker' fc val Present Zero = pure MkUnit
 checkMarker' fc val Absent Zero = throwError $ E (getFC val) "Erased value \{show val} used in unerased context"
 
-
 -- collectDecl collects multiple Def for one function into one
 collectDecl : List Decl -> List Decl
 collectDecl Nil = Nil
@@ -759,8 +758,8 @@ instance Show Bind where
 
 ---------------- Case builder
 
-data Constraint = PC String Pattern Val
-instance Show Constraint where
+data PMatch = PC String Pattern Val
+instance Show PMatch where
   show (PC nm pat ty) = show (nm,pat,ty)
 
 -- Maybe this moves to Elab..
@@ -772,7 +771,7 @@ record Clause where
   -- It's a VVar k or possibly a pattern.
   -- a pattern either is zipped out, dropped (non-match) or is assigned to rhs
   -- if we can do all three then we can have a VVar here.
-  cons : List Constraint
+  cons : List PMatch
   pats : List Pattern
   -- We'll need some context to typecheck this
   -- it has names from Pats, which will need types in the env
@@ -812,7 +811,7 @@ introClause nm icit ty (MkClause fc cons Nil expr) = error fc "Clause size doesn
 -- solving the others.
 -- TODO If the type is a meta and we're looking at a DCon, we _could_ give the TCon some
 -- args and try to solve the meta, but I'm not sure if that's a good idea.
-findSplit : List Constraint -> Maybe Constraint
+findSplit : List PMatch -> Maybe PMatch
 findSplit Nil = Nothing
 findSplit (x@(PC nm (PatCon _ _ _ _ _) _) :: xs) = Just x
 findSplit (x@(PC nm (PatLit _ val) _) :: xs) = Just x
@@ -1029,7 +1028,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
     -- We get a list of clauses back (a Problem) and then solve that
     -- If they all fail, we have a coverage issue. (Assuming the constructor is valid)
 
-    makeConstr : FC -> List Bind -> List Pattern -> M (List Constraint)
+    makeConstr : FC -> List Bind -> List Pattern -> M (List PMatch)
     makeConstr fc Nil Nil = pure $ Nil
     makeConstr fc Nil (pat :: pats) = error (getFC pat) "too many patterns"
 
@@ -1057,7 +1056,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
 
     -- constraints on scnm with constraints on parameters, or nothing if non-matching clause
     -- TODO update types that reference the scrutinee?
-    rewriteConstraint : QName -> List Bind -> List Constraint -> List Constraint -> M (Maybe (List Constraint))
+    rewriteConstraint : QName -> List Bind -> List PMatch -> List PMatch -> M (Maybe (List PMatch))
     rewriteConstraint sctynm vars Nil acc = pure $ Just acc
     rewriteConstraint sctynm vars (c@(PC nm y scty) :: xs) acc =
       if nm == scnm
@@ -1167,7 +1166,7 @@ checkWhere ctx decls body ty = do
   pure $ LetRec sigFC name funTy tm ty'
 
 -- checks the body after we're done with a case tree branch
-checkDone : FC -> Context -> List Constraint -> Maybe Raw -> Val -> M Tm
+checkDone : FC -> Context -> List PMatch -> Maybe Raw -> Val -> M Tm
 checkDone fc ctx Nil Nothing ty = error fc "impossible clause needs () on LHS"
 checkDone fc ctx Nil (Just body) ty = do
   debug "DONE-> check body \{show body} at \{show ty}"
@@ -1233,7 +1232,7 @@ checkDone fc ctx (PC x pat scty :: xs) body ty = error (getFC pat) "stray constr
 
 -- need to run constructors, then run default
 
-matchName : String → Constraint → Bool
+matchName : String → PMatch → Bool
 matchName nm (PC n _ scty) = nm == n
 
 isDefaultCase : String -> Clause -> Bool
@@ -1279,7 +1278,7 @@ buildLitCase ctx prob fc scnm scty lit = do
   where
     -- FIXME - thread in M for errors
     -- replace constraint with constraints on parameters, or nothing if non-matching clause
-    rewriteConstraint : List Constraint -> List Constraint -> Maybe (List Constraint)
+    rewriteConstraint : List PMatch -> List PMatch -> Maybe (List PMatch)
     rewriteConstraint Nil acc = Just acc
     rewriteConstraint (c@(PC nm y scty) :: xs) acc =
       if nm == scnm
@@ -1338,10 +1337,10 @@ renameContext from to ctx = { types $= go } ctx
     go Nil = Nil
     go ((a,b) :: types) = if a == from then (to,b) :: types else (a,b) :: go types
 
-checkDups : FC → List Constraint → M Unit
+checkDups : FC → List PMatch → M Unit
 checkDups fc = go Nil
   where
-    go : List String → List Constraint → M Unit
+    go : List String → List PMatch → M Unit
     go seen Nil = pure MkUnit
     go seen (PC nm _ _ :: cons) =
       if elem nm seen
@@ -1377,17 +1376,12 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
       checkDone fc ctx constraints expr ty
 
   debug "SPLIT on \{scnm} because \{show pat} \{show $ getFC pat}"
-  let (Just (sctm, scty, rig)) = lookupName ctx scnm
+  let (Just (sctm,_, _)) = lookupName ctx scnm
     | _ => error fc "Internal Error: can't find \{scnm} in environment"
 
   -- REVIEW We probably need to know this is a VRef before we decide to split on this slot..
+  -- I'm doing all of this and then using scty below?
   scty' <- unlet ctx.env scty >>= forceType ctx.env
-  -- TODO attempting to pick up Autos that could have been solved immediately
-  -- If we try on creation, we're looping at the moment, because of the possibility
-  -- of Ord a -> Ord b -> Ord (a \x b). Need to cut earlier when solving or switch to
-  -- Idris method...
-  -- This is necessary for tests/InferenceIssue.newt
-  -- solveAutos below is the important part
   scty' <- case scty' of
     (VMeta fc1 ix sp) => do
       meta <- lookupMeta ix
@@ -1405,8 +1399,6 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
     PatCon fc _ _ _ as => do
       -- expand vars that may be solved, eval top level functions
       debug "EXP \{show scty} -> \{show scty'}"
-      -- this is per the paper, but it would be nice to coalesce
-      -- default cases
       cons <- getConstructors ctx (getFC pat) scty'
       let matched = matchedConstructors scnm prob.clauses
       let matched' = map snd matched
@@ -1417,7 +1409,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
        (fc, qn) => do
           if elem qn (map fst cons)
             then pure MkUnit
-            else error fc "\{show qn} not a constructor for \{show scty}"
+            else error fc "\{show qn} not a constructor for \{show scty'}"
 
       debug "CONS \{show $ map fst cons} matched \{show matched} miss \{show miss} miss' \{show miss'}"
 
@@ -1437,12 +1429,13 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
     PatLit fc v => do
       let tyname = litTyName v
       case scty' of
-        (VRef fc1 nm sp) => when (nm /= tyname) $ error fc "expected \{show scty} and got \{show tyname}"
-        _ => error fc "expected \{show scty} and got \{show tyname}"
+        (VRef fc1 nm sp) => when (nm /= tyname) $ error fc "expected \{show scty'} and got \{show tyname}"
+        _ => error fc "expected \{show scty'} and got \{show tyname}"
       -- need to run through all of the PatLits in this slot and then find a fallback
       -- walk the list of patterns, stop if we hit a PatVar / PatWild, fail if we don't
-      alts <- buildLitCases ctx prob fc scnm scty
+      alts <- buildLitCases ctx prob fc scnm scty'
       pure $ Case fc sctm alts
+
     pat => error (getFC pat) "Internal error - tried to split on \{show pat}"
 
 showDef : Context -> List String -> Int -> Val -> M String
