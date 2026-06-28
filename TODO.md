@@ -2,8 +2,10 @@
 ## TODO
 
 - [x] LSP actions in code playground
+- [ ] code action to add clause
 - [ ] Add missing args code action?
-  - (useful both for refactoring and type constructor and autocomplete)
+  - when a constructor is underapplied
+  - is this useful? we would probably have to add at the end
 - [ ] Port test suite from erasure-impl
 - [x] Constraint error messages have bad FC
   - point to say a constructor def and not the code with the constraint

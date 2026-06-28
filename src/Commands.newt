@@ -189,7 +189,7 @@ addMissingCases _ _ fc@(MkFC uri (MkBounds sr sc er ec)) ctx names = do
   putStrLn "Add Missing \{show fc} \{show names}"
   pure $ Just $ AddMissingAction edits
 
-getCaseSplit : Int → Int → FC → Context → String → Val → M (Maybe CodeAction)
+getCaseSplit : Int → Int → FC → Context → Int → Val → M (Maybe CodeAction)
 getCaseSplit row col fc@(MkFC uri (MkBounds sr sc er ec)) ctx nm scty = do
   top <- getTop
   -- It's getting vars for the type

@@ -350,7 +350,7 @@ instance Show TopEntry where
   show (MkEntry fc q name type def flags) = "\{show q}\{show name} : \{show type} := \{show def} \{show flags}"
 
 data EditorInfo
-  = CaseSplit FC Context String Val
+  = CaseSplit FC Context Int Val
   -- Not sure we need Context here?
   | MissingCases FC Context (List QName)
 

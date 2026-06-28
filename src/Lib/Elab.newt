@@ -1197,11 +1197,11 @@ checkDone fc ctx Nil (Just body) ty = do
   pure got
 checkDone fc ctx (PC x (PatWild pvfc icit) scty :: xs) body ty = do
   -- sometimes have the same FC as real arguments
-  when (icit == Explicit) $ addInfo $ CaseSplit pvfc ctx "_" scty
+  when (icit == Explicit) $ addInfo $ CaseSplit pvfc ctx x scty
   checkDone fc ctx xs body ty
 checkDone fc ctx (PC nm (PatVar pvfc _ nm') scty :: xs) body ty = do
   -- TIME 5.50 -> 5.62 (we can flag this if it's an issue)
-  addInfo $ CaseSplit pvfc ctx nm' scty
+  addInfo $ CaseSplit pvfc ctx nm scty
 
   let ctx = the Context { types $= rename (lvl2ix ctx.lvl nm) } ctx
   checkDone fc ctx xs body ty
