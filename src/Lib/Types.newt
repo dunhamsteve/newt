@@ -260,7 +260,7 @@ data Error
   | ENotInScope FC String
   -- Postpone signals a meta that needs to be solved first
   | Postpone FC String
-  | UnificationError FC (List String) Val Val Error
+  | UnificationError FC (List String) Tm Tm Error
 
 instance HasFC Error where
   getFC (E x str) = x

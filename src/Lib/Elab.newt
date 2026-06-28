@@ -689,7 +689,10 @@ unifyCatch fc ctx ty' ty = do
       err => do
         let names = map fst ctx.types
         debug "fail \{show ty'} \{show ty}"
-        throwError $ UnificationError fc names ty' ty err
+        -- Need to quote here to catch any transient meta solutions
+        a <- quote ctx.lvl ty'
+        b <- quote ctx.lvl ty
+        throwError $ UnificationError fc names a b err
 
 freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
 freshMeta ctx fc ty kind = do

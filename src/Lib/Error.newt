@@ -11,8 +11,6 @@ prettyErrorMsg (ENotInScope x nm) = pure "\{nm} not in scope"
 prettyErrorMsg (Postpone x str) = pure str
 prettyErrorMsg (UnificationError fc names a b err) = do
   let lvl = length' names
-  a <- quote lvl a
-  b <- quote lvl b
   pure "unification failure: \{errorMsg err}\n  failed to unify \{rpprint names a}\n             with \{rpprint names b}\n  "
 
 -- Use prettyError when possible
