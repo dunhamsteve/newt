@@ -1,0 +1,20 @@
+use-grammars = { only = [ "newt"] }
+
+[language-server.newt-lsp]
+command = "newt-lsp"
+args = ["--stdio"]
+
+[[language]]
+name = "newt"
+scope = "source.newt"
+grammar = "newt"
+file-types = ["newt"]
+comment-tokens = "--"
+block-comment-tokens = { start = "/-", end = "-/" }
+indent = { tab-width = 2, unit = "  " }
+language-servers = [ "newt-lsp" ]
+
+[[grammar]]
+name = "newt"
+source = { git = "https://github.com/dunhamsteve/tree-sitter-newt", rev="59dd153296019671cfd940966ebf2c43e518c3af"}
+

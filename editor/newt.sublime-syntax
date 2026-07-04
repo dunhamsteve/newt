@@ -1,0 +1,36 @@
+%YAML 1.2
+---
+# for fancier stuff look at
+# https://github.com/tellnobody1/sublime-purescript-syntax/blob/master/purescript.sublime-syntax
+# But I'm not sure if the folding data is worth it for just bat / delta
+name: Newt
+file_extensions:
+  - newt
+scope: source.newt
+contexts:
+  main:
+    - match: \b(let|in|where|case|of|data|U|do|ptype|pfunc|module|infixl|infixr|infix|∀|forall|import|uses|derive|class|instance|record|constructor|if|then|else)\b 
+      scope: keyword.control.newt
+    - match: '"'
+      push: string
+    # crashes bat
+    # - match: '`'
+    #   embed: source.javascript
+    #   escape: '`'
+  string:
+    # - meta_scope: string.quoted.double.newt
+    - match: \\\{
+      push: interp
+    - match: \\.
+      scope: constant.character.escape.newt
+    - match: '"'
+      pop: true
+    # meta_scope hits inner contexts, too.
+    - match: .
+      scope: string.quoted.double.newt
+  interp:
+    - match: \}
+      pop: true
+    - include: main
+
+         

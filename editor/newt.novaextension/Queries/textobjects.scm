@@ -1,0 +1,3 @@
+[
+  (dataDecl)
+] @class.around

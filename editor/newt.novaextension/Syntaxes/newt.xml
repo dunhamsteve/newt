@@ -1,0 +1,54 @@
+<syntax name="newt">
+<meta>
+  <name>newt</name>
+  <type>compiled</type>
+  <preferred-file-extension>newt</preferred-file-extension>
+</meta>
+<detectors>
+  <extension priority="1.0">newt</extension>
+</detectors>
+<indentation>
+  <increase>
+    <expression>\b(of|where)\b</expression>
+  </increase>
+  <!-- decrease -->
+</indentation>
+<comments>
+<single>
+<expression>--</expression>
+</single>
+<multiline>
+  <starts-with><expression>/-</expression></starts-with>
+  <ends-with><expression>-/</expression></ends-with>
+</multiline>
+</comments>
+<injection>
+  <expression>newt</expression>
+</injection>
+<!-- default are () [] {}
+  <brackets>
+<pair open="{" close="}"/>
+</brackets>
+<surrounding-pairs></surrounding-pairs>
+-->
+
+<!--
+Use their build script: https://docs.nova.app/syntax-reference/tree-sitter/
+-->
+<tree-sitter>
+  <highlights path="highlights.scm" />
+<!-- <injections/> -->
+<!-- symbols, folds -->
+</tree-sitter>
+
+<!-- regex grammars deprecated for tree-sitter
+https://docs.nova.app/syntax-reference/regex-grammars/
+-->
+<!--
+<scopes>
+<scope name="newt.keyword">
+<expression>\b(let|where|case|of|if|then|else|data|record|in|module|import)\b</expression>
+</scope>
+</scopes> -->
+</syntax>
+

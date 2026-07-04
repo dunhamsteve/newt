@@ -1,0 +1,26 @@
+{
+    "identifier": "com.cloakedarrow.newt",
+    "name": "newt",
+    "organization": "Cloaked Arrow",
+    "description": "support for the newt language",
+    "version": "1.0",
+    "categories": ["languages"],
+
+    "main": "main.js",
+
+    "entitlements": {
+        "process": true,
+        "filesystem": "readonly"
+    },
+    "activationEvents": [
+      "onLanguage:newt"
+    ],
+    "config": [
+        {
+            "key": "newt.language-server-path",
+            "title": "Language Server Path",
+            "type": "path",
+            "placeholder": "~/bin/newt-lsp"
+        }
+    ]
+}

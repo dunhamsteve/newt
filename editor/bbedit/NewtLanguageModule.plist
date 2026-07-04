@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Newt support for BBEdit -->
+<plist version="1.0">
+<dict>
+	<key>BBEditDocumentType</key>
+	<string>CodelessLanguageModule</string>
+	<key>BBLMColorsSyntax</key>
+	<true/>
+         <key>BBLMLanguageServerInfo</key>
+        <dict>
+                <key>ServerArguments</key>
+                <array>
+                   <string>--stdio</string>
+                </array>
+                <key>ServerCommand</key>
+                <string>newt-lsp</string>
+                <key>ServerInitParams</key>
+                <string></string>
+                <key>ServerLanguageID</key>
+                <string></string>
+        </dict>
+	<key>BBLMCommentLineDefault</key>
+	<string>-- </string>
+	<key>BBLMCommentPrefixDefault</key>
+	<string>/-</string>
+	<key>BBLMCommentLineDefault</key>
+	<string>-/</string>
+	<key>BBLMIsCaseSensitive</key>
+	<true/>
+	<key>BBLMKeywordList</key>
+	<array>
+		<string>let</string>
+		<string>in</string>
+		<string>where</string>
+		<string>case</string>
+		<string>of</string>
+		<string>data</string>
+		<string>derive</string>
+		<string>alias</string>
+		<string>U</string>
+		<string>do</string>
+		<string>ptype</string>
+		<string>pfunc</string>
+		<string>module</string>
+		<string>infixl</string>
+		<string>infixr</string>
+		<string>infix</string>
+		<string>∀</string>
+		<string>forall</string>
+		<string>import</string>
+		<string>uses</string>
+		<string>class</string>
+		<string>instance</string>
+		<string>record</string>
+		<string>constructor</string>
+		<string>if</string>
+		<string>then</string>
+		<string>else</string>
+	</array>
+	<key>BBLMLanguageCode</key>
+	<string>NEWT</string>
+	<key>BBLMLanguageDisplayName</key>
+	<string>Newt</string>
+	<key>BBLMScansFunctions</key>
+	<true/>
+	<key>BBLMSuffixMap</key>
+	<array>
+		<dict>
+			<key>BBLMLanguageSuffix</key>
+			<string>.newt</string>
+		</dict>
+	</array>
+	<key>BBLMSupportsTextCompletion</key>
+	<false/>
+	<key>Language Features</key>
+	<dict>
+		<key>Comment Pattern</key>
+		<string>--.*$</string>
+		<key>Function Pattern</key>
+        <!-- <string><![CDATA[^(?P<function>(?P<function_name>[\w\d_']+)\s*:(.|[\n])*?^(?!(?P=function_name)))(?=\w)]]></string> -->
+        <string><![CDATA[^(?P<function>(?P<function_name>[\w\d_']+)\s*:.*)]]></string>
+		<key>Identifier and Keyword Character Class</key>
+		<string>A-Za-z0-9</string>
+		<key>Open Line Comments</key>
+		<string>--</string>
+		<key>String Pattern</key>
+		<string>("(\\"|[^"])*")</string>
+	</dict>
+	<key>com.barebones.DocumentType</key>
+	<string>CodelessLanguageModule</string>
+</dict>
+</plist>
