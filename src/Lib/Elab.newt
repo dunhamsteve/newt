@@ -978,29 +978,24 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         pure $ Just $ CaseCons dcName (map getName vars) tm
 
     _ => do
-        -- REVIEW the unifications in here might need to be at Zero
-        (Right res) <- tryError (unify ctx'.env UPattern ty' scty)
-          | Left err => do
-            debug "SKIP \{show dcName} because unify error \{errorMsg err}"
-            putStrLn "SKIP \{show dcName} because unify error \{errorMsg err}"
-            pure Nothing
-
         -- Constrain the scrutinee's variable to be dcon applied to args
         let scon = (scnm, VRef ctx.ctxFC dcName sc) -- (DCon arity dcName)
 
         debug "scty \{show scty}"
         debug "UNIFY results \{show res.constraints}"
+        debug "SC CONSTRAINT: \{show scon}"
         debug "before types: \{show ctx'.types}"
         debug "before env: \{show ctx'.env}"
-        debug "SC CONSTRAINT: \{show scon}"
 
         -- push the constraints into the environment by turning bind into define
         -- Is this kosher?  It might be a problem if we've already got metas over
         -- this stuff, because it intends to ignore defines.
+        -- this requires we add `unlet` in a few places to materialize the
+        -- new assignments into existing Val
         ctx' <- updateContext ctx' (scon :: res.constraints)
 
-        debug "context types: \{show ctx'.types}"
-        debug "context env: \{show ctx'.env}"
+        debug "after types: \{show ctx'.types}"
+        debug "after env: \{show ctx'.env}"
 
         -- What if all of the pattern vars are defined to meta
 
