@@ -2,30 +2,30 @@
 module Prelude
 module ConstraintErr
 INFO at tests/ConstraintErr.newt:9:15--9:16: User Hole
-  l : Prelude.Nat
-  n : Prelude.Nat
-  m : Prelude.Nat
+  l : Nat
+  n : Nat
+  m : Nat
   -----------
-  Prelude.Nat
+  Nat
 INFO at tests/ConstraintErr.newt:9:15--9:16: User Hole
-  l : Prelude.Nat
-  n : Prelude.Nat
-  m : Prelude.Nat
+  l : Nat
+  n : Nat
+  m : Nat
   -----------
-  Prelude.Nat
+  Nat
 INFO at tests/ConstraintErr.newt:8:14--8:15: User Hole
-  _$0 : Prelude.Nat
-  n : Prelude.Nat
-  _$2 : Prelude.Nat
+  _$0 : Nat
+  n : Nat
+  _$2 : Nat
   -----------
-  Prelude.Nat
+  Nat
 ERROR at tests/ConstraintErr.newt:14:17--14:21: Unsolved meta ConstraintErr.$m9 Normal type U -> U
   
   foo : IO Int
   foo = (1 +) <$> pure
                   ^^^^
 
-ERROR at tests/ConstraintErr.newt:14:17--14:21: Unsolved meta ConstraintErr.$m10 AutoSolve type Prelude.Applicative ?$m9
+ERROR at tests/ConstraintErr.newt:14:17--14:21: Unsolved meta ConstraintErr.$m10 AutoSolve type Applicative ?$m9
   0 Solutions: []
   
   foo : IO Int

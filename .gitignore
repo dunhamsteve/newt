@@ -21,3 +21,6 @@ bootstrap/serializer.js
 /playground/src/newt.js
 .vite
 bs
+/aside
+bench*.txt
+*.dylib

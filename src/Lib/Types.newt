@@ -119,6 +119,11 @@ showCaseAlt (CaseLit lit tm) = "\{show lit} => \{show tm}"
 instance Show CaseAlt where
   show = showCaseAlt
 
+-- TODO make it more readable
+-- Option to hide implicits
+-- Ahh, but App doesn't know...
+-- Restore infix operations e.g. (_::_ a b) => a _::_ b (but implicits!)
+
 pprint' : Int -> List String -> Tm -> Doc
 pprintAlt : Int -> List String -> CaseAlt -> Doc
 pprintAlt p names (CaseDefault t) = text "_" <+> text "=>" <+> pprint' p ("_" :: names) t
@@ -137,7 +142,7 @@ pprint' p names (Bnd _ k) = case getAt (cast k) names of
   Just nm => text "\{nm}:\{show k}"
 pprint' p names (Force _ t) = text "%force" <+> pprint' p names t
 pprint' p names (Delay _ t) = parens 0 p $ text "%delay" <+> pprint' 0 names t
-pprint' p names (Ref _ str) = text (show str)
+pprint' p names (Ref _ (QN qns baseName)) = text baseName
 pprint' p names (Meta _ (QN qns baseName)) = text "?\{baseName}"
 pprint' p names (Lam _ nm icit quant t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> pprint' 0 (nm :: names) t
 -- TODO would be nice to make Meta app prettier, we could funArgs it, but might not be able
