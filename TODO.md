@@ -7,6 +7,9 @@
   - when a constructor is underapplied
   - is this useful? we would probably have to add at the end
 - [ ] Port test suite from erasure-impl
+- [ ] add something like `rewrite` to make replace easier to use
+  - look at Idris and pi-forall
+  - consider something interactive (what would Ask do?)
 - [x] Constraint error messages have bad FC
   - point to say a constructor def and not the code with the constraint
   - e.g. change a `List String` to `String` in a dcon arg

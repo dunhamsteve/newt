@@ -1,0 +1,83 @@
+module OTComp
+
+-- This was a project that I did early on in Idris.
+-- The rewrite stuff doesn't exist in newt, and using replace is a little painful
+-- Backing out the steps (replace `Refl` with ?) and looking at the holes shows
+-- where resugaring would be nice.
+
+-- We probably want to elide implicits and put operators back together.
+-- And the same with unification errors (modulo a flag or something)
+
+-- https://www.cs.nott.ac.uk/~psymp4/files/dependently-typed-compilers.pdf
+
+import Prelude
+
+data Exp : U -> U where
+  Val : ∀ t. t -> Exp t
+  Add : Exp Nat -> Exp Nat -> Exp Nat
+  If  : ∀ t. {{Eq t}} → Exp Bool -> Exp t -> Exp t -> Exp t
+
+eval : ∀ t. Exp t -> t
+eval (Val x) = x
+eval (Add x y) = eval x + eval y
+eval (If x y z) = ite (eval x) (eval y) (eval z)
+
+data Stack : List U -> U where
+  Eps : Stack Nil
+  _|>_ : ∀ t ts. t -> Stack ts -> Stack (t :: ts)
+
+infixr 7 _|>_ _+++_
+
+data Code : List U -> List U -> U where
+  PUSH  : ∀ t ts. t -> Code ts (t :: ts)
+  IF    : ∀ s s'. Code s s' -> Code s s' -> Code (Bool :: s) s'
+  ADD   : ∀ s. Code (Nat :: Nat :: s) (Nat :: s)
+  _+++_ : ∀ s s' s''. Code s s' -> Code s' s'' -> Code s s''
+
+exec : ∀ s s'. Code s s' -> Stack s -> Stack s'
+exec (PUSH x) s          = x |> s
+exec (IF c1 c2) (b |> s) = ite b (exec c1 s) (exec c2 s)
+exec ADD (m |> n |> s)   = (n + m) |> s
+exec (c1 +++ c2) s       = exec c2 (exec c1 s)
+
+compile : ∀ t s. Exp t -> Code s (t :: s)
+compile (Val x)    = PUSH x
+compile (Add x y)  = compile x +++ compile y +++ ADD
+compile (If b x y) = compile b +++ IF (compile x) (compile y)
+
+distributeIf : ∀ t1 t2. (f : t1 -> t2) -> (b : Bool) -> (x : t1) -> (y : t1) ->
+               f (ite b x y) ≡ ite b (f x) (f y)
+distributeIf _ False x y = Refl
+distributeIf _ True  x y = Refl
+
+0 correct : ∀ t ts. (e : Exp t) -> (s : Stack ts) -> exec (compile e) s ≡ eval e |> s
+correct (Val x) s = Refl
+correct e@(Add x y) s =
+  replace (\ z => exec (compile y +++ ADD) z ≡ eval e |> s) (sym $ correct x s) $
+  replace (\ z => exec ADD z ≡ eval e |> s) (sym $ correct y (eval x |> s))
+  Refl
+  -- so MO here is:
+  -- write `replace (\z => dest type) (eq)`
+  -- fill in the dest type
+  -- expand if necessary
+  -- replace the changing bit with z
+correct e@(If b x y) s =
+  replace (\ z => exec (IF (compile x) (compile y)) z ≡ eval e |> s) (sym $ correct b s) $
+  -- thought the (|> s) was an issue, desugars to flip _|> s, but that's not it
+  replace (\ z => exec (IF (compile x) (compile y)) (eval b |> s) ≡ z) (sym $ distributeIf (|> s) (eval b) (eval x) (eval y)) $
+  -- other way from Idris. It was easier to keep working on that side
+  replace (\ z => exec (IF (compile x) (compile y)) (eval b |> s) ≡ ite (eval b) (z) (eval y |> s)) (correct x s) $
+  replace (\ z => exec (IF (compile x) (compile y)) (eval b |> s) ≡ ite (eval b) (exec (compile x) s) z) (correct y s) $
+  Refl
+
+-- Idris version:
+-- correct (Add x y) s =
+--   rewrite correct x s  in
+--   rewrite correct y (eval x |> s) in
+--   Refl
+-- correct (If b x y) s =
+--   rewrite correct b s in
+--   rewrite distributeIf (|> s) (eval b) (eval x) (eval y) in
+--   rewrite correct x s in
+--   rewrite correct y s in
+--   Refl
