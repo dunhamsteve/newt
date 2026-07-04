@@ -514,7 +514,9 @@ unify env mode t u = do
   debug "Unify lvl \{show $ length env}"
   debug "  \{show t}"
   debug "  =?= \{show u}"
+  -- test if unlet necessary via Combinatory.newt
   t' <- forceMeta t >>= unlet env
+  -- test if unlet necessary via Prelude.newt
   u' <- forceMeta u >>= unlet env
   debug "forced \{show t'}"
   debug "  =?= \{show u'}"
@@ -763,6 +765,7 @@ instance Show Bind where
 
 ---------------- Case builder
 
+-- These are "constraint" in the paper, but we've got other things called constraints
 data PMatch = PC Int Pattern Val
 instance Show PMatch where
   show (PC nm pat ty) = show (nm,pat,ty)
@@ -921,7 +924,7 @@ checkCase ctx scnm scty (dcName, arity, ty) = do
     _ => pure True
 
 -- Build the tree for a match against a casealt `dcName`
--- return Nothing if dcon type doesn't unify with scrut
+-- return Nothing if dcon type doesn't unify with the scrutinee type
 buildCase : Context -> Problem -> Int -> Val -> (QName × Int × Tm) -> M (Maybe CaseAlt)
 buildCase ctx prob scnm scty (dcName, arity, ty) = do
   debug "CASE \{show scnm} match \{show dcName} ty \{rpprint (names ctx) ty}"
@@ -1373,8 +1376,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
   debug "SPLIT on \{show scnm} because \{show pat} \{show $ getFC pat}"
   let sctm = Bnd emptyFC (lvl2ix ctx.lvl scnm)
 
-  -- REVIEW We probably need to know this is a VRef before we decide to split on this slot..
-  -- I'm doing all of this and then using scty below?
+  -- Prelude.newt breaks without this unlet
   scty' <- unlet ctx.env scty >>= forceType ctx.env
   scty' <- case scty' of
     (VMeta fc1 ix sp) => do
@@ -1560,17 +1562,18 @@ check ctx tm ty = do
       debug "SCTM \{rpprint (names ctx) sc}"
       debug "SCTY \{show scty}"
 
+      -- buildTree expects scrutinee to be a var in the context
       let scnm = fresh "sc"
       top <- getTop
       clauses <- for alts $ \case
         (MkAlt pat rawRHS) => do
           pat' <- mkPat (pat, Explicit)
-          -- REVIEW that's the name of the next level right?
           pure $ MkClause (getFC pat) ((PC ctx.lvl pat' scty) :: Nil) Nil rawRHS
-      -- buildCase expects scrutinee to be a name in the context, so we need to let it.
-      -- if it's a Bnd and not shadowed we could skip the let, but that's messy.
+
       -- scrutinee was checked at Many above
       let ctx' = withPos (extend ctx scnm scty Many) (getFC tm)
+
+      -- If a Lazy ty is expected, insert a Delay
       case lazyType ty of
         Nothing => do
           tree <- buildTree ctx' $ MkProb clauses ty
