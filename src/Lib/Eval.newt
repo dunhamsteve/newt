@@ -41,19 +41,6 @@ lookupVar env k = let l = cast $ length env in
       Just v => Just v
       Nothing => Nothing
 
--- hoping to apply what we got via pattern matching
--- TODO see if we can drop this after updating pattern matching
-unlet : Env -> Val -> M Val
-unlet env t@(VVar fc nm k sp) = case lookupVar env k of
-      Just tt@(VVar fc' nm' k' sp') => do
-        debug $  "lookup \{show k} is \{show tt}"
-        if k' == k then pure t else (vappSpine tt sp >>= unlet env)
-      Just t => vappSpine t sp >>= unlet env
-      Nothing => do
-        debug $  "lookup \{show k} is Nothing in env \{show env}"
-        pure t
-unlet env x = pure x
-
 -- Try applying VRef to spine, back out if it is stuck
 tryEval : Env -> Val -> M (Maybe Val)
 tryEval env (VRef fc k sp) = do

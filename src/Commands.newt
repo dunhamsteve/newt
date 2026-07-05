@@ -192,8 +192,6 @@ addMissingCases _ _ fc@(MkFC uri (MkBounds sr sc er ec)) ctx names = do
 getCaseSplit : Int → Int → FC → Context → Int → Val → M (Maybe CodeAction)
 getCaseSplit row col fc@(MkFC uri (MkBounds sr sc er ec)) ctx nm scty = do
   top <- getTop
-  -- It's getting vars for the type
-  -- scty <- unlet ctx.env scty
   cons <- getConstructors ctx fc scty
   ty <- quote ctx.lvl scty
   cons <- filterM (checkCase ctx nm scty) cons

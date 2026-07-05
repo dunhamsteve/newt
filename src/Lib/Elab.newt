@@ -452,9 +452,6 @@ solve env m sp t = do
     | Left err => do
         debug "postpone constraint \{show err}"
         addConstraint env (getFC t) (VMeta (getFC t) m sp) t
-  -- force unlet
-  -- hack <- quote l t
-  -- t <- eval env hack
   catchError (do
     tm <- rename m ctx.marker ren l t
     let tm = lams (snoclen sp) (reverse ctx.boundNames) tm
@@ -513,10 +510,8 @@ unify env mode t u = do
   debug "Unify lvl \{show $ length env}"
   debug "  \{show t}"
   debug "  =?= \{show u}"
-  -- test if unlet necessary via Combinatory.newt
-  t' <- forceMeta t -- >>= unlet env
-  -- test if unlet necessary via Prelude.newt
-  u' <- forceMeta u -- >>= unlet env
+  t' <- forceMeta t
+  u' <- forceMeta u
   debug "forced \{show t'}"
   debug "  =?= \{show u'}"
   debug "env \{show env}"
@@ -1003,8 +998,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         -- push the constraints into the environment by turning bind into define
         -- Is this kosher?  It might be a problem if we've already got metas over
         -- this stuff, because it intends to ignore defines.
-        -- this requires we add `unlet` in a few places to materialize the
-        -- new assignments into existing Val
+        -- This is now only used for forced values.
         ctx' <- updateContext ctx' (scon :: res.constraints)
 
         debug "after types: \{show ctx'.types}"
@@ -1017,7 +1011,6 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         for prob.clauses $ (\x => debug "    \{show x}")
         clauses <- mapMaybe id <$> traverse (rewriteClause sctynm vars) prob.clauses
 
-        -- This removes two unlet and breaks tests/Tree.newt
         clauses <- traverse (updateClauseTypes (scon :: res.constraints)) clauses
 
         debug "and now:"
@@ -1397,8 +1390,6 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
   debug "SPLIT on \{show scnm} because \{show pat} \{show $ getFC pat}"
   let sctm = Bnd emptyFC (lvl2ix ctx.lvl scnm)
 
-  -- Prelude.newt breaks without this unlet
-  -- scty' <- unlet ctx.env scty >>= forceType ctx.env
   scty' <- forceType ctx.env scty
   scty' <- case scty' of
     (VMeta fc1 ix sp) => do
