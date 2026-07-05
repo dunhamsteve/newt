@@ -453,8 +453,8 @@ solve env m sp t = do
         debug "postpone constraint \{show err}"
         addConstraint env (getFC t) (VMeta (getFC t) m sp) t
   -- force unlet
-  hack <- quote l t
-  t <- eval env hack
+  -- hack <- quote l t
+  -- t <- eval env hack
   catchError (do
     tm <- rename m ctx.marker ren l t
     let tm = lams (snoclen sp) (reverse ctx.boundNames) tm
@@ -487,7 +487,6 @@ solve env m sp t = do
       debug "check autos depending on \{show ix} \{debugStr mc.mcmode}"
       checkAutos ix mc.autos
     )
-
     (\case
       Postpone fc msg => do
         debug "CONSTRAINT2 \{show ix} \{show sp} =?= \{show t}"
@@ -515,9 +514,9 @@ unify env mode t u = do
   debug "  \{show t}"
   debug "  =?= \{show u}"
   -- test if unlet necessary via Combinatory.newt
-  t' <- forceMeta t >>= unlet env
+  t' <- forceMeta t -- >>= unlet env
   -- test if unlet necessary via Prelude.newt
-  u' <- forceMeta u >>= unlet env
+  u' <- forceMeta u -- >>= unlet env
   debug "forced \{show t'}"
   debug "  =?= \{show u'}"
   debug "env \{show env}"
@@ -849,6 +848,12 @@ getConstructors ctx scfc (VRef fc nm _) = do
 getConstructors ctx scfc tm = do
   tms <- vprint ctx tm
   error scfc "Can't split - not VRef: \{tms}"
+mapFstM : ∀ a b c. (a → M c) → SnocList (a × b) → M $ SnocList (c × b)
+mapFstM f Lin = pure Lin
+mapFstM f (xs :< (a,b) ) = do
+  a <- f a
+  xs <- mapFstM f xs
+  pure $ xs :< (a,b)
 
 -- Extend environment with fresh variables from a pi-type
 -- the pi-type is the telescope of a constructor
@@ -866,15 +871,21 @@ extendPi ctx ty nms sc = pure (ctx, ty, nms <>> Nil, sc)
 -- turn vars into lets for forced values.
 -- substitute inside values
 -- FIXME we're not going under closures at the moment
-substVal : Int -> Val -> Val -> Val
+substVal : Int -> Val -> Val -> M Val
 substVal k v tm = go tm
   where
-    go : Val -> Val
-    go (VVar fc nm j sp) = if j == k then v else (VVar fc nm j (map (mapFst go) sp))
-    go (VPi fc nm icit rig a b) = VPi fc nm icit rig (go a) b
-    go (VMeta fc ix sp) = VMeta fc ix (map (mapFst go) sp)
-    go (VRef fc nm sp) = VRef fc nm (map (mapFst go) sp)
-    go tm = tm
+    go : Val -> M Val
+    go (VVar fc nm j sp) = if j == k
+      then case sp of
+        Lin => pure v
+        _ => vappSpine v sp
+      else (VVar fc nm j <$> mapFstM go sp)
+    go (VPi fc nm icit rig a b) = do
+      a <- go a
+      pure $ VPi fc nm icit rig a b
+    go (VMeta fc ix sp) = VMeta fc ix <$> mapFstM go sp
+    go (VRef fc nm sp) = VRef fc nm <$> mapFstM go sp
+    go tm = pure tm
 
 -- Update context when a variable is constrained to a value.
 -- For now, we're updating the context to turn var bindings
@@ -891,9 +902,10 @@ updateContext ctx ((k, val) :: cs) =
     (Just (VVar _ _ k' Lin)) =>
       if k' /= k
         then updateContext ctx ((k',val) :: cs)
-        else
-          let ctx' = MkCtx ctx.lvl (map (substVal k val) ctx.env) ctx.types (replaceV ix Defined ctx.bds) ctx.ctxFC ctx.marker
-          in updateContext ctx' cs
+        else do
+          env' <- traverse (substVal k val) ctx.env
+          let ctx' = MkCtx ctx.lvl env' ctx.types (replaceV ix Defined ctx.bds) ctx.ctxFC ctx.marker
+          updateContext ctx' cs
     (Just val') => do
       -- This is fine for Z =?= Z but for other stuff, we probably have to match
       info (getFC val) "need to unify \{show val} and \{show val'} or something"
@@ -971,6 +983,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
         for prob.clauses $ (\x => debug "    \{show x}")
         clauses <- mapMaybe id <$> traverse (rewriteClause sctynm vars) prob.clauses
+        clauses <- traverse (updateClauseTypes scons) clauses
         debug "and now:"
         for clauses $ (\x => debug "    \{show x}")
         when (length' clauses == 0) $ error ctx.ctxFC "Missing case for \{show dcName} splitting \{show scnm}"
@@ -1003,12 +1016,25 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
         for prob.clauses $ (\x => debug "    \{show x}")
         clauses <- mapMaybe id <$> traverse (rewriteClause sctynm vars) prob.clauses
+
+        -- This removes two unlet and breaks tests/Tree.newt
+        clauses <- traverse (updateClauseTypes (scon :: res.constraints)) clauses
+
         debug "and now:"
         for clauses $ (\x => debug "    \{show x}")
         when (length' clauses == 0) $ error ctx.ctxFC "Missing case for \{show dcName} splitting \{show scnm}"
         tm <- buildTree ctx' (MkProb clauses prob.ty)
         pure $ Just $ CaseCons dcName (map getName vars) tm
   where
+
+    updateMatchType : PMatch → (Int × Val) → M PMatch
+    updateMatchType (PC k pat ty) (ix,v) = PC k pat <$> substVal ix v ty
+
+    updateClauseTypes : List (Int × Val) → Clause → M Clause
+    updateClauseTypes scons (MkClause clauseFC cons pats expr) = do
+      cons <- (traverse (\x => foldlM updateMatchType x scons) cons)
+      pure $ MkClause clauseFC cons pats expr
+
     constrainSpine : Int -> List (Val × Quant) -> List (Int × Val)
     constrainSpine lvl Nil = Nil
     constrainSpine lvl ((v,q) :: vs) = (lvl, v) :: constrainSpine (1 + lvl) vs
@@ -1372,7 +1398,8 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
   let sctm = Bnd emptyFC (lvl2ix ctx.lvl scnm)
 
   -- Prelude.newt breaks without this unlet
-  scty' <- unlet ctx.env scty >>= forceType ctx.env
+  -- scty' <- unlet ctx.env scty >>= forceType ctx.env
+  scty' <- forceType ctx.env scty
   scty' <- case scty' of
     (VMeta fc1 ix sp) => do
       meta <- lookupMeta ix
