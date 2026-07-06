@@ -26,6 +26,11 @@ function! GetNewtIndent()
     return l:prevIndent + 2
   endif
 
+  " return on a blank line outdents
+  if l:prevLine =~ '^\s*$'
+    return 0
+  endif
+
   return l:prevIndent
 endfunction
 

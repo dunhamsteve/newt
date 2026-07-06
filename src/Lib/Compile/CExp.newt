@@ -95,11 +95,11 @@ data CExp : U where
 derive Show CAlt
 derive Show CExp
 
-getEnv : Int → CEnv → M CExp
-getEnv k (MkCEnv cenv clvl) = case getAt' k cenv of
+getEnv : FC → Int → CEnv → M CExp
+getEnv fc k (MkCEnv cenv clvl) = case getAt' k cenv of
   Just (Just x) => pure $ CBnd $ lvl2ix clvl x
-  Just Nothing => error emptyFC "debruijn index \{show k} got erased value in env \{show cenv}"
-  Nothing => error emptyFC "Bad debruijn index \{show k} len \{show $ length' cenv} env: \{show cenv}"
+  Just Nothing => error fc "debruijn index \{show k} got erased value in env \{show cenv}"
+  Nothing => error fc "Bad debruijn index \{show k} len \{show $ length' cenv} env: \{show cenv}"
 
 -- I'm counting Lam in the term for arity.  This matches what I need in code gen.
 lamArity : Tm -> List Quant
@@ -112,7 +112,7 @@ lamArity _ = Nil
 arityForName : {{Ref2 Defs St}} → FC -> QName -> M (List Quant)
 arityForName fc nm = do
   defs <- getRef Defs
-  case lookupMap' nm defs of
+  case lookupMap' nm defs : Maybe Def of
     Nothing => error fc "Name \{show nm} not in scope"
     -- we really shouldn't be hitting Axiom (undefined function) in codegen
     (Just Axiom) => pure Nil
@@ -149,7 +149,7 @@ getBody (CLitAlt _ t) = t
 getBody (CDefAlt t) = t
 
 compileTerm : {{Ref2 Defs St}} → CEnv → Tm → M CExp
-compileTerm env (Bnd _ k) = getEnv k env
+compileTerm env (Bnd fc k) = getEnv fc k env
 -- can't reuse CLam / CApp because of deBruijn, but backends may want to memoize anyway
 compileTerm env (Force fc t) = CForce <$> compileTerm env t
 compileTerm env (Delay fc t) = CThunk <$> compileTerm env t
