@@ -21,6 +21,11 @@ derive Show BD
 data Quant = Zero | Many
 derive Eq Quant
 
+instance Mul Quant where
+  Zero * b = Zero
+  a * Zero = Zero
+  a * b = Many
+
 -- Used for pretty-printing
 instance Show Quant where
   show Zero = "0 "
@@ -142,6 +147,7 @@ pprint' p names (Bnd _ k) = case getAt (cast k) names of
   Just nm => text "\{nm}:\{show k}"
 pprint' p names (Force _ t) = text "%force" <+> pprint' p names t
 pprint' p names (Delay _ t) = parens 0 p $ text "%delay" <+> pprint' 0 names t
+pprint' p names (Ref _ qn) = text $ show qn
 pprint' p names (Ref _ (QN qns baseName)) = text baseName
 pprint' p names (Meta _ (QN qns baseName)) = text "?\{baseName}"
 pprint' p names (Lam _ nm icit quant t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> pprint' 0 (nm :: names) t

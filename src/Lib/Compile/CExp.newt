@@ -213,6 +213,11 @@ compileTerm env (Pi fc nm icit rig t u) = error fc "Pi in codegen"
   -- u' <- compileTerm env u
   -- pure $ CAppRef (QN primNS "PiType") (t' :: CLam nm u' :: Nil) (S (S Z))
 compileTerm env (Case fc t alts) = do
+  case t of
+    Bnd _ k => case getAt' k env.cenv of
+      (Just Nothing) => error fc "splitting on an erased term in CExp"
+      _ => pure MkUnit
+    _ => pure MkUnit
   t' <- compileTerm env t
   alts' <- for alts $ \case
     CaseDefault tm => CDefAlt <$> compileTerm env tm
@@ -294,7 +299,7 @@ compileTerm env (Erased _) = pure CErased
 
 compileFun : {{Ref2 Defs St}} → CEnv → Tm -> M CExp
 compileFun env tm = do
-  debug "compileFun \{show tm}"
+  debug "compileFun \{render 90 $ pprint [] tm}"
   res <- go env tm Lin
   debug "res \{show res}"
   pure res
