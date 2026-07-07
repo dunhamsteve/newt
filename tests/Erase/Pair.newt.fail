@@ -1,7 +1,7 @@
 *** Process tests/Erase/Pair.newt
 module Erase.Pair
 ERROR at tests/Erase/Pair.newt:7:15--7:16: unification failure: Erased value Prim.Int used in unerased context for Erase.Pair.$m0 [] =?= Prim.Int
-  failed to unify Int
+  failed to unify Prim.Int
              with ?$m0
   
   
@@ -10,7 +10,7 @@ ERROR at tests/Erase/Pair.newt:7:15--7:16: unification failure: Erased value Pri
                 ^
 
 ERROR at tests/Erase/Pair.newt:14:10--14:11: unification failure: Erased value Prim.Int used in unerased context for Erase.Pair.$m0 [] =?= Prim.Int
-  failed to unify Int
+  failed to unify Prim.Int
              with ?$m0
   
   

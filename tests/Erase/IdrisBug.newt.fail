@@ -3,15 +3,15 @@ module Prelude
 module Data.Fin
 module Erase.IdrisBug
 ERROR at tests/Erase/IdrisBug.newt:12:19--12:29: unification failure: Erased value (bang:0 n:1) used in unerased context for Erase.IdrisBug.$m0 [(bang:0, 0 ), (n:1, )] =?= (Prelude.S (bang:0 n:1))
-  failed to unify Fin (S (bang:1 n:0))
-             with Fin (foo bang:1 n:0)
+  failed to unify Data.Fin.Fin (Prelude.S (bang:1 n:0))
+             with Data.Fin.Fin (Erase.IdrisBug.foo bang:1 n:0)
   
   
   bar : (0 bang : Nat -> Nat) -> (n : Nat) -> Fin (foo bang n)
   bar  = \bang n => FZ {bang n}
                     ^^^^^^^^^^
 
-ERROR at tests/Erase/IdrisBug.newt:9:18--9:19: Unsolved meta Erase.IdrisBug.$m0 Normal type Nat
+ERROR at tests/Erase/IdrisBug.newt:9:18--9:19: Unsolved meta Erase.IdrisBug.$m0 Normal type Prelude.Nat
   -- https://github.com/idris-lang/Idris2/issues/3680
   foo : (0 bang : Nat -> Nat) -> Nat -> Nat
   foo = \bang n => _

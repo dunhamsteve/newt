@@ -21,4 +21,4 @@ J : {A : U} ->
     (p : Eq x y) ->
     C x y p
 -- this was failing until I constrained scrutinee to the constructor + args
-J c x y Refl = c x
+J c x x Refl = c x
