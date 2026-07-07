@@ -470,6 +470,8 @@ infixl 9 _∘_
 _∘_ : ∀ A B C. (B → C) → (A → B) → A → C
 (f ∘ g) x = f (g x)
 
+any : ∀ m a. {{Foldable m}} → (a → Bool) → m a → Bool
+any f ma = foldl (\a x => a || f x) False ma
 
 pfunc addInt : Int → Int → Int := `(x,y) => x + y`
 pfunc mulInt : Int → Int → Int := `(x,y) => x * y`
