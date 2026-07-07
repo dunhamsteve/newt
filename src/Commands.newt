@@ -225,8 +225,6 @@ introActions (Just $ Unsolved fc qn ctx vty User) =
         let str = "(\\ \{nm} => ?)"
         pure $ Intro str (MkEdit fc str) :: Nil
       _ => do
-        -- Prelude.Nat not a vref?
-        -- also need to handle pi types
         cons <- getConstructors ctx fc vty
         putStrLn "constructors \{show cons}"
         pure $ map makeEdit cons

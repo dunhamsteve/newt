@@ -764,19 +764,12 @@ data PMatch = PC Int Pattern Val
 instance Show PMatch where
   show (PC nm pat ty) = show (nm,pat,ty)
 
--- Maybe this moves to Elab..
 record Clause where
   constructor MkClause
   clauseFC : FC
-  -- I'm including the type of the left, so we can check pats and get the list of possibilities
-  -- But maybe rethink what happens on the left.
-  -- It's a VVar k or possibly a pattern.
-  -- a pattern either is zipped out, dropped (non-match) or is assigned to rhs
-  -- if we can do all three then we can have a VVar here.
   cons : List PMatch
   pats : List Pattern
-  -- We'll need some context to typecheck this
-  -- it has names from Pats, which will need types in the env
+  -- The right hand side, Nothing for impossible clauses
   expr : Maybe Raw
 
 derive Show Clause
@@ -784,8 +777,7 @@ derive Show Clause
 record Problem where
   constructor MkProb
   clauses : List Clause
-  -- I think a pi-type representing the pattern args -> goal, so we're checking
-  -- We might pull out the pattern abstraction to a separate step and drop pats from clauses.
+  -- the goal type, INTRO drops pi binders off of the front
   ty : Val
 
 -- Might have to move this if Check reaches back in...
@@ -843,6 +835,7 @@ getConstructors ctx scfc (VRef fc nm _) = do
 getConstructors ctx scfc tm = do
   tms <- vprint ctx tm
   error scfc "Can't split - not VRef: \{tms}"
+
 mapFstM : ∀ a b c. (a → M c) → SnocList (a × b) → M $ SnocList (c × b)
 mapFstM f Lin = pure Lin
 mapFstM f (xs :< (a,b) ) = do
@@ -863,29 +856,10 @@ extendPi ctx (VPi x str icit rig a b) nms sc = do
     extendPi ctx' tyb (nms :< MkBind ctx.lvl icit a) (sc :< (VVar x str ctx.lvl Lin, rig))
 extendPi ctx ty nms sc = pure (ctx, ty, nms <>> Nil, sc)
 
--- turn vars into lets for forced values.
--- substitute inside values
--- FIXME we're not going under closures at the moment
-substVal : Int -> Val -> Val -> M Val
-substVal k v tm = go tm
-  where
-    go : Val -> M Val
-    go (VVar fc nm j sp) = if j == k
-      then case sp of
-        Lin => pure v
-        _ => vappSpine v sp
-      else (VVar fc nm j <$> mapFstM go sp)
-    go (VPi fc nm icit rig a b) = do
-      a <- go a
-      pure $ VPi fc nm icit rig a b
-    go (VMeta fc ix sp) = VMeta fc ix <$> mapFstM go sp
-    go (VRef fc nm sp) = VRef fc nm <$> mapFstM go sp
-    go tm = pure tm
-
--- Update context when a variable is constrained to a value.
--- For now, we're updating the context to turn var bindings
--- into lets.
--- TODO rework this to do something better.
+-- Update context when a variable is constrained to a value
+-- so we can leverage quote/eval to substitute
+-- They should be Pattern shaped (var or dcon applied to pattern-shaped)
+-- FIXME - Also we should not touch entries above the case statement we're working on.
 updateContext : Context -> List (Int × Val) -> M Context
 updateContext ctx Nil = pure ctx
 updateContext ctx ((k, val) :: cs) =
@@ -895,11 +869,13 @@ updateContext ctx ((k, val) :: cs) =
   let ix = cast $ lvl2ix ctx.lvl k in
   case getAt ix ctx.env of
     (Just (VVar _ _ k' Lin)) =>
+      -- if it is redirected, update that one instead
       if k' /= k
         then updateContext ctx ((k',val) :: cs)
         else do
-          env' <- traverse (substVal k val) ctx.env
-          let ctx' = MkCtx ctx.lvl env' ctx.types (replaceV ix Defined ctx.bds) ctx.ctxFC ctx.marker
+          let env' = map (substVar k val) ctx.env
+          -- we don't want metas to see these substituted entries
+          let ctx' = MkCtx ctx.lvl env' ctx.types (setAt' ix Defined ctx.bds) ctx.ctxFC ctx.marker
           updateContext ctx' cs
     (Just val') => do
       -- This is fine for Z =?= Z but for other stuff, we probably have to match
@@ -907,14 +883,23 @@ updateContext ctx ((k, val) :: cs) =
       updateContext ctx cs
     Nothing => error (getFC val) "INTERNAL ERROR: bad index in updateContext"
   where
+    substVar : Int -> Val -> Val -> Val
+    substVar k v tm@(VVar fc nm j sp) = if j == k
+      then case sp of
+        Lin => v
+        _ => tm
+      else tm
+    substVar k v (VRef fc nm sp) = VRef fc nm $ map (mapFst $ substVar k v) sp
+    substVar k v tm = tm
+
     isSelf : Int → Val → Bool
     isSelf ix (VVar _ _ k Lin) = ix == k
     isSelf ix _ = False
 
-    replaceV : ∀ a. Nat -> a -> List a -> List a
-    replaceV k x Nil = Nil
-    replaceV Z x (y :: xs) = x :: xs
-    replaceV (S k) x (y :: xs) = y :: replaceV k x xs
+    setAt' : ∀ a. Nat -> a -> List a -> List a
+    setAt' k x Nil = Nil
+    setAt' Z x (y :: xs) = x :: xs
+    setAt' (S k) x (y :: xs) = y :: setAt' k x xs
 
 -- check if a constructor is possible. Used to check impossible and missing cases.
 checkCase : Context → Int → Val → (QName × Int × Tm) → M Bool
@@ -929,7 +914,6 @@ checkCase ctx scnm scty (dcName, arity, ty) = do
   case getAt' (lvl2ix ctx.lvl scnm) ctx.env of
     Just val@(VRef fc nm sp) => pure $ nm == dcName
     _ => pure True
-
 
 -- the code will probably get bigger unless we check whether the vars are actually used
 -- A forced + unused case split should be dropped.
@@ -1006,18 +990,49 @@ rewriteClause scnm tcname dcname vars (MkClause fc cons pats expr) = do
   Just cons <- rewriteConstraint scnm tcname dcname vars cons Nil | _ => pure Nothing
   pure $ Just $ MkClause fc cons pats expr
 
+constrainSpine : Int -> List (Val × Quant) -> List (Int × Val)
+constrainSpine lvl Nil = Nil
+constrainSpine lvl ((v,q) :: vs) = (lvl, v) :: constrainSpine (1 + lvl) vs
+
+isSplit : Int → List Clause → Bool
+isSplit ix Nil = False
+isSplit ix ((MkClause clauseFC cons pats expr) :: xs) =
+  if any (match) cons then True else isSplit ix xs
+  where
+    match : PMatch → Bool
+    match (PC k _ _) = k == ix
+
+matchName : Int → PMatch → Bool
+matchName nm (PC n _ scty) = nm == n
+
+-- collect constructors that are matched on
+matchedConstructors : Int → List Clause → List (FC × QName)
+matchedConstructors nm Nil = Nil
+matchedConstructors nm ((MkClause fc cons pats expr) :: cs) = case find (matchName nm) cons of
+  Just (PC _ (PatCon fc _ dcon _ _) _) => (fc, dcon) :: matchedConstructors nm cs
+  _ => matchedConstructors nm cs
+
+getQuantity : Context → (lvl : Int) → Quant
+getQuantity ctx lvl = case getAt' (lvl2ix ctx.lvl lvl) ctx.types of
+  Just (_ , _ , q) => q
+  Nothing => Many
+
+-- This is handling `eq` now and the forced case of buildTree is unreachable
 -- ix is forced to value, we've already run it at the types (maybe move that here?)
 -- Do we need a Maybe on here?
 forcedCase : Context → Problem → List (Int × Val) → M Tm
 forcedCase ctx prob Nil = buildTree ctx prob
+-- Var / Var matches
 forcedCase ctx prob@(MkProb clauses ty) ((ix, (VVar _ nm k sp)) :: scons) = do
   -- We could log this, I don't think it should happen.
   let (Lin) = sp | _ => forcedCase ctx prob scons
-  -- replace Var k with Var ix, we end up picking erased values if we go the other way
-  -- We might have to actually check the environment to see which way to go
-  -- TODO flip this back and see why we're not getting quantity errors
-  clauses <- traverse (updateClause k ix) clauses
-  forcedCase ctx (MkProb (clauses) ty) scons
+  -- Prefer the non-erased value
+  -- FIXME may be a different order than the updateContext...
+  clauses <- case getQuantity ctx ix of
+    Zero => traverse (updateClause ix k) clauses
+    Many => traverse (updateClause k ix) clauses
+
+  forcedCase ctx (MkProb (clauses) prob.ty) scons
   where
     substIx : Int → Int → PMatch → PMatch
     substIx ix k pm@(PC i pat v) = if i == ix then PC k pat v else pm
@@ -1025,21 +1040,53 @@ forcedCase ctx prob@(MkProb clauses ty) ((ix, (VVar _ nm k sp)) :: scons) = do
     updateClause : Int → Int → Clause → M Clause
     updateClause ix k (MkClause clauseFC cons pats expr) = do
       let cons = map (substIx ix k) cons
-      -- TODO check for duplicate constraints
-      -- That happens at the end for now, but may be an issue if we further process one of them
-      -- and it should be ok if two end up with the same name
       pure $ MkClause clauseFC cons pats expr
-forcedCase ctx prob ((ix , (VRef _ nm sp)) :: scons) = do
-  -- putStrLn "forced vref \{show nm} \{show sp}"
-  -- stuff from buildCase should be moved here
-  forcedCase ctx prob scons
+forcedCase ctx prob@(MkProb clauses ty) ((ix , (VRef _ dcName sp)) :: scons) = do
+  -- If no clause hits this forced case, don't bother splitting
+  -- This also helps with inadvertent erased splits
+  let matched = matchedConstructors ix clauses
+  let (True) = elem dcName $ map snd matched
+    | _ => forcedCase ctx prob scons
+
+  let (True) = isSplit ix clauses | _ => forcedCase ctx prob scons
+
+  top <- getTop
+  let (Just (MkEntry fc quant name ty (DCon _ _ _ tcon) eflags)) = lookup dcName top
+    | _ => forcedCase ctx prob scons
+
+  debug "force \{show ix} match \{show dcName} ty \{rpprint (names ctx) ty}"
+
+  -- Add the constructor arguments to the context
+  vty <- eval Nil ty
+  (ctx', ty', vars, sc) <- extendPi ctx (vty) Lin Lin
+
+  when (length vars /= snoclen sp) $ error emptyFC "\{show $ length vars} vars /= \{show $ snoclen sp}"
+
+  -- constrain arguments to spine of dotted value
+  let lvl = ctx'.lvl - length' vars
+  let scons' = constrainSpine lvl (sp <>> Nil)
+
+  ctx' <- updateContext ctx' scons'
+
+  debug "(dcon \{show dcName} ty \{show ty'}"
+  debug "(dcon \{show dcName}) (vars \{show vars}) clauses were \n\{joinBy "\n" $ map show prob.clauses}"
+  clauses <- mapMaybe id <$> traverse (rewriteClause ix tcon dcName vars) prob.clauses
+  debug "and now:"
+  for clauses $ (\x => debug "    \{show x}")
+  when (length' clauses == 0) $ error ctx.ctxFC "Missing case for \{show dcName} splitting \{show ix}"
+  tm <- forcedCase ctx' (MkProb clauses prob.ty) $ scons ++ scons'
+
+  pure $ Case ctx.ctxFC (Bnd ctx.ctxFC (lvl2ix ctx.lvl ix)) [CaseCons dcName (map (const "_") vars) tm]
+
 forcedCase ctx prob ((ix , l@(VLit _ _)) :: scons) = do
-  putStrLn "forced Lit \{show l}"
+  debug "forced Lit \{show l}"
   forcedCase ctx prob scons
 forcedCase ctx prob ((ix , val) :: scons) = do
-  -- we get stuff like pi types in here, it's fine as long as we're not pattern matching against it
-  putStrLn "forced other \{show ix} \{show val}"
+  -- things like pi types
+  -- This probably is an issue if we're looking at an index
+  debug "forced other \{show ix} \{show val}"
   forcedCase ctx prob scons
+
 
 -- Build the tree for a match against a casealt `dcName`
 -- return Nothing if dcon type doesn't unify with the scrutinee type
@@ -1052,18 +1099,12 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   vty <- eval Nil ty
   (ctx', ty', vars, sc) <- extendPi ctx (vty) Lin Lin
 
-  -- TODO I think we need to figure out what is dotted, maybe
-  -- the environment manipulation below is sufficient bookkeeping
-  -- or maybe it's a bad approach.
-
-  -- At some point, I'll take a break and review more papers and code,
-  -- now that I know some of the questions I'm trying to answer.
-
   -- We get unification constraints from matching the data constructor's
   -- codomain with the scrutinee type
   debug "unify dcon cod with scrut\n  \{show ty'}\n  \{show scty}"
   Just res <- catchError(Just <$> unify ctx'.env UPattern ty' scty)
               (\err => do
+                  -- REVIEW we may need to distinguish between NO and FAIL here
                   debug "SKIP \{show dcName} because unify error \{errorMsg err}"
                   pure Nothing)
     | _ => pure Nothing
@@ -1071,36 +1112,12 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   let (VRef _ sctynm _) = scty | _ => error (getFC scty) "case split on non-inductive \{show scty}"
   case getAt' (lvl2ix ctx.lvl scnm) ctx.env of
     -- value is dotted
-    Just val@(VRef fc nm sp) =>
-      if nm /= dcName
-      then do
-        -- if the value is already constrained to a different constructor, return Nothing
-        debug "SKIP \{show dcName} because \{show scnm} forced to \{show val}"
-        pure Nothing
-      else do
-        debug "case \{show dcName} dotted \{show val}"
-        when (length vars /= snoclen sp) $ error emptyFC "\{show $ length vars} vars /= \{show $ snoclen sp}"
-
-        -- constrain arguments to spine of dotted value
-        let lvl = ctx'.lvl - length' vars
-        let scons = constrainSpine lvl (sp <>> Nil)
-        ctx' <- updateContext ctx' scons
-
-        -- TODO bundle up this debug message so it doesn't run the loops when not debugging
-        debug "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
-        debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
-        for prob.clauses $ (\x => debug "    \{show x}")
-        clauses <- mapMaybe id <$> traverse (rewriteClause scnm sctynm dcName vars) prob.clauses
-        clauses <- traverse (updateClauseTypes scons) clauses
-        debug "and now:"
-        for clauses $ (\x => debug "    \{show x}")
-        when (length' clauses == 0) $ error ctx.ctxFC "Missing case for \{show dcName} splitting \{show scnm}"
-        -- REVIEW we weren't updating the context with res.constraints, should we?
-        tm <- forcedCase ctx' (MkProb clauses prob.ty) scons
-        -- tm <- buildTree ctx' (MkProb clauses prob.ty)
-        pure $ Just $ CaseCons dcName (map getName vars) tm
+    Just val@(VRef fc nm sp) => error ctx.ctxFC "Internal Error: split on updated var"
     Just (VVar _ nm k sp) => do
-        -- when (k /= scnm) $ error ctx.ctxFC "Splitting forced value" >>= addError
+        -- future me: This case is in SortedMap. I thought to point the context
+        -- updates in the other direction to match forcedCase, but then we get skolem issues
+        -- when (k /= scnm) $ error ctx.ctxFC "Splitting forced value"
+
         -- Constrain the scrutinee's variable to be dcon applied to args
         let scon = (scnm, VRef ctx.ctxFC dcName sc) -- (DCon arity dcName)
 
@@ -1111,45 +1128,24 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         debug "before env: \{show ctx'.env}"
 
         -- push the constraints into the environment by turning bind into define
-        -- Is this kosher?  It might be a problem if we've already got metas over
-        -- this stuff, because it intends to ignore defines.
-        -- This is now only used for forced values.
         ctx' <- updateContext ctx' (scon :: res.constraints)
 
         debug "after types: \{show ctx'.types}"
         debug "after env: \{show ctx'.env}"
-
-        -- What if all of the pattern vars are defined to meta
-
         debug "(dcon \{show dcName} ty \{show ty'} scty \{show scty}"
-        debug "(dcon \{show dcName}) (vars \{show vars}) clauses were"
-        for prob.clauses $ (\x => debug "    \{show x}")
-        clauses <- mapMaybe id <$> traverse (rewriteClause scnm sctynm dcName vars) prob.clauses
+        debug "(dcon \{show dcName}) (vars \{show vars}) clauses were \n\{joinBy "\n" $ map show prob.clauses}"
 
-        clauses <- traverse (updateClauseTypes (scon :: res.constraints)) clauses
+        clauses <- mapMaybe id <$> traverse (rewriteClause scnm sctynm dcName vars) prob.clauses
 
         debug "and now:"
         for clauses $ (\x => debug "    \{show x}")
+        -- TODO error hole (continue with other cases on error)
         when (length' clauses == 0) $ error ctx.ctxFC "Missing case for \{show dcName} splitting \{show scnm}"
-        -- tm <- buildTree ctx' (MkProb clauses prob.ty)
         tm <- forcedCase ctx' (MkProb clauses prob.ty) res.constraints
         pure $ Just $ CaseCons dcName (map getName vars) tm
     Just v => fatalError "Weird thing \{show v} in buildCase"
     Nothing => fatalError "Bad index in buildCase"
   where
-    -- this is a match traverse.
-    updateMatchType : PMatch → (Int × Val) → M PMatch
-    updateMatchType (PC k pat ty) (ix,v) = PC k pat <$> substVal ix v ty
-
-    updateClauseTypes : List (Int × Val) → Clause → M Clause
-    updateClauseTypes scons (MkClause clauseFC cons pats expr) = do
-      cons <- (traverse (\x => foldlM updateMatchType x scons) cons)
-      pure $ MkClause clauseFC cons pats expr
-
-    constrainSpine : Int -> List (Val × Quant) -> List (Int × Val)
-    constrainSpine lvl Nil = Nil
-    constrainSpine lvl ((v,q) :: vs) = (lvl, v) :: constrainSpine (1 + lvl) vs
-
     getName : Bind -> String
     getName (MkBind nm _ _) = "_"
 
@@ -1274,7 +1270,8 @@ checkDone fc ctx (PC nm (PatVar pvfc _ nm') scty :: xs) body ty = do
   where
     rename : Int → List (String × Val × Quant) -> List (String × Val × Quant)
     rename _ Nil = Nil
-    rename 0 ((name, ty) :: xs) = (nm', ty) :: xs
+    -- slip in the new type, too
+    rename 0 ((name, ty, q) :: xs) = (nm', scty, q) :: xs
     rename k ((name, ty) :: xs) = (name, ty) :: rename (k - 1) xs
 
 -- I'm running this at the end to ensure everything relevant has been split
@@ -1284,6 +1281,8 @@ checkDone fc ctx (PC nm (PatImpossible fc') scty :: xs) body ty = do
   -- FIXME check impossible - We need a scrutinee type here!
   -- I think we want it anyway in those constraints
 
+  tmp <- quote ctx.lvl scty
+  scty <- eval ctx.env tmp
   cons <- getConstructors ctx fc scty
   Nil <- filterM (checkCase ctx nm scty) cons
     | xs => error fc' "possible constructors: \{show $ map fst xs}"
@@ -1292,9 +1291,6 @@ checkDone fc ctx (PC nm (PatImpossible fc') scty :: xs) body ty = do
 checkDone fc ctx (PC x pat scty :: xs) body ty = error (getFC pat) "stray constraint \{show x} /? \{show pat}"
 
 -- need to run constructors, then run default
-
-matchName : Int → PMatch → Bool
-matchName nm (PC n _ scty) = nm == n
 
 isDefaultCase : Int -> Clause -> Bool
 isDefaultCase scnm cl = case find (matchName scnm) cl.cons of
@@ -1312,12 +1308,6 @@ getLits ty nm ((MkClause fc cons pats expr) :: cs) = case find (matchName nm) co
   Just (PC _ (PatCon fc _ _ _ _) _) => error fc "expected \{show ty}"
   _ => getLits ty nm cs
 
--- collect constructors that are matched on
-matchedConstructors : Int → List Clause → List (FC × QName)
-matchedConstructors nm Nil = Nil
-matchedConstructors nm ((MkClause fc cons pats expr) :: cs) = case find (matchName nm) cons of
-  Just (PC _ (PatCon fc _ dcon _ _) _) => (fc, dcon) :: matchedConstructors nm cs
-  _ => matchedConstructors nm cs
 
 -- then build a lit case for each of those
 
@@ -1326,7 +1316,8 @@ buildLitCase ctx prob fc scnm scty lit = do
 
   -- Constrain the scrutinee's variable to be lit value
   let scon = (scnm, VLit fc lit)
-  ctx' <- updateContext ctx (scon :: Nil)
+  -- ctx' <- updateContext ctx (scon :: Nil)
+  let ctx' = ctx
   let clauses = mapMaybe rewriteClause prob.clauses
 
   when (length' clauses == 0) $ error ctx.ctxFC "Missing case for \{show lit} splitting \{show scnm}"
@@ -1398,19 +1389,25 @@ renameContext from to ctx = { types $= go } ctx
 checkDups : FC → List PMatch → M Unit
 checkDups fc ms = go Nil ms
   where
+    -- tests/TestCase4.newt has a z / j shadowing,
+    -- tests/TestCase5.newt has z / z
     getNames : Int → List PMatch → List String
     getNames k Nil = Nil
     getNames k Nil = ?
-    getNames k (PC i _ (VVar _ nm k sp) :: ms) = if i == k then nm :: getNames k ms else getNames k ms
+    getNames k (PC i (PatVar _ _ nm) _ :: ms) = if i == k then nm :: getNames k ms else getNames k ms
     getNames k (_ :: ms)  = getNames k ms
 
     go : List Int → List PMatch → M Unit
     go seen Nil = pure MkUnit
     go seen (PC k (PatVar _ _ nm) _ :: cons) =
       if elem k seen
-        then error fc "Var \{show k} has multiple names: \{show $ getNames k ms}"
+        then do
+          let names = nub $ getNames k ms
+          when (length' names > 1) $ error fc "Var \{show k} has multiple names: \{show $ getNames k ms}"
+          go (k :: seen) cons
         else go (k :: seen) cons
     go seen (PC k (PatWild _ _) _ :: cons) = go seen cons
+    go seen (PC k (PatImpossible _) _ :: cons) = go seen cons
     go seen (pm :: cons) = fatalError "Weird \{show pm}"
 
 -- This process is similar to extendPi, but we need to stop
@@ -1443,8 +1440,9 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
 
   debug "SPLIT on \{show scnm} because \{show pat} \{show $ getFC pat}"
   let sctm = Bnd emptyFC (lvl2ix ctx.lvl scnm)
-
-  scty' <- forceType ctx.env scty
+  tmp <- quote ctx.lvl scty
+  scty' <- eval ctx.env tmp
+  scty' <- forceType ctx.env scty'
   scty' <- case scty' of
     (VMeta fc1 ix sp) => do
       meta <- lookupMeta ix
