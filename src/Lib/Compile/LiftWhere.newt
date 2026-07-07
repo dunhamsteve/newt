@@ -83,6 +83,8 @@ liftWhereTm name env tm@(Bnd fc k) = case getAt (cast k) env of
     apply l _ tm Nil = tm
     -- (l - k) is like lvl2ix, but with k one bigger
     apply l k tm (q :: qs) = App fc (apply l (k - 1) tm qs) (Bnd fc (l - k)) q
+liftWhereTm name env (Force fc t) = Force fc <$> liftWhereTm name env t
+liftWhereTm name env (Delay fc t) = Delay fc <$> liftWhereTm name env t
 liftWhereTm name env tm = pure tm
 
 liftWhereFn : {{Ref2 Defs St}} → QName × Def → M Unit

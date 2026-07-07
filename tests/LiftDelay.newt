@@ -1,0 +1,10 @@
+module LiftDelay
+
+import Prelude
+
+main : IO Unit
+main = go ["hello", "world"]
+  where
+    go : List String → IO Unit
+    go x = do
+      when (length' x > 0) $ putStrLn "Hello, world" >> go []
