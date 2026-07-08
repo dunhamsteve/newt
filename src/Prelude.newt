@@ -193,6 +193,10 @@ instance Traversable List where
   traverse f Nil = pure Nil
   traverse f (x :: xs) = pure _::_ <*> f x <*> traverse f xs
 
+instance Traversable SnocList where
+  traverse f Lin = pure Lin
+  traverse f (xs :< x) = pure _:<_ <*> traverse f xs <*> f x
+
 traverse_ : ∀ t f a b. {{Traversable t}} {{Applicative f}} → (a → f b) → t a → f Unit
 traverse_ f xs = pure (const MkUnit) <*> traverse f xs
 
