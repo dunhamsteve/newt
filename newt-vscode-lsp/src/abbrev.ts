@@ -33,4 +33,6 @@ export const ABBREV: Record<string, string> = {
   "\\GP": "∏",
   "\\[[": "⟦",
   "\\]]": "⟧",
+  "\\cuL": "⌈",
+  "\\cuR": "⌉",
 };

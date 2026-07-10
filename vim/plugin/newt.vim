@@ -18,6 +18,8 @@ autocmd FileType newt inoremap <buffer> \neg  ¬
 autocmd FileType newt inoremap <buffer> \[[  ⟦
 autocmd FileType newt inoremap <buffer> \]]  ⟧
 autocmd FileType newt inoremap <buffer> \circ ∘
+autocmd FileType newt inoremap <buffer> \cuL ⌈
+autocmd FileType newt inoremap <buffer> \cuR ⌉
 
 " Sets and Types
 autocmd FileType newt inoremap <buffer> \bN  ℕ
