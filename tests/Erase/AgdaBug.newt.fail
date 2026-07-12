@@ -1,6 +1,6 @@
 *** Process tests/Erase/AgdaBug.newt
 module Erase.AgdaBug
-ERROR at tests/Erase/AgdaBug.newt:20:33--20:37: unification failure: Erased value A:0 used in unerased context for Erase.AgdaBug.$m1 [(A:0, 0 ), (F:1, ), (eq:2, 0 ), (refl:3, )] =?= (F:1 A:0)
+ERROR at tests/Erase/AgdaBug.newt:20:33--20:37: unification failure: Erased value used in unerased context for Erase.AgdaBug.$m1 [(A:0, 0 ), (F:1, ), (eq:2, 0 ), (refl:3, )] =?= (F:1 A:0)
   failed to unify eq:2 (?$m3 A:4 F:3 eq:2 refl:1) (?$m4 A:4 F:3 eq:2 refl:1) (?$m4 A:4 F:3 eq:2 refl:1)
              with eq:2 U (?$m1 A:4 F:3 eq:2 refl:1) (F:3 A:4)
   

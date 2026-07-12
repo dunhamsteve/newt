@@ -20,15 +20,10 @@ vprint ctx v = do
   pure $ render 90 $ pprint (names ctx) tm
 
 -- Check that target is Many or we are in an erased context
-checkMarker : FC → Context → Quant → M Unit
+checkMarker : FC → Marker → Quant → M Unit
 checkMarker fc _ Many = pure MkUnit
-checkMarker fc (MkCtx lvl env types bds ctxFC Present) Zero = pure MkUnit
-checkMarker fc (MkCtx lvl env types bds ctxFC Absent) Zero = throwError $ E fc "Erased value used in unerased context"
-
-checkMarker' : FC → Val → Marker → Quant → M Unit
-checkMarker' fc val _ Many = pure MkUnit
-checkMarker' fc val Present Zero = pure MkUnit
-checkMarker' fc val Absent Zero = throwError $ E (getFC val) "Erased value \{show val} used in unerased context"
+checkMarker fc Present Zero = pure MkUnit
+checkMarker fc Absent Zero = throwError $ E fc "Erased value used in unerased context"
 
 -- collectDecl collects multiple Def for one function into one
 collectDecl : List Decl -> List Decl
@@ -357,14 +352,14 @@ rename meta mark ren lvl v@(VVar fc nm k sp) = go 0 ren
     go x Nil = error fc "scope/skolem thinger VVar \{show k} ren \{show ren}"
     go x ((k',q) :: rest) = if k' == k
       then do
-        checkMarker' fc v mark q
+        checkMarker fc mark q
         renameSpine meta mark ren lvl (Bnd fc x) sp
       else go (x + 1) rest
 rename meta Absent ren lvl v@(VRef fc nm sp) = do
   top <- getTop
   case lookup nm top of
     Just (MkEntry fc q name type def eflags) => do
-      checkMarker' fc v Absent q
+      checkMarker fc Absent q
       renameSpine meta Absent ren lvl (Ref fc nm) sp
 
     _ => renameSpine meta Absent ren lvl (Ref fc nm) sp
@@ -393,13 +388,13 @@ rename meta mark ren lvl (VLam fc n icit rig t) = do
   scope <- rename meta mark ((lvl,rig) :: ren) (1 + lvl) tapp
   pure (Lam fc n icit rig scope)
 rename meta mark ren lvl v@(VPi fc n icit rig ty tm) = do
-  checkMarker' fc v mark Zero
+  checkMarker fc mark Zero
   ty' <- rename meta mark ren lvl ty
   tmapp <- tm $$ VVar emptyFC n lvl Lin
   scope' <- rename meta mark ((lvl,rig) :: ren) (1 + lvl) tmapp
   pure (Pi fc n icit rig ty' scope')
 rename meta mark ren lvl v@(VU fc) = do
-  checkMarker' fc v mark Zero
+  checkMarker fc mark Zero
   pure (UU fc)
 rename meta mark ren lvl (VErased fc) = pure (Erased fc)
 rename meta mark ren lvl (VLit fc lit) = pure (Lit fc lit)
@@ -1752,7 +1747,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
       case lookupRaw nm top of
         Just (MkEntry _ q name ty def _) => do
           debug "lookup \{show name} as \{show def}"
-          checkMarker fc ctx q
+          checkMarker fc ctx.marker q
           vty <- eval Nil ty
           pure (Ref fc name, vty)
         -- Can we soften this without introducing a meta for the type
@@ -1762,7 +1757,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
     go i ((x, ty, q) :: xs) =
       if x == nm
       then do
-        checkMarker fc ctx q
+        checkMarker fc ctx.marker q
         pure (Bnd fc i, ty)
       else go (i + 1) xs
 
@@ -1801,10 +1796,10 @@ infer ctx (RApp fc t u icit) = do
   pure (App fc t u q, bappu)
 
 infer ctx (RU fc) = do
-  checkMarker fc ctx Zero
+  checkMarker fc ctx.marker Zero
   pure (UU fc, VU fc) -- YOLO
 infer ctx (RPi fc (BI fc nm icit quant) ty ty2) = do
-  checkMarker fc ctx Zero
+  checkMarker fc ctx.marker Zero
   ty' <- checkIn ctx Zero ty (VU fc)
   vty' <- eval ctx.env ty'
   ty2' <- checkIn (extend ctx nm vty' quant) Zero ty2 (VU fc)

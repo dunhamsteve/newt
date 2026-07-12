@@ -2,7 +2,7 @@
 module Prelude
 module Data.Fin
 module Erase.IdrisBug
-ERROR at tests/Erase/IdrisBug.newt:12:19--12:29: unification failure: Erased value (bang:0 n:1) used in unerased context for Erase.IdrisBug.$m0 [(bang:0, 0 ), (n:1, )] =?= (Prelude.S (bang:0 n:1))
+ERROR at tests/Erase/IdrisBug.newt:12:19--12:29: unification failure: Erased value used in unerased context for Erase.IdrisBug.$m0 [(bang:0, 0 ), (n:1, )] =?= (Prelude.S (bang:0 n:1))
   failed to unify Data.Fin.Fin (Prelude.S (bang:1 n:0))
              with Data.Fin.Fin (Erase.IdrisBug.foo bang:1 n:0)
   
