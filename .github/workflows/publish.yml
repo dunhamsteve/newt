@@ -1,4 +1,4 @@
-name: Publish Playground
+name: Newt CI
 concurrency:
     group: production
     cancel-in-progress: true
@@ -12,12 +12,12 @@ jobs:
     # container: ghcr.io/stefan-hoeck/idris2-pack:latest
     steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
 
       - name: dependencies
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 23
+          node-version: 24
       - name: setup
         run: |
           sudo apt-get update
@@ -42,7 +42,7 @@ jobs:
           vite build --base /todomvc --outDir ../playground/dist/todomvc
       - name: Upload playground
         id: deployment
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: playground/dist/
   deploy:
@@ -57,4 +57,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
