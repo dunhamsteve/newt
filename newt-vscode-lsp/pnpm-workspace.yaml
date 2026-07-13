@@ -2,8 +2,7 @@ allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
   - diff@8.0.3
-  - serialize-javascript@7.0.3
-  - serialize-javascript@7.0.5
+  - serialize-javascript@7.0.3 || 7.0.5
   - shell-quote@1.8.4
   - esbuild@0.28.1
   - js-yaml@4.1.2
