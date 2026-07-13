@@ -1,62 +1,21 @@
 
 ## TODO
 
-- [x] LSP actions in code playground
-- [ ] code action to add clause
-- [ ] Add missing args code action?
-  - when a constructor is underapplied
-  - is this useful? we would probably have to add at the end
-- [ ] Port test suite from erasure-impl
-- [ ] add something like `rewrite` to make replace easier to use
-  - look at Idris and pi-forall
-  - consider something interactive (what would Ask do?)
-- [x] Constraint error messages have bad FC
-  - point to say a constructor def and not the code with the constraint
-  - e.g. change a `List String` to `String` in a dcon arg
-  - and wrong file, even. A problem in LSP
-- [x] Fix unification issue (postpone App/App with metas)
-- [ ] Write up / commit editor support
-- [ ] Literate programming? Allow markdown files?
 - [ ] Build single name map on import
-  - Check performance - cost to build this vs not walking $n$ maps
+  - Check performance - cost to build the map vs not walking $n$ maps
   - This will likely be needed for qualified / partial imports
-- [ ] Support pattern matching on `Lazy x`
-  - e.g. change second arg of `<|>` to lazy, Parser.Impl doesn't compile
-    complaining that `Lazy` is not a type constructor.
-  - Put a match on `Delay` there (add `Delay` to surface syntax). Eliminator forces the function
-  - Can be manually done today by breaking out another `case` for the lazy value (scrutinee is forced)
-- [ ] play with documentation extraction?
-  - lean uses `/--` and `/-!` I think I prefer something like this over the `|||` in Idris.
-- [ ] consider `.newt.md` support.
-- [ ] Collect remaining cases on default / variable patterns for more precise case split
-- [x] Look into Constatine Theocaris erasure thing
-  - https://arxiv.org/abs/2605.00655
-  - Can this technique work for async, too?
-  - We will leverage this to get rid of erased args in C backend
-- [ ] C backend
-  - [-] Rework the Javascript AST to be more generic semi-A-Normal form (WIP)
-  - [ ] Generated code accepted by C compiler
-  - [ ] Runtime implementation
+  - [ ] Add `export` keywords
 - [ ] code formatter
   - [ ] consider moving caselet, etc. desugaring out of the parser
   - comments stored aside (location, whether it is a tail or standalone) and re-integrated
   - how do we want to handle `$` and parens?
-- [ ] Idris `!` / Lean `<-` notation.
-- [x] Scheme backend
-- [x] Smart encoding of lists (and cons cells?) in scheme
 - [ ] consider postponing `case` if scrutinee type is an unsolved meta
 - [ ] in batch mode, stop at first erroring module
   - We could also gain performance by not collecting LSP data in batch mode
 - [ ] maybe `let case` instead of `let (...)` (which is a little subtle)
   - Or simply put a term in there and treat as a variable iff it is lowercase and non-applied
-- [x] Use looping for TCO
-  - For single functions at least - I think this would be a performance win. I've learned that the slowness on `bun` goes away if I drop the TCO transform.
-  - Doing this manually for `lookupT23` got 3% speedup.
-  - [ ] got 12% speedup overall from this, not doing it yet for mutual recursion
+- [ ] Use while-TCO for mutual recursion, drop `bouncer`
 - [ ] Importing Prelude twice should be an error (currently it causes double hints and breaks auto)
-- [x] For errors in other files, point to the import
-- [x] Unsolved metas should be errors (user metas are fine)
-- [x] Better syntax for forward declared data (so we can distinguish from functions)
 - [ ] maybe allow "Main" module name for any file
   - possibly allow eliding `module` for Main?
 - [ ] preserve information on record / class / instance for LSP "document symbols" kind
@@ -65,11 +24,6 @@
 - [ ] Put a copy of the `Def` on `Ref` terms
   - It may be Axiom for forward/recursive functions, but it would get us DCon and TCon info without lookup - and may save passing around the Ref2 (+lookup) during Compilation.
   - We can do lookup for Axiom via helper
-- [x] Restore "add missing cases" for LSP mode
-- [x] Case split for LSP mode
-- [x] Require lowercase pattern variables
-  - otherwise, I accidentally misspell a constructor and end up with a wildcard.
-- [x] Leverage LSP code for web playground
 - [ ] Improve handling of names:
   - We need FC on names in a lot of places
   - [x] FC for duplicate `data`, `record`, `class` name is wrong (points to `data`)
@@ -78,69 +32,35 @@
   - [ ] Duplicate data constructor errors point to `data`
   - [ ] Allow Qualified names in surface syntax
   - Don't disambiguate on type for now
+- [ ] Suppress code actions in `derive` statements
 - [ ] Could we disambiguate just Data constructors on type?
-- [x] change "in prefix position" and "trailing operator" errors to do sections
 - [ ] maybe add fat arrows, I keep wanting to type them, `{{...}}` is a little ugly
   - There may be ambiguity issues at the parsing level, but we don't have typecase, so.
   - It's less to type, too.
-- [x] get some names on add missing cases (if not too difficult)
-- [ ] Implement "add missing cases" for playground
-- [x] add optional types to case `case xxx : Maybe Int of ...`
-- [x] "Expected keyword" at `\ a ->` should be error at the `->`
-- [x] Show Either
-- [ ] `local` for `where`-like `let` clauses? (I want a `where` that closes over more stuff)
-  - I can do `let f : ... = \ a b c => ...`. But it doesn't work for recursion and cases are awkward.
-- [ ] Erasure issue during AoC from case building replacing a non-erased value with erased.
-  - [ ] see TestCase4 for an example
-- [x] Add Foldable
 - [ ] Maybe return constraints instead of solving metas during unification
   - We already return non-meta constraints for work on the LHS.
   - We might get into a situation where solving immediately would have gotten us more progress?
-- [ ] "Failed to unify %var0 and %var1" - get names in there
-  - Need fancier `Env` or the index on the type of `Tm`
-  - Or the name on the VVar?
-  - Also we should render %pi, etc more readably (bonus points for _×_)
-- Editor support:
-  - [x] add missing cases should skip indented lines
-  - [x] add missing cases should handle `_::_`
-  - [x] add missing cases should share code between vscode and playground
-  - [x] "Not in scope" should offer to import
-  - [x] Case split
-- [ ] Maybe run whole project for completion search and "all errors in project"
+  - Idris had a couple of bugs where they were accidentally dropped
 - [ ] Delay checking
   - We have things like `foldr (\ x acc => case x : ...`, where the lambda doesn't have a good type, so we have to be explicit. If we could defer the checking of that expression until more things are solved, we might not need the annotation (e.g. checking the other arguments). Some `case` statements may have a similar situation.
   - One idea is to throw the checks onto some sort of TODO list and run whatever works. (I think Idris may have a heuristic where it checks arguments backwards in some cases.)
-- [x] Dependent records (I guess I missed that bit)
-- [x] Arguments on records
-- [x] Add sugar for type aliases (maybe infer arguments)
-  - Lean has this as `abbrev`, we maybe could run infer on the RHS and call it a day? We would need a simple LHS, though.
 - [ ] see if we can get a better error if `for` is used instead of `for_` in do blocks
-- [ ] Remove erased args from primitive functions
-  - But we need separate `+` functions rather than the magic `∀ a. a -> a -> a` to support other backends
 - [ ] consider moving primitive functions to a support file
   - Downside here is that we lose some dead code elimination
   - it better supports bootstrapping when calling convention changes.
-  - it better supports other
-- [ ] Alternate backend
-  - Options are scheme, C, WASM, arm assembly. Maybe C is the next step.
 - [ ] allow declaration of primitive operators
   - Removes assumptions of hack in Compile.newt, but might not support other backends
   - Alternate solution would be to pull from Prelude and hard code for all backends
   - POper added to physical syntax types, but not implemented
-- [x] Remove erased fields from constructor data
-- [ ] Teach magic nat / magic enum about erased args
-- [x] Update LiftLambda.newt for arg removal changes
 - [ ] See if we can split up `Elab.newt`
   - Unify, checking, and case builder have circular references.
   - Perhaps unify should return constraints instead of calling solve directly.
   - passing a pointer to `check` in the context may suffice
-- [ ] Add error for non-linear names in pattern matching (currently it picks one)
-  - We probably should handle forced values. Idris requires them to have the same name.
 - [ ] Functions with erased-only arguments still get called with `()` - do we want this or should they be constants?
-- [x] Take the parens off of FC to make vscode happy
-- [x] Magic to make Bool a boolean
+  - Is this still the case?
 - [ ] Lifted closures could elide unused arguments (LiftWhere / LiftLambda)
-- [ ] Look into using holes for errors (https://types.pl/@AndrasKovacs/115401455046442009)
+- [-] Look into using holes for errors (https://types.pl/@AndrasKovacs/115401455046442009)
+  - This is done in some places
   - This would let us hit more cases in a function when we hit an error.
   - I've been wanting to try holes for parse errors too.
   - Does softening up check errors break `auto`?
@@ -151,9 +71,6 @@
   - Do we want to (maybe later) keep the scope as a FC? We could do scope at point then.
 - [ ] LSP and/or more editor support
   - [ ] refactor to query based?  E.g. importing a module
-  - [x] would be nice to have "add missing cases" and "case split"
-  - [x] Probably need ranges for FC
-  - [x] leave an interactive process running
   - [ ] restart mid file (we could save state per top level decl)
   - [ ] rename in editor (need to accumulate all names and what they reference)
   - [ ] who calls X?  We can only do this scoped to the current context for now. Someday whole source dir. #lsp
@@ -162,17 +79,98 @@
   - We would need to address stack and laziness issues in prettier printer (or make it merely pretty)
 - [ ] Add info to Ref/VRef (is dcon, arity, etc)
   - To save lookups during compilation and it might make eval faster
-- [x] number tags for data constructors
-  - Numeric tags are about 9% faster
-  - Issues:
-    - They make debugging more difficult. I was able to sort out debruijn issues because the names were wrong.
-    - There are a couple of spots I have to fudge in the native code, because there is no constant for `Nil` and `_::_` tags
-    - the debugString pretty printer was leveraging the names
-- [x] Increment row/col in printing, so vscode can click on compiler output
-- [ ] Raw is duplicated between Lib.Syntax and Lib.Compile, but not detected
-  - [ ] Maybe add qualified names to surface syntax and allow / detect conflicts on reference
-  - [ ] Add `export` keywords
-- [x] vscode - run newt when switching editors
+- [ ] Consider splitting desugar/check
+  - We can only check physical syntax at the moment, which has been inconvenient in a couple of spots where we want to check generated code. E.g. solutions to auto implicits.
+  - case let for do, list syntax, and tuple syntax are desugared in the parser. operators are run in the parser.
+- [ ] Eq Nat does things the hard way, can we turn it into `==`?
+  - We could have a compile time substitution for the function
+  - Maybe this could reify how we're hard coding functions to js operators
+- Improve `auto`
+  - [ ] Improve cases where the auto isn't solved because of a type error
+  - [ ] Handle `Foo Blah`, `Foo a => Bar a` vs `Bar Blah`
+- [ ] Add some optimizations
+  - It would be nice if IO looked like imperative JS, but that might be a bit of a stretch.
+- [ ] warn on unused imports?
+  - Probably have to mark on name lookup, maybe wait until we have query-based
+- [ ] Add default path for library, so we don't need symlinks everywhere and can write tests for the library
+  - We need this to work for tests / dev and for installed newt.
+  - The new `FileSource` mechanism might help here.
+- [ ] mutual recursion in where?
+  - need to scan sigs and then defs, will have to make sure Compile.idr puts them all in scope before processing each.
+  - we probably want this, just haven't gotten around to it.
+  - LetRec would have to be extended to have multiple names.
+- [ ] Consider making `<` independent of `Ord`, so we get the `<` oper in the javascript.
+  - Or a "default implementation" deal.
+- [ ] There are issues with matching inside do blocks
+    - I may have handled a lot of this by reworking autos to check just one level of constraints (with a 20% speedup)
+    - Do we need to guess scrutinee? Or we could refine a meta scrutinee type to match the constructor being split. This happens during checking for pi, where we create ?m -> ?m and unifiy it with the meta. Could we do the same in a case, where `Just ...` says the meta must be `Maybe ?m`?
+  - ~~`newt/Fixme.newt` - I can drop `do` _and_ put `bind {IO}` to push it along. It may need to try to solve autos earlier and better.~~
+
+### Error messages
+
+- [ ] "Failed to unify %var0 and %var1" - get names in there
+  - Need fancier `Env` or the index on the type of `Tm`
+  - Or the name on the VVar?
+  - Also we should render %pi, etc more readably (bonus points for _×_)
+- [ ] Better FC for parse errors (both EOF and the ones that show up just after the error)
+
+### Documentation
+
+- [ ] Document syntax
+- [ ] Document case building
+
+### Language
+
+- [ ] add something like `rewrite` to make replace easier to use
+  - look at Idris and pi-forall
+  - consider something interactive (what would Ask do?)
+- [ ] play with documentation extraction?
+  - lean uses `/--` and `/-!` I think I prefer something like this over the `|||` in Idris.
+- [ ] Idris `!` / Lean `<-` notation.
+- [ ] Maybe `letcase` for case `let` statements (the "must have parens" rule is subtle - we might get away with "is it capital or app" though.
+- [ ] Maybe `local` for `where`-like `let` clauses? (I want a `where` that closes over more stuff)
+- [ ] Maybe allow `{x}` to skip over auto and vice-versa
+  - I think we print a mismatch here. Not sure how useful it would be though.
+  - I can do `let f : ... = \ a b c => ...`. But it doesn't work for recursion and cases are awkward.
+
+### Case building
+
+- [ ] Warnings or errors for unused cases
+  - This is important when misspelled constructors become pattern vars
+- [ ] Support pattern matching on `Lazy x`
+  - e.g. change second arg of `<|>` to lazy, Parser.Impl doesn't compile
+    complaining that `Lazy` is not a type constructor.
+  - Put a match on `Delay` there (add `Delay` to surface syntax). Eliminator forces the function
+  - Can be manually done today by breaking out another `case` for the lazy value (scrutinee is forced)
+- [ ] Collect remaining cases on default / variable patterns for more precise case split
+
+### Type classes
+
+- [ ] typeclass dependencies
+  - need to flag internal functions to not search (or flag functions for search). I need to decide on syntax for this.
+  - for something like an `isEq` field in `Ord`, auto-search is picking up the function being defined.
+- [ ] default implementations (use them if nothing is defined, where do we store them?) e.g. Ord compare, <, etc in Idris
+  - I may need to actually store some details on interfaces rather than reverse engineer from type.
+- [x] syntax for negative integers
+- [ ] if we're staying with this version of auto, we might need to list candidates and why they're rejected. e.g. I had a bifunctor fail to solve because the right answer unblocked a Foo vs IO Foo mismatch
+
+### Parser
+
+- [ ] Qualified names
+- [ ] Improve FC
+  - [ ] mechanism to capture the range for a production
+  - [ ] FC on more names (rather than relying on the expression FC
+- [ ] Parse error not ideal for `\x y z b=> b` (points to lambda)
+- [ ] Consider `.newt.md` support.
+
+### LSP
+
+- [ ] add jump to definition for non-top-level functions
+- [ ] Maybe run whole project for completion search and "all errors in project"
+- [ ] code action to add clause
+- [ ] Add missing args code action?
+  - when a constructor is underapplied
+  - is this useful? we would probably have to add at the end
 - [x] case split
   - We could fake this up:
     - given a name and a point in the editor
@@ -183,267 +181,55 @@
     - For `<-` or `let` we'd want to fudge some `|` lines
     - [ ] `let` has issues for multiline split / add missing
     - [ ] `derive` has phantom split actions in it
-- [x] Support "Add missing cases"
-  - This has been hakced together
-  - LSP version now.
-  - We could possibly fake up missing cases, too. Since they're listed and  have an FC pointing at the first one
-- [x] inline struct getters during code generation (We'd like  `x.h1.h2`)
-- [ ] Better FC for parse errors (both EOF and the ones that show up just after the error)
-- [x] Code gen for PiType (rather than static JS)
-- [x] fix string highlighting
-- [x] implement tail call optimization
-- [x] implement magic nat
-- [ ] Consider splitting desugar/check
-  - We can only check physical syntax at the moment, which has been inconvenient in a couple of spots where we want to check generated code. E.g. solutions to auto implicits.
-  - case let for do, list syntax, and tuple syntax are desugared in the parser. operators are run in the parser.
-- [x] record update can't elaborate if type is unsolved meta
-  - The issue actually was a solved meta that wasn't forced
-- [x] drop erased args on types and top level functions
-- [x] can I do some inlining without blowing up code size?
-  - [x] Maybe tag some functions as inline
-  - [x] Eq Nat is not tail recursive because of the call to `==`
-- [ ] Eq Nat does things the hard way, can we turn it into `==`?
-  - We could have a compile time substitution for the function
-  - Maybe this could reify how we're hard coding functions to js operators
-- [x] use hint table for auto solving. (I think walking the `toList` is a big chunk of performance in `Elab.newt`.)
-- [x] implement string enum (or number, but I'm using strings for tags at the moment)
-- [x] use monaco input method instead of lean's
-- [x] `Def` is shadowed between Types and Syntax (TCon vs DCon), detect this
-- [x] constructor magic for Bool?
-  - We'd have to make assumptions about order.
-  - we could special case some translations
-  - extra code.
-- [ ] review pattern matching. goal is to have a sane context on the other end. secondary goal - bring it closer to the paper.
-  - Two issues
-    - I'm rewriting stuff in the context, leaving it in a bad state (forward references). I think I can avoid this.
-    - The variables at the end of pattern matching have types with references in the wrong order. I think we can reorder them on dependencies.
-    - In some cases Idris stuffs Erased into types.
-- Improve `auto`
-  - [ ] Improve cases where the auto isn't solved because of a type error
-  - [ ] Handle `Foo Blah`, `Foo a => Bar a` vs `Bar Blah`
-- [ ] Add some optimizations
-  - [ ] see if we can make the typeclass stuff a little leaner, e.g. inline a projection of a static record. (Maybe done now with the inlining, but verify.)
-  - It would be nice if IO looked like imperative JS, but that might be a bit of a stretch.
-- [ ] warn on unused imports?
-  - Probably have to mark on name lookup, maybe wait until we have query-based
-- [x] redo code to determine base path
-- [x] emit only one branch for default case when splitting inductives
-- [x] save/load results of processing a module
-  - [x] keep each module separate in context
-  - [x] search would include imported modules, collect ops into and from modules
-  - [x] serialize modules
-  - [x] deserialize modules if up to date
-    - We use a hash of the source and all of its import hashes to check
-    - eventually we may want to support resuming halfway through a file
 
-- [x] get port to run
-  - [x] something goes terribly wrong with traverse_ and for_ (related to erasure, I think)
-- [x] ~~don't use `take` - it's not stack safe~~ The newt version is stack safe
-- [x] show user hole info even in case of error
-- [x] tokenizer that can be ported to newt
-- [ ] Add default path for library, so we don't need symlinks everywhere and can write tests for the library
-  - We need this to work for tests / dev and for installed newt.
-  - The new `FileSource` mechanism might help here.
-- [x] string interpolation?
-  - The tricky part here is the `}` - I need to run the normal tokenizer in a way that treats `}` specially.
-  - Idris handles `putStrLn "done \{ show $ add {x=1} 2}"` - it recurses for `{` `}` pairs.  Do we want that complexity?
-  - The mini version would be recurse on `{`, pop on `}` (and expect caller to handle), fail if we get to the top with a tokens remaining.
-- [ ] mutual recursion in where?
-  - need to scan sigs and then defs, will have to make sure Compile.idr puts them all in scope before processing each.
-  - we probably want this, just haven't gotten around to it.
-  - LetRec would have to be extended to have multiple names.
-- [x] Move on to next decl in case of error
-- [x] for parse error, seek to col 0 token and process next decl
-- [x] record update sugar
-- [x] Change `Ord` to be more like Idris - LT / EQ / GT (and entail equality)
-- [ ] Consider making `<` independent of `Ord`, so we get the `<` oper in the javascript.
-  - Maybe a "default implementation" deal.
-- [x] Keep a `compare` function on `SortedMap` (like lean)
-  - `emptyMap` helper defaults to `compare` from `Ord a`
-- [x] keymap for monaco
-- [x] SortedMap.newt issue in `where`
-- [x] fix "insufficient patterns", wire in M or Either String
-- [x] Matching _,_ when Maybe is expected should be an error
-- [ ] There are issues with matching inside do blocks
-    - I may have handled a lot of this by reworking autos to check just one level of constraints (with a 20% speedup)
-    - Do we need to guess scrutinee? Or we could refine a meta scrutinee type to match the constructor being split. This happens during checking for pi, where we create ?m -> ?m and unifiy it with the meta. Could we do the same in a case, where `Just ...` says the meta must be `Maybe ?m`?
-  - ~~`newt/Fixme.newt` - I can drop `do` _and_ put `bind {IO}` to push it along. It may need to try to solve autos earlier and better.~~
-  - Also, the root cause is tough to track down if there is a type error (this happens with `do` in Idris, too).
-  - Part of it is the auto solutions are getting discarded because of an unrelated unification failure. Either auto shouldn't go as deep or should run earlier. Forgetting that lookupMap returns a (k,v) pair is a good example.
-  - I've gotten it to the point where things are solved for good code, but it still does poorly when there is an error. (Auto fails to solve and it doesn't get far enough to report error.)
-- [ ] add error for non-linear pattern
-- [ ] typeclass dependencies
-  - need to flag internal functions to not search (or flag functions for search). I need to decide on syntax for this.
-  - for something like an `isEq` field in `Ord`, auto-search is picking up the function being defined.
-- [ ] default implementations (use them if nothing is defined, where do we store them?) e.g. Ord compare, <, etc in Idris
-  - I may need to actually store some details on interfaces rather than reverse engineer from type.
-- [x] syntax for negative integers
+### Code generation
+
+- [ ] add default failing case for constructor matching to catch errors
+- [ ] C backend
+  - [x] Rework the Javascript AST to be more generic semi-A-Normal form (WIP)
+  - [x] Generated code accepted by C compiler
+  - [ ] Check in C code generation
+  - [ ] Implement runtime for C code generation
+  - [ ] Runtime implementation
+
+### Misc
+
 - [ ] White box tests in `test` directory (I can't get this to work right with pack et al)
 - [x] Put worker in iframe on safari
 - [ ] Warnings or errors for missing definitions (e.g. on `Axiom` in codegen)
-- [ ] Add the type name to dcon so confusion detection in case split is simpler
-- [ ] Warnings or errors for unused cases
-  - This is important when misspelled constructors become pattern vars
-- [ ] if we're staying with this version of auto, we might need to list candidates and why they're rejected. e.g. I had a bifunctor fail to solve because the right answer unblocked a Foo vs IO Foo mismatch
 - [ ] literals for double
-- [ ] add default failing case for constructor matching to catch errors
-- [x] Add icit to Lam
-- [ ] add jump to definition magic to vscode extension
-  - [x] Working for top level, we may want a proper REPL or LSP (and FC ranges?) before we do others
-- [x] deconstructing `let` (and do arrows)
-- [x] Fix string printing to be js instead of weird Idris strings
-- [x] make $ special
-  - Makes inference easier, cleaner output, and allows `foo $ \ x => ...`
-  - [ ] `$` no longer works inside ≡⟨ ⟩ - sort out how to support both that and `$ \ x => ...` (or don't bother)
-    - We'd either need to blacklist all non-initial mixfix bits at the appropriate spots or always pass around a terminating token.
-    - I'm leaning towards _no_ here, because I may want to lift mixfix processing out of the parsing step in the future.
-- [x] **Translate newt to newt**
-  - [x] Support @ on the LHS
-  - [x] if / then / else sugar
-  - [x] `data Foo = A | B` sugar
-  - [x] records
-  - [x] where
-- [x] add namespaces
-- [x] magic nat?
-- [x] rework `unify` case tree
-  - Idris needs help with the case tree to keep code size down, do it in stages, one dcon at a time.
-  - I'm not sure it can go a few steps deep and have a default hanging off the side, so we may need to put the default case in another function ourselves.
-- [x] Strategy to avoid three copies of `Prelude.newt` in this source tree
-- [x] `mapM` needs inference help when scrutinee (see Day2.newt)
-  - Meta hasn't been solved yet. It's Normal, but maybe our delayed solving of Auto plays into it. Idris will peek at LHS of CaseAlts to guess the type if it doesn't have one.
-  - Probably fixed by trying to solve auto immediately
-- [x] Can't skip an auto. We need `{{_}}` to be auto or have a `%search` syntax.
-- [x] add filenames to FC
-- [x] Add full ranges to FC
-  - [ ] Done, but we need to fix a bunch of FC in the parser
-- [x] maybe use backtick for javascript so we don't highlight strings as JS
-- [x] dead code elimination
-- [x] imported files leak info messages everywhere
-  - For now, take the start ix for the file and report at end starting there
-- [x] update node shim to include idris2-playground changes
-- [x] refactor playground to better share code with idris2-playground
-- [x] accepting DCon for another type (skipping case, but should be an error)
-- [ ] don't allow (or dot) duplicate names on LHS
-- [x] remove metas from context, M has TopContext
 - [ ] add unit test framework
-- [x] forall / ∀ sugar (Maybe drop this, issues with `.` and `{A}` works fine)
-- [x] Bad module name error has FC 0,0 instead of the module or name
-- [ ] Revisit substitution in case building
-- [x] Check for shadowing when declaring dcon
-  - Handles the forward decl in `Zoo1.newt`, but we'll need different syntax if
-    we have different core terms for TCon/DCon/Function
 - [ ] Require infix decl before declaring mixfix names with `_` (helps find bugs) or implicitly define as infixl if it is missing
-- [x] sugar for typeclasses
-- [x] maybe add implicits in core to help resugar operators?
-- [ ] consider putting binders in environment, like Idris, to better mark `let` and to provide names
-  - I might want to distinguish `let` from pattern vars from user-`let`. The latter we probably want to exist
-    in emitted code, and the former inlined.  Currently they both live in context and the inlining occurs during
-    code-gen if the definition is simple enough (other vars or projections).
+- [ ] consider putting binders in environment, like Idris, to better mark `let` and to provide names for printing
+  - I might want to distinguish `let` from pattern vars from user-`let`.
 - [x] move some top-level chattiness to `debug`
 - [ ] consider optionally compiling to eliminators for a second type-checking pass to help catch bugs.
-- [x] Allow unicode operators/names
-- Web playground
-  - [x] editor
-  - [x] view output
-  - [x] view javascript
-  - [x] run javascript
-  - [x] need to shim out Buffer
-- [x] get rid of stray INFO from auto resolution
-- [x] handle `if_then_else_` style mixfix
-  - [x] equational reasoning sample (maybe PLFA "Lists")
-  - actual `if_then_else_` isn't practical because the language is strict
-- [x] Search should look at context
 - [ ] copattern matching
-- [x] Get `Combinatory.newt` to work
-  - Fixed when eval was fixed
-- [x] Remember operators from imports
-- [x] Default cases for non-primitives (currently gets expanded to all constructors)
-  - This may need a little care. But I think I could collect all constructors that only match wildcards into a single case. This would lose any information from breaking out the individual, unnamed cases though.
-  - There are cases where we have  `_` and then `Foo` on the next line, but they should all get collected into the `Foo` case. I think I sorted all of this out for primitives.
-- [x] Case for primitives
-- [x] Maybe Eq and stuff would work for typeclass without dealing with unification issues yet
-- [x] unsolved meta errors repeat (need to freeze or only report at end)
-- [x] Sanitize JS idents, e.g. `_+_`
-- [x] Generate some programs that do stuff
-- [x] import
 - [ ] consider making meta application implicit in term, so it's more readable when printed
   - Currently we have explicit `App` surrounding `Meta` when inserting metas. Some people
     leave that implicit for efficiency. I think it would also make printing more readable.
   - When printing `Value`, I now print the spine size instead of spine.
-- [x] eval for case (see order.newt)
-- [x] switch from commit/mustWork to checking progress
-- [x] type constructors are no longer generated?  And seem to have 0 arity.
-- [x] raw let is not yet implemented (although define used by case tree building)
-- [x] there is some zero argument application in generated code
-- [x] get equality.newt to work
-  - [x] broken again because I added J, probably need to constrain scrutinee to value
-- [x] Bad FC for missing case in where clause (probably from ctx)
-- [x] inline metas.  Maybe zonk after TC/elab
-- [x] implicit patterns
-- [x] operators
-- [x] pair syntax (via comma operator)
-- [x] `data` sugar: `data Maybe a = Nothing | Just a`
-- [x] matching on operators
-  - [x] top level
-  - [x] case statements
 - [ ] Lean ⟨ ⟩ anonymous constructors
   - This would only work for `check` and we might need to revisit how `,` is handled.
 - [ ] Lean-like `#eval`
 - [ ] Lean-like .map, etc? (resolve name in namespace of target type, etc)
-- [x] autos / typeclass resolution
-  - [x] very primitive version in place, not higher order, search at end
-  - [x] monad is now working
-- [x] do blocks (needs typeclass, overloaded functions, or constrain to IO)
-- [x] some solution for `+` problem (classes? ambiguity?)
-- [x] show compiler failure in the editor (exit code != 0)
-- [x] write output to file
-  - uses `-o` option
 - [ ] detect extra clauses in case statements
 - [ ] add test framework
-- [x] decide what to do for erasure
-  - I'm going to try explicit annotation, forall/∀ is erased
-  - [x] Parser side
-  - [x] push down to value/term
-  - [x] check quantity
-  - [x] erase in output
-- [x] remove erased top level arguments
-  - maybe have something shaped like `List Bool` for `arity`
-- [x] top level at point in vscode
-- [x] repl
-- [x] don't match forced constructors at runtime
-  - I think we got this by not switching for single cases
-- [x] magic nat (codegen as number with appropriate pattern matching)
 - [ ] magic tuple? (codegen as array)
   - Seems like this would be tricky as soon as the user starts peeling off the tail or consing them
 - [ ] magic newtype? (drop them in codegen)
-  - Needed before we newtype IO, so the tail recursion still works
-  - Without handling erased values, there are only two instances in the compiler code.
-- [x] vscode: syntax highlighting for String
-- [ ] Maybe a rollup plugin?
-- [ ] add `poper` or variant of `pfunc` that maps to an operator, giving the js operator and precedence on RHS
-  - This has now been hard-coded in codegen, but a syntax or something would be better.
-  - We want to drop implicit / erased args - i.e. pick the right two args for the native operator, see jsEq
+  - Needed before we switch IO to newtype, so the tail recursion still works
+- [ ] Maybe a rollup plugin? (So web apps can be rolled up from newt.)
 - [-] pattern matching lambda
   - `\case` is sufficient
   - I kept wanting this in AoC and use it a lot in the newt code
   - This conflicts with current code (unused?) that allows telescope information in lambdas
-
-### Parsing
-
-- [x] consider allowing σ etc in identifiers
-  - Probably need to merge oper / ident first and sort out mixfix in parsing
-  - The mixfix parsing can handle this now, need to update lexing.
-- [ ] Parse error not ideal for `\x y z b=> b` (points to lambda)
 
 ### Background
 
 - [ ] Read Ulf Norell thesis
 - [ ] Finish reading dynamic pattern unification paper to see what is missing/wrong with the current implementation
 - [ ] Read "Unifiers as Equivalences" has unification with types.  Look into adapting some of that (or at least read/understand it).  Indexed types are mentioned here.
-
-### Other issues
-
-- [ ] Name space flattening makes it a bit more subtle when a misspelled (or shadowed) constructor turns into a variable.
 
 ### Error Messages
 
