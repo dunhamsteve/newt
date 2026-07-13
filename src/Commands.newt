@@ -17,6 +17,10 @@ import Lib.Parser
 import Lib.Syntax
 import Lib.Parser.Impl
 
+getIndent : Int → List Char → Int
+getIndent acc (' ' :: rest) = getIndent (1 + acc) rest
+getIndent acc _ = acc
+
 -- For now we cheat and assume capitalized directories are a module component
 decomposeName : String → String × String
 decomposeName fn =
@@ -85,6 +89,7 @@ data FileEdit = MkEdit FC String
 data CodeAction
   = CaseSplitAction (List FileEdit)
   | AddMissingAction (List FileEdit)
+  | GenericAction String (List FileEdit)
   | Intro String FileEdit
   | ImportAction String FileEdit
 
@@ -104,7 +109,8 @@ data Flavor = EqSplit | FatArrowSplit | MonadSplit
 splitEquals : SnocList Char → List Char → (Flavor × String × String)
 splitEquals acc Nil = (EqSplit, pack (acc <>> Nil), "")
 splitEquals acc xs@('=' :: '>' :: _) = (FatArrowSplit, pack (acc <>> Nil), pack xs)
-splitEquals acc xs@('=' :: _) = (EqSplit, pack (acc <>> Nil), pack xs)
+splitEquals acc xs@('=' :: _) =
+  (EqSplit, pack (acc <>> Nil), pack xs)
 splitEquals acc xs@('<' :: '-' :: _) = (MonadSplit, pack (acc <>> Nil), pack xs)
 splitEquals acc (x :: xs) = splitEquals (acc :< x) xs
 
@@ -132,10 +138,13 @@ resugarOper (x :: xs) = go Lin (split x "_") xs
     go acc ("" :: rest) Nil = (x :: xs)
     go acc (x :: xs) ys = go (acc :< x) xs ys
 
--- REVIEW - maybe pass in QName and use applyDCon in here, especially if we want to get better names?
-makeEdits : FC → List QName → Bool → M (List FileEdit)
-makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
+makeCons : List QName → M (List (List String))
+makeCons names = do
   cons <- map applyDCon <$> traverse lookupDCon names
+  return $ map resugarOper cons
+
+makeEdits : FC → List (List String) → Bool → M (List FileEdit)
+makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) cons inPlace = do
   top <- getTop
   let (Just mod) = lookupMap' top.currentMod.modName top.modules | _ => pure Nil
   let lines = split mod.modSource "\n"
@@ -143,9 +152,13 @@ makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
   let cs = unpack line
   let head = take (cast sc) cs
   let tail = drop (S $ cast (ec - 1)) cs
-  let (splitKind, before, after) = splitEquals Lin tail
+  let (splitKind, before, _after) = splitEquals Lin tail
+
+  let (splitKind, head) = the (Flavor × List Char) $ case letHead 0 head of
+    Just head => (MonadSplit,head)
+    Nothing => (splitKind, head)
   let np = needParens (Lin <>< head) tail
-  let cons = map (addParens np ∘ resugarOper) cons
+  let cons = map (addParens np) cons
   let phead = pack head
   let indent = getIndent 0 head
   let nextrow = scan indent lines (sr + 1)
@@ -161,7 +174,9 @@ makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
         case splitKind of
           EqSplit => joinBy "" $ map (\ap => phead ++ ap ++ before ++ "= ?\n") rest
           FatArrowSplit => joinBy "" $ map (\ap => phead ++ ap ++ before ++ "=> ?\n") rest
-          MonadSplit => joinBy "" $ map (\ap => "  | \{pack head}\{ap}\{before}=> ?\n") rest
+          -- FIXME - need to pull spaces off of the front of head
+          -- find indent of next indented line (if any) otherwise current line + 2
+          MonadSplit => joinBy "" $ map (\ap => "\{pack $ replicate (cast indent) ' '}  | \{trim $ pack head}\{ap}\{before}=> ?\n") rest
 
   putStrLn "Split \{show line} HD '\{show head}' TL '\{show tail}'"
   putStrLn srest
@@ -169,9 +184,11 @@ makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
   putStrLn "edits \{debugStr edits}"
   pure edits
   where
-    getIndent : Int → List Char → Int
-    getIndent acc (' ' :: rest) = getIndent (1 + acc) rest
-    getIndent acc _ = acc
+    letHead : Int → List Char → Maybe (List Char)
+    letHead acc ('l' :: 'e' :: 't' :: xs) = Just $ replicate (cast $ acc) ' ' ++ xs
+    letHead acc (x :: xs) = letHead (1 + acc) xs
+    letHead acc Nil = Nothing
+
 
     scan : Int → List String → Int → Int
     scan indent lines row =
@@ -182,24 +199,28 @@ makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) names inPlace = do
     doFirst True (first :: rest) = (MkEdit fc first :: Nil, rest)
     doFirst _ cons = (Nil, cons)
 
-addMissingCases : Int → Int → FC → Context → List QName → M (Maybe CodeAction)
+addMissingCases : Int → Int → FC → Context → List QName → M (List CodeAction)
 addMissingCases _ _ fc@(MkFC uri (MkBounds sr sc er ec)) ctx names = do
   top <- getTop
-  edits <- makeEdits fc names False
+  cons <- makeCons names
+  edits <- makeEdits fc cons False
   putStrLn "Add Missing \{show fc} \{show names}"
-  pure $ Just $ AddMissingAction edits
+  if length' cons > 1
+    then do
+      fb <- makeEdits fc [["_"]] False
+      pure [AddMissingAction edits, GenericAction "Add fallback case" fb]
+    else pure [AddMissingAction edits]
 
-getCaseSplit : Int → Int → FC → Context → Int → Val → M (Maybe CodeAction)
+getCaseSplit : Int → Int → FC → Context → Int → Val → M (List CodeAction)
 getCaseSplit row col fc@(MkFC uri (MkBounds sr sc er ec)) ctx nm scty = do
   top <- getTop
   cons <- getConstructors ctx fc scty
   ty <- quote ctx.lvl scty
   cons <- filterM (checkCase ctx nm scty) cons
-  let names = map fst cons
-  putStrLn "Make splits for \{show names}"
-  edits <- makeEdits fc names True
+  let cons' = map (resugarOper ∘ applyDCon) cons
+  edits <- makeEdits fc cons' True
   -- TODO if constructor is not in scope, add import too.
-  pure $ Just $ CaseSplitAction edits
+  pure [CaseSplitAction edits]
 
 posInFC : Int → Int → FC → Bool
 posInFC row col (MkFC _ (MkBounds 0 0 0 0)) = False
@@ -219,15 +240,21 @@ introActions (Just $ Unsolved fc qn ctx vty User) =
     -- Are there ever any constraints?
     top <- getTop
     vty <- forceMeta vty
+    let row = fc.bnds.startLine
+    let lines = split top.currentMod.modSource "\n"
+    let line = fromMaybe "" (getAt' row lines)
+    let indent = getIndent 0 $ unpack line
+    let introCase = Intro "case" $ MkEdit fc "case _ of\n\{pack $ replicate (cast $ 2 + indent) ' '}_ => ?"
+
     putStrLn "intros for \{show vty}"
     case vty of
       VPi _ nm Explicit _ a b => do
         let str = "(\\ \{nm} => ?)"
-        pure $ Intro str (MkEdit fc str) :: Nil
+        pure $ Intro str (MkEdit fc str) :: introCase :: Nil
       _ => do
         cons <- getConstructors ctx fc vty
         putStrLn "constructors \{show cons}"
-        pure $ map makeEdit cons
+        pure $ map makeEdit cons ++ [ introCase ]
   ) $ \ err => do
       putStrLn "Got error in introActions:"
       putStrLn $ show err
@@ -268,6 +295,27 @@ errorActions row col err = do
       let row =  ite (isPrefixOf "module" l || isPrefixOf "import" l) cur row
       in getInsertRow row (cur + 1) ls
 
+addClause : Int → Int → M (List CodeAction)
+addClause row col = do
+  top <- getTop
+  -- TODO def at point
+  let (Just def) = find isDef $ listValues top.currentMod.modDefs
+    | _ => pure []
+  let row = def.fc.bnds.startLine + 1
+  let fc = MkFC def.fc.file (MkBounds row col row col)
+  let text = mkClause (Lin :< def.name.baseName) def.type
+
+  pure [GenericAction "Add clause" [MkEdit fc text]]
+  where
+    mkClause : SnocList String → Tm → String
+    mkClause acc (Pi fc nm _ _ a b) = mkClause (acc :< nm) b
+    mkClause acc _ = unwords (acc <>> []) ++ " = ?\n"
+
+    isDef : TopEntry → Bool
+    isDef (MkEntry (MkFC _ (MkBounds sr sc _ _)) _ _ _ Axiom eflags) =
+      ( row == sr || row == sr + 1) && col == sc
+    isDef _ = False
+
 getActions : FileSource → String → Int → Int → M (List CodeAction)
 getActions repo modns row col = do
   Just mod <- switchModule repo modns | _ => pure Nil
@@ -279,15 +327,17 @@ getActions repo modns row col = do
   putStrLn "Hole \{debugStr hole}"
   intros <- introActions $ getHole mod row col
   eactions <- join <$> traverse (errorActions row col) mod.modErrors
-  pure $ actions ++ intros ++ eactions
+  ac <- addClause row col
+  pure $ join [ actions, intros, eactions, ac ]
   where
-    getAction : EditorInfo → M (Maybe CodeAction)
+    getAction : EditorInfo → M (List CodeAction)
     getAction (CaseSplit fc ctx nm scty) = getCaseSplit row col fc ctx nm scty
     getAction (MissingCases fc ctx names) = addMissingCases row col fc ctx names
 
     go : List CodeAction → List EditorInfo → M (List CodeAction)
     go acc Nil = pure acc
     go acc (x :: xs) = do
-      Right (Just res) <- tryError $ getAction x
+      Right res <- tryError $ getAction x
         | _ => go acc xs
-      go (res :: acc) xs
+      go (res ++ acc) xs
+

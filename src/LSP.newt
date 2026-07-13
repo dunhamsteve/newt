@@ -141,6 +141,11 @@ codeActionInfo uri line col = unsafePerformIO $ do
         :: Nil
 
     actionToJson : CodeAction → Json
+    actionToJson (GenericAction title edits) =
+      JsonObj
+        $ ("title", JsonStr title)
+        :: ("edit", (single "changes" $ single uri $ JsonArray $ map editToJson edits))
+        :: Nil
     actionToJson (CaseSplitAction edits) =
       JsonObj
         $ ("title", JsonStr "Case split")

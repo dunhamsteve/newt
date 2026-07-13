@@ -167,7 +167,7 @@
 
 - [ ] add jump to definition for non-top-level functions
 - [ ] Maybe run whole project for completion search and "all errors in project"
-- [ ] code action to add clause
+- [x] code action to add clause
 - [ ] Add missing args code action?
   - when a constructor is underapplied
   - is this useful? we would probably have to add at the end

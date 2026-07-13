@@ -117,6 +117,7 @@ conAltEnv sc k env (_ :: xs) = conAltEnv sc (1 + k) (push env (Dot sc k)) xs
 
 -- given a name, find a similar one that doesn't shadow in Env
 freshName : String -> JSEnv -> String
+freshName nm env = "$\{show env.depth}"
 freshName nm env = if free env.jsenv nm then nm else go nm 1
   where
     free : List JSExp -> String -> Bool
@@ -201,11 +202,11 @@ termToJS env (CLet nm (CBnd k) u) f = termToJS (push env $ getEnv k env.jsenv) u
 termToJS env (CLet nm t u) f =
   let nm' = freshName nm env
       env' = push env (Var nm')
-  in case termToJS env t (JAssign nm') of
+  in case termToJS (incr env) t (JAssign nm') of
     (JAssign _ exp) => if simpleJSExp exp
       then termToJS (push env exp) u f
-      else JSnoc (JConst nm' exp) (termToJS env' u f)
-    t' => JSnoc (JLet nm' t') (termToJS env' u f)
+      else JSnoc (JConst nm' exp) (termToJS (incr env') u f)
+    t' => JSnoc (JLet nm' t') (termToJS (incr env') u f)
 termToJS env (CLetLoop args body) f =
   let off = length' args in
   -- Add lets for the args, we put this in a while and
