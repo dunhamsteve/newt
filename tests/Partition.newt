@@ -1,0 +1,7 @@
+module Partition
+
+import Prelude
+
+main : IO Unit
+main = printLn $ partition (< 5) [1,6,2,3,7,4]
+

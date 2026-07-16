@@ -1,0 +1,10 @@
+module Lazy3
+
+import Prelude
+
+main : IO Unit
+main = do
+  -- hrm, I saw bad code gen for something similar in newt proper, but no repro..
+  when (1 == 1) $ case 1 + 1 of
+    2 => putStrLn "woo!"
+    _ => putStrLn "wha?"

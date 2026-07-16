@@ -180,7 +180,7 @@ termToJS env (CBnd k) f = f $ getEnv k env.jsenv
 -- REVIEW - might need to handle these in lifting..
 termToJS env (CForce t) f = termToJS env t $ \ t' => f $ ApplyCL t' JUndefined
 -- REVIEW was Nil for args
-termToJS env (CThunk t) f = f $ JLam (freshName "_" env) $ termToJS env t JReturn
+termToJS env (CThunk t) f = f $ JLam (freshName "_" env) $ termToJS (incr env) t JReturn
 termToJS env CErased f = f JUndefined
 termToJS env (CRaw str _) f = f (Raw str)
 termToJS env (CLam nm t) f =

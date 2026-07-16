@@ -778,13 +778,13 @@ flip : ∀ a b c. (a → b → c) → (b → a → c)
 flip f b a = f a b
 
 partition : ∀ a. (a → Bool) → List a → List a × List a
-partition {a} pred xs = go xs Nil Nil
+partition {a} pred xs = go xs Lin Lin
   where
-    go : List a → List a → List a → List a × List a
-    go Nil as bs = (as, bs)
+    go : List a → SnocList a → SnocList a → List a × List a
+    go Nil as bs = (as <>> Nil, bs <>> Nil)
     go (x :: xs) as bs = if pred x
-      then go xs (x :: as) bs
-      else go xs as (x :: bs)
+      then go xs (as :< x) bs
+      else go xs as (bs :< x)
 
 -- probably not super efficient, but it works
 qsort : ∀ a. (a → a → Bool) → List a → List a
