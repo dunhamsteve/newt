@@ -315,15 +315,14 @@ processInstance ns instfc rawty decls = do
   conTele <- getFields appty env Nil
   -- declare individual functions, collect their defs
   defs <- for conTele $ \case
-     (MkBinder fc nm Explicit rig ty) => do
+     (MkBinder _ nm Explicit rig ty) => do
        let ty' = foldr (\ x acc => case x : Binder of (MkBinder fc nm' icit rig ty') => Pi fc nm' icit rig ty' acc) ty tele
        let nm' = "\{instname},\{nm}"
        -- we're working with a Tm, so we define directly instead of processDecl
        let (Just (FunDef fc name xs)) = find (\x => case x : Decl of
-              (FunDef y name xs) => name == nm
+              (FunDef _ name xs) => name == nm
               _ => False) decls
                 | _ => error instfc "no definition for \{nm}"
-
        -- REVIEW if we want to Hint this
        setDef (QN ns nm') fc Many ty' Axiom Nil
        let decl = (FunDef fc nm' xs)
@@ -338,7 +337,8 @@ processInstance ns instfc rawty decls = do
     debug $ render 80 $ pretty decl
     processDecl ns decl
   let (QN _ con') = con
-  let decl = FunDef instfc instname ((RVar instfc instname, (Just $ mkRHS instname conTele (RVar instfc con'))) :: Nil)
+  -- TODO can we tighten up FC a little in the mkRHS? There are inside that `for` as fc..
+  let decl = FunDef instfc instname ((RVar instfc instname, (Just $ mkRHS instfc instname conTele (RVar instfc con'))) :: Nil)
   log 1 "SIGDECL"
   log 1 "\{render 90 $ pretty sigDecl}"
   log 1 $ render 80 $ pretty decl
@@ -361,10 +361,11 @@ processInstance ns instfc rawty decls = do
     tenv Z = Nil
     tenv (S k) = (VVar emptyFC "_" (cast k) Lin :: tenv k)
 
-    mkRHS : String -> List Binder -> Raw -> Raw
-    mkRHS instName (MkBinder fc nm Explicit rig ty :: bs) tm = mkRHS instName bs (RApp fc tm (RVar fc "\{instName},\{nm}") Explicit)
-    mkRHS instName (b :: bs) tm = mkRHS instName bs tm
-    mkRHS instName Nil tm = tm
+    mkRHS : FC → String → List Binder → Raw → Raw
+    mkRHS fc instName (MkBinder _ nm Explicit rig ty :: bs) tm =
+      mkRHS fc instName bs (RApp fc tm (RVar fc "\{instName},\{nm}") Explicit)
+    mkRHS fc instName (b :: bs) tm = mkRHS fc instName bs tm
+    mkRHS fc instName Nil tm = tm
 
     apply : Val -> List Val -> M Val
     apply x Nil = pure x
