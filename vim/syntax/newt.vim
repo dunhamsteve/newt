@@ -1,3 +1,6 @@
+if &filetype =~# 'markdown'
+  finish
+endif
 syn keyword newtInfix infix infixl infixr
 syn keyword newtKW data where let in case of derive module import if then else alias class instance record constructor
 syn match newtType "\<[A-Z][a-zA-Z0-9]*\>"

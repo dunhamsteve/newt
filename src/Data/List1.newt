@@ -22,6 +22,7 @@ unsnoc {a} (x ::: xs) = go x xs
     go x (y :: ys) = let (as, a) = go y ys in (x :: as, a)
 
 splitFileName : String → String × String
-splitFileName fn = case splitBy1 fn '.' of
-    part ::: Nil => (part, "")
-    xs => mapFst (joinBy ".") $ unsnoc xs
+splitFileName fn = case splitBy fn '.' of
+  Nil => ("","")
+  x :: xs => (x, joinBy "." xs)
+

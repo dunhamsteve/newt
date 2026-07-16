@@ -14,6 +14,19 @@ import Lib.Parser
 import Data.List1
 import Lib.Elab
 
+illiterate : String → String → String
+illiterate fn src =
+  if isSuffixOf ".md" fn then unlines $ filterLit Lin False $ lines src else src
+  where
+    filterLit : SnocList String → Bool → List String → List String
+    filterLit acc _ Nil = acc <>> Nil
+    filterLit acc False (x :: xs) = if isPrefixOf "```newt" x
+      then filterLit (acc :< "") True xs
+      else filterLit (acc :< "") False xs
+    filterLit acc True (x :: xs) = if isPrefixOf "```" x
+      then filterLit (acc :< "") False xs
+      else filterLit (acc :< x) True xs
+
 -- declare internal primitives
 addPrimitives : M ModContext
 addPrimitives = do
@@ -78,12 +91,14 @@ processModule importFC repo stk modns = do
   let mod = MkModCtx modns "" emptyMap freshMC emptyMap Nil Nil Nil
   modifyTop { currentMod := mod; hints := emptyMap; ops := emptyMap }
 
-  -- TODO now we can pass in the module name...
-  Right (fn,src) <- tryError $ repo.getFile importFC fn
+  Right (fn,src) <- do
+        -- try for literate first
+        (Left _) <- tryError $ repo.getFile importFC "\{fn}.md" | x => pure x
+        tryError $ repo.getFile importFC fn
     | Left err => reportError err  -- TODO maybe want a better FC.
   modifyTop { currentMod $= { modSource := src }}
 
-  let (Right toks) = tokenise fn src
+  let (Right toks) = tokenise fn (illiterate fn src)
     | Left err => reportError err
 
   let (Right ((nameFC, modName), ops, toks)) = partialParse fn parseModHeader top.ops toks

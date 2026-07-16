@@ -86,10 +86,9 @@ processFile fn = do
   let dir = if dirs == Nil then "." else joinBy "/" dirs
   let (name, ext) = splitFileName file
   log 1 "\{show dir} \{show name} \{show ext}"
-
   (Right src) <- liftIO {M} $ readFile fn
     | Left err => error (emptyFC' fn) "error reading \{fn}: \{show err}"
-  let (Right toks) = tokenise fn src
+  let (Right toks) = tokenise fn $ illiterate fn src
     | Left err => throwError err
   let (Right ((nameFC, modName), _, _)) = partialParse fn parseModHeader emptyMap toks
     | Left (err,toks) => throwError err
@@ -115,7 +114,7 @@ cmdLine ("-o" :: fn :: args) = do
   pure ((out <|> Just fn), files)
 
 cmdLine (fn :: args) = do
-  let (True) = isSuffixOf ".newt" fn
+  let (True) = isSuffixOf ".newt" fn || isSuffixOf ".newt.md" fn
     | _ => error emptyFC "Bad argument \{show fn}"
   (out, files) <- cmdLine args
   pure (out, fn :: files)

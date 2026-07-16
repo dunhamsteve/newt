@@ -33,5 +33,7 @@ autocmd FileType newt inoremap <buffer> \GG  Γ
 autocmd FileType newt inoremap <buffer> \Gl  λ
 autocmd FileType newt inoremap <buffer> \Gs  σ
 autocmd FileType newt inoremap <buffer> \Gt  τ
+autocmd FileType newt inoremap <buffer> \Ga  α
+autocmd FileType newt inoremap <buffer> \Gd  δ
 augroup END
 

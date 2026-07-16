@@ -24,7 +24,9 @@ getIndent acc _ = acc
 -- For now we cheat and assume capitalized directories are a module component
 decomposeName : String → String × String
 decomposeName fn =
-    go Nil $ Lin <>< split (fst $ splitFileName fn) "/"
+    case Lin <>< split fn "/" of
+      Lin => ("","")
+      (xs :< x) => go Nil (xs :< fst (splitFileName x))
     where
         go : List String → SnocList String → String × String
         go acc Lin = (".", joinBy "." acc)
