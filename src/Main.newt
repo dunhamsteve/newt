@@ -8,6 +8,7 @@ import Lib.Compile.JS
 --import Lib.Compile.CC
 import Lib.Compile.Scheme
 import Lib.Parser
+import Lib.Eval
 import Lib.Elab
 import Lib.Error
 import Lib.Util
@@ -139,8 +140,9 @@ replHeader = putStrLn "Newt REPL (\{show gitRevision})\n"
 getDoc : String → M Unit
 getDoc name = do
   top <- getTop
-  for_ (lookupAll name top) $ \e =>
-      putStrLn "\{show e.name} : \{rpprint Nil e.type}"
+  for_ (lookupAll name top) $ \e => do
+    type <- nf Nil e.type
+    putStrLn "\{show e.name} : \{rpprint Nil type}"
 
 replHelp : M Unit
 replHelp =
