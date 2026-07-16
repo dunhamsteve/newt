@@ -86,3 +86,4 @@
 (define (Node.getArgs w) ($IORes (command-line) w))
 (define (Prelude.unsafePerformIO f)
   (car (f 'world)))
+(define (Main.jsEval) (Node.putStr "TODO"))

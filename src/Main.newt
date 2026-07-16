@@ -137,6 +137,35 @@ browseTop qn@(QN ns x) = do
 replHeader : M Unit
 replHeader = putStrLn "Newt REPL (\{show gitRevision})\n"
 
+nfRaw : Raw → M Unit
+nfRaw exp = do
+  let ctx = mkCtx emptyFC Many
+  (tm, ty) <- infer ctx exp
+  ty <- quote 0 ty
+  tm <- nf Nil tm
+  putStrLn "normalized to:"
+  putStrLn "\{render 90 $ pprint Nil tm} : \{render 90 $ pprint Nil ty}"
+
+
+pfunc jsEval : String → IO Unit := `(src) => (w) => {
+  src = src.replace('export let Prelude_main', 'let Prelude_main')
+  new Function(src)()
+  return Prelude_MkIORes(Prelude_MkUnit,w)
+}`
+
+execRaw : Raw → M Unit
+execRaw exp = do
+  -- TODO what do we do with FC and errors?
+  prev <- getTop
+  let fc = emptyFC
+  let exp' = RApp fc (RVar fc "printLn") exp Explicit
+  processTypeSig prev.currentMod.modName emptyFC Many ["main"] (RApp fc (RVar fc "IO") (RVar fc "Unit") Explicit)
+  processDef prev.currentMod.modName emptyFC "main" [(RVar fc "main",Just exp')]
+  docs <- compileJavascript
+  putTop prev
+  liftIO $ jsEval $ unlines $ map (render 90) docs
+  pure MkUnit
+
 getDoc : String → M Unit
 getDoc name = do
   top <- getTop
@@ -153,11 +182,13 @@ replHelp =
           MkCmd _ _ ArgOptInt _ => " [ 1 ]"
           MkCmd _ _ ArgIdent _ => " map"
           MkCmd _ _ ArgString _ => " \"name\""
+          MkCmd _ _ ArgRaw _ => " expr"
     case cmd of
       (MkCmd kw desc _ _) => putStrLn "\{kw}\{args} - \{desc}"
 
 runCommand : ReplCommand → M Unit
 runCommand (Load fn) = processFile fn
+runCommand (ExecCmd raw) = execRaw raw
 runCommand (HelpCmd) = replHelp
 runCommand (BrowseCmd qn) = browseTop qn
 runCommand (GetDoc name) = getDoc name
@@ -168,11 +199,13 @@ runCommand (OutputJS fn) = writeJS fn
 -- Broken out to a separate function so I can hook it.
 runString : String → M Unit
 runString line = do
+  top <- getTop
   let (Right toks) = tokenise "<stdin>" line
     | Left err => showError line err >>= putStrLn
-  let (Right cmd) = parse "<stdin>" parseCommand toks
-    | Left err => showError line err >>= putStrLn
-  catchError (runCommand cmd) (showError line >=> putStrLn)
+  -- let (Right cmd) = parse "<stdin>" parseCommand toks
+  let (Right cmd) = partialParse "<stdin>" parseCommand top.currentMod.modOps toks
+    | Left (err, _) => showError line err >>= putStrLn
+  catchError (runCommand $ fst cmd) (showError line >=> putStrLn)
 
 runRepl : M Unit
 runRepl = do

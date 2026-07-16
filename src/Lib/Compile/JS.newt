@@ -49,7 +49,7 @@ data JSExp : U where
   JTernary : JSExp → JSExp → JSExp → JSExp
   Index : JSExp -> JSExp -> JSExp
   Dot : JSExp -> Int -> JSExp
-  Raw : String -> JSExp
+  JSRaw : String -> JSExp
 
 data JSStmt : StKind -> U where
   -- Maybe make this a snoc...
@@ -182,7 +182,7 @@ termToJS env (CForce t) f = termToJS env t $ \ t' => f $ ApplyCL t' JUndefined
 -- REVIEW was Nil for args
 termToJS env (CThunk t) f = f $ JLam (freshName "_" env) $ termToJS (incr env) t JReturn
 termToJS env CErased f = f JUndefined
-termToJS env (CRaw str _) f = f (Raw str)
+termToJS env (CRaw str _) f = f (JSRaw str)
 termToJS env (CLam nm t) f =
   let (nm',env') = freshName' nm env -- "\{nm}$\{show $ length env}"
   in f $ JLam nm' (termToJS env' t JReturn)
@@ -339,7 +339,7 @@ expToDoc (DataCon tag vals) = text "{" <+> text "tag:" <+> text (show tag) ++ te
     entry (nm, exp) = jsIdent nm ++ text ":" <+> expToDoc exp
 expToDoc (LitString str) = text $ quoteString str
 expToDoc (LitInt i) = text $ show i
-expToDoc (Raw str) = text str
+expToDoc (JSRaw str) = text str
 -- TODO add precedence
 expToDoc (ApplyCL x@(JLam _ _) xs) = text "(" ++ expToDoc x ++ text ")" ++ text "(" ++ nest 2 (expToDoc xs) ++ text ")"
 expToDoc (ApplyCL x xs) = expToDoc x ++ text "(" ++ nest 2 (expToDoc xs) ++ text ")"

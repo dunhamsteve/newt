@@ -6,6 +6,7 @@ import Lib.Parser
 import Lib.Token
 import Lib.Common
 import Data.List1
+import Lib.Syntax
 
 data ReplCommand
     = Load String
@@ -13,6 +14,7 @@ data ReplCommand
     | Verbose (Maybe Int)
     | GetDoc String
     | BrowseCmd QName
+    | ExecCmd Raw
     | HelpCmd
 
 kw : String → Parser String
@@ -38,7 +40,7 @@ replQN = do
   let (ns,nm) = unsnoc $ splitBy1 name '.'
   pure $ QN (joinBy "." ns) nm
 
-data ArgType = ArgNone | ArgString | ArgIdent | ArgOptInt | ArgQName
+data ArgType = ArgNone | ArgString | ArgIdent | ArgOptInt | ArgQName | ArgRaw
 
 0 argCon : ArgType → U
 argCon ArgNone = ReplCommand
@@ -46,6 +48,7 @@ argCon ArgOptInt = Maybe Int → ReplCommand
 argCon ArgIdent = String → ReplCommand
 argCon ArgString = String → ReplCommand
 argCon ArgQName = QName → ReplCommand
+argCon ArgRaw = Raw → ReplCommand
 
 data CmdDesc : U where
     MkCmd : String → String → (arg : ArgType) → argCon arg → CmdDesc
@@ -62,6 +65,7 @@ commands
     :: MkCmd ":d" "document function" ArgIdent GetDoc
     :: MkCmd ":doc" "document function" ArgIdent GetDoc
     :: MkCmd ":b" "browse namespace" ArgQName BrowseCmd
+    :: MkCmd ":exec" "execute and print term" ArgRaw ExecCmd
    -- type at point
     -- solve hole
     -- search by prefix (for autocomplete - ideally include types at point, but we'd need recovery)
@@ -76,6 +80,7 @@ parseCommand = do
         | _ => fail "Unknown command"
     the (Parser ReplCommand) $ case cmd of
         MkCmd _ _ ArgNone cstr => pure cstr
+        MkCmd _ _ ArgRaw cstr => cstr <$> term
         MkCmd _ _ ArgOptInt cstr => cstr <$> optional replInt
         MkCmd _ _ ArgIdent cstr => cstr <$> (ident <|> uident)
         MkCmd _ _ ArgString cstr => cstr <$> replString
