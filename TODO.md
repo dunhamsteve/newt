@@ -70,6 +70,7 @@
   - So the idea here is that the references will be via FC, we remember the type at declaration and then point the usage back to the declaration (FC -> FC). We could dump all of this. (If we're still doing json.)
   - This information _could_ support renaming, too (but there may be indentation issues).
   - Do we want to (maybe later) keep the scope as a FC? We could do scope at point then.
+  - I'd thought to scan the AST, but we'd need a context with FC
 - [ ] LSP and/or more editor support
   - [ ] refactor to query based?  E.g. importing a module
   - [ ] restart mid file (we could save state per top level decl)
@@ -218,8 +219,11 @@
 - [ ] add test framework
 - [ ] magic tuple? (codegen as array)
   - Seems like this would be tricky as soon as the user starts peeling off the tail or consing them
-- [ ] magic newtype? (drop them in codegen)
+- [x] magic newtype? (drop them in codegen)
   - Needed before we switch IO to newtype, so the tail recursion still works
+  - This is happening in CExp, so we'd have to move inlining.
+  - There is a let that might blind newtyped functions.
+  - Saves 5%, maybe from M
 - [ ] Maybe a rollup plugin? (So web apps can be rolled up from newt.)
 - [-] pattern matching lambda
   - `\case` is sufficient

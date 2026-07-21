@@ -324,6 +324,7 @@ record MetaContext where
 derive Eq MetaMode
 
 data ConInfo = NormalCon
+             | NewTypeCon
              | SuccCon | ZeroCon
              | EnumCon | TrueCon | FalseCon
              | NilCon | ConsCon
@@ -332,6 +333,7 @@ derive Eq ConInfo
 
 instance Show ConInfo where
   show NormalCon = ""
+  show NewTypeCon = "[X]"
   show ConsCon = "[C]"
   show NilCon = "[N]"
   show FalseCon = "[F]"

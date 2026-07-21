@@ -415,6 +415,7 @@ populateConInfo entries =
   case entries of
     a :: Nil => case countFields a of
       0 => setInfo a NilCon :: Nil
+      1 => setInfo a NewTypeCon :: Nil
       2 => setInfo a ConsCon :: Nil
       _ => entries
     a :: b :: Nil =>

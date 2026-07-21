@@ -191,6 +191,10 @@ compileTerm env tm@(App fc _ _ _) = case manyFunArgs tm of
             if length' qs == length' args
               then pure $ CConstr tag nm.baseName args' ConsCon
               else apply nm args' arity
+          Just (DCon tag NewTypeCon qs _) =>
+            case args' of
+              [x] => pure x
+              _ => apply nm args' arity
           Just (DCon tag NilCon qs _) =>
             if length' qs == length' args
               then pure $ CConstr tag nm.baseName args' NilCon
@@ -246,11 +250,12 @@ compileTerm env (Case fc t alts) = do
     numAltP (CConAlt _ _ ZeroCon _ _) = True
     numAltP _ = False
 
-    enumAlt : CAlt → CAlt
-    enumAlt (CConAlt ix nm EnumCon args tm) = CLitAlt (LInt $ cast ix) tm
-    enumAlt (CConAlt ix nm FalseCon args tm) = CLitAlt (LBool False) tm
-    enumAlt (CConAlt ix nm TrueCon args tm) = CLitAlt (LBool True) tm
-    enumAlt alt = alt
+    enumAlt : CExp → CAlt → CAlt
+    enumAlt sc (CConAlt ix nm EnumCon args tm) = CLitAlt (LInt $ cast ix) tm
+    enumAlt sc (CConAlt ix nm FalseCon args tm) = CLitAlt (LBool False) tm
+    enumAlt sc (CConAlt ix nm TrueCon args tm) = CLitAlt (LBool True) tm
+    enumAlt sc (CConAlt ix nm NewTypeCon args tm) = CDefAlt $ CLet "nt" sc tm -- CLitAlt (LBool True) tm
+    enumAlt sc alt = alt
 
     isInfo : ConInfo → CAlt → Bool
     isInfo needle (CConAlt _ _  info _ _)  = needle == info
@@ -283,7 +288,7 @@ compileTerm env (Case fc t alts) = do
     fancyCons sc alts =
       if any numAltP alts
         then doNumCon sc alts
-        else map enumAlt alts
+        else map (enumAlt sc) alts
 
 compileTerm env (Lit _ lit) = pure $ CLit lit
 compileTerm env (Let _ nm t u) = do
