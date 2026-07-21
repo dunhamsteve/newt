@@ -428,7 +428,7 @@ stmtToDoc (JLet nm body) = text "let" <+> jsIdent nm ++ text ";" </> stmtToDoc b
 stmtToDoc (JAssign nm expr) = jsIdent nm <+> text "=" <+> expToDoc expr ++ text ";"
 stmtToDoc (JLoopAssign nm expr) = jsIdent nm <+> text "=" <+> expToDoc expr ++ text ";"
 stmtToDoc (JContinue) = text "continue" ++ text ";"
-stmtToDoc (JWhile stmt) = text "while (1)" <+> bracket "{" (stmtToDoc stmt) "}"
+stmtToDoc (JWhile stmt) = text "for (;;)" <+> bracket "{" (stmtToDoc stmt) "}"
 -- In the loop case, this may be reassigned
 stmtToDoc (JConst nm x) = text "let" <+> jsIdent nm <+> nest 2 (text "=" <+/> expToDoc x ++ text ";")
 stmtToDoc (JReturn x) = text "return" <+> expToDoc x ++ text ";"
