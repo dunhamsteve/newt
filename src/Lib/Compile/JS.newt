@@ -238,7 +238,10 @@ termToJS {e} env (CLoop args quants) f = runArgs (reverse env.jsenv) args
   where
     runArgs : List JSExp → List CExp → JSStmt e
     runArgs (Var x :: rest) (arg :: args) =
-      termToJS env arg $ \ arg' => JSnoc (JLoopAssign x arg') $ runArgs rest args
+      termToJS env arg $ \case
+        -- These are the unused arguments in TCO
+        JUndefined => runArgs rest args
+        arg' => JSnoc (JLoopAssign x arg') $ runArgs rest args
     runArgs _ _ = JContinue
 termToJS env (CAppRef nm args quants) f = argsToJS env args $ \ args => f $ ApplyRef (show nm) quants args
 termToJS env (CApp t arg) f = termToJS env t (\ t' => termToJS env arg (\arg' => f (ApplyCL t' arg')))

@@ -1,0 +1,19 @@
+module EvenOdd
+
+import Prelude
+
+isEven : Nat → Bool
+isOdd : Nat → String → Bool
+
+isOdd Z x = False
+isOdd (S k) x = isEven k
+
+isEven Z = True
+isEven (S k) = isOdd k "foo"
+
+
+main : IO Unit
+main = do
+  printLn $ isEven (cast 10)
+  printLn $ isEven (cast 11)
+

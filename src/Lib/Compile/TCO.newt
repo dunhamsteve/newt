@@ -9,11 +9,19 @@ import Lib.Compile.CExp
 import Data.SortedMap
 
 /-
-  This is modeled after Idris' tail call optimization written by Stefan Hoeck.
+  Originally this was modeled after Idris' tail call optimization written by Stefan Hoeck.
 
-  We collect strongly connected components of the tail call graph,
-  defunctionalize it (make a data type modelling function calls and "return"),
-  and wrap it in a trampoline.
+  It collects strongly connected components of the tail call graph,
+  defunctionalizes it (make a data type modelling function calls and "return"),
+  and wraps it in a trampoline.
+
+  The trampoline had some performance impact in node, so we've replaced it with a while loop.
+  The implementation for a single function is `rewriteLoop`. It duplicates the arguments, and
+
+  The multi-function version generalizes this by combining the functions into a single one that
+  takes an integer indicating which function to call and the arguments, which are padded in front
+  with undefined to give all of the functions the same number of arguments (padded in front to avoid
+  rewriting debruijn indexes).
 
 -/
 
@@ -44,29 +52,32 @@ tailNames (CLit _) = Nil
 tailNames (CMeta _) = Nil
 tailNames (CRaw _ _) = Nil
 
--- rewrite tail calls to return an object to a trampoline
--- takes a list of the names in the group and the function body
-rewriteTailCalls : List QName → CExp → CExp
-rewriteTailCalls nms tm = case tm of
+-- We _prefix_ the args with the function id and enough erased values to
+-- fill to arity, so the existing debruijn indices work out
+rewriteTailCalls : Int → List QName → CExp → CExp
+rewriteTailCalls arity nms tm = case tm of
   CAppRef nm args qs =>
       if length args == qs
-      then case getTag (S Z) nm nms of
-        Just ix => CConstr ix (show nm) args NormalCon
-        Nothing => CConstr Z "return" (tm :: Nil) NormalCon
-      else CConstr Z "return" (tm :: Nil) NormalCon
-  CLetRec nm t u => CLetRec nm t $ rewriteTailCalls nms u
-  CLet nm t u => CLet nm t $ rewriteTailCalls nms u
+      then case getTag Z nm nms of
+        Just ix =>
+          let arglen = length' args in
+          let allargs = CLit (LInt (cast ix)) :: replicate (cast $ arity - arglen) CErased ++ args in
+          CLoop allargs (cast arity)
+        Nothing => tm
+      else tm
+  CLetRec nm t u => CLetRec nm t $ rewriteTailCalls arity nms u
+  CLet nm t u => CLet nm t $ rewriteTailCalls arity nms u
   CCase sc alts => CCase sc $ map rewriteAlt alts
-  tm => CConstr Z "return" (tm :: Nil) NormalCon
+  tm => tm
   where
       getTag : Nat → QName → List QName → Maybe Nat
       getTag t nm Nil = Nothing
       getTag t nm (n :: ns) = if n == nm then Just t else getTag (S t) nm ns
 
       rewriteAlt : CAlt -> CAlt
-      rewriteAlt (CConAlt ix nm info args t) = CConAlt ix nm info args $ rewriteTailCalls nms t
-      rewriteAlt (CDefAlt t) = CDefAlt $ rewriteTailCalls nms t
-      rewriteAlt (CLitAlt lit t) = CLitAlt lit $ rewriteTailCalls nms t
+      rewriteAlt (CConAlt ix nm info args t) = CConAlt ix nm info args $ rewriteTailCalls arity nms t
+      rewriteAlt (CDefAlt t) = CDefAlt $ rewriteTailCalls arity nms t
+      rewriteAlt (CLitAlt lit t) = CLitAlt lit $ rewriteTailCalls arity nms t
 
 -- A looping version of TCO, specialized for single function calls
 -- takes a list of the name of the function and the function body
@@ -86,10 +97,6 @@ rewriteLoop qn tm = case tm of
     rewriteAlt (CDefAlt t) = CDefAlt $ rewriteLoop qn t
     rewriteAlt (CLitAlt lit t) = CLitAlt lit $ rewriteLoop qn t
 
--- the name of our trampoline
-bouncer : QName
-bouncer = QN "" "bouncer"
-
 doOptimize : List (QName × CExp) → M (List (QName × CExp))
 doOptimize ((qn, exp) :: Nil) = do
   let (CFun args body) = exp | _ => error emptyFC "doOptimize \{show qn} not a CFun"
@@ -98,29 +105,35 @@ doOptimize ((qn, exp) :: Nil) = do
 
 doOptimize fns = do
   splitFuns <- traverse splitFun fns
+  let arity = foldl (\a b => max a $ getArity b) 0 splitFuns
   let nms = map fst fns
-  let alts = map (mkAlt nms) $ enumerate splitFuns
+  let alts = map (mkAlt arity nms) $ enumerate splitFuns
   recName <- mkRecName nms
-  let recfun = CFun ("arg" :: Nil) $ CCase (CBnd 0) alts
-  wrapped <- traverse (mkWrap recName) (enumerate fns)
+  -- case and
+  let args = ("arg" :: replicate (cast arity) "_")
+  let recfun = CFun args $ CLetLoop args $ CCase (CBnd arity) alts
+  wrapped <- traverse (mkWrap recName arity) (enumerate fns)
   pure $ (recName, recfun) :: wrapped
   where
-    mkWrap : QName → Nat × QName × CExp → M (QName × CExp)
-    mkWrap recName (ix, qn, CFun args _) = do
+    getArity : QName × List String × CExp → Int
+    getArity (_, xs, _) = length' xs
+
+    mkWrap : QName → Int → Nat × QName × CExp → M (QName × CExp)
+    mkWrap recName arity (ix, qn, CFun args _) = do
       let arglen = length' args
       let conargs = map (\k => CBnd (arglen - k - 1)) (range 0 arglen)
-      -- let conquant = map fst args
-      let arg = CConstr (S ix) (show qn) conargs NormalCon
-      let body = CAppRef bouncer (CRef recName :: arg :: Nil) (S (S Z))
+      let allargs = CLit (LInt (cast ix)) :: replicate (cast $ arity - arglen) CErased ++ conargs
+      -- needs extra args
+      let body = CAppRef recName allargs (S $ cast arity)
       pure (qn, CFun args body)
-    mkWrap _ (qn, _) = error emptyFC "error in mkWrap: \{show qn} not a CFun"
+    mkWrap _ _ (qn, _) = error emptyFC "error in mkWrap: \{show qn} not a CFun"
 
     mkRecName : List QName → M QName
     mkRecName Nil = error emptyFC "INTERNAL ERROR: Empty List in doOptimize"
     mkRecName (QN ns nm :: _) = pure $ QN ns "REC_\{nm}"
 
-    mkAlt : List QName → (Nat × QName × List Name × CExp) -> CAlt
-    mkAlt nms (ix, qn, args, tm) = CConAlt (S ix) (show qn) NormalCon args (rewriteTailCalls nms tm)
+    mkAlt : Int → List QName → (Nat × QName × List Name × CExp) -> CAlt
+    mkAlt arity nms (ix, qn, args, tm) = CLitAlt (LInt $ cast ix) (rewriteTailCalls arity nms tm)
 
     splitFun : (QName × CExp) → M (QName × List Name × CExp)
     splitFun (qn, CFun args body) = pure (qn, args, body)

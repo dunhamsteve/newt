@@ -14,8 +14,9 @@
   - We could also gain performance by not collecting LSP data in batch mode
 - [ ] maybe `let case` instead of `let (...)` (which is a little subtle)
   - Or simply put a term in there and treat as a variable iff it is lowercase and non-applied
-- [ ] Use while-TCO for mutual recursion, drop `bouncer`
+- [x] Use while-TCO for mutual recursion, drop `bouncer`
 - [ ] Importing Prelude twice should be an error (currently it causes double hints and breaks auto)
+  - or relax to no-op to aid repl usage
 - [ ] maybe allow "Main" module name for any file
   - possibly allow eliding `module` for Main?
 - [ ] preserve information on record / class / instance for LSP "document symbols" kind

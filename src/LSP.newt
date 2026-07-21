@@ -277,27 +277,8 @@ docSymbols fn = wrapper fn getSymbols $ \ err => pure js_null
 compileJS : String → JSObject
 compileJS fn = wrapper fn (do
     docs <- compileJavascript
-    let src = unlines $
-          ( "const bouncer = (f,ini) => { let obj = ini; while (obj.tag) obj = f(obj); return obj.h1 };"
-          :: Nil)
-          ++ map (render 90 ∘ noAlt) docs
+    let src = unlines $ map (render 90 ∘ noAlt) docs
     pure $ JsonStr src) (\ err => pure $ js_castStr "// \{errorMsg err}")
-compileJS fn = unsafePerformIO $ do
-  let (base, modName) = decomposeName fn
-  st <- readIORef state
-  when (st.baseDir /= base) $ resetState base
-  repo <- lspFileSource
-  (Right (top, src)) <- (do
-    mod <- processModule emptyFC repo Nil modName
-    docs <- compileJavascript
-    let src = unlines $
-          ( "const bouncer = (f,ini) => { let obj = ini; while (obj.tag) obj = f(obj); return obj.h1 };"
-          :: Nil)
-          ++ map (render 90 ∘ noAlt) docs
-    pure src).runM st.topContext
-    | Left err => pure $ js_castStr "// \{errorMsg err}"
-  modifyIORef state { topContext := top }
-  pure $ js_castStr src
 
 compileToScheme : String → JSObject
 compileToScheme fn = wrapper fn (do
