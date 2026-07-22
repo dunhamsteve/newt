@@ -12,7 +12,7 @@ data Machine : U where
 parseButton : Parser Point
 parseButton = do
   token "Button"
-  any
+  anyChar
   token ":"
   token "X+"
   x <- number

@@ -41,8 +41,8 @@ satisfy pred = \case
 match : Char → Parser Char
 match d = satisfy (_==_ d)
 
-any : Parser Char
-any = satisfy (λ _ => True)
+anyChar : Parser Char
+anyChar = satisfy (λ _ => True)
 
 some many : ∀ a. Parser a → Parser (List a)
 many p = some p <|> pure Nil

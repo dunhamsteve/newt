@@ -63,9 +63,11 @@ infixr 7 _::_
 data List a = Nil | a :: List a
 
 length : ∀ a. List a → Nat
-length Nil = Z
-length (x :: xs) = S (length xs)
-
+length {a} xs = go Z xs
+  where
+    go : Nat → List a → Nat
+    go acc Nil = acc
+    go acc (x :: xs) = go (S acc) xs
 
 infixl 7 _:<_
 data SnocList a = Lin | SnocList a :< a
@@ -351,13 +353,13 @@ instance ∀ a. Concat (List a) where
       go Nil ys = ys
       go (x :: xs) ys = go xs (x :: ys)
 
-
 instance Monad List where
   return a = a :: Nil
-  bind Nil amb = Nil
-  bind (x :: xs) amb = amb x ++ bind xs amb
-
-
+  bind {a} {b} xs amb = go Lin xs
+    where
+      go : SnocList b → List a → List b
+      go acc Nil = acc <>> Nil
+      go acc (x :: xs) = go (acc <>< amb x) xs
 
 -- This is traverse, but we haven't defined Traversable yet
 mapA : ∀ m. {{Applicative m}} {0 a b : _} → (a → m b) → List a → m (List b)
