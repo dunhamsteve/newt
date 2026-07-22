@@ -85,10 +85,12 @@ data Decl
   | Instance FC Raw (Maybe (List Decl))
   | Record FC (FC × Name) Telescope (Maybe $ FC × Name) (List Decl)
   | Exports FC (List $ FC × Name)
+  | DLog FC Int
 
 
 instance HasFC Decl where
   getFC (TypeSig x _ strs tm) = x
+  getFC (DLog x _) = x
   getFC (DAlias x _ _ _) = x
   getFC (Exports x _) = x
   getFC (FunDef x str xs) = x
@@ -210,6 +212,7 @@ pipeSep = folddoc (\a b => a <+/> text "|" <+> b)
 
 instance Pretty Decl where
   pretty (TypeSig _ q nm ty) = text (show q) ++ spread (map text nm) <+> text ":" <+> nest 2 (pretty ty)
+  pretty (DLog _ level) = text "#log" <+> text (show level)
   pretty (DAlias _ nm args tm) = text "alias" <+> text (snd nm) <+> spread (map prettyBind args) <+> text "=" <+> pretty tm
   pretty (DDerive _ x y) = text "derive" <+> text (snd x) <+> text (snd y)
   pretty (FunDef _ nm clauses) = stack $ map prettyPair clauses

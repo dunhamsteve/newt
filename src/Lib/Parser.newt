@@ -732,11 +732,21 @@ parseAlias = do
       nm <- token Ident
       pure [(BI fc nm Explicit Many, RImplicit fc) ]
 
+parseLog : Parser Decl
+parseLog = do
+  loc <- getPos
+  keyword "#log"
+  t <- token Number
+  let level = stringToInt t
+  end <- lastPos
+  pure $ DLog (loc + end) level
+
 parseDecl : Parser Decl
 parseDecl = parseMixfix <|> parsePType <|> parsePFunc
   <|> parseNorm <|> parseData <|> parseShortData
   <|> parseClass <|> parseInstance <|> parseRecord
   <|> parseExport <|> parseDerive <|> parseAlias
+  <|> parseLog
   -- We'll put the backtracing stuff last, but there is a commit issue in parseDef
   <|> parseSig <|> parseDef
 

@@ -150,6 +150,10 @@ getPos = P $ \last toks com ops indent => case toks of
   Nil => OK (MkFC indent.file last) last toks com ops
   (t :: ts) => OK (MkFC indent.file t.bounds) last toks com ops
 
+
+lastPos : Parser FC
+lastPos = P $ \last toks com ops indent => OK (MkFC indent.file last) last toks com ops
+
 tokStart : TokenList → Bounds
 tokStart Nil = emptyBounds
 tokStart (t :: ts) = t.bounds
@@ -165,7 +169,6 @@ withFC pa = P $ \last toks com ops indent =>
     case runP pa last toks com ops indent of
       (OK a last toks' com ops) => OK ((MkFC indent.file $ tokStart toks + last), a) last toks' com ops
       (Fail err last toks x ops) => Fail err last toks x ops
-
 
 -- Start an indented block and run parser in it
 
