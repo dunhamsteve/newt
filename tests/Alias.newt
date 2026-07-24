@@ -1,0 +1,9 @@
+module Alias
+
+import Prelude
+
+alias Foo a = a -> Maybe a
+alias Fun a b = a → b
+
+mycast : Fun String Int
+mycast = stringToInt

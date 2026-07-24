@@ -595,13 +595,13 @@ processAlias fc (fc', nm) args rhs = do
   let ns = top.currentMod.modName
   let ty = mkty args
   processTypeSig ns fc Zero [nm] ty
-  let lhs = mklhs args
+  let lhs = mklhs $ Lin <>< args
   processDef ns fc (nm) [(lhs, Just rhs)]
   pure MkUnit
   where
-    mklhs : Telescope → Raw
-    mklhs Nil = RVar fc' nm
-    mklhs ((BI fc name icit quant, _) :: rest) =
+    mklhs : SnocList (BindInfo × Raw) → Raw
+    mklhs Lin = RVar fc' nm
+    mklhs (rest :< (BI fc name icit quant, _)) =
       RApp fc (mklhs rest) (RVar fc name) Explicit
 
     mkty : Telescope → Raw
