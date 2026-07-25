@@ -215,7 +215,7 @@ instance Applicative Maybe where
 
 infixr 2 _<|>_
 class Alternative (m : U → U) where
-  _<|>_ : ∀ a. m a → m a → m a
+  _<|>_ : ∀ a. m a → Lazy (m a) → m a
 
 instance Alternative Maybe where
   Nothing <|> x = x

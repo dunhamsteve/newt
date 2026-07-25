@@ -97,13 +97,17 @@ instance Applicative Parser where
 
 -- Second argument lazy so we don't have circular refs when defining parsers.
 
+force : ∀ a. Lazy a → a
+force a = a
+
 instance Alternative Parser where
-  (P pa) <|> (P pb) = P $ \last toks com ops col =>
-    case pa last toks False ops col of
-      OK a last' toks' com' ops => OK a last' toks' (com || com') ops
-      -- Fail  err last' toks' com ops  => Fail err last' toks' com ops
-      Fail err last' toks' True ops => Fail err last' toks' True ops
-      Fail err last' toks' False ops => pb last toks com ops col
+  (P pa) <|> pb = P $ \last toks com ops col =>
+      case pa last toks False ops col of
+        OK a last' toks' com' ops => OK a last' toks' (com || com') ops
+        -- Fail  err last' toks' com ops  => Fail err last' toks' com ops
+        Fail err last' toks' True ops => Fail err last' toks' True ops
+        Fail err last' toks' False ops => case force pb of
+          P pb => pb last toks com ops col
 
 
 instance Monad Parser where
