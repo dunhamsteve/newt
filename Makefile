@@ -44,6 +44,9 @@ bench: .PHONY build/newt2.js build/newt.so
 	hyperfine 'node build/newt2.js src/Main.newt -o out.js'  'scheme --program build/newt.so src/Main.newt -o out.js' > build/$$FN; \
 	cat build/$$FN
 
+bench2: .PHONY build/newt2.js build/newt.so
+	hyperfine 'deno run --allow-read --allow-write build/newt2.js src/Main.newt -o out.js'  'node build/newt2.js src/Main.newt -o out.js'  'scheme --program build/newt.so src/Main.newt -o out.js'
+
 clean:
 	rm  build/*
 
