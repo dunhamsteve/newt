@@ -8,7 +8,7 @@ syn region newtBlockComment start="/-" end="-/"
 syn match newtLineComment "--.*$" contains=@Spell
 
 syn region newtInterp matchgroup=PreProc start='\\{' end='}' contained contains=ALL
-syn region newtString start='"' skip='\\"' end='"' contains=@Spell,newtInterp
+syn region newtString start='"' skip='\\["\\]' end='"' contains=@Spell,newtInterp
 
 syn match newtChar "'\([^'\\]\|\\.\)'"
 
