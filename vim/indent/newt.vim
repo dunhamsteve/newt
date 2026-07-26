@@ -26,9 +26,13 @@ function! GetNewtIndent()
     return l:prevIndent + 2
   endif
 
+  let l:pline = v:lnum - 1
+  let l:prevIndent = indent(l:pline)
+  let l:prevLine = getline(l:pline)
+
   " return on a blank line outdents
   if l:prevLine =~ '^\s*$'
-    return 0
+    return max([0, l:prevIndent - 2])
   endif
 
   return l:prevIndent
