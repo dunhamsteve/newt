@@ -149,6 +149,15 @@ pfunc jsEval : String → IO Unit := `(src) => (w) => {
   return Prelude_MkIORes(Prelude_MkUnit,w)
 }`
 
+inferType : Raw → M Unit
+inferType exp = do
+  let ctx = mkCtx emptyFC Many
+  (tm,ty) <- infer ctx exp
+  tm <- nf Nil tm
+  ty' <- quote 0 ty
+  ty' <- nf Nil ty'
+  putStrLn "\{render 90 $ pprint [] tm} : \{render 90 $ pprint [] ty'}"
+
 execRaw : Raw → M Unit
 execRaw exp = do
   -- TODO what do we do with FC and errors?
@@ -184,6 +193,7 @@ replHelp =
 
 runCommand : ReplCommand → M Unit
 runCommand (Load fn) = processFile fn
+runCommand (InferTypeCmd raw) = inferType raw
 runCommand (ExecCmd raw) = execRaw raw
 runCommand (HelpCmd) = replHelp
 runCommand (BrowseCmd qn) = browseTop qn

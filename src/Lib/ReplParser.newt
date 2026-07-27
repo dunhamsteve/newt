@@ -15,6 +15,7 @@ data ReplCommand
     | GetDoc String
     | BrowseCmd QName
     | ExecCmd Raw
+    | InferTypeCmd Raw
     | HelpCmd
 
 kw : String → Parser String
@@ -66,6 +67,7 @@ commands
     :: MkCmd ":doc" "document function" ArgIdent GetDoc
     :: MkCmd ":b" "browse namespace" ArgQName BrowseCmd
     :: MkCmd ":exec" "execute and print term" ArgRaw ExecCmd
+    :: MkCmd ":t" "infer type of term" ArgRaw InferTypeCmd
    -- type at point
     -- solve hole
     -- search by prefix (for autocomplete - ideally include types at point, but we'd need recovery)
