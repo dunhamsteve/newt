@@ -22,9 +22,11 @@
 - [ ] preserve information on record / class / instance for LSP "document symbols" kind
   - We will want some of this for default implementations in class
   - It may help avoid reverse-engineering the class when processing implementation
-- [ ] Put a copy of the `Def` on `Ref` terms
+- [-] Put a copy of the `Def` on `Ref` terms
   - It may be Axiom for forward/recursive functions, but it would get us DCon and TCon info without lookup - and may save passing around the Ref2 (+lookup) during Compilation.
   - We can do lookup for Axiom via helper
+  - This was about 40ms saved, not worth the complexity
+  - There was some lookup of DCon (from list on TCon) in case building and Defs for getEntries
 - [ ] Improve handling of names:
   - We need FC on names in a lot of places
   - [x] FC for duplicate `data`, `record`, `class` name is wrong (points to `data`)
@@ -129,6 +131,8 @@
 - [ ] play with documentation extraction?
   - lean uses `/--` and `/-!` I think I prefer something like this over the `|||` in Idris.
 - [ ] Idris `!` / Lean `<-` notation.
+  - We could manage `!` followed by atom, it is not used yet
+  - Would probably want to run a desugar stage in front of type checking
 - [ ] Maybe `letcase` for case `let` statements (the "must have parens" rule is subtle - we might get away with "is it capital or app" though.
 - [ ] Maybe `local` for `where`-like `let` clauses? (I want a `where` that closes over more stuff)
 - [ ] Maybe allow `{x}` to skip over auto and vice-versa
@@ -138,13 +142,11 @@
 ### Case building
 
 - [ ] Warnings or errors for unused cases
-  - This is important when misspelled constructors become pattern vars
 - [ ] Support pattern matching on `Lazy x`
-  - e.g. change second arg of `<|>` to lazy, Parser.Impl doesn't compile
-    complaining that `Lazy` is not a type constructor.
-  - Put a match on `Delay` there (add `Delay` to surface syntax). Eliminator forces the function
-  - Can be manually done today by breaking out another `case` for the lazy value (scrutinee is forced)
+  - not sure I need this, if the arg is lazy, I probably want to force it later (e.g. `<|>` in parser)
+  - [ ] scrutinee should be forced though
 - [ ] Collect remaining cases on default / variable patterns for more precise case split
+  - idea here is to collect all of the possibilities at a point, but we may have situations where we're already in a branch (some other field is `S k`). Do we generate a _lot_ of precise options or decide that splitting the original suffices for some overlapping cases.
 
 ### Type classes
 
@@ -227,12 +229,14 @@
 - [ ] Maybe a rollup plugin? (So web apps can be rolled up from newt.)
 - [-] pattern matching lambda
   - `\case` is sufficient
+  - `\case` is awkward with indentation
   - I kept wanting this in AoC and use it a lot in the newt code
-  - This conflicts with current code (unused?) that allows telescope information in lambdas
+  - This conflicts with current syntax (unused?) that allows telescope information in lambdas
 
 ### Background
 
 - [ ] Read Ulf Norell thesis
+  - I should have read this at the beginning. It looks like it has a lot of the approach taken in elaboration zoo, and adds inductive types - which I guessed at.
 - [ ] Finish reading dynamic pattern unification paper to see what is missing/wrong with the current implementation
 - [ ] Read "Unifiers as Equivalences" has unification with types.  Look into adapting some of that (or at least read/understand it).  Indexed types are mentioned here.
 
