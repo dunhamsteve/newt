@@ -2,7 +2,6 @@
 SAMPLES=$(find playground/samples -name "*.newt")
 # NEWT ="bun run build/newt.js"
 NEWT=${NEWT:="node build/newt.js"}
-OUTFILE=${OUTFILE:="tmp/out.js"}
 RUNOUT=${RUNOUT:="node"}
 mkdir -p tmp
 total=0
@@ -10,11 +9,15 @@ failed=0
 tests=$(find tests -name '*.newt')
 faillist=()
 for fn in $tests; do
+  OUTFILE=${OUTFILE:="tmp/out.js"}
   total=$((total + 1))
   echo Test $fn
   bn=$(basename $fn)
   if [ -f ${fn}.skip ]; then
     continue
+  fi
+  if [ -f ${fn%.newt}.js ]; then
+    OUTFILE=${fn%.newt}.js
   elif [ -f ${fn}.golden ]; then
     $NEWT $fn -o $OUTFILE > tmp/${bn}.compile
   else
