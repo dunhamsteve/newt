@@ -322,7 +322,11 @@ processInstance ns instfc rawty decls = do
        let (Just (FunDef fc name xs)) = find (\x => case x : Decl of
               (FunDef _ name xs) => name == nm
               _ => False) decls
-                | _ => error instfc "no definition for \{nm}"
+                | _ => do
+                  let err = EMissingMethod instfc nm ty'
+                  -- TODO soft
+                  throwError err
+
        -- REVIEW if we want to Hint this
        setDef (QN ns nm') fc Many ty' Axiom Nil
        let decl = (FunDef fc nm' xs)
@@ -331,7 +335,6 @@ processInstance ns instfc rawty decls = do
        log 1 $ render 80 $ pretty decl
        pure $ Just decl
      _ => pure Nothing
-
   for (mapMaybe id defs) $ \decl => do
     -- debug because already printed above, but nice to have it near processing
     debug $ render 80 $ pretty decl

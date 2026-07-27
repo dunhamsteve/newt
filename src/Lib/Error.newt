@@ -5,6 +5,8 @@ import Lib.Types
 import Lib.Eval
 import Lib.Common
 
+-- REVIEW - we're not hitting the monad...
+
 prettyErrorMsg : Error -> M String
 prettyErrorMsg (E x str) = pure str
 prettyErrorMsg (ENotInScope x nm) = pure "\{nm} not in scope"
@@ -12,6 +14,7 @@ prettyErrorMsg (Postpone x str) = pure str
 prettyErrorMsg (UnificationError fc names a b err) = do
   let lvl = length' names
   pure "unification failure: \{errorMsg err}\n  failed to unify \{rpprint names a}\n             with \{rpprint names b}\n  "
+prettyErrorMsg e@(EMissingMethod fc nm ty) = pure $ errorMsg e
 
 -- Use prettyError when possible
 showError : (src : String) -> Error -> M String

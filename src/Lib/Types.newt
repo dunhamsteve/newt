@@ -269,6 +269,7 @@ rpprint names tm = render 90 $ pprint names tm
 data Error
   = E FC String
   | ENotInScope FC String
+  | EMissingMethod FC String Tm
   -- Postpone signals a meta that needs to be solved first
   | Postpone FC String
   | UnificationError FC (List String) Tm Tm Error
@@ -278,10 +279,12 @@ instance HasFC Error where
   getFC (UnificationError fc _ _ _ _) = fc
   getFC (ENotInScope x _) = x
   getFC (Postpone x str) = x
+  getFC (EMissingMethod fc _ _) = fc
 
 -- Non-pretty version, there is an in-monad prettyErrorMsg in Lib.Error
 errorMsg : Error -> String
 errorMsg (E x str) = str
+errorMsg (EMissingMethod x nm ty) = "no definition for \{nm} : \{rpprint Nil ty}"
 errorMsg (ENotInScope x nm) = "\{nm} not in scope"
 errorMsg (Postpone x str) = str
 errorMsg (UnificationError fc names a b err) =
