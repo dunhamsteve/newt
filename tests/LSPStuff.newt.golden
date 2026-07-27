@@ -1,0 +1,26 @@
+*** Check LSPStuff.newt
+INFO 5:11--5:12 "  n : Prelude.Nat\n  m : Prelude.Nat\n--------\nPrelude.Nat"
+ERROR 12:5--12:6 "missing cases: [LSPStuff.B]"
+ERROR 9:0--9:8 "no definition for show : LSPStuff.Foo -> Prim.String"
+
+*** Actions LSPStuff.newt 5 6
+* Case split
+- LSPStuff.newt 6:0--6:0 "plus (S _) m = ?\n"
+- LSPStuff.newt 5:5--5:6 "Z"
+
+*** Actions LSPStuff.newt 5 12
+* Intro Z
+- LSPStuff.newt 5:11--5:12 "Z"
+* Intro (S ?)
+- LSPStuff.newt 5:11--5:12 "(S ?)"
+* Intro case
+- LSPStuff.newt 5:11--5:12 "case _ of\n  _ => ?"
+
+*** Actions LSPStuff.newt 9 0
+* Add show
+- LSPStuff.newt 10:0--10:0 "  show _ = ?\n"
+
+*** Actions LSPStuff.newt 12 5
+* Add missing cases
+- LSPStuff.newt 13:0--13:0 "blah B = ?\n"
+

@@ -1,8 +1,0 @@
-module NoDef
-
-import Prelude
-
-data Foo = A | B
-
-instance Show Foo where
-

@@ -1,0 +1,13 @@
+module LSPStuff
+
+import Prelude
+
+plus : Nat → Nat → Nat
+plus n m = ?
+
+data Foo = A | B
+
+instance Show Foo where
+
+blah : Foo → Int
+blah A = 41
