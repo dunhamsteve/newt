@@ -953,3 +953,9 @@ getTime = liftIO prim_getTime
 max : Int → Int → Int
 max a b = if a < b then b else a
 
+infixl 5 _|||_
+infixr 7 _&&&_
+
+pfunc _|||_ : Int → Int → Int := `(x,y) => x | y`
+pfunc _&&&_ : Int → Int → Int := `(x,y) => x & y`
+

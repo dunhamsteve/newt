@@ -87,3 +87,6 @@
 (define (Prelude.unsafePerformIO f)
   (car (f 'world)))
 (define (Main.jsEval _) (Node.putStr "TODO"))
+(define (Prelude._$26$26$26_ x y) (bitwise-and x y))
+(define (Prelude._$7C$7C$7C_ x y) (bitwise-ior x y))
+

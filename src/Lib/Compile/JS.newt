@@ -356,6 +356,8 @@ expToDoc (ApplyRef nm qs xs) =
         "Prelude.subInt"  => opdoc "-" x y
         "Prelude._&&_"  => opdoc "&&" x y
         "Prelude._||_"  => opdoc "||" x y
+        "Prelude._&&&_"  => opdoc "&" x y
+        "Prelude._|||_"  => opdoc "|" x y
         -- Assumes Bool is in the right order!
         "Prelude.jsEq"  => opdoc "==" x y
         "Prelude.eqChar"  => opdoc "==" x y
