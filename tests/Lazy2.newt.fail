@@ -10,4 +10,4 @@ ERROR at tests/Lazy2.newt:7:11--7:19: unification failure: unify failed (Prim.La
   force f = f MkUnit
             ^^^^^^^^
 
-ERROR at tests/Lazy2.newt:1:1--1:1: Compile failed
+Stop on error

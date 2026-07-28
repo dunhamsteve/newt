@@ -302,8 +302,11 @@ errorActions row col err =
     getInsertRow : Int → Int → List String → Int
     getInsertRow row cur Nil = row
     getInsertRow row cur (l :: ls) =
-      let row =  ite (isPrefixOf "module" l || isPrefixOf "import" l) cur row
-      in getInsertRow row (cur + 1) ls
+      if isPrefixOf "module" l || isPrefixOf "import" l
+      then getInsertRow cur (cur + 1) ls
+      else if isPrefixOf " " l || isPrefixOf "--" l || l == ""
+      then getInsertRow row (cur + 1) ls
+      else row
 
 addClause : Int → Int → M (List CodeAction)
 addClause row col = do

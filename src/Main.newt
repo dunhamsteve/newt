@@ -232,7 +232,7 @@ main' = do
             replHeader
             runRepl
   (out, files) <- cmdLine args
-
+  setCFlag batchModeFlag
   traverse processFile files
 
   case out of

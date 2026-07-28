@@ -959,3 +959,7 @@ infixr 7 _&&&_
 pfunc _|||_ : Int → Int → Int := `(x,y) => x | y`
 pfunc _&&&_ : Int → Int → Int := `(x,y) => x & y`
 
+isNil : ∀ a. List a → Bool
+isNil Nil = True
+isNil _ = False
+

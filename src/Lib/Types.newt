@@ -413,6 +413,10 @@ record TopContext where
   -- I didn't want to pass another argument through eval (maybe an auto?)
   -- used to switch behavior for inlining
   elabMode : ElabMode
+  cflags : Int
+
+batchModeFlag : Int
+batchModeFlag = 1
 
 -- For erasure, is the erased marker present in the environment
 data Marker = Present | Absent

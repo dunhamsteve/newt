@@ -12,4 +12,4 @@ ERROR at tests/QTcon.newt:9:1--9:4: Type constructor forward declaration at wron
   Bar : U
   ^^^
 
-ERROR at tests/QTcon.newt:1:1--1:1: Compile failed
+Stop on error

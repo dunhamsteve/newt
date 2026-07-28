@@ -10,4 +10,4 @@ ERROR at tests/Postpone2.newt:7:18--7:20: unification failure: vref mismatch
   foo xs = length' xs
                    ^^
 
-ERROR at tests/Postpone2.newt:1:1--1:1: Compile failed
+Stop on error

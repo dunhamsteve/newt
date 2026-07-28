@@ -13,6 +13,7 @@ import Lib.Parser.Impl
 import Lib.Parser
 import Data.List1
 import Lib.Elab
+import Node
 
 illiterate : String → String → String
 illiterate fn src =
@@ -165,8 +166,8 @@ processModule importFC repo stk modns = do
   top <- getTop
   -- print errors (for batch processing case)
   for_ (reverse top.currentMod.modErrors) $ showError src >=> putStrLn
-  -- let (Nil) = top.currentMod.modErrors
-  --   | _ => fatalError "Stop"
+  isBatch <- getCFlag batchModeFlag
+  when (isBatch && not (isNil top.currentMod.modErrors)) $ liftIO $ exitFailure "Stop on error"
 
   -- update modules with result, leave the rest of context in case this is top file
   top <- getTop

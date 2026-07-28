@@ -17,4 +17,4 @@ ERROR at tests/Erase/IdrisBug.newt:9:18--9:19: Unsolved meta Erase.IdrisBug.$m0 
   foo = \bang n => _
                    ^
 
-ERROR at tests/Erase/IdrisBug.newt:1:1--1:1: Compile failed
+Stop on error

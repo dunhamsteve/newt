@@ -38,4 +38,4 @@ ERROR at tests/ConstraintErr.newt:14:17--14:21: Constraint: (%meta ConstraintErr
   foo = (1 +) <$> pure
                   ^^^^
 
-ERROR at tests/ConstraintErr.newt:1:1--1:1: Compile failed
+Stop on error

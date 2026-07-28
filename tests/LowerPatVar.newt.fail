@@ -7,4 +7,4 @@ ERROR at tests/LowerPatVar.newt:6:6--6:8: ZZ not in scope
   foo (ZZ , y) = Z
        ^^
 
-ERROR at tests/LowerPatVar.newt:1:1--1:1: Compile failed
+Stop on error

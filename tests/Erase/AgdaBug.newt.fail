@@ -9,4 +9,4 @@ ERROR at tests/Erase/AgdaBug.newt:20:33--20:37: unification failure: Erased valu
       let unsolved : eq x (F A) = refl in
                                   ^^^^
 
-ERROR at tests/Erase/AgdaBug.newt:1:1--1:1: Compile failed
+Stop on error

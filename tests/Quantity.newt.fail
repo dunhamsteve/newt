@@ -7,4 +7,4 @@ ERROR at tests/Quantity.newt:11:15--11:16: Erased value used in unerased context
   bar {x} = foo x
                 ^
 
-ERROR at tests/Quantity.newt:1:1--1:1: Compile failed
+Stop on error
