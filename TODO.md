@@ -4,11 +4,11 @@
 - [ ] Build single name map on import
   - Check performance - cost to build the map vs not walking $n$ maps
   - This will likely be needed for qualified / partial imports
-  - [ ] Add `export` keywords
+  - [ ] Add `public` keyword
 - [ ] code formatter
-  - [ ] consider moving caselet, etc. desugaring out of the parser
+  - [ ] consider moving caselet, operator, etc. desugaring out of the parser
   - comments stored aside (location, whether it is a tail or standalone) and re-integrated
-  - how do we want to handle `$` and parens?
+  - how do we want to handle `$` and parens? we could preserve or normalize
 - [ ] consider postponing `case` if scrutinee type is an unsolved meta
 - [ ] in batch mode, stop at first erroring module
   - We could also gain performance by not collecting LSP data in batch mode

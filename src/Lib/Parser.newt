@@ -11,8 +11,6 @@ import Lib.Types
 
 -- TODO - anywhere this says getPos, we probably have to fix bounds?  It is token sized though.
 
-lazy : ∀ a. (Unit → Parser a) → Parser a
-lazy pa = pa MkUnit
 
 ident : Parser String
 ident = token Ident <|> token MixFix

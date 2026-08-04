@@ -115,7 +115,7 @@ infixl 1 _≡_
 data _≡_ : ∀ A. A → A → U where
   Refl :  ∀ A. {0 a : A} → a ≡ a
 
-replace : ∀ A. {0 a b : A} → (P : A → U) → a ≡ b → P a → P b
+replace : ∀ A. {0 a b : A} → (0 P : A → U) → a ≡ b → P a → P b
 replace p Refl x = x
 
 cong : ∀ A B. {0 a b : A} → (f : A → B) → a ≡ b → f a ≡ f b
