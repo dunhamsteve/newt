@@ -786,7 +786,7 @@ buildTree : Context -> Problem -> M Tm
 -- Updates a clause for INTRO - turning a pattern into a constraint
 introClause : Int -> Icit -> Val -> Clause -> M Clause
 introClause nm icit ty (MkClause fc cons (pat :: pats) expr) =
-  if icit == getIcit pat then pure $ MkClause fc (PC nm pat :: cons) pats expr
+  if icit == getIcit pat then pure $ MkClause fc (cons ++ [PC nm pat]) pats expr
   else if icit == Implicit then pure $ MkClause fc (PC nm (PatWild fc Implicit) :: cons) (pat :: pats) expr
   else if icit == Auto then pure $ MkClause fc (PC nm (PatWild fc Auto) :: cons) (pat :: pats) expr
   else error fc "Explicit arg and \{show $ getIcit pat} pattern \{show nm}  \{show pat}"
