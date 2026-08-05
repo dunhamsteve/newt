@@ -14,6 +14,7 @@ autocmd FileType newt inoremap <buffer> \3  ₃
 " Multi-character sequences
 autocmd FileType newt inoremap <buffer> \all ∀
 autocmd FileType newt inoremap <buffer> \==  ≡
+autocmd FileType newt inoremap <buffer> \=?  ≟
 autocmd FileType newt inoremap <buffer> \neg  ¬
 autocmd FileType newt inoremap <buffer> \[[  ⟦
 autocmd FileType newt inoremap <buffer> \]]  ⟧
