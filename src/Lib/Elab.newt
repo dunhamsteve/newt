@@ -105,14 +105,6 @@ getMetas (VCase _ sc _ alts) = join $ getMetas sc :: map getAltMetas alts
 getMetas (VLetRec _ _ ty (MkClosure _ t) (MkClosure _ u)) = getMetas ty ++ getTMetas t ++ getTMetas u
 getMetas _ = []
 
-forceMeta : Val -> M Val
-forceMeta (VMeta fc ix sp) = do
-  meta <- lookupMeta ix
-  case meta of
-    (Solved _ k t) => vappSpine t sp >>= forceMeta
-    _ => pure (VMeta fc ix sp)
-forceMeta x = pure x
-
 -- currently only used for pattern matching
 record UnifyResult where
   constructor MkResult
@@ -667,7 +659,7 @@ unify env mode t u = do
         (_,Lin) => pure $ MkResult ((k', t') :: Nil)
         _ => error fc "Failed to unify \{show t'} and \{show u'} at \{show mode}"
 
-    unifyPattern (VVar fc nm k Lin) u = pure $ MkResult((k, u) :: Nil)
+    unifyPattern (VVar fc nm k Lin) u = pure $ MkResult ((k, u) :: Nil)
     unifyPattern t (VVar fc nm k Lin) = pure $ MkResult ((k, t) :: Nil)
     unifyPattern t u = unifyMeta t u
 
@@ -851,6 +843,24 @@ extendPi ctx (VPi x str icit rig a b) nms sc = do
     extendPi ctx' tyb (nms :< MkBind ctx.lvl icit a) (sc :< (VVar x str ctx.lvl Lin, rig))
 extendPi ctx ty nms sc = pure (ctx, ty, nms <>> Nil, sc)
 
+-- Still not right, we have S _ /= Z (good)
+-- but S _ ≟ view _ _  is unknown
+-- We need to reduce view and count as unknown if it's not a constructor
+-- For filtering constructors, we'll want to keep unknown, currently
+-- this is used only in that case
+checkConflicts : List (Int × Val) → M Unit
+checkConflicts Nil = pure MkUnit
+checkConflicts ((l, v) :: xs) = do
+  traverse_ go xs
+  checkConflicts xs
+  where
+    go : (Int × Val) → M Unit
+    go (k,w) = if k /= l then pure MkUnit
+      else case (v,w) of
+        (VRef fc qn _, VRef fc' qn' _) =>
+          if qn == qn' then pure MkUnit else error fc "need to unify \{show v} and \{show w}"
+        _ => pure MkUnit
+
 -- Update context when a variable is constrained to a value
 -- so we can leverage quote/eval to substitute
 -- They should be Pattern shaped (var or dcon applied to pattern-shaped)
@@ -873,8 +883,10 @@ updateContext ctx ((k, val) :: cs) =
           let ctx' = MkCtx ctx.lvl env' ctx.types (setAt' ix Defined ctx.bds) ctx.ctxFC ctx.marker
           updateContext ctx' cs
     (Just val') => do
-      -- This is fine for Z =?= Z but for other stuff, we probably have to match
-      info (getFC val) "need to unify \{show val} and \{show val'} or something"
+      -- var k is both val' and val
+      -- We need a more appropriate unify for pattern matching
+      MkResult Nil <- unify ctx.env UPattern val val'
+        | res => error (getFC val) "TODO: Handle more updates \{show res.constraints}"
       updateContext ctx cs
     Nothing => error (getFC val) "INTERNAL ERROR: bad index in updateContext"
   where
@@ -905,7 +917,9 @@ checkCase ctx scnm scty (dcName, arity, ty) = do
           | Left err => do
             debug "SKIP \{show dcName} because unify error \{errorMsg err}"
             pure False
-
+  -- TODO make a better unify for pattern matching
+  Right _ <- tryError $ checkConflicts res.constraints
+    | Left err => pure False
   case getAt' (lvl2ix ctx.lvl scnm) ctx.env of
     Just val@(VRef fc nm sp) => pure $ nm == dcName
     _ => pure True

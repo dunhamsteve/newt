@@ -269,6 +269,14 @@ quote l (VCase fc sc env alts) = do
 quote l (VLit fc lit) = pure $ Lit fc lit
 quote l (VErased fc) = pure $ Erased fc
 
+forceMeta : Val -> M Val
+forceMeta (VMeta fc ix sp) = do
+  meta <- lookupMeta ix
+  case meta of
+    (Solved _ k t) => vappSpine t sp >>= forceMeta
+    _ => pure (VMeta fc ix sp)
+forceMeta x = pure x
+
 -- Can we assume closed terms?
 -- ezoo only seems to use it at Nil, but essentially does this:
 
