@@ -22,7 +22,7 @@ function! GetNewtIndent()
   let l:prevIndent = indent(l:pline)
   let l:prevLine = getline(l:pline)
 
-  if l:prevLine =~# '\<\(of\|where\|do\|=\)\s*$'
+  if l:prevLine =~# '\<\(of\|where\|do\|=\|=>\)\s*$'
     return l:prevIndent + 2
   endif
 
