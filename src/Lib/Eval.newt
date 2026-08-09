@@ -11,6 +11,7 @@ import Data.SnocList
 import Data.SortedMap
 
 eval : Env -> Tm -> M Val
+quote : (lvl : Int) -> Val -> M Tm
 
 infixl 8 _$$_
 
@@ -23,6 +24,17 @@ vapp (VPi _ _ _ _ _ t) u q = t $$ u
 vapp (VVar fc nm k sp) u q = pure $ VVar fc nm k (sp :< (u,q))
 vapp (VRef fc nm sp) u q = pure $ VRef fc nm (sp :< (u,q))
 vapp (VMeta fc k sp) u q = pure $ VMeta fc k (sp :< (u,q))
+-- Used for inlining, remove after it gets a separate eval
+vapp (VCase fc sc env [CaseCons nm args tm]) u q = do
+  let env' = mkenv (length' env) env args
+  val <- eval env' tm
+  val' <- vapp val u q
+  tm' <- quote (length' env') val'
+  pure $ VCase fc sc env [CaseCons nm args tm']
+  where
+    mkenv : Int → Env → List String → Env
+    mkenv l env Nil = env
+    mkenv l env (n :: ns) = mkenv (l + 1) (VVar emptyFC n l Lin :: env) ns
 -- not really impossible, could be a stuck VCase.
 vapp t u q = error' "unhandled vapp \{show t} to \{show u}\n"
 
@@ -202,8 +214,6 @@ eval env tm@(Case fc sc alts) = do
 
   vsc <- eval env sc
   pure $ VCase fc vsc env alts
-
-quote : (lvl : Int) -> Val -> M Tm
 
 quoteSp : (lvl : Int) -> Tm -> VSpine -> M Tm
 quoteSp lvl t Lin = pure t
