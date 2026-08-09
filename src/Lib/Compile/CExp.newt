@@ -238,8 +238,14 @@ compileTerm env (Case fc t alts) = do
         _ => error fc "\{show nm} is not a data constructor"
 
     CaseLit lit tm => CLitAlt lit <$> compileTerm env tm
+  -- Have to handle this here because we don't want to generate a CCase
+  let (Nothing) = newTypeMatch t' alts' | Just x => pure x
   pure $ CCase t' $ fancyCons t' alts'
   where
+    newTypeMatch : CExp → List CAlt → Maybe CExp
+    newTypeMatch sc [ CConAlt _ _ NewTypeCon [arg] tm ] = Just $ CLet "nt" sc tm
+    newTypeMatch _ _ = Nothing
+
     filterArgs : List Quant → List String → List String
     filterArgs (Many :: qs) (x :: xs) = x :: filterArgs qs xs
     filterArgs (_ :: qs) (x :: xs) = filterArgs qs xs
@@ -254,7 +260,6 @@ compileTerm env (Case fc t alts) = do
     enumAlt sc (CConAlt ix nm EnumCon args tm) = CLitAlt (LInt $ cast ix) tm
     enumAlt sc (CConAlt ix nm FalseCon args tm) = CLitAlt (LBool False) tm
     enumAlt sc (CConAlt ix nm TrueCon args tm) = CLitAlt (LBool True) tm
-    enumAlt sc (CConAlt ix nm NewTypeCon args tm) = CDefAlt $ CLet "nt" sc tm -- CLitAlt (LBool True) tm
     enumAlt sc alt = alt
 
     isInfo : ConInfo → CAlt → Bool
@@ -264,7 +269,6 @@ compileTerm env (Case fc t alts) = do
     isDef : CAlt → Bool
     isDef (CDefAlt _) = True
     isDef _ = False
-
 
     doNumCon : CExp → List CAlt → List CAlt
     doNumCon sc alts =
@@ -277,6 +281,7 @@ compileTerm env (Case fc t alts) = do
                   _ => Nil
       in
       let succAlt = case find (isInfo SuccCon) alts of
+            -- FIXME - this recomputes sc
             Just (CConAlt _ _ _ _ tm) => CDefAlt (CLet "x" (CAppRef (QN "Prelude" "subInt") [sc, CLit (LInt 1)] (S (S Z))) tm) :: Nil
             Just tm => fatalError "ERROR succAlt mismatch \{debugStr tm}"
             _ => case find isDef alts of
