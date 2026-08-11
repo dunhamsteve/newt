@@ -52,6 +52,8 @@ scmIdent id = if elem id scmKeywords then "$" ++ id else pack $ fix (unpack id)
 scmLit : Literal → String
 scmLit (LString str) = quoteString str
 scmLit (LInt n) = show n
+scmLit (LChar ' ') = "#\\space"
+scmLit (LChar '\n') = "#\\newline"
 scmLit (LChar c) = pack $ '#' :: '\\' :: c :: Nil -- FIXME
 scmLit (LBool b) = ite b "#t" "#f"
 
@@ -125,6 +127,11 @@ cexpToScm env (CCase sc alts) = do
     doAlt nm (CDefAlt body) = "(else \{cexpToScm env body})"
     doAlt nm (CLitAlt lit body) = "((\{scmLit lit}) \{cexpToScm env body})"
 
+    doCondAlt : String → CAlt → String
+    doCondAlt nm (CConAlt tag cname _ args body) = "((equal? \{nm} \{show tag}) \{conAlt env nm 1 args body})"
+    doCondAlt nm (CDefAlt body) = "(else \{cexpToScm env body})"
+    doCondAlt nm (CLitAlt lit body) = "((equal? \{nm} \{scmLit lit}) \{cexpToScm env body})"
+
     -- doCase decides the top level path - case/cond/if/...
     doCase : String → List CAlt → String
     doCase nm (CDefAlt body :: Nil) = cexpToScm env body
@@ -149,6 +156,7 @@ cexpToScm env (CCase sc alts) = do
     doCase nm (CConAlt tag cname _ args body :: Nil) = conAlt env nm 1 args body
     doCase nm (CLitAlt _ body :: Nil) = cexpToScm env body
     doCase nm (CDefAlt body :: Nil) = cexpToScm env body
+    doCase nm alts@(CLitAlt (LString _) _ :: _) = "(cond \{joinBy " " $ map (doCondAlt nm) alts})"
     doCase nm alts@(CLitAlt _ _ :: _) = "(case \{nm} \{joinBy " " $ map (doAlt nm) alts})"
     doCase nm alts = "(case (vector-ref \{cexpToScm env sc} 0) \{joinBy " " $ map (doAlt nm) alts})"
 

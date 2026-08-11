@@ -29,6 +29,12 @@
 ;; maybe they should all go away for specific instances
 (define (Prelude.jsShow x) (format #f "~s" x))
 (define (Node.putStr s)  (lambda (w) (display s) ($IORes #f w)))
+(define (Prelude.trace msg a)
+  (display msg)
+  (display " ")
+  (display a)
+  (newline)
+  a)
 (define (Prelude.mod x y) (mod x y))
 ;; REVIEW returns #f for failure
 (define Prelude.stringToInt string->number)
@@ -65,9 +71,10 @@
 ;; Actually should return unit..
 (define (Data.IORef.primWriteIORef ref a) (lambda (w) ($IORes (set-box! ref a) w)))
 (define (Node.readLine w)
-  (case (get-line (current-input-port))
-        (#!eof ($IORes ($Left "EOF") w))
-        (else ($IORes ($Right (get-line (current-input-port))) w))))
+  (let ((line (get-line (current-input-port))))
+    (cond
+      ((eof-object? line) ($IORes ($Left "EOF") w))
+      (else ($IORes ($Right line) w)))))
 (define (Prelude.subInt a b) (- a b))
 (define (Prelude.jsEq a b) (= a b))
 (define (Prelude.divInt a b) (fx/ a b))
