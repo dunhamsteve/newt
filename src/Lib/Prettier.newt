@@ -20,8 +20,8 @@ data Doc = Empty | Line | Text String | Nest Int Doc | Seq Doc Doc | Alt Doc Doc
 data Item = TEXT String | LINE Int
 
 
-empty : Doc
-empty = Empty
+emptyDoc : Doc
+emptyDoc = Empty
 
 flatten : Doc -> Doc
 flatten Empty = Empty

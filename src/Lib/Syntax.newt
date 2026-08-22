@@ -223,12 +223,12 @@ instance Pretty Decl where
   pretty (Data _ (_,nm) x Nothing) = text "data" <+> text nm <+> text ":" <+>  pretty x
   pretty (Data _ (_,nm) x (Just xs)) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map pretty xs))
   pretty (DCheck _ x y) = text "#check" <+> pretty x <+> text ":" <+> pretty y
-  pretty (PType _ nm ty) = text "ptype" <+> text nm <+> (maybe empty (\ty => text ":" <+> pretty ty) ty)
+  pretty (PType _ nm ty) = text "ptype" <+> text nm <+> (maybe emptyDoc (\ty => text ":" <+> pretty ty) ty)
   pretty (PFunc _ nm Nil ty src) = text "pfunc" <+> text nm <+> text ":" <+> nest 2 (pretty ty <+> text ":=" <+/> text (show src))
   pretty (PFunc _ nm used ty src) = text "pfunc" <+> text nm <+> text "uses" <+> spread (map text used) <+> text ":" <+> nest 2 (pretty ty <+> text ":=" <+/> text (show src))
   pretty (PMixFix _ names prec fix) = text (show fix) <+> text (show prec) <+> spread (map text names)
   pretty (Record _ (_,nm) tele (cname) decls) = text "record" <+> text nm <+> text ":" <+> spread (map prettyBind tele)
-    <+> (nest 2 $ text "where" </> stack (maybe empty (\ nm' => text "constructor" <+> text (snd nm')) cname :: map pretty decls))
+    <+> (nest 2 $ text "where" </> stack (maybe emptyDoc (\ nm' => text "constructor" <+> text (snd nm')) cname :: map pretty decls))
   pretty (Class _ (_,nm) tele decls) = text "class" <+> text nm <+> text ":" <+> spread (map prettyBind tele)
     <+> (nest 2 $ text "where" </> stack (map pretty decls))
   pretty (Instance fc top Nothing) = text "instance" <+> pretty top

@@ -101,6 +101,7 @@ force : ∀ a. Lazy a → a
 force a = a
 
 instance Alternative Parser where
+  empty = fail "empty"
   (P pa) <|> pb = P $ \last toks com ops col =>
       case pa last toks False ops col of
         OK a last' toks' com' ops => OK a last' toks' (com || com') ops
