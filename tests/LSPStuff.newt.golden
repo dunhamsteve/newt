@@ -1,4 +1,5 @@
 *** Check LSPStuff.newt
+INFO 16:12--16:13 "  _$0 : Prelude._×_ Prim.Int Prim.String\n  0 a$1 : U\n  0 b$2 : U\n  a : Prim.Int\n  b : Prim.String\n--------\nPrim.String"
 INFO 5:11--5:12 "  n : Prelude.Nat\n  m : Prelude.Nat\n--------\nPrelude.Nat"
 ERROR 12:5--12:6 "missing cases: [LSPStuff.B]"
 ERROR 9:0--9:8 "no definition for show : LSPStuff.Foo -> Prim.String"
@@ -15,6 +16,10 @@ ERROR 9:0--9:8 "no definition for show : LSPStuff.Foo -> Prim.String"
 - LSPStuff.newt 5:11--5:12 "(S ?)"
 * Intro case
 - LSPStuff.newt 5:11--5:12 "case _ of\n  _ => ?"
+* Intro m
+- LSPStuff.newt 5:11--5:12 "m"
+* Intro n
+- LSPStuff.newt 5:11--5:12 "n"
 
 *** Actions LSPStuff.newt 9 0
 * Add show
@@ -23,4 +28,10 @@ ERROR 9:0--9:8 "no definition for show : LSPStuff.Foo -> Prim.String"
 *** Actions LSPStuff.newt 12 5
 * Add missing cases
 - LSPStuff.newt 13:0--13:0 "blah B = ?\n"
+
+*** Actions LSPStuff.newt 16 12
+* Intro case
+- LSPStuff.newt 16:12--16:13 "case _ of\n  _ => ?"
+* Intro b
+- LSPStuff.newt 16:12--16:13 "b"
 

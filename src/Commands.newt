@@ -248,20 +248,31 @@ introActions (Just $ Unsolved fc qn ctx vty User) =
     let indent = getIndent 0 $ unpack line
     let introCase = Intro "case" $ MkEdit fc "case _ of\n\{pack $ replicate (cast $ 2 + indent) ' '}_ => ?"
 
+    locals <- mapMaybe id <$> traverse checkEntry ctx.types
+    let actions = introCase :: locals
+
     putStrLn "intros for \{show vty}"
     case vty of
       VPi _ nm Explicit _ a b => do
         let str = "(\\ \{nm} => ?)"
-        pure $ Intro str (MkEdit fc str) :: introCase :: Nil
-      _ => do
-        cons <- getConstructors ctx fc vty
-        putStrLn "constructors \{show cons}"
-        pure $ map makeEdit cons ++ [ introCase ]
+        pure $ Intro str (MkEdit fc str) :: actions
+      _ => catchError (do
+            cons <- getConstructors ctx fc vty
+            putStrLn "constructors \{show cons}"
+            pure $ map makeEdit cons ++ actions
+          ) $ \ _ => pure actions
   ) $ \ err => do
       putStrLn "Got error in introActions:"
       putStrLn $ show err
       pure Nil
   where
+    checkEntry : (String × Val × Quant) → M (Maybe CodeAction)
+    checkEntry ("_", ty, q) = pure Nothing
+    checkEntry (nm, ty, q) = do
+      Right _ <- tryError (unify ctx.env UNormal vty ty)
+         | _ => pure Nothing
+      pure $ Just $ Intro nm $ MkEdit fc nm
+
     introDCon : QName × Int × Tm → List String
     introDCon (QN _ nm, _, tm) = go (Lin :< nm) tm
       where

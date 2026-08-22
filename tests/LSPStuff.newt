@@ -11,3 +11,8 @@ instance Show Foo where
 
 blah : Foo → Int
 blah A = 41
+
+
+foo : (Int × String) → String
+foo (a,b) = ?
+
