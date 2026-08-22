@@ -712,10 +712,9 @@ freshMeta ctx fc ty kind = do
     applyBDs k t (Defined :: xs) (y :: ys) = applyBDs (1 + k) t xs ys
     applyBDs k t _ _ = t
 
-lazyType : Val → Maybe Val
-lazyType (VRef _ (QN "Prim" "Lazy") (Lin :< (a, q))) = Just a
-lazyType ty = Nothing
-
+lazyType : Val → (Bool × Val)
+lazyType (VRef _ (QN "Prim" "Lazy") (Lin :< (a, q))) = (True,a)
+lazyType ty   = (False,ty)
 
 insert : (ctx : Context) -> Tm -> Val -> M (Tm × Val)
 insert ctx tm ty = do
@@ -1657,13 +1656,11 @@ check ctx tm ty = do
       let ctx' = withPos (extend ctx scnm scty Many) (getFC tm)
       -- solveAutos
       -- If a Lazy ty is expected, insert a Delay
-      case lazyType ty of
-        Nothing => do
-          tree <- buildTree ctx' $ MkProb clauses ty
-          pure $ Let fc scnm sc tree
-        Just ty => do
-          tree <- buildTree ctx' $ MkProb clauses ty
-          pure $ Delay fc $ Let fc scnm sc tree
+      let (lazy,ty) = lazyType ty
+      tree <- buildTree ctx' $ MkProb clauses ty
+      if lazy
+          then pure $ Delay fc $ Let fc scnm sc tree
+          else pure $ Let fc scnm sc tree
 
     -- rendered in ProcessDecl
     (RHole fc, ty) => freshMeta ctx fc ty User
@@ -1746,9 +1743,9 @@ check ctx tm ty = do
       insertForce ctx tm ty exp = do
          case (lazyType ty, lazyType exp) of
            -- expect nothing, tm is lazy
-           (Just x, Nothing) => pure (Force (getFC tm) tm, x)
+           ((True,x), (False,_)) => pure (Force (getFC tm) tm, x)
            -- expected lazy and tm is not, Lazy takes an erased arg (def'd in ProcessModule)
-           (Nothing, Just x) => let fc = getFC tm in pure (Delay fc tm, VRef fc (QN "Prim" "Lazy") (Lin :< (ty, Zero)))
+           ((False,_), (True,x)) => let fc = getFC tm in pure (Delay fc tm, VRef fc (QN "Prim" "Lazy") (Lin :< (ty, Zero)))
            _ => pure (tm, ty)
 
 infer ctx tm@(RUpdateRec fc _ _) = error fc "I can't infer record updates"
@@ -1776,18 +1773,16 @@ infer ctx (RVar fc nm) = go 0 ctx.types
       else go (i + 1) xs
 
 infer ctx (RApp fc t u icit) = do
+  (t, tty) <- infer ctx t
+  let (lazy, tty) = lazyType tty
+  -- force lazy
   -- If the app is explicit, add any necessary metas
   (icit, t, tty) <- case icit of
       Explicit => do
-        (t, tty) <- infer ctx t
         (t, tty) <- insert ctx t tty
         pure (Explicit, t, tty)
-      Implicit => do
-        (t, tty) <- infer ctx t
-        pure (Implicit, t, tty)
-      Auto => do
-        (t, tty) <- infer ctx t
-        pure (Auto, t, tty)
+      Implicit => pure (Implicit, t, tty)
+      Auto => pure (Auto, t, tty)
 
   (q,a,b) <- do
     tty' <- forceType ctx.env tty
@@ -1807,7 +1802,9 @@ infer ctx (RApp fc t u icit) = do
   u <- checkIn ctx q u a
   u' <- eval ctx.env u
   bappu <- b $$ u'
-  pure (App fc t u q, bappu)
+  if lazy
+    then pure (App fc (Force fc t) u q, bappu)
+    else pure (App fc t u q, bappu)
 
 infer ctx (RU fc) = do
   checkMarker fc ctx.marker Zero

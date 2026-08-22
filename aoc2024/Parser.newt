@@ -10,6 +10,7 @@ instance Monad Parser where
   bind ma mab = \ cs => ma cs >>= uncurry mab
 
 instance Alternative Parser where
+  empty = \ cs => Left "empty"
   pa <|> pb = \ cs => case pa cs of
     Left msg => pb cs
     res => res
