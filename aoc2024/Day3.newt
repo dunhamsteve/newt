@@ -10,13 +10,14 @@ instance Monad Parser where
   return a = \ cs => Just (a, cs)
   bind ma mab = \ cs => ma cs >>= uncurry mab
 
+-- fail : ∀ a. Parser a
+-- fail = \ cs => Nothing
+
 instance Alternative Parser where
+  empty = \ cs => Nothing
   pa <|> pb = \ cs => case pa cs of
     Nothing => pb cs
     res => res
-
-fail : ∀ a. Parser a
-fail = \ cs => Nothing
 
 satisfy : (Char → Bool) → Parser Char
 satisfy pred = λ cs => case cs of
@@ -39,7 +40,7 @@ some p = do
 pnum : Parser Int
 pnum = do
   chars <- many (satisfy isDigit)
-  if S (S (S Z)) < length chars then fail
+  if S (S (S Z)) < length chars then empty
     else return $ stringToInt $ pack chars
 
 data Inst : U where
@@ -79,9 +80,14 @@ pdont = do
   return Dont
 
 some' many' : ∀ a. Parser a → Parser (List a)
-many' p = do
-  return MkUnit
-  some' p <|> (any >> many' p) <|> return Nil
+many' {a} p = go Lin
+  where
+    go : SnocList a → Parser (List a)
+    go acc = \cs => case cs of
+      Nil => return (acc <>> Nil, cs)
+      (c :: cs') => case p cs of
+        Nothing => go acc cs'
+        Just (x,cs) => go (acc :< x) cs
 
 some' p = do
   v <- p

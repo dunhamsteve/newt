@@ -46,7 +46,13 @@ anyChar : Parser Char
 anyChar = satisfy (λ _ => True)
 
 some many : ∀ a. Parser a → Parser (List a)
-many p = some p <|> pure Nil
+many {a} p = go Lin
+  where
+    go : SnocList a → Parser (List a)
+    go acc = \cs => case p cs of
+      Left _ => Right (acc <>> Nil, cs)
+      Right (x,cs) => go (acc :< x) cs
+
 some p = do
   v <- p
   vs <- many p

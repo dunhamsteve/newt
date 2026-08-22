@@ -29,7 +29,7 @@ data Machine : U where
 preg : Parser BigInt
 preg = do
   token "Register"
-  any
+  anyChar
   token ":"
   n <- number
   match '\n'
