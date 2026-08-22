@@ -25,6 +25,7 @@ jobs:
       - name: build
         run: |
           make newt3
+          make test
           cd playground
           npm install -g esbuild vite
           npm install
