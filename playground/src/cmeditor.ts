@@ -1,5 +1,6 @@
 import { AbstractEditor, EditorDelegate, Marker } from "./types";
 import { basicSetup } from "codemirror";
+import { getCM, Vim, vim } from '@replit/codemirror-vim';
 import {
   indentMore,
   indentLess,
@@ -174,7 +175,7 @@ export function scheme() {
 
 const schemeLanguage: StreamLanguage<State> = StreamLanguage.define({
   startState: () => null,
-  token(stream, st) {
+  token(stream, _st) {
     const keywords = [
       "define",
       "let",
@@ -338,14 +339,33 @@ export class CMEditor implements AbstractEditor {
   view: EditorView;
   delegate: EditorDelegate;
   theme: Compartment;
+  vimCompartment: Compartment
+
+  setVim(enabled: boolean) {
+    if (enabled)
+      this.view.dispatch({
+        effects: this.vimCompartment.reconfigure([
+          vim({ status: true }),
+        ])
+      })
+    else this.view.dispatch({ effects: this.vimCompartment.reconfigure([]) })
+  }
+  escape() {
+    Vim.handleKey(getCM(this.view)!, '<Esc>','')
+  }
+  focus() {
+    this.view.focus()
+  }
   constructor(container: HTMLElement, doc: string, delegate: EditorDelegate) {
     this.delegate = delegate;
     this.theme = new Compartment();
+    this.vimCompartment = new Compartment
 
     this.view = new EditorView({
       doc,
       parent: container,
       extensions: [
+        this.vimCompartment.of([]),
         basicSetup,
         actionsPanel(delegate),
         linter((view) => this.delegate.lint(view)),
@@ -459,5 +479,5 @@ export class CMEditor implements AbstractEditor {
     // maybe?
     return this.view.state.doc.toString();
   }
-  setMarkers(_: Marker[]) {}
+  setMarkers(_: Marker[]) { }
 }

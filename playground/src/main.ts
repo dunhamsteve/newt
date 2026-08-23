@@ -177,6 +177,7 @@ const state = {
   dark: signal(false),
   files: signal<string[]>(["Tour.newt"]),
   currentFile: signal<string>(localStorage.currentFile ?? "Tour.newt"),
+  viMode: signal(false),
   selected: signal(localStorage.tab ?? RESULTS),
 };
 
@@ -462,6 +463,16 @@ function EditWrap() {
       loadFile(fn);
     }
   };
+  const toggleViMode = (ev: MouseEvent) => {
+    state.viMode.value = !state.viMode.value
+    state.editor.value?.setVim(state.viMode.value)
+    state.editor.value?.focus()
+  };
+  const doEscape = (ev: MouseEvent) => {
+    state.editor.value?.escape()
+    ev.preventDefault();
+    ev.stopPropagation();
+  }
 
   return h(
     "div",
@@ -485,6 +496,9 @@ function EditWrap() {
         },
         h("svg", { class: "icon" }, h("use", { href: "#github" })),
       ),
+      h('div', { onClick: toggleViMode, className: state.viMode.value ? 'vimon' : 'vimoff' }, "vi"),
+      // Maybe add an "ESC" button, with preventDefault for mobile
+      h('div', { onMouseDown: doEscape, className: state.viMode.value ? 'vimon' : 'vimoff' }, "esc"),
       h("div", { style: { flex: "1 1" } }),
       h(
         "div",

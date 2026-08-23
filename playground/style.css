@@ -173,3 +173,15 @@ svg.icon {
   color: var(--text-color);
   background-color: var(--actions-bg);
 }
+.vimon, .vimoff {
+  margin: 3px 0 7px 0;
+  padding: 0 2px;
+  border-radius: 10px;
+}
+.vimon {
+  border: solid 1px var(--text-color);
+}
+.vimoff {
+  color: grey;
+  border: solid 1px grey;
+}

@@ -82,4 +82,7 @@ export interface AbstractEditor {
   getValue: () => string;
   setMarkers: (_: Marker[]) => unknown;
   setDark(isDark: boolean): unknown;
+  setVim(isVim: boolean): unknown;
+  focus(): unknown;
+  escape(): unknown;
 }
