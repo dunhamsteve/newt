@@ -370,6 +370,8 @@ data EditorInfo
   -- Not sure we need Context here?
   | MissingCases FC Context (List QName)
 
+data TypeInfo = MkTypeInfo FC String Env Val
+
 record ModContext where
   constructor MkModCtx
   modName : String
@@ -382,9 +384,10 @@ record ModContext where
   modDeps : List String
   modErrors : List Error
   modInfos : List EditorInfo
+  modTypes : List TypeInfo
 
 emptyModCtx : String → String → ModContext
-emptyModCtx modName source = MkModCtx modName source emptyMap (MC emptyMap Nil Nil 0 NoCheck) emptyMap Nil Nil Nil
+emptyModCtx modName source = MkModCtx modName source emptyMap (MC emptyMap Nil Nil 0 NoCheck) emptyMap Nil Nil Nil Nil
 
 alias HintTable = SortedMap QName (List (QName × Tm))
 

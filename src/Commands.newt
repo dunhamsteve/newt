@@ -17,6 +17,10 @@ import Lib.Parser
 import Lib.Syntax
 import Lib.Parser.Impl
 
+posInFC : Int → Int → FC → Bool
+posInFC row col (MkFC _ (MkBounds 0 0 0 0)) = False
+posInFC row col (MkFC _ (MkBounds sr sc er ec)) = (sr <= row && row <= er) && (sc <= col && col <= ec)
+
 getIndent : Int → List Char → Int
 getIndent acc (' ' :: rest) = getIndent (1 + acc) rest
 getIndent acc _ = acc
@@ -54,6 +58,7 @@ getHoverInfo : FileSource → String → Int → Int → M HoverInfo
 getHoverInfo repo modns row col = do
     Just mod <- switchModule repo modns | _ => pure NeedCheck
     top <- getTop
+    let (Nothing) = checkMod mod.modTypes | Just res => res
 
     -- Find the token at the point
     let lines = split mod.modSource "\n"
@@ -73,6 +78,14 @@ getHoverInfo repo modns row col = do
     pure $ HasHover e.fc ("\{show e.name} : \{rpprint Nil ty}")
 
     where
+        checkMod : List TypeInfo → Maybe $ M HoverInfo
+        checkMod Nil = Nothing
+        checkMod (MkTypeInfo fc nm env vty :: xs) = 
+          if posInFC row col fc
+          then Just $ do
+                  ty <- quote (length' env) vty
+                  pure $ HasHover fc ("\{nm} : \{rpprint Nil ty}")
+          else checkMod xs
         -- We don't want to pick up the paren token when on the border
         isIdent : BTok → Bool
         isIdent (MkBounded (Tok Ident _) _) = True
@@ -224,9 +237,6 @@ getCaseSplit row col fc@(MkFC uri (MkBounds sr sc er ec)) ctx nm scty = do
   -- TODO if constructor is not in scope, add import too.
   pure [CaseSplitAction edits]
 
-posInFC : Int → Int → FC → Bool
-posInFC row col (MkFC _ (MkBounds 0 0 0 0)) = False
-posInFC row col (MkFC _ (MkBounds sr sc er ec)) = (sr <= row && row <= er) && (sc <= col && col <= ec)
 
 getHole : ModContext → Int → Int → Maybe MetaEntry
 getHole mod row col =

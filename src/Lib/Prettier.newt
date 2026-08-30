@@ -58,7 +58,7 @@ layout Nil acc = fastConcat $ acc <>> Nil
 layout (LINE k :: x) acc = layout x (acc :< "\n" :< padding k ' ')
 layout (TEXT str :: x) acc = layout x (acc :< str)
 
--- Whether a documents first line fits.
+-- Whether a document's first line fits.
 fits : Int -> List Item -> Bool
 fits w ((TEXT s) :: xs) = if slen s < w then fits (w - slen s) xs else False
 fits w _ = True
@@ -80,11 +80,7 @@ be fit acc w k ((i, (Text s)) :: xs) =
 be fit acc w k ((i, (Nest j x)) :: xs) = be fit acc w k ((i + j, x) :: xs)
 be fit acc w k ((i, (Seq x y)) :: xs) = be fit acc w k ((i,x) :: (i,y) :: xs)
 be fit acc w k ((i, (Alt x y)) :: xs) =
-  -- The version with <|> is exponential, because <|> is not lazy
-  -- (_<>>_ acc) <$> (be True Lin w k ((i,x) :: xs) <|> be fit Lin w k ((i,y) :: xs))
-  case be True Lin w k ((i,x) :: xs) of
-    Just x => Just $ acc <>> x
-    Nothing => (acc <>>) <$> be fit Lin w k ((i,y) :: xs)
+  (acc <>>) <$> (be True Lin w k ((i,x) :: xs) <|> be fit Lin w k ((i,y) :: xs))
 
 
 

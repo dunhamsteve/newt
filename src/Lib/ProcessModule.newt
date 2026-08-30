@@ -89,7 +89,7 @@ processModule importFC repo stk modns = do
   let fn = joinBy "/" parts ++ ".newt"
 
   -- Dummy for initial load/parse
-  let mod = MkModCtx modns "" emptyMap freshMC emptyMap Nil Nil Nil
+  let mod = MkModCtx modns "" emptyMap freshMC emptyMap Nil Nil Nil Nil
   modifyTop { currentMod := mod; hints := emptyMap; ops := emptyMap }
 
   Right (fn,src) <- do
@@ -125,7 +125,7 @@ processModule importFC repo stk modns = do
 
   -- currentMod has been wiped by imports..
   let freshMC = MC emptyMap Nil Nil 0 CheckAll
-  let mod = MkModCtx modns src emptyMap freshMC emptyMap imported Nil Nil
+  let mod = MkModCtx modns src emptyMap freshMC emptyMap imported Nil Nil Nil
   modifyTop { currentMod := mod
             ; hints := emptyMap
             ; ops := ops

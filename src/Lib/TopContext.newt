@@ -103,6 +103,9 @@ addError err = modifyTop { currentMod $= { modErrors $= (err ::) } }
 addInfo : EditorInfo → M Unit
 addInfo info = modifyTop { currentMod $= {modInfos $= (info ::) } }
 
+addTypeInfo : FC → String → Env → Val → M Unit
+addTypeInfo fc nm env ty = modifyTop { currentMod $= { modTypes $= (MkTypeInfo fc nm env ty ::) } }
+
 -- temporary? used in derive for now
 freshName : String → M String
 freshName nm = do

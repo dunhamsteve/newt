@@ -1669,6 +1669,7 @@ check ctx tm ty = do
             debug "icits \{nm} \{show icit} \{nm'} \{show icit'}"
             if icit == icit' then do
                 let var = VVar fc nm ctx.lvl Lin
+                addTypeInfo fc nm ctx.env a
                 let ctx' = extend ctx nm a rig
                 bapp <- b $$ var
                 tm' <- check ctx' tm bapp
@@ -1687,6 +1688,7 @@ check ctx tm ty = do
         a <- freshMeta (enterMarker ctx) fc (VU emptyFC) Normal >>= eval ctx.env
         b <- MkClosure ctx.env <$> freshMeta (extend (enterMarker ctx) nm a quant) fc (VU emptyFC) Normal
         unifyCatch fc ctx tty (VPi fc "_" icit quant a b)
+        addTypeInfo fc nm ctx.env a
         let var = VVar fc nm ctx.lvl Lin
         ty' <- b $$ var
         let ctx' = extend ctx nm a quant
@@ -1694,7 +1696,6 @@ check ctx tm ty = do
         pure $ Lam fc nm icit quant tm'
     (t@(RLam fc (BI _ nm icit quant) tm), ty) => do
               pty <- prvalCtx ty
-              -- TODO I'm hitting this with an unsolved meta
               error fc "Expected \{pty}, got a function"
 
     (RLet fc nm ty v sc, rty) => do
@@ -1703,6 +1704,7 @@ check ctx tm ty = do
       vty <- eval ctx.env ty'
       v' <- check ctx v vty
       vv <- eval ctx.env v'
+      addTypeInfo fc nm ctx.env vty
       -- TODO allow rig on Let (here and check -> checkIn above)
       let ctx' = define ctx nm vv vty Many
       sc' <- check ctx' sc rty
@@ -1769,6 +1771,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
       if x == nm
       then do
         checkMarker fc ctx.marker q
+        addTypeInfo fc nm ctx.env ty
         pure (Bnd fc i, ty)
       else go (i + 1) xs
 
@@ -1818,6 +1821,7 @@ infer ctx (RPi fc (BI fc nm icit quant) ty ty2) = do
 infer ctx (RLet fc nm ty v sc) = do
   ty' <- checkIn ctx Zero ty (VU emptyFC)
   vty <- eval ctx.env ty'
+  addTypeInfo fc nm ctx.env vty
   v' <- check ctx v vty
   vv <- eval ctx.env v'
   -- TODO allow rig on let (what use case?)
@@ -1827,6 +1831,7 @@ infer ctx (RLet fc nm ty v sc) = do
 
 infer ctx (RLam _ (BI fc nm icit quant) tm) = do
   a <- freshMeta (enterMarker ctx) fc (VU emptyFC) Normal >>= eval ctx.env
+  addTypeInfo fc nm ctx.env a
   let ctx' = extend ctx nm a quant
   (tm', b) <- infer ctx' tm
   debug "make lam for \{show nm} scope \{rpprint (names ctx) tm'} : \{show b}"
