@@ -113,8 +113,8 @@ applyDCon : QName × Int × Tm → List String
 applyDCon (QN _ nm, _, tm) = go (Lin :< nm) tm
   where
     go : SnocList String → Tm → List String
-    go acc (Pi _ nm Explicit _ _ u) = go (acc :< nm) u
-    go acc (Pi _ _ _ _ _ u) = go acc u
+    go acc (Pi _ (BI _ nm Explicit _ _) u) = go (acc :< nm) u
+    go acc (Pi _ _ u) = go acc u
     go acc _ = acc <>> Nil
 
 data Flavor = EqSplit | FatArrowSplit | MonadSplit
@@ -263,7 +263,7 @@ introActions (Just $ Unsolved fc qn ctx vty User) =
 
     putStrLn "intros for \{show vty}"
     case vty of
-      VPi _ nm Explicit _ a b => do
+      VPi _ (BI _ nm Explicit _ a) b => do
         let str = "(\\ \{nm} => ?)"
         pure $ Intro str (MkEdit fc str) :: actions
       _ => catchError (do
@@ -276,9 +276,9 @@ introActions (Just $ Unsolved fc qn ctx vty User) =
       putStrLn $ show err
       pure Nil
   where
-    checkEntry : (String × Val × Quant) → M (Maybe CodeAction)
-    checkEntry ("_", ty, q) = pure Nothing
-    checkEntry (nm, ty, q) = do
+    checkEntry : BindInfo Val → M (Maybe CodeAction)
+    checkEntry (BI _ "_" _ q ty) = pure Nothing
+    checkEntry (BI _ nm _ q ty) = do
       Right _ <- tryError (unify ctx.env UNormal vty ty)
          | _ => pure Nothing
       pure $ Just $ Intro nm $ MkEdit fc nm
@@ -287,8 +287,8 @@ introActions (Just $ Unsolved fc qn ctx vty User) =
     introDCon (QN _ nm, _, tm) = go (Lin :< nm) tm
       where
         go : SnocList String → Tm → List String
-        go acc (Pi _ nm Explicit _ _ u) = go (acc :< "?") u
-        go acc (Pi _ _ _ _ _ u) = go acc u
+        go acc (Pi _ (BI _ nm Explicit _ _) u) = go (acc :< "?") u
+        go acc (Pi _ _ u) = go acc u
         go acc _ = acc <>> Nil
 
     makeEdit : (QName × Int × Tm) → CodeAction
@@ -342,7 +342,7 @@ addClause row col = do
   pure [GenericAction "Add clause" [MkEdit fc text]]
   where
     mkClause : SnocList String → Tm → String
-    mkClause acc (Pi fc nm _ _ a b) = mkClause (acc :< nm) b
+    mkClause acc (Pi fc (BI _ nm _ _ a) b) = mkClause (acc :< nm) b
     mkClause acc _ = unwords (acc <>> []) ++ " = ?\n"
 
     isDef : TopEntry → Bool

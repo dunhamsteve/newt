@@ -79,8 +79,8 @@ updateDef name fc ty def = do
   modifyTop { currentMod $= { modDefs := updateMap name (MkEntry fc' q name ty def flags) top.currentMod.modDefs } }
 
 typeName : Tm → Maybe QName
-typeName (Pi fc nm Explicit rig t u) = Nothing
-typeName (Pi fc name icit rig t u) = typeName u
+typeName (Pi fc (BI _ nm Explicit rig t) u) = Nothing
+typeName (Pi fc (BI _ name icit rig t) u) = typeName u
 typeName (App fc t u q) = typeName t
 typeName (Ref _ nm) = Just nm
 typeName _ = Nothing

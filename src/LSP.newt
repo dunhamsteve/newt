@@ -3,6 +3,7 @@ module LSP
 import Prelude
 import Lib.Common
 import Lib.Eval
+import Lib.Elab
 import Lib.Error
 import Lib.Types
 import Lib.TopContext
@@ -238,9 +239,8 @@ getInfos = do
         go acc Nil = pure acc
         go acc (Unsolved fc k ctx ty User :: rest) = do
             ty' <- quote ctx.lvl ty
-            let names = map fst ctx.types
-            let dispType = render 90 $ pprint names ty'
-            dispEnv <- dumpEnv ctx
+            let dispType = render 90 $ pprint ctx.names ty'
+            dispEnv <- showCtx ctx
             let msg = "\{dispEnv}\n--------\n\{dispType}"
             let diag = JsonObj
                   $  ("severity", JsonInt 3)

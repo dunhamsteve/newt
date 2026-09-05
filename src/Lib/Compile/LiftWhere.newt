@@ -14,14 +14,14 @@ import Data.IORef
 alias LiftEnv = List (Quant × Maybe (QName × List Quant))
 
 liftWhereTm : {{Ref2 Defs St}} → QName → LiftEnv → Tm → M Tm
-liftWhereTm name env (Lam fc nm icit quant t) =
-  Lam fc nm icit quant <$> liftWhereTm name ((quant, Nothing) :: env) t
+liftWhereTm name env (Lam fc info t) =
+  Lam fc info <$> liftWhereTm name ((info.biQuant, Nothing) :: env) t
 liftWhereTm name env (App fc t u q) =
   App fc <$> liftWhereTm name env t <*> liftWhereTm name env u <*> pure q
-liftWhereTm name env (Pi fc nm icit quant t u) = do
-  t <- liftWhereTm name env t
-  u <- liftWhereTm name ((quant, Nothing) :: env) u
-  pure $ Pi fc nm icit quant t u
+liftWhereTm name env (Pi fc info u) = do
+  info <- traverse (liftWhereTm name env) info
+  u <- liftWhereTm name ((info.biQuant, Nothing) :: env) u
+  pure $ Pi fc info u
 liftWhereTm name env (Let fc nm v sc) = do
   v <- liftWhereTm name env v
   sc <- liftWhereTm name ((Many, Nothing) :: env) sc
@@ -71,7 +71,7 @@ liftWhereTm name env (LetRec fc nm ty t u) = do
     -- FIXME - this seems backwards
     wrapLam : List Quant → Tm → Tm
     wrapLam Nil tm = tm
-    wrapLam (q :: qs) tm = wrapLam qs $ Lam fc "_" Explicit q tm
+    wrapLam (q :: qs) tm = wrapLam qs $ Lam fc (BI fc "_" Explicit q MkUnit) tm
 
 -- Substitute call to lifted function
 liftWhereTm name env tm@(Bnd fc k) = case getAt (cast k) env of

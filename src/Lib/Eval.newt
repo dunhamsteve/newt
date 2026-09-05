@@ -19,8 +19,8 @@ _$$_ : Closure -> Val -> M Val
 _$$_ (MkClosure env tm) u = eval (u :: env) tm
 
 vapp : Val -> Val ->  Quant -> M Val
-vapp (VLam _ _ _ _ t) u q = t $$ u
-vapp (VPi _ _ _ _ _ t) u q = t $$ u
+vapp (VLam _ _ t) u q = t $$ u
+vapp (VPi _ _ t) u q = t $$ u
 vapp (VVar fc nm k sp) u q = pure $ VVar fc nm k (sp :< (u,q))
 vapp (VRef fc nm sp) u q = pure $ VRef fc nm (sp :< (u,q))
 vapp (VMeta fc k sp) u q = pure $ VMeta fc k (sp :< (u,q))
@@ -75,7 +75,7 @@ tryEval env (VRef fc k sp) = do
             -- These are considered "stuck" and we back out to the nearest name application
             case val of
               VCase _ _ _ _ => pure Nothing
-              VLam _ _ _ _ _ => pure Nothing
+              VLam _ _ _ => pure Nothing
               VLetRec _ _ _ _ _ => pure Nothing
               v => pure $ Just v)
             (const $ pure Nothing)
@@ -177,10 +177,10 @@ eval env (Meta fc i) = do
   case meta of
         (Solved _ k t) => pure $ t
         _ => pure $ VMeta fc i Lin
-eval env (Lam fc x icit rig t) = pure $ VLam fc x icit rig (MkClosure env t)
-eval env (Pi fc x icit rig a b) = do
-  a' <- eval env a
-  pure $ VPi fc x icit rig a' (MkClosure env b)
+eval env (Lam fc info t) = pure $ VLam fc info (MkClosure env t)
+eval env (Pi fc info b) = do
+  info' <- traverse (eval env) info
+  pure $ VPi fc info' (MkClosure env b)
 eval env (Let fc nm t u) = do
   t' <- eval env t
   -- We want to keep it as a let if inlining (maybe that should be separate from eval)
@@ -248,15 +248,15 @@ quote l (VMeta fc i sp) = do
   case meta of
         (Solved _ k t) => vappSpine t sp >>= quote l
         _ => quoteSp l (Meta fc i) sp
-quote l (VLam fc x icit rig t) = do
-  val <- t $$ VVar emptyFC x l Lin
+quote l (VLam fc info t) = do
+  val <- t $$ VVar fc info.biName l Lin
   tm <- quote (1 + l) val
-  pure $ Lam fc x icit rig tm
-quote l (VPi fc x icit rig a b) = do
-  a' <- quote l a
-  val <- b $$ VVar emptyFC x l Lin
+  pure $ Lam fc info tm
+quote l (VPi fc info b) = do
+  info' <- traverse (quote l) info 
+  val <- b $$ VVar emptyFC info.biName l Lin
   tm <- quote (1 + l) val
-  pure $ Pi fc x icit rig a' tm
+  pure $ Pi fc info' tm
 quote l (VLet fc nm t u) = do
   t' <- quote l t
   u <- u $$ VVar fc nm l Lin
@@ -296,7 +296,7 @@ nf env t = eval env t >>= quote (length' env)
 prvalCtx : {{ctx : Context}} -> Val -> M String
 prvalCtx {{ctx}} v = do
   tm <- quote ctx.lvl v
-  pure $ render 90 $ pprint (map fst ctx.types) tm
+  pure $ render 90 $ pprint ctx.names tm
 
 -- 'zonk' is substituting metas _and_ doing inlining
 
@@ -334,9 +334,9 @@ tweakFC fc (Delay _ t) = Delay fc t
 tweakFC fc (Ref fc1 nm) = Ref fc nm
 tweakFC fc (UU fc1) = UU fc
 tweakFC fc (Meta fc1 k) = Meta fc k
-tweakFC fc (Lam fc1 nm icit rig t) = Lam fc nm icit rig t
+tweakFC fc (Lam fc1 info t) = Lam fc info t
 tweakFC fc (App fc1 t u q) = App fc t u q
-tweakFC fc (Pi fc1 nm icit x t u) = Pi fc nm icit x t u
+tweakFC fc (Pi fc1 info u) = Pi fc info u
 tweakFC fc (Case fc1 t xs) = Case fc t xs
 tweakFC fc (Let fc1 nm t u) = Let fc nm t u
 tweakFC fc (LetRec fc1 nm ty t u) = LetRec fc nm ty t u
@@ -402,7 +402,7 @@ zonkApp top l env t sp = do
     -- peel off enough args for the function, hoping to avoid the errors from app of case or let
     splitSpine : Tm → SnocList QuantVal → List QuantVal → SnocList QuantVal × List QuantVal
     splitSpine t sp Nil = (sp, Nil)
-    splitSpine (Pi fc nm _ _ a b) sp (arg :: args) = splitSpine b (sp :< arg) args
+    splitSpine (Pi fc info b) sp (arg :: args) = splitSpine b (sp :< arg) args
     splitSpine t sp args = (sp, args)
 
     -- lookup name and return Def if flagged inline
@@ -426,13 +426,13 @@ zonk top l env t =
   (Meta fc k) => zonkApp top l env t Nil
   (Force fc t) => Force fc <$> zonk top l env t
   (Delay fc t) => Delay fc <$> zonk top l env t
-  (Lam fc nm icit rig u) =>
+  (Lam fc info u) =>
     let env' = VVar emptyFC "_" l Lin :: env in
-    Lam fc nm icit rig <$> (zonk top (1 + l) env' u)
+    Lam fc info <$> (zonk top (1 + l) env' u)
   (App fc _ _ q) => withLets $ zonkApp top l env t Nil
-  (Pi fc nm icit rig a b) =>
+  (Pi fc info b) =>
     let env' = VVar emptyFC "_" l Lin :: env in
-    Pi fc nm icit rig <$> zonk top l env a <*> zonkBind top (l + 1) env' b
+    Pi fc <$> traverse (zonk top l env) info <*> zonkBind top (l + 1) env' b
   (Let fc nm t u) =>
     let env' = VVar emptyFC "_" l Lin :: env in
     Let fc nm <$> zonk top l env t <*> zonkBind top (l + 1) env' u

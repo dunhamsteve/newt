@@ -22,6 +22,11 @@ data Desc : U where
 
 -- So I guess we do a few of these and then figure out how to make it easier
 
+getExplictNames : SnocList String → Tm → List String
+getExplictNames acc (Pi fc (BI _ nm Explicit quant a) b) = getExplictNames (acc :< nm) b
+getExplictNames acc (Pi fc _ b) = getExplictNames acc b
+getExplictNames acc _ = acc <>> Nil
+
 deriveEq : FC → String → M (List Decl)
 deriveEq fc name = do
   top <- getTop
@@ -37,16 +42,10 @@ deriveEq fc name = do
 
   where
     arr : Raw → Raw → Raw
-    arr a b = RPi fc (BI fc "_" Explicit Many) a b
+    arr a b = RPi fc (BI fc "_" Explicit Many a) b
 
     rvar : String → Raw
     rvar nm = RVar fc nm
-
-    getExplictNames : SnocList String → Tm → List String
-    getExplictNames acc (Pi fc nm Explicit quant a b) = getExplictNames (acc :< nm) b
-    getExplictNames acc (Pi fc nm Implicit quant a b) = getExplictNames acc b
-    getExplictNames acc (Pi fc nm Auto quant a b) = getExplictNames acc b
-    getExplictNames acc _ = acc <>> Nil
 
     buildApp : String → List Raw → Raw
     buildApp nm nms = foldl (\ t u => RApp fc t u Explicit) (rvar nm) $  nms
@@ -89,19 +88,13 @@ deriveShow fc name = do
 
   where
     arr : Raw → Raw → Raw
-    arr a b = RPi fc (BI fc "_" Explicit Many) a b
+    arr a b = RPi fc (BI fc "_" Explicit Many a) b
 
     rvar : String → Raw
     rvar nm = RVar fc nm
 
     lstring : String → Raw
     lstring s = RLit fc (LString s)
-
-    getExplictNames : SnocList String → Tm → List String
-    getExplictNames acc (Pi fc nm Explicit quant a b) = getExplictNames (acc :< nm) b
-    getExplictNames acc (Pi fc nm Implicit quant a b) = getExplictNames acc b
-    getExplictNames acc (Pi fc nm Auto quant a b) = getExplictNames acc b
-    getExplictNames acc _ = acc <>> Nil
 
     buildApp : String → List Raw → Raw
     buildApp nm nms = foldl (\ t u => RApp fc t u Explicit) (rvar nm) $  nms

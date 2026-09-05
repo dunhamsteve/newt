@@ -103,7 +103,7 @@ getEnv fc k (MkCEnv cenv clvl) = case getAt' k cenv of
 
 -- I'm counting Lam in the term for arity.  This matches what I need in code gen.
 lamArity : Tm -> List Quant
-lamArity (Lam _ _ _ quant t) = quant :: (lamArity t)
+lamArity (Lam _ info t) = info.biQuant :: (lamArity t)
 lamArity _ = Nil
 
 -- This is how much we want to curry at top level
@@ -174,8 +174,8 @@ compileTerm env t@(Ref fc nm@(QN _ tag)) = do
     _ => apply nm Nil arity
 
 compileTerm env (Meta fc k) = error fc "Compiling meta \{show k}"
-compileTerm env (Lam _ nm _ Many t) = CLam nm <$> compileTerm (push env Many) t
-compileTerm env (Lam _ nm _ Zero t) = compileTerm (push env Zero)  t
+compileTerm env (Lam _ (BI _ nm _ Many _) t) = CLam nm <$> compileTerm (push env Many) t
+compileTerm env (Lam _ (BI _ nm _ Zero _) t) = compileTerm (push env Zero)  t
 -- Special funArgs is dropping erased
 compileTerm env tm@(App fc _ _ _) = case manyFunArgs tm of
   (Meta _ k, args) => error fc "Compiling an unsolved meta \{show tm}"
@@ -212,7 +212,7 @@ compileTerm env tm@(App fc _ _ _) = case manyFunArgs tm of
     applySucc (t :: Nil) = pure $ addOne t
     applySucc _ = error (getFC tm) "overapplied Succ \{show tm}"
 compileTerm env (UU fc) = error fc "UU in codegen"
-compileTerm env (Pi fc nm icit rig t u) = error fc "Pi in codegen"
+compileTerm env (Pi fc info u) = error fc "Pi in codegen"
   -- t' <- compileTerm env t
   -- u' <- compileTerm env u
   -- pure $ CAppRef (QN primNS "PiType") (t' :: CLam nm u' :: Nil) (S (S Z))
@@ -315,8 +315,8 @@ compileFun env tm = do
   pure res
   where
     go : CEnv → Tm -> SnocList String -> M CExp
-    go env (Lam _ nm _ Zero t) acc = go (push env Zero) t acc
-    go env (Lam _ nm _ quant t) acc = go (push env quant) t (acc :< nm)
+    go env (Lam _ (BI _ nm _ Zero _) t) acc = go (push env Zero) t acc
+    go env (Lam _ (BI _ nm _ quant _) t) acc = go (push env quant) t (acc :< nm)
     go env tm Lin = compileTerm env tm
     go env tm args = CFun (args <>> Nil) <$> compileTerm env tm
 

@@ -41,39 +41,34 @@ showCtx ctx =
     isVar k (VVar _ nm k' Lin) = k == k'
     isVar _ _ = False
 
-    go : List String -> Int -> List (Val × String × Val × Quant) -> List String -> M (List String)
+    go : List String -> Int -> List (Val × (BindInfo Val)) -> List String -> M (List String)
     go _ _ Nil acc = pure acc
-    go names k ((v, n, ty, q) :: xs) acc = if isVar k v
-      then do
+    go names k ((v, BI _ n _ q ty) :: xs) acc = do
         tty <- quote ctx.lvl ty
         go names (1 + k) xs ("  \{show q}\{n} : \{rpprint names tty}" :: acc)
-      else do
-        tm <- quote ctx.lvl v
-        tty <- quote ctx.lvl ty
-        go names (1 + k) xs ("  \{show q}\{n} = \{rpprint names tm} : \{rpprint names tty}" :: acc)
 
 -- return Bnd and type for name
-lookupName : Context -> String -> Maybe (Tm × Val × Quant)
+lookupName : Context -> String -> Maybe (Tm × (BindInfo Val))
 lookupName ctx name = go 0 ctx.types
   where
-    go : Int -> List (String × Val × Quant) -> Maybe (Tm × Val × Quant)
+    go : Int -> List (BindInfo Val) -> Maybe (Tm × (BindInfo Val))
     go ix Nil = Nothing
     -- FIXME - we should stuff a Binder of some sort into "types"
-    go ix ((nm, info) :: xs) = if nm == name then Just (Bnd emptyFC ix, info) else go (1 + ix) xs
+    go ix (info :: xs) = if biName info == name then Just (Bnd emptyFC ix, info) else go (1 + ix) xs
 
 lookupDef : Context -> String -> Maybe Val
 lookupDef ctx name = go 0 ctx.types ctx.env
   where
-    go : Int -> List (String × Val × Quant) -> List Val -> Maybe Val
-    go ix ((nm, ty) :: xs) (v :: vs) = if nm == name then Just v else go (1 + ix) xs vs
+    go : Int -> List (BindInfo Val) -> List Val -> Maybe Val
+    go ix (ce :: xs) (v :: vs) = if biName ce == name then Just v else go (1 + ix) xs vs
     go ix _ _ = Nothing
 
 -- get metas referenced in a term
 getTMetas : Tm → List QName
 getTMetas (Meta _ nm) = [nm]
 getTMetas (App _ t u q) = getTMetas t ++ getTMetas u
-getTMetas (Pi fc nm _ _ a b) = getTMetas a ++ getTMetas b
-getTMetas (Lam _ _ _ _ sc) = getTMetas sc
+getTMetas (Pi fc (BI _ _ _ _ a) b) = getTMetas a ++ getTMetas b
+getTMetas (Lam _ _ sc) = getTMetas sc
 getTMetas (Case _ t alts) = join $ getTMetas t :: map getAltMetas alts
   where
     getAltMetas : CaseAlt → List QName
@@ -91,8 +86,8 @@ getMetas : Val → List QName
 getMetas (VMeta _ ix sp) = [ix]
 getMetas (VVar _ nm k sp) = join $ map (getMetas ∘ fst) (sp <>> Nil)
 getMetas (VRef _ nm sp) = join $ map (getMetas ∘ fst) (sp <>> Nil)
-getMetas (VPi _ _ _ _ a (MkClosure _ b)) = getMetas a ++ getTMetas b
-getMetas (VLam _ _ _ _ (MkClosure _ sc)) = getTMetas sc
+getMetas (VPi _ (BI _ _ _ _ a) (MkClosure _ b)) = getMetas a ++ getTMetas b
+getMetas (VLam _ _ (MkClosure _ sc)) = getTMetas sc
 getMetas (VLet _ _ t (MkClosure _ b)) = getMetas t ++ getTMetas b
 getMetas (VDelay _ t) = getMetas t
 getMetas (VForce _ t) = getMetas t
@@ -108,7 +103,7 @@ getMetas _ = []
 -- currently only used for pattern matching
 record UnifyResult where
   constructor MkResult
-  -- wild guess here - lhs is a VVar
+  -- these correspond to v₁ ≡ val from indicies
   constraints : List (Int × Val)
 
 instance Semigroup UnifyResult where
@@ -130,8 +125,8 @@ checkIn ctx Many t a = check ctx t a
 unifyCatch : FC -> Context -> Val -> Val -> M Unit
 
 isCandidate : Val -> Tm -> Bool
-isCandidate ty (Pi fc nm Explicit rig t u) = False
-isCandidate ty (Pi fc nm icit rig t u) = isCandidate ty u
+isCandidate ty (Pi fc (BI _ nm Explicit rig t) u) = False
+isCandidate ty (Pi fc _ u) = isCandidate ty u
 isCandidate (VRef _ nm _) (Ref fc nm') = nm == nm'
 isCandidate ty (App fc t u q) = isCandidate ty t
 isCandidate _ _ = False
@@ -169,11 +164,12 @@ findMatches ctx ty ((name, type) :: xs) = do
       findMatches ctx ty xs)
 
 contextMatches : Context -> Val -> M (List (Tm × Val))
+-- REVIEW consider not zipping
 contextMatches ctx ty = go (zip ctx.env ctx.types)
   where
-    go : List (Val × String × Val × Quant) -> M (List (Tm × Val))
+    go : List (Val × (BindInfo Val)) -> M (List (Tm × Val))
     go Nil = pure Nil
-    go ((tm, nm, vty, quant) :: xs) = do
+    go ((tm, BI _ nm _ _ vty) :: xs) = do
       type <- quote ctx.lvl vty
       let (True) = isCandidate ty type | False => go xs
       top <- getTop
@@ -190,8 +186,7 @@ contextMatches ctx ty = go (zip ctx.env ctx.types)
           go xs)
 
 getArity : Tm -> List Quant
-getArity (Pi x str icit rig t u) = rig :: getArity u
--- Ref or App (of type constructor) are valid
+getArity (Pi x (BI _ str icit rig t) u) = rig :: getArity u
 getArity _ = Nil
 
 solve : Env -> QName -> SnocList (Val × Quant) -> Val -> M Unit
@@ -240,9 +235,9 @@ trySolveAuto (Unsolved fc k ctx ty AutoSolve) = do
       pure True
     where
       -- Makes the arg for `solve` when we solve an auto
-      makeSpine : Int → List BD → List (String × Val × Quant) → SnocList (Val × Quant)
+      makeSpine : Int → List BD → List (BindInfo Val) → SnocList (Val × Quant)
       makeSpine k (Defined :: xs) (q :: qs) = makeSpine (k - 1) xs qs
-      makeSpine k (Bound :: xs) ((_ , _ , q) :: qs) = makeSpine (k - 1) xs qs :< (VVar emptyFC "_" (k - 1) Lin, q)
+      makeSpine k (Bound :: xs) (ce :: qs) = makeSpine (k - 1) xs qs :< (VVar emptyFC "_" (k - 1) Lin, ce.biQuant)
       makeSpine k _ _ = Lin
 
 trySolveAuto _ = pure False
@@ -375,16 +370,16 @@ rename meta mark ren lvl (VMeta fc ix sp) = do
         _ => do
           debug "rename: \{show ix} is unsolved"
           catchError (renameSpine meta mark ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc (errorMsg err))
-rename meta mark ren lvl (VLam fc n icit rig t) = do
-  tapp <- t $$ VVar fc n lvl Lin
-  scope <- rename meta mark ((lvl,rig) :: ren) (1 + lvl) tapp
-  pure (Lam fc n icit rig scope)
-rename meta mark ren lvl v@(VPi fc n icit rig ty tm) = do
+rename meta mark ren lvl (VLam fc info t) = do
+  tapp <- t $$ VVar fc info.biName lvl Lin
+  scope <- rename meta mark ((lvl, info.biQuant) :: ren) (1 + lvl) tapp
+  pure (Lam fc info scope)
+rename meta mark ren lvl v@(VPi fc info tm) = do
   checkMarker fc mark Zero
-  ty' <- rename meta mark ren lvl ty
-  tmapp <- tm $$ VVar emptyFC n lvl Lin
-  scope' <- rename meta mark ((lvl,rig) :: ren) (1 + lvl) tmapp
-  pure (Pi fc n icit rig ty' scope')
+  info' <- traverse (rename meta mark ren lvl) info
+  tmapp <- tm $$ VVar emptyFC info.biName lvl Lin
+  scope' <- rename meta mark ((lvl,info.biQuant) :: ren) (1 + lvl) tmapp
+  pure (Pi fc info' scope')
 rename meta mark ren lvl v@(VU fc) = do
   checkMarker fc mark Zero
   pure (UU fc)
@@ -394,15 +389,15 @@ rename meta mark ren lvl (VLit fc lit) = pure (Lit fc lit)
 -- If we we need this, follow the model of VLam
 rename meta mark ren lvl tm = error (getFC tm) "Unhandled term in `rename`: \{show tm}"
 
-lams : Nat -> List (String × Val × Quant) -> Tm -> Tm
+lams : Nat -> List (BindInfo Val) -> Tm -> Tm
 lams Z _ tm = tm
--- REVIEW do we want a better FC, icity?, rig?
 lams (S k) Nil tm = fatalError "Fatal: too many args in lams"
-lams (S k) ((x, _, q) :: xs) tm = Lam emptyFC x Explicit q (lams k xs tm)
+-- REVIEW forgetting type?
+lams (S k) (info :: xs) tm = Lam emptyFC (map (const MkUnit) info) (lams k xs tm)
 
 unify : Env -> UnifyMode -> Val -> Val  -> M UnifyResult
 
-.boundNames : Context -> List (String × Val × Quant)
+.boundNames : Context -> List (BindInfo Val)
 ctx.boundNames = map snd $ filter (\x => fst x == Bound) $ zip ctx.bds ctx.types
 
 -- run action if mcmode allows it, ratcheting as necessary
@@ -512,7 +507,7 @@ unify env mode t u = do
   where
     -- The case tree in Idris was huge, so I split it into stages
     unifyRest : Val -> Val -> M UnifyResult
-    unifyRest (VPi fc nm _ _ a b) (VPi fc' _ _ _ a' b') = do
+    unifyRest (VPi fc (BI _ nm _ _ a) b) (VPi fc' (BI _ _ _ _ a') b') = do
       let fresh = VVar fc nm (length' env) Lin
       xb <- b $$ fresh
       xb' <- b' $$ fresh
@@ -606,18 +601,18 @@ unify env mode t u = do
     unifyVar t u = unifyRef t u
 
     unifyLam : Val -> Val -> M UnifyResult
-    unifyLam (VLam fc n _ _ t)  (VLam _ _ _ _ t') = do
-      let fresh = VVar fc n (length' env) Lin
+    unifyLam (VLam fc info t)  (VLam _ _ t') = do
+      let fresh = VVar fc info.biName (length' env) Lin
       vappt <- t $$ fresh
       vappt' <- t' $$ fresh
       unify (fresh :: env) mode vappt vappt'
-    unifyLam t         (VLam fc' nm _ q t') = do
+    unifyLam t         (VLam fc' (BI _ nm _ q _) t') = do
       debug "ETA \{show t}"
       let fresh = VVar fc' nm (length' env) Lin
       vappt <- vapp t fresh q
       vappt' <- t' $$ fresh
       unify (fresh :: env) mode vappt vappt'
-    unifyLam (VLam fc n _ q t)  t'     = do
+    unifyLam (VLam fc (BI _ n _ q _) t)  t' = do
       debug "ETA' \{show t'}"
       let fresh = VVar fc n (length' env) Lin
       appt <- t $$ fresh
@@ -670,12 +665,11 @@ unifyCatch fc ctx ty' ty = do
         pure neutral
 
       err => do
-        let names = map fst ctx.types
         debug "fail \{show ty'} \{show ty}"
         -- Need to quote here to catch any transient meta solutions
         a <- quote ctx.lvl ty'
         b <- quote ctx.lvl ty
-        throwError $ UnificationError fc names a b err
+        throwError $ UnificationError fc ctx.names a b err
 
 freshMeta : Context -> FC -> Val -> MetaKind -> M Tm
 freshMeta ctx fc ty kind = do
@@ -707,8 +701,8 @@ freshMeta ctx fc ty kind = do
     checkAuto (sp :< (VMeta _ nm _, q)) = False
     checkAuto (sp :< _) = checkAuto sp
 
-    applyBDs : Int -> Tm -> List BD -> List (String × Val × Quant) -> Tm
-    applyBDs k t (Bound :: xs) ((nm, ty, q) :: ys) = App emptyFC (applyBDs (1 + k) t xs ys) (Bnd emptyFC k) q
+    applyBDs : Int -> Tm -> List BD -> List (BindInfo Val) -> Tm
+    applyBDs k t (Bound :: xs) ((BI _ nm _ q ty) :: ys) = App emptyFC (applyBDs (1 + k) t xs ys) (Bnd emptyFC k) q
     applyBDs k t (Defined :: xs) (y :: ys) = applyBDs (1 + k) t xs ys
     applyBDs k t _ _ = t
 
@@ -720,14 +714,14 @@ insert : (ctx : Context) -> Tm -> Val -> M (Tm × Val)
 insert ctx tm ty = do
   ty' <- forceMeta ty
   case ty' of
-    VPi fc x Auto rig a b => do
+    VPi fc (BI _ _ Auto rig a) b => do
       m <- freshMeta (enterMarker' rig ctx) (getFC tm) a AutoSolve
       debug "INSERT Auto \{rpprint (names ctx) m} : \{show a}"
       debug "TM \{rpprint (names ctx) tm}"
       mv <- eval ctx.env m
       bapp <- b $$ mv
       insert ctx (App (getFC tm) tm m rig) bapp
-    VPi fc x Implicit rig a b => do
+    VPi fc (BI _ _ Implicit rig a) b => do
       m <- freshMeta (enterMarker' rig ctx) (getFC tm) a Normal
       debug "INSERT \{rpprint (names ctx) m} : \{show a} rig \{show rig} mark \{show ctx.marker}"
       debug "FOR TM \{rpprint (names ctx) tm}"
@@ -834,9 +828,9 @@ mapFstM f (xs :< (a,b) ) = do
 -- return context, remaining type, and list of names
 -- So Γ |- (a : A) -> (b : B) -> C  --> Γ, (a : A), (b : B) |- C[fresh_a/a,fresh_b/b] and "fresh_a", "fresh_b"
 extendPi : Context -> Val -> SnocList Bind -> VSpine -> M (Context × Val × List Bind × VSpine)
-extendPi ctx (VPi x str icit rig a b) nms sc = do
+extendPi ctx (VPi x info@(BI _ str icit rig a) b) nms sc = do
     let nm = fresh str
-    let ctx' = extend ctx nm a rig
+    let ctx' = extend ctx (BI x nm icit rig a)
     let v = VVar emptyFC str ctx.lvl Lin
     tyb <- b $$ v
     extendPi ctx' tyb (nms :< MkBind ctx.lvl icit a) (sc :< (VVar x str ctx.lvl Lin, rig))
@@ -1022,7 +1016,7 @@ matchedConstructors nm ((MkClause fc cons pats expr) :: cs) = case find (matchNa
 
 getQuantity : Context → (lvl : Int) → Quant
 getQuantity ctx lvl = case getAt' (lvl2ix ctx.lvl lvl) ctx.types of
-  Just (_ , _ , q) => q
+  Just info => info.biQuant
   Nothing => Many
 
 -- This is handling `eq` now and the forced case of buildTree is unreachable
@@ -1100,7 +1094,7 @@ forcedCase ctx prob ((ix , val) :: scons) = do
 -- return Nothing if dcon type doesn't unify with the scrutinee type
 buildCase : Context -> Problem -> Int -> Val -> (QName × Int × Tm) -> M (Maybe CaseAlt)
 buildCase ctx prob scnm scty (dcName, arity, ty) = do
-  let (Just (_nm, _ty, q)) = getAt' (lvl2ix ctx.lvl scnm) ctx.types | _ => fatalError "bad lvl in buildCase"
+  let (Just (BI _ _ _ q _)) = getAt' (lvl2ix ctx.lvl scnm) ctx.types | _ => fatalError "bad lvl in buildCase"
   debug "CASE \{show scnm} match \{show dcName} ty \{rpprint (names ctx) ty} quant \{show q}"
 
   -- Add the constructor arguments to the context
@@ -1220,7 +1214,8 @@ checkWhere ctx decls body ty = do
   clauses' <- traverse makeClause clauses
   vty <- eval ctx.env funTy
   debug "\{name} vty is \{show vty}"
-  let ctx' = extend ctx name vty Many
+  -- FIXME name FC
+  let ctx' = extend ctx (BI sigFC name Explicit Many vty)
 
   -- if I lift, I need to namespace it, add args, and add args when
   -- calling locally
@@ -1234,7 +1229,7 @@ checkWhere ctx decls body ty = do
 
 levelType : Context → Int → M Val
 levelType ctx k = case getAt' (lvl2ix ctx.lvl k) ctx.types of
-  (Just (_,scty,_)) => pure scty
+  Just info => pure info.biTy
   _ => error ctx.ctxFC "bad level"
 
 -- checks the body after we're done with a case tree branch
@@ -1246,15 +1241,8 @@ checkDone fc ctx Nil (Just body) ty = do
   debugM $ showCtx ctx
   -- Hack to try to get Combinatory working
   -- we're trying to subst in solutions here.
-  env' <- for ctx.env $ \ val => do
-    ty <- quote ctx.lvl val
-    -- This is not getting vars under lambdas
-    eval ctx.env ty
-  types' <- for ctx.types $ \case
-    (nm,ty,q) =>  do
-      nty <- quote (length' env') ty
-      ty' <- eval env' nty
-      pure (nm, ty', q)
+  env' <- traverse (quote ctx.lvl >=> eval ctx.env) ctx.env
+  types' <- traverse (traverse $ quote (length' env') >=> eval env') ctx.types
   -- let ctx = MkCtx ctx.lvl env' types' ctx.bds ctx.ctxFC
   let ctx = the Context $ { env := env'; types := types' } ctx
   debug "AFTER"
@@ -1282,11 +1270,11 @@ checkDone fc ctx (PC nm (PatVar pvfc _ nm') :: xs) body ty = do
   let ctx = the Context { types $= rename (lvl2ix ctx.lvl nm) } ctx
   checkDone fc ctx xs body ty
   where
-    rename : Int → List (String × Val × Quant) -> List (String × Val × Quant)
+    rename : Int → List (BindInfo Val) -> List (BindInfo Val)
     rename _ Nil = Nil
     -- slip in the new type, too
-    rename 0 ((name, ty, q) :: xs) = (nm', ty, q) :: xs
-    rename k ((name, ty) :: xs) = (name, ty) :: rename (k - 1) xs
+    rename 0 (BI fc _ icit q ty :: xs) = BI fc nm' icit q ty :: xs
+    rename k (x :: xs) = x :: rename (k - 1) xs
 
 -- I'm running this at the end to ensure everything relevant has been split
 -- if we have `foo Z ()`, we want to be sure `Z` was matched before we check
@@ -1394,9 +1382,9 @@ litTyName (LBool _) = boolType -- not used
 renameContext : String -> String -> Context -> Context
 renameContext from to ctx = { types $= go } ctx
   where
-    go : List (String × Val × Quant) -> List (String × Val × Quant)
+    go : List (BindInfo Val) -> List (BindInfo Val)
     go Nil = Nil
-    go ((a,b) :: types) = if a == from then (to,b) :: types else (a,b) :: go types
+    go (ce@(BI fc a icit q ty) :: types) = if a == from then  (BI fc to icit q ty) :: types else ce :: go types
 
 checkDups : FC → List PMatch → M Unit
 checkDups fc ms = go Nil ms
@@ -1425,15 +1413,15 @@ checkDups fc ms = go Nil ms
 -- This process is similar to extendPi, but we need to stop
 -- if one clause is short on patterns.
 buildTree ctx (MkProb Nil ty) = error emptyFC "no clauses"
-buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ str icit rig a b)) = do
+buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ info@(BI fc' nm icit q a) b)) = do
   let l = ctx.lvl
-  let nm = fresh str
-  let ctx' = extend ctx nm a rig
+  let nm = fresh info.biName
+  let ctx' = extend ctx $ BI fc' nm icit q a
   -- type of the rest
   clauses <- traverse (introClause l icit a) prob.clauses
   -- REVIEW fc from a pat?
   vb <- b $$ VVar fc nm l Lin
-  Lam fc nm icit rig <$> buildTree ctx' (MkProb clauses vb)
+  Lam fc (BI fc' nm icit q MkUnit) <$> buildTree ctx' (MkProb clauses vb)
 buildTree ctx prob@(MkProb ((MkClause fc cons pats@(x :: xs) expr) :: cs) ty) =
   error fc "Extra pattern variables \{show pats}"
 -- need to find some name we can split in (x :: xs)
@@ -1537,7 +1525,7 @@ undo ((DoExpr fc tm) :: xs) = do
   xs' <- undo xs
   -- Not sure if it helps inference or not (and now fails with erasure thing)
   -- pure $ RApp fc (RApp fc (RVar fc "_>>_") tm Explicit) xs' Explicit
-  pure $ RApp fc (RApp fc (RVar fc "bind") tm Explicit) (RLam fc (BI fc "_" Explicit Many) xs') Explicit
+  pure $ RApp fc (RApp fc (RVar fc "bind") tm Explicit) (RLam fc (BI fc "_" Explicit Many Nothing) xs') Explicit
 undo ((DoLet fc nm tm) :: xs) = RLet fc nm (RImplicit fc) tm <$> undo xs
 undo ((DoArrow fc left@(RVar fc' nm) right Nil) :: xs) = do
   top <- getTop
@@ -1547,17 +1535,17 @@ undo ((DoArrow fc left@(RVar fc' nm) right Nil) :: xs) = do
       xs' <- undo xs
       rest <- pure $ RCase fc (RVar fc nm) Nothing (MkAlt left (Just xs') :: Nil)
       pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
-        (RLam fc (BI fc nm Explicit Many) rest) Explicit
+        (RLam fc (BI fc nm Explicit Many Nothing) rest) Explicit
     Nothing => do
       xs' <- undo xs
       pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
-        (RLam fc (BI fc' nm Explicit Many) xs') Explicit
+        (RLam fc (BI fc' nm Explicit Many Nothing) xs') Explicit
 undo ((DoArrow fc left right alts) :: xs) = do
   let nm = "$sc"
   xs' <- undo xs
   rest <- pure $ RCase fc (RVar fc nm) Nothing (MkAlt left (Just xs') :: alts)
   pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
-    (RLam fc (BI fc nm Explicit Many) rest) Explicit
+    (RLam fc (BI fc nm Explicit Many Nothing) rest) Explicit
 
 
 -- REVIEW should `arg` be assigned to a variable with `RLet`?
@@ -1574,7 +1562,7 @@ updateRec ctx fc clauses arg ty = do
   let tm = foldl (\ acc tm => RApp (getFC tm) acc tm Explicit) (RVar fc conname) $ map snd args'
   let tm = case arg of
         Just arg => tm
-        Nothing => RLam fc (BI fc "$ru" Explicit Many) tm
+        Nothing => RLam fc (BI fc "$ru" Explicit Many Nothing) tm
   check ctx tm ty
   where
     app : FC → Raw → Raw → Raw
@@ -1599,7 +1587,7 @@ updateRec ctx fc clauses arg ty = do
         go (x :: xs) = if fst x == nm then pure $ (nm, tm) :: xs else _::_ x <$> go xs
 
     collect : Raw → Tm → List (String × Raw)
-    collect arg (Pi _ nm _ _ a b) = (nm, RApp fc (RVar fc $ "." ++ nm) arg Explicit) :: collect arg b
+    collect arg (Pi _ (BI _ nm _ _ a) b) = (nm, RApp fc (RVar fc $ "." ++ nm) arg Explicit) :: collect arg b
     collect _ _ = Nil
 
     getTele : Maybe Raw → Val → M (QName × List (String × Raw))
@@ -1611,11 +1599,18 @@ updateRec ctx fc clauses arg ty = do
       let (Just (MkEntry _ _ _ ty (DCon _ _ _ _) _)) = lookup conname top
         | _ => error fc "\{show conname} not a dcon"
       pure (conname, collect arg ty)
-    getTele Nothing (VPi _ _ _ _ a b) = do
+    getTele Nothing (VPi _ (BI _ _ _ _ a) b) = do
       a <- forceType ctx.env a
       getTele (Just $ RVar fc "$ru") a
     getTele Nothing v = error fc "Expected \{show v}, missing argument to record update."
     getTele (Just tm) v = error (getFC tm) "Expected a record type, got \{show v}"
+
+-- The type on a lambda arg is optional, check it or create a fresh meta
+maybeType : FC → Context → Maybe Raw → M Val
+maybeType nmfc ctx mty = do
+  case mty of
+    Just ty => check (enterMarker ctx) ty (VU emptyFC) >>= eval ctx.env
+    Nothing => freshMeta (enterMarker ctx) nmfc (VU emptyFC) Normal >>= eval ctx.env
 
 infer : Context -> Raw  -> M (Tm × Val)
 
@@ -1653,7 +1648,7 @@ check ctx tm ty = do
           pure $ MkClause (getFC pat) ((PC ctx.lvl pat') :: Nil) Nil rawRHS
 
       -- scrutinee was checked at Many above
-      let ctx' = withPos (extend ctx scnm scty Many) (getFC tm)
+      let ctx' = withPos (extend ctx (BI fc scnm Explicit Many scty)) (getFC tm)
       -- solveAutos
       -- If a Lazy ty is expected, insert a Delay
       let (lazy,ty) = lazyType ty
@@ -1665,36 +1660,38 @@ check ctx tm ty = do
     -- rendered in ProcessDecl
     (RHole fc, ty) => freshMeta ctx fc ty User
 
-    (t@(RLam fc (BI _ nm icit _) tm), ty@(VPi fc' nm' icit' rig a b)) => do
+    -- TODO use type if present
+    (t@(RLam fc (BI nmfc nm icit _ _) tm), ty@(VPi fc' info'@(BI nm'fc nm' icit' rig' a) b)) => do
             debug "icits \{nm} \{show icit} \{nm'} \{show icit'}"
             if icit == icit' then do
+                -- we don't have surface syntax to put quantity on the lambda
+                -- For now, pull it off of the type
                 let var = VVar fc nm ctx.lvl Lin
                 addTypeInfo fc nm ctx.env a
-                let ctx' = extend ctx nm a rig
+                let ctx' = extend ctx (BI nmfc nm icit rig' a)
                 bapp <- b $$ var
                 tm' <- check ctx' tm bapp
-                pure $ Lam fc nm icit rig tm'
+                pure $ Lam fc (BI nmfc nm icit rig' MkUnit) tm'
               else if icit' /= Explicit then do
                 let var = VVar fc nm' ctx.lvl Lin
                 ty' <- b $$ var
-                -- use nm' here if we want them automatically in scope
-                sc <- check (extend ctx nm' a rig) t ty'
-                pure $ Lam fc nm' icit rig sc
+                sc <- check (extend ctx info') t ty'
+                pure $ Lam fc (BI nm'fc nm' icit' rig' MkUnit) sc
               else
                 error fc "Icity issue checking \{show t} at \{show ty}"
     -- Unify unsolved metas with appropriate Pi of metas
-    (t@(RLam fc (BI _ nm icit quant) tm), tty@(VMeta _ _ _)) => do
+    (t@(RLam fc info@(BI nmFC nm icit quant mty) tm), tty@(VMeta _ _ _)) => do
         debug "unify PI for \{show tty} at \{show $ getFC tty}"
-        a <- freshMeta (enterMarker ctx) fc (VU emptyFC) Normal >>= eval ctx.env
-        b <- MkClosure ctx.env <$> freshMeta (extend (enterMarker ctx) nm a quant) fc (VU emptyFC) Normal
-        unifyCatch fc ctx tty (VPi fc "_" icit quant a b)
+        a <- maybeType nmFC ctx mty
+        let ctx' = extend ctx (BI fc nm icit quant a)
+        b <- MkClosure ctx.env <$> freshMeta (enterMarker ctx') fc (VU emptyFC) Normal
+        unifyCatch fc ctx tty (VPi fc (BI nmFC "_" icit quant a) b)
         addTypeInfo fc nm ctx.env a
         let var = VVar fc nm ctx.lvl Lin
         ty' <- b $$ var
-        let ctx' = extend ctx nm a quant
         tm' <- check ctx' tm ty'
-        pure $ Lam fc nm icit quant tm'
-    (t@(RLam fc (BI _ nm icit quant) tm), ty) => do
+        pure $ Lam fc (BI nmFC nm icit quant MkUnit) tm'
+    (t@(RLam fc (BI _ nm icit quant _) tm), ty) => do
               pty <- prvalCtx ty
               error fc "Expected \{pty}, got a function"
 
@@ -1706,29 +1703,28 @@ check ctx tm ty = do
       vv <- eval ctx.env v'
       addTypeInfo fc nm ctx.env vty
       -- TODO allow rig on Let (here and check -> checkIn above)
-      let ctx' = define ctx nm vv vty Many
+      let ctx' = define ctx (BI fc nm Explicit Many vty) vv
       sc' <- check ctx' sc rty
       pure $ Let fc nm v' sc'
 
     (RImplicit fc, ty) => freshMeta ctx fc ty Normal
 
-    (tm, ty@(VPi fc nm' Implicit rig a b)) => do
-      let names = map fst ctx.types
+    (tm, ty@(VPi fc info@(BI nm'fc nm' Implicit rig a) b)) => do
       debug "elab.insert: Add implicit lambda {\{nm'} : \{show a}} to \{show tm} "
       let var = VVar fc nm' ctx.lvl Lin
       ty' <- b $$ var
-      sc <- check (extend ctx nm' a rig) tm ty'
-      pure $ Lam (getFC tm) nm' Implicit rig sc
+      sc <- check (extend ctx info) tm ty'
+      pure $ Lam (getFC tm) (const MkUnit <$> info) sc
 
-    (tm, ty@(VPi fc nm' Auto rig a b)) => do
+    (tm, ty@(VPi fc info@(BI nm'fc nm' Auto rig a) b)) => do
       debug "elab.insert: Add auto lambda {\{nm'} : \{show a}} to \{show tm}"
       let var = VVar fc nm' ctx.lvl Lin
       ty' <- b $$ var
       debugM $ do
-        pty' <- prvalCtx {{(extend ctx nm' a rig)}} ty'
+        pty' <- prvalCtx {{(extend ctx info)}} ty'
         pure "elab.insert: ty' is \{pty'}"
-      sc <- check (extend ctx nm' a rig) tm ty'
-      pure $ Lam (getFC tm) nm' Auto rig sc
+      sc <- check (extend ctx info) tm ty'
+      pure $ Lam (getFC tm) (const MkUnit <$> info) sc
 
     -- this ends up in the tree a couple of times, pull it into a function
     (tm, ty) => do
@@ -1736,8 +1732,7 @@ check ctx tm ty = do
       (tm', ty') <- insert ctx tm' ty'
       (tm', ty') <- insertForce ctx tm' ty' ty
 
-      let names = map fst ctx.types
-      debug "INFER \{render 90 $ pretty tm}\n   to (\{rpprint names tm'}\n   ty \{show ty'})\nexpect \{show ty}"
+      debug "INFER \{render 90 $ pretty tm}\n   to (\{rpprint ctx.names tm'}\n   ty \{show ty'})\nexpect \{show ty}"
       unifyCatch (getFC tm) ctx ty' ty
       pure tm'
     where
@@ -1754,7 +1749,7 @@ infer ctx tm@(RUpdateRec fc _ _) = error fc "I can't infer record updates"
 
 infer ctx (RVar fc nm) = go 0 ctx.types
   where
-    go : Int -> List (String × Val × Quant)  -> M (Tm × Val)
+    go : Int -> List (BindInfo Val) -> M (Tm × Val)
     go i Nil = do
       top <- getTop
       case lookupRaw nm top of
@@ -1767,7 +1762,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
         -- a meta might be additional errors, but also could lead to narrowing of possible names...
         -- especially when we hit this for .foo
         Nothing => throwError $ ENotInScope fc nm
-    go i ((x, ty, q) :: xs) =
+    go i ((BI vfc x icit q ty) :: xs) =
       if x == nm
       then do
         checkMarker fc ctx.marker q
@@ -1790,7 +1785,7 @@ infer ctx (RApp fc t u icit) = do
   (q,a,b) <- do
     tty' <- forceType ctx.env tty
     case tty' of
-      (VPi fc' str icit' rig a b) => if icit' == icit then pure (rig,a,b)
+      (VPi fc' (BI _ str icit' rig a) b) => if icit' == icit then pure (rig,a,b)
           else error fc "IcitMismatch \{show icit} \{show icit'}"
 
       -- If it's not a VPi, try to unify it with a VPi
@@ -1798,8 +1793,9 @@ infer ctx (RApp fc t u icit) = do
       tty => do
         debug "unify PI for \{show tty} at \{show $ getFC tty}"
         a <- freshMeta (enterMarker ctx) fc (VU emptyFC) Normal >>= eval ctx.env
-        b <- MkClosure ctx.env <$> freshMeta (extend (enterMarker ctx) "_" a Many) fc (VU emptyFC) Normal
-        unifyCatch fc ctx tty (VPi fc "_" icit Many a b)
+        let info = (BI fc "_" icit Many a)
+        b <- MkClosure ctx.env <$> freshMeta (extend (enterMarker ctx) info) fc (VU emptyFC) Normal
+        unifyCatch fc ctx tty (VPi fc info b)
         pure (Many, a, b)
 
   u <- checkIn ctx q u a
@@ -1812,12 +1808,12 @@ infer ctx (RApp fc t u icit) = do
 infer ctx (RU fc) = do
   checkMarker fc ctx.marker Zero
   pure (UU fc, VU fc) -- YOLO
-infer ctx (RPi fc (BI fc nm icit quant) ty ty2) = do
+infer ctx (RPi fc info@(BI nmfc nm icit quant ty) ty2) = do
   checkMarker fc ctx.marker Zero
   ty' <- checkIn ctx Zero ty (VU fc)
   vty' <- eval ctx.env ty'
-  ty2' <- checkIn (extend ctx nm vty' quant) Zero ty2 (VU fc)
-  pure (Pi fc nm icit quant ty' ty2', (VU fc))
+  ty2' <- checkIn (extend ctx (const vty' <$> info)) Zero ty2 (VU fc)
+  pure (Pi fc (const ty' <$> info) ty2', (VU fc))
 infer ctx (RLet fc nm ty v sc) = do
   ty' <- checkIn ctx Zero ty (VU emptyFC)
   vty <- eval ctx.env ty'
@@ -1825,18 +1821,19 @@ infer ctx (RLet fc nm ty v sc) = do
   v' <- check ctx v vty
   vv <- eval ctx.env v'
   -- TODO allow rig on let (what use case?)
-  let ctx' = define ctx nm vv vty Many
+  let ctx' = define ctx (BI fc nm Explicit Many vty) vv
   (sc',scty) <- infer ctx' sc
   pure (Let fc nm v' sc', scty)
 
-infer ctx (RLam _ (BI fc nm icit quant) tm) = do
-  a <- freshMeta (enterMarker ctx) fc (VU emptyFC) Normal >>= eval ctx.env
-  addTypeInfo fc nm ctx.env a
-  let ctx' = extend ctx nm a quant
+infer ctx (RLam fc (BI nmfc nm icit quant mty) tm) = do
+  a <- maybeType nmfc ctx mty
+  addTypeInfo nmfc nm ctx.env a
+  let info = (BI nmfc nm icit quant a)
+  let ctx' = extend ctx info
   (tm', b) <- infer ctx' tm
   debug "make lam for \{show nm} scope \{rpprint (names ctx) tm'} : \{show b}"
   tyb <- quote (1 + ctx.lvl) b
-  pure (Lam fc nm icit quant tm', VPi fc nm icit quant a (MkClosure ctx.env tyb))
+  pure (Lam fc (BI nmfc nm icit quant MkUnit)tm', VPi fc (BI nmfc nm icit quant a) (MkClosure ctx.env tyb))
 
 infer ctx (RImplicit fc) = do
   ty <- freshMeta (enterMarker ctx) fc (VU emptyFC) Normal
@@ -1849,4 +1846,3 @@ infer ctx (RLit fc (LInt i)) = pure (Lit fc (LInt i), VRef fc intType Lin)
 infer ctx (RLit fc (LChar c)) = pure (Lit fc (LChar c), VRef fc charType Lin)
 infer ctx (RAs fc _ _) = error fc "@ can only be used in patterns"
 infer ctx tm = error (getFC tm) "Implement infer \{show tm}"
-

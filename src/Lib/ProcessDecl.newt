@@ -16,30 +16,6 @@ import Lib.Types
 import Lib.Util
 import Lib.Derive
 
-dumpEnv : Context -> M String
-dumpEnv ctx =
-  unlines ∘ reverse <$> go (names ctx) 0 (reverse $ zip ctx.env ctx.types) Nil
-  where
-    isVar : Int -> Val -> Bool
-    isVar k (VVar _ _ k' Lin) = k == k'
-    isVar _ _ = False
-    -- REVIEW consider moving the goal up for editors like Helix that truncate
-    -- REVIEW should we hide/demphasize entries that aren't bound to names?
-    go : List String -> Int -> List (Val × String × Val × Quant) -> List String -> M (List String)
-    go _ _ Nil acc = pure acc
-    -- don't show the = bit for now. Lean folds it. We could truncate or ... it so we know it's a def.
-    go names k ((v, n, ty, q) :: xs) acc = do
-        ty' <- quote ctx.lvl ty
-        go names (1 + k) xs ("  \{show q}\{n} : \{render 90 $ pprint names ty'}":: acc)
-
-    -- go names k ((v, n, ty) :: xs) acc = if isVar k v
-    --   then do
-    --     ty' <- quote ctx.lvl ty
-    --     go names (1 + k) xs ("  \{n} : \{render 90 $ pprint names ty'}":: acc)
-    --   else do
-    --     v' <- quote ctx.lvl v
-    --     ty' <- quote ctx.lvl ty
-    --     go names (1 + k) xs ("  \{n} = \{render 90 $ pprint names v'} : \{render 90 $ pprint names ty'}":: acc)
 
 logConstraints : M Unit
 logConstraints = do
@@ -53,9 +29,8 @@ logMetas (OutOfScope :: rest) = logMetas rest
 logMetas (Solved fc k soln :: rest) = logMetas rest
 logMetas (Unsolved fc k ctx ty User :: rest) = do
       ty' <- quote ctx.lvl ty
-      let names = map fst ctx.types
-      env <- dumpEnv ctx
-      let msg = "\{env}\n  -----------\n  \{render 90 $ pprint names ty'}"
+      env <- showCtx ctx
+      let msg = "\{env}\n  -----------\n  \{render 90 $ pprint ctx.names ty'}"
       info fc "User Hole\n\{msg}"
       logMetas rest
 -- error is reported separately
@@ -94,13 +69,13 @@ getSigs (_ :: xs) = getSigs xs
 
 teleToPi : Telescope -> Raw -> Raw
 teleToPi Nil end = end
-teleToPi ((info, ty) :: tele) end = RPi (getFC info) info ty (teleToPi tele end)
+teleToPi (info@(BI fc nm _ _ ty) :: tele) end = RPi (getFC info) info (teleToPi tele end)
 
 impTele : Telescope -> Telescope
 impTele tele = map foo tele
   where
-    foo : BindInfo × Raw → BindInfo × Raw
-    foo (BI fc nm _ _ , ty) = (BI fc nm Implicit Zero, ty)
+    foo : BindInfo Raw → BindInfo Raw
+    foo (BI fc nm _ _ ty) = (BI fc nm Implicit Zero ty)
 
 
 checkAlreadyDef : FC → Name → M Unit
@@ -150,7 +125,7 @@ processPrimFn ns fc nm used ty src = do
 -- important that we don't inline emptyTop - it has a lambda inside it (not top level)
 -- which picks up the locals and leaks memory
 shouldInline : Tm → Bool
-shouldInline (Lam _ _ _ _ sc) = shouldInline sc
+shouldInline (Lam _ _ sc) = shouldInline sc
 shouldInline (Bnd _ _) = True
 shouldInline (Ref _ _) = True
 shouldInline (App _ t u Zero) = shouldInline t
@@ -229,7 +204,7 @@ processClass ns classFC (nameFC, nm) tele decls = do
   processDecl ns decl
   ignore $ for fields $ \case
     (fc,q,name,ty) => do
-      let funType = teleToPi (impTele tele) $ RPi fc (BI fc "_" Auto Many) tail ty
+      let funType = teleToPi (impTele tele) $ RPi fc (BI fc "_" Auto Many tail) ty
       let autoPat = foldl mkAutoApp (RVar classFC dcName) fields
       let lhs = makeLHS (RVar fc name) tele
       let lhs = RApp classFC lhs autoPat Auto
@@ -242,7 +217,7 @@ processClass ns classFC (nameFC, nm) tele decls = do
       processDecl ns decl
   where
     makeLHS : Raw → Telescope → Raw
-    makeLHS acc ((BI fc' nm icit quant,  _) :: tele) = RApp fc' (makeLHS acc tele) (RVar fc' nm) Implicit
+    makeLHS acc ((BI fc' nm icit quant _) :: tele) = RApp fc' (makeLHS acc tele) (RVar fc' nm) Implicit
     makeLHS acc Nil = acc
 
     -- TODO probably should just do the fold ourselves then.
@@ -250,10 +225,10 @@ processClass ns classFC (nameFC, nm) tele decls = do
     mkAutoApp acc (fc, q, nm, ty) = RApp fc acc (RVar fc nm) Explicit
 
     mkPi : FC × Quant × String × Raw → Raw → Raw
-    mkPi (fc, q, nm, ty) acc = RPi fc (BI fc nm Explicit q) ty acc
+    mkPi (fc, q, nm, ty) acc = RPi fc (BI fc nm Explicit q ty) acc
 
-    mkApp : Raw → BindInfo × Raw → Raw
-    mkApp acc (BI fc nm icit _, _) = RApp fc acc (RVar fc nm) icit
+    mkApp : Raw → BindInfo Raw → Raw
+    mkApp acc (BI fc nm icit _ _) = RApp fc acc (RVar fc nm) icit
 
 processInstance :  String → FC → Raw → Maybe (List Decl) → M Unit
 processInstance ns instfc rawty decls = do
@@ -300,7 +275,8 @@ processInstance ns instfc rawty decls = do
     | _ => error tyFC "\{show tconName} has multiple constructors \{show cons}"
   let (Just (MkEntry _ _ _ dcty (DCon _ _ _ _) _)) = lookup con top
     | _ => error tyFC "can't find constructor \{show con}"
-  vdcty@(VPi _ nm icit rig a b) <- eval Nil dcty
+  -- vdcty@(VPi _ nm icit rig a b) <- eval Nil dcty
+  vdcty@(VPi _ info b) <- eval Nil dcty
     | x => error (getFC x) "dcty not Pi"
   debug "dcty \{render 90 $ pprint Nil dcty}"
   -- let (_,args) = funArgs codomain
@@ -315,8 +291,8 @@ processInstance ns instfc rawty decls = do
   conTele <- getFields appty env Nil
   -- declare individual functions, collect their defs
   defs <- for conTele $ \case
-     (MkBinder _ nm Explicit rig ty) => do
-       let ty' = foldr (\ x acc => case x : Binder of (MkBinder fc nm' icit rig ty') => Pi fc nm' icit rig ty' acc) ty tele
+     (BI _ nm Explicit rig ty) => do
+       let ty' = foldr (\ info acc => Pi info.biFC info acc) ty tele
        let nm' = "\{instname},\{nm}"
        -- we're working with a Tm, so we define directly instead of processDecl
        let (Just (FunDef fc name xs)) = find (\x => case x : Decl of
@@ -351,12 +327,12 @@ processInstance ns instfc rawty decls = do
     -- try to extract types of individual fields from the typeclass dcon
     -- We're assuming they don't depend on each other.
     getFields : Val -> Env -> List Binder -> M (List Binder)
-    getFields tm@(VPi fc nm Explicit rig ty sc) env bnds = do
-      bnd <- MkBinder fc nm Explicit rig <$> quote (length' env) ty
+    getFields tm@(VPi fc info@(BI _ nm Explicit rig ty) sc) env bnds = do
+      bnd <- traverse (quote (length' env)) info
       appsc <- sc $$ VVar fc nm (length' env) Lin
       getFields appsc env (bnd :: bnds)
-    getFields tm@(VPi fc nm _ rig ty sc) env bnds = do
-      appsc <- sc $$ VVar fc nm (length' env) Lin
+    getFields tm@(VPi fc info sc) env bnds = do
+      appsc <- sc $$ VVar fc info.biName (length' env) Lin
       getFields appsc env bnds
     getFields tm xs bnds = pure $ reverse bnds
 
@@ -365,14 +341,14 @@ processInstance ns instfc rawty decls = do
     tenv (S k) = (VVar emptyFC "_" (cast k) Lin :: tenv k)
 
     mkRHS : FC → String → List Binder → Raw → Raw
-    mkRHS fc instName (MkBinder _ nm Explicit rig ty :: bs) tm =
+    mkRHS fc instName (BI _ nm Explicit rig ty :: bs) tm =
       mkRHS fc instName bs (RApp fc tm (RVar fc "\{instName},\{nm}") Explicit)
     mkRHS fc instName (b :: bs) tm = mkRHS fc instName bs tm
     mkRHS fc instName Nil tm = tm
 
     apply : Val -> List Val -> M Val
     apply x Nil = pure x
-    apply (VPi fc nm icit rig a b) (x :: xs) = do
+    apply (VPi fc info b) (x :: xs) = do
       bx <- b $$ x
       apply bx xs
     apply x (y :: xs) = error instfc "expected pi type \{show x}"
@@ -389,7 +365,7 @@ processShortData ns fc lhs sigs = do
   processDecl ns dataDecl
   where
     mkPi : FC × Name → Raw → Raw
-    mkPi (fc,n) a = RPi fc (BI fc n Explicit Zero) (RU fc) a
+    mkPi (fc,n) a = RPi fc (BI fc n Explicit Zero (RU fc)) a
 
     getArgs : Raw -> List (FC × String) -> M (FC × String × List (FC × String))
     getArgs (RVar fc1 nm) acc = pure (fc1, nm, acc)
@@ -398,12 +374,12 @@ processShortData ns fc lhs sigs = do
 
     mkDecl : List (FC × Name) -> List Raw -> Raw -> M Decl
     mkDecl args acc (RVar fc' name) = do
-      let base = foldr (\ ty acc => RPi (getFC ty) (BI (getFC ty) "_" Explicit Many) ty acc) lhs acc
+      let base = foldr (\ ty acc => RPi (getFC ty) (BI (getFC ty) "_" Explicit Many ty) acc) lhs acc
       let ty = foldr mkPi base args
       pure $ TypeSig fc' Many (name :: Nil) ty
       where
         mkPi : FC × String → Raw → Raw
-        mkPi (fc,nm) acc = RPi fc (BI fc nm Implicit Zero) (RU fc) acc
+        mkPi (fc,nm) acc = RPi fc (BI fc nm Implicit Zero (RU fc)) acc
 
     mkDecl args acc (RApp fc' t u icit) = mkDecl args (u :: acc) t
     mkDecl args acc tm = error (getFC tm) "Expected contructor application, got: \{show tm}"
@@ -429,8 +405,8 @@ populateConInfo entries =
     countFields (MkEntry fc _ name type def eflags) = go type
      where
        go : Tm → Int
-       go (Pi fc nm _ Zero a b) = go b
-       go (Pi fc nm _ Many a b) = 1 + go b
+       go (Pi fc (BI _ _ _ Zero a) b) = go b
+       go (Pi fc (BI _ _ _ Many a) b) = 1 + go b
        go _ = 0
     countFields _ = 0
 
@@ -438,8 +414,8 @@ populateConInfo entries =
     runtimeFields type = go type Lin
       where
         go : Tm → SnocList Tm → List Tm × Tm
-        go (Pi fc nm _ Zero a b) tele = go b tele
-        go (Pi fc nm _ Many a b) tele = go b (tele :< a)
+        go (Pi fc (BI _ _ _ Zero a) b) tele = go b tele
+        go (Pi fc (BI _ _ _ Many a) b) tele = go b (tele :< a)
         go tl tele = (tele <>> Nil, tl)
 
     splitApp : Tm → Tm × List Tm
@@ -463,7 +439,7 @@ populateConInfo entries =
     isZero entry = countFields entry == 0
 
     isSucc : TopEntry → Bool
-    isSucc entry@(MkEntry fc _ nm dty@(Pi _ _ _ _ _ b) (DCon _ _ _ hn) _)  = case runtimeFields dty of
+    isSucc entry@(MkEntry fc _ nm dty@(Pi _ _ b) (DCon _ _ _ hn) _)  = case runtimeFields dty of
       ([a],b) => case (splitApp a, splitApp b) of
         ((Ref _ a, _), (Ref _ b, _)) => a == b
         (a,b) => False
@@ -512,7 +488,7 @@ processData ns fc (nameFC, nm) ty cons = do
           -- We know it's in U because it's part of a checked Pi type
           let (codomain, tele) = splitTele dty
           -- for printing
-          let tnames = reverse $ map binderName tele
+          let tnames = reverse $ map biName tele
           let (Ref _ hn, args) = funArgs codomain
             | (tm, _) => error (getFC tm) "expected \{nm} got \{render 90 $ pprint tnames tm}"
           when (hn /= QN ns nm) $
@@ -533,12 +509,9 @@ processData ns fc (nameFC, nm) ty cons = do
     makeConEntry : (Nat × Tm × String) → TopEntry
     makeConEntry (ix, dty, nm') = MkEntry fc Many (QN ns nm') dty (DCon ix NormalCon (getArity dty) (QN ns nm)) Nil
 
-    binderName : Binder → Name
-    binderName (MkBinder _ nm _ _ _) = nm
-
     checkDeclType : Tm -> M Unit
     checkDeclType (UU _) = pure MkUnit
-    checkDeclType (Pi _ str icit rig t u) = checkDeclType u
+    checkDeclType (Pi _ _ u) = checkDeclType u
     checkDeclType _ = error fc "data type doesn't return U"
 
 
@@ -549,9 +522,9 @@ processRecord ns recordFC (nameFC, nm) tele cname decls = do
   let fields = getSigs decls
   let (dcFC,dcName) = fromMaybe (nameFC,"Mk\{show nm}") cname
   let tcType = teleToPi tele (RU recordFC)
-  let tail = foldl (\ acc bi => case bi : BindInfo × Raw of (BI fc nm icit _, _) => RApp fc acc (RVar fc nm) icit) (RVar nameFC nm) tele
+  let tail = foldl (\ acc bi => case bi : BindInfo Raw of (BI fc nm icit _ _) => RApp fc acc (RVar fc nm) icit) (RVar nameFC nm) tele
   let dcType = teleToPi (impTele tele) $
-        foldr (\ x acc => case x : FC × Quant × String × Raw of (fc, q, nm, ty) =>  RPi fc (BI fc nm Explicit q) ty acc  ) tail fields
+        foldr (\ x acc => case x : FC × Quant × String × Raw of (fc, q, nm, ty) =>  RPi fc (BI fc nm Explicit q ty) acc) tail fields
 
   log 1 "tcon type \{render 90 $ pretty tcType}"
   log 1 "dcon type \{render 90 $ pretty dcType}"
@@ -566,11 +539,11 @@ processRecord ns recordFC (nameFC, nm) tele cname decls = do
     processFields : Raw → Raw → List (String × Raw) → List (FC × Quant × String × Raw) → M Unit
     processFields _ _ _ Nil = pure MkUnit
     processFields autoPat tail deps ((fc,q,name,ty) :: rest) = do
-      let funType = substRaw deps $ teleToPi (impTele tele) $ RPi fc (BI fc "$self" Explicit Many) tail ty
+      let funType = substRaw deps $ teleToPi (impTele tele) $ RPi fc (BI fc "$self" Explicit Many tail) ty
 
-      -- `.fieldName`
+      -- Add `.fieldName` function
       let pname = "." ++ name
-      let lhs = foldl (\acc x => case x : BindInfo × Raw of (BI fc' nm icit quant, _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc pname) tele
+      let lhs = foldl (\acc x => case x : BindInfo Raw of (BI fc' nm icit quant _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc pname) tele
       let lhs = RApp recordFC lhs autoPat Explicit
       let pdecl = FunDef fc pname ((lhs, (Just $ RVar fc name)) :: Nil)
       log 1 "\{pname} : \{render 90 $ pretty funType}"
@@ -602,14 +575,14 @@ processAlias fc (fc', nm) args rhs = do
   processDef ns fc (nm) [(lhs, Just rhs)]
   pure MkUnit
   where
-    mklhs : SnocList (BindInfo × Raw) → Raw
+    mklhs : SnocList (BindInfo Raw) → Raw
     mklhs Lin = RVar fc' nm
-    mklhs (rest :< (BI fc name icit quant, _)) =
+    mklhs (rest :< (BI fc name icit quant _)) =
       RApp fc (mklhs rest) (RVar fc name) Explicit
 
     mkty : Telescope → Raw
     mkty Nil = RU fc
-    mkty ((bi, ty) :: ns) = RPi (getFC bi) bi ty $ mkty ns
+    mkty (bi :: ns) = RPi (getFC bi) bi $ mkty ns
 
 
 processExports : String → FC → List (FC × String) → M Unit

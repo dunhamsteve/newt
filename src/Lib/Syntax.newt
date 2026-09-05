@@ -29,11 +29,11 @@ data Decl : U
 
 data Raw : U where
   RVar : (fc : FC) -> (nm : Name) -> Raw
-  RLam : (fc : FC) -> BindInfo -> (sc : Raw) -> Raw
+  RLam : (fc : FC) -> BindInfo (Maybe Raw) -> (sc : Raw) -> Raw
   RApp : (fc : FC) -> (t : Raw) -> (u : Raw) -> (icit : Icit) -> Raw
   RU   : (fc : FC) -> Raw
   RImpossible   : (fc : FC) -> Raw
-  RPi  : (fc : FC) -> BindInfo -> (ty : Raw) -> (sc : Raw) -> Raw
+  RPi  : (fc : FC) -> BindInfo Raw -> (sc : Raw) -> Raw
   RLet : (fc : FC) -> (nm : Name) -> (ty : Raw) -> (v : Raw) -> (sc : Raw) -> Raw
   RLit : (fc : FC) -> Literal -> Raw
   RCase : (fc : FC) -> (scrut : Raw) -> (mty : Maybe Raw) -> (alts : List RCaseAlt) -> Raw
@@ -52,7 +52,7 @@ instance HasFC Raw where
   getFC (RLam fc _ ty) = fc
   getFC (RApp fc t u icit) = fc
   getFC (RU fc) = fc
-  getFC (RPi fc _ ty sc) = fc
+  getFC (RPi fc _ sc) = fc
   getFC (RLet fc nm ty v sc) = fc
   getFC (RLit fc y) = fc
   getFC (RCase fc scrut mty alts) = fc
@@ -67,7 +67,7 @@ instance HasFC Raw where
 
 data Import = MkImport FC (FC × Name)
 
-alias Telescope = List (BindInfo × Raw)
+alias Telescope = List (BindInfo Raw)
 
 data Decl
   = TypeSig FC Quant (List Name) Raw
@@ -114,8 +114,12 @@ record Module where
 
 instance Show Raw
 
+-- TODO derive with args
+-- derive Show (∀ a. BindInfo a)
+instance ∀ a. {{Show a}} → Show (BindInfo a) where
+  show (BI fc name icit quant ty) = "BI \{show name} \{show icit} \{show quant} \{show ty}"
+
 derive Show Import
-derive Show BindInfo
 derive Show DoStmt
 derive Show Decl
 derive Show Module
@@ -154,22 +158,20 @@ instance Pretty Pattern where
 instance Pretty Raw where
   pretty = asDoc 0
     where
-    bindDoc : BindInfo -> Doc
-    bindDoc (BI _ nm icit quant) = text "BINDDOC"
-
     paren : Int -> Int -> Doc -> Doc
     paren p p' d = if p' < p then text "(" ++ d ++ text ")" else d
 
     asDoc : Int -> Raw -> Doc
     asDoc p (RVar _ str) = text str
-    asDoc p (RLam _ (BI _ nm icit q) x) = paren p 0 $ text "\\" ++ wrap icit (text nm) <+> text "=>" <+> asDoc 0 x
+    -- TODO print mty
+    asDoc p (RLam _ (BI _ nm icit q mty) x) = paren p 0 $ text "\\" ++ wrap icit (text nm) <+> text "=>" <+> asDoc 0 x
     -- This needs precedence and operators...
     asDoc p (RApp _ x y Explicit) = paren p 2 $ asDoc 2 x <+> asDoc 3 y
     asDoc p (RApp _ x y Implicit) = paren p 2 $ asDoc 2 x <+> text "{" ++ asDoc 0 y ++ text "}"
     asDoc p (RApp _ x y Auto) = paren p 2 $ asDoc 2 x <+> text "{{" ++ asDoc 0 y ++ text "}}"
     asDoc p (RU _) = text "U"
-    asDoc p (RPi _ (BI _ "_" Explicit Many) ty scope) = paren p 1 $ asDoc p ty <+> text "->" <+/> asDoc p scope
-    asDoc p (RPi _ (BI _ nm icit quant) ty scope) =
+    asDoc p (RPi _ (BI _ "_" Explicit Many ty) scope) = paren p 1 $ asDoc p ty <+> text "->" <+/> asDoc p scope
+    asDoc p (RPi _ (BI _ nm icit quant ty) scope) =
       paren p 1 $ wrap icit (text (show quant ++ nm) <+> text ":" <+> asDoc p ty ) <+> text "->" <+/> asDoc 1 scope
     asDoc p (RLet _ x v ty scope) =
       paren p 0 $ text "let" <+> text x <+> text ":" <+> asDoc p ty
@@ -203,8 +205,8 @@ instance Pretty Raw where
     asDoc p (RAs _ nm x) = text nm ++ text "@(" ++ asDoc 0 x ++ text ")"
     asDoc p (RUpdateRec _ clauses tm) = text "{" <+> text "TODO RUpdateRec" <+> text "}"
 
-prettyBind : (BindInfo × Raw) -> Doc
-prettyBind (BI _ nm icit quant, ty) = wrap icit (text (show quant ++ nm) <+> text ":" <+> pretty ty)
+prettyBind : (BindInfo Raw) -> Doc
+prettyBind (BI _ nm icit quant ty) = wrap icit (text (show quant ++ nm) <+> text ":" <+> pretty ty)
 
 pipeSep : List Doc -> Doc
 pipeSep = folddoc (\a b => a <+/> text "|" <+> b)
@@ -254,7 +256,7 @@ substRaw ss t = case t of
   (RAs fc nm t) => RAs fc nm (substRaw ss t)
   (RIf fc c t e) => RIf fc (substRaw ss c) (substRaw ss t) (substRaw ss e)
   (RLet fc nm ty v sc) => RLet fc nm (substRaw ss ty) (substRaw ss v) (substRaw ss sc)
-  (RPi fc info a b) => RPi fc info (substRaw ss a) (substRaw (filterBind info ss) b)
+  (RPi fc info b) => RPi fc (substRaw ss <$> info) (substRaw (filterBind info ss) b)
   (RApp fc t u icit) => RApp fc (substRaw ss t) (substRaw ss u) icit
   (RLam fc info sc) => RLam fc info (substRaw (filterBind info ss) sc)
   -- FIXME shadowing
@@ -274,8 +276,8 @@ substRaw ss t = case t of
       filter nms Nil = Nil
       filter nms (x@(a,b) :: xs) = if elem a nms then filter nms xs else x :: filter nms xs
 
-      filterBind : ∀ a. BindInfo → List (String × a) → List (String × a)
-      filterBind (BI fc nm _ _) xs = filter (nm :: Nil) xs
+      filterBind : ∀ a b. BindInfo b → List (String × a) → List (String × a)
+      filterBind (BI fc nm _ _ _) xs = filter (nm :: Nil) xs
 
       substUC : UpdateClause → UpdateClause
       substUC (AssignField fc nm t) = AssignField fc nm (substRaw ss t)

@@ -340,7 +340,7 @@ lamExpr = do
   pure $ foldr (mkLam fc) scope args
   where
     mkLam : FC → FC × Icit × Name × Maybe Raw → Raw → Raw
-    mkLam fc (nfc, icit, name, ty) sc = RLam fc (BI nfc name icit Many) sc
+    mkLam fc (nfc, icit, name, ty) sc = RLam fc (BI nfc name icit Many ty) sc
 
 
 caseAlt : Parser RCaseAlt
@@ -366,7 +366,7 @@ caseLamExpr = do
   fc <- getPos
   try ((keyword "\\" <|> keyword "λ") *> keyword "case")
   alts <- startBlock $ someSame $ caseAlt
-  pure $ RLam fc (BI fc "$case" Explicit Many) $ RCase fc (RVar fc "$case") Nothing alts
+  pure $ RLam fc (BI fc "$case" Explicit Many Nothing) $ RCase fc (RVar fc "$case") Nothing alts
 
 doExpr : Parser Raw
 doStmt : Parser DoStmt
@@ -480,8 +480,8 @@ ebind = do
   symbol ")"
   pure $ map (makeBind quant ty) names
   where
-    makeBind : Quant → Raw → FC × String → (BindInfo × Raw)
-    makeBind quant ty (pos, name) = (BI pos name Explicit quant, ty)
+    makeBind : Quant → Raw → FC × String → (BindInfo Raw)
+    makeBind quant ty (pos, name) = BI pos name Explicit quant ty
 
 
 ibind : Parser Telescope
@@ -497,8 +497,8 @@ ibind = do
   symbol "}"
   pure $ map (makeBind quant (Just ty)) names
   where
-    makeBind : Quant → Maybe Raw → FC × String → BindInfo × Raw
-    makeBind quant ty (pos, name) = (BI pos name Implicit quant, fromMaybe (RImplicit pos) ty)
+    makeBind : Quant → Maybe Raw → FC × String → BindInfo Raw
+    makeBind quant ty (pos, name) = BI pos name Implicit quant (fromMaybe (RImplicit pos) ty)
 
 abind : Parser Telescope
 abind = do
@@ -508,8 +508,8 @@ abind = do
   ty <- typeExpr
   symbol "}}"
   case name of
-    Just (pos,name) => pure ((BI pos name Auto Many, ty) :: Nil)
-    Nothing => pure ((BI (getFC ty) "_" Auto Many, ty) :: Nil)
+    Just (pos,name) => pure (BI pos name Auto Many ty :: Nil)
+    Nothing => pure (BI (getFC ty) "_" Auto Many ty :: Nil)
 
 arrow : Parser Unit
 arrow = symbol "->" <|> symbol "→"
@@ -525,17 +525,17 @@ forAll = do
   pure $ foldr mkPi scope all
   where
     mkPi : FC × String → Raw → Raw
-    mkPi (fc, n) sc = RPi fc (BI fc n Implicit Zero) (RImplicit fc) sc
+    mkPi (fc, n) sc = RPi fc (BI fc n Implicit Zero (RImplicit fc)) sc
 
 binders : Parser Raw
 binders = do
   binds <- many (abind <|> ibind <|> ebind)
   arrow
   scope <- typeExpr
-  pure $ foldr mkBind scope (join binds)
+  pure $ foldr makePi scope (join binds)
   where
-    mkBind : (BindInfo × Raw) -> Raw -> Raw
-    mkBind (info, ty) scope = RPi (getFC info) info ty scope
+    makePi : (BindInfo Raw) -> Raw -> Raw
+    makePi (info) scope = RPi (getFC info) info scope
 
 typeExpr
   = binders
@@ -547,7 +547,7 @@ typeExpr
         case scope of
           Nothing      => pure exp
           -- consider Maybe String to represent missing
-          (Just scope) => pure $ RPi fc (BI fc "_" Explicit Many) exp scope)
+          (Just scope) => pure $ RPi fc (BI fc "_" Explicit Many exp) scope)
 
 -- And top level stuff
 
@@ -656,8 +656,8 @@ nakedBind = do
   names <- some (addPos varname)
   pure $ map makeBind names
   where
-    makeBind : FC × String → (BindInfo × Raw)
-    makeBind (pos, name) = (BI pos name Explicit Many, RImplicit pos)
+    makeBind : FC × String → (BindInfo Raw)
+    makeBind (pos, name) = (BI pos name Explicit Many $ RImplicit pos)
 
 parseRecord : Parser Decl
 parseRecord = do
@@ -728,7 +728,7 @@ parseAlias = do
     ident = do
       fc <- getPos
       nm <- token Ident
-      pure [(BI fc nm Explicit Many, RImplicit fc) ]
+      pure [(BI fc nm Explicit Many $ RImplicit fc) ]
 
 parseLog : Parser Decl
 parseLog = do

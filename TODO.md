@@ -1,6 +1,7 @@
 
 ## TODO
 
+- [ ] Fix "`.a` not in scope" for record update, if record has an implicit arg
 - [ ] Build single name map on import
   - Check performance - cost to build the map vs not walking $n$ maps
   - This will likely be needed for qualified / partial imports

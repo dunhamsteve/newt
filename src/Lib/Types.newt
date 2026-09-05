@@ -31,13 +31,31 @@ instance Show Quant where
   show Zero = "0 "
   show Many = ""
 
-data BindInfo : U where
-  BI : (fc : FC) -> (name : Name) -> (icit : Icit) -> (quant : Quant) -> BindInfo
+-- There were a lot of tuples similar to this, and we need
+-- to propogate FC for rename operations.
+record BindInfo a where
+  constructor BI
+  -- FC of the name
+  biFC : FC
+  biName : String
+  biIcit : Icit
+  biQuant : Quant
+  biTy : a
 
-instance HasFC BindInfo where
-  getFC (BI fc _ _ _) = fc
+instance Functor BindInfo where
+  map f (BI fc name icit quant ty) = (BI fc name icit quant (f ty))
 
-0 Tm : U
+instance ∀ a. HasFC (BindInfo a) where
+  getFC (BI fc _ _ _ _) = fc
+
+instance Traversable BindInfo where
+  traverse f (BI fc name icit q ty) = pure (BI fc name icit q) <*> f ty
+
+-- FIXME we need to treat (.biName) differently
+biName : ∀ a . BindInfo a → String
+biName info = info.biName
+
+data Tm : U
 
 data Literal = LString String | LInt Int | LChar Char | LBool Bool
 
@@ -65,12 +83,13 @@ data Tm : U where
   -- Maybe Def here instead of Maybe Tm, we'll have DCon, TCon, etc.
   Ref : FC -> QName -> Tm
   Meta : FC -> QName -> Tm
-  Lam : FC -> Name -> Icit -> Quant -> Tm -> Tm
+  -- do we need type here?
+  Lam : FC → BindInfo Unit → Tm → Tm
   App : FC -> Tm -> Tm -> Quant -> Tm
   UU   : FC -> Tm
-  Pi  : (fc : FC) -> (nm : Name) -> Icit -> Quant -> (a : Tm) -> (b : Tm) -> Tm
+  Pi  : (fc : FC) → BindInfo Tm → Tm → Tm
   Case : FC -> Tm -> List CaseAlt -> Tm
-  -- need type?
+  -- need type? use bindinfo?
   Let : FC -> Name -> Tm -> Tm -> Tm
   -- for desugaring where
   LetRec : FC -> Name -> (ty : Tm) -> (t : Tm) -> (u : Tm) -> Tm
@@ -86,10 +105,10 @@ instance HasFC Tm where
   getFC (Delay fc _) = fc
   getFC (Ref fc str) = fc
   getFC (Meta fc k) = fc
-  getFC (Lam fc str _ _ t) = fc
+  getFC (Lam fc _ t) = fc
   getFC (App fc t u _) = fc
   getFC (UU fc) = fc
-  getFC (Pi fc str icit quant t u) = fc
+  getFC (Pi fc (BI _ str icit quant t) u) = fc
   getFC (Case fc t xs) = fc
   getFC (Lit fc _) = fc
   getFC (Let fc _ _ _) = fc
@@ -103,14 +122,14 @@ instance Show Tm where
   show (Force _ t) = "(Force \{show t})"
   show (Delay _ t) = "(Delay \{show t})"
   show (Ref _ str) = "(Ref \{show str})"
-  show (Lam _ nm icit rig t) = "(\\ \{show rig}\{nm}  => \{show  t})"
+  show (Lam _ (BI fc nm icit rig _) t) = "(\\ \{show rig}\{nm}  => \{show  t})"
   show (App _ t u _) = "(\{show t} \{show u})"
   show (Meta _ i) = "(Meta \{show i})"
   show (Lit _ l) = "(Lit \{show l})"
   show (UU _) = "U"
-  show (Pi _ str Explicit rig t u) = "(Pi (\{show rig}\{str} : \{show t}) => \{show u})"
-  show (Pi _ str Implicit rig t u) = "(Pi {\{show rig}\{str} : \{show t}} => \{show u})"
-  show (Pi _ str Auto rig t u) = "(Pi {{\{show rig}\{str} : \{show t}}} => \{show u})"
+  show (Pi _ (BI _ str Explicit rig t) u) = "(Pi (\{show rig}\{str} : \{show t}) => \{show u})"
+  show (Pi _ (BI _ str Implicit rig t) u) = "(Pi {\{show rig}\{str} : \{show t}} => \{show u})"
+  show (Pi _ (BI _ str Auto rig t) u) = "(Pi {{\{show rig}\{str} : \{show t}}} => \{show u})"
   show (Case _ sc alts) = "(Case \{show sc} \{show $ map showCaseAlt   alts})"
   show (Let _ nm t u) = "(Let \{nm} \{show t} \{show u})"
   show (LetRec _ nm ty t u) = "(LetRec \{nm} : \{show ty} \{show t} \{show u})"
@@ -150,18 +169,18 @@ pprint' p names (Delay _ t) = parens 0 p $ text "%delay" <+> pprint' 0 names t
 pprint' p names (Ref _ qn) = text $ show qn
 pprint' p names (Ref _ (QN qns baseName)) = text baseName
 pprint' p names (Meta _ (QN qns baseName)) = text "?\{baseName}"
-pprint' p names (Lam _ nm icit quant t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> pprint' 0 (nm :: names) t
+pprint' p names (Lam _ (BI _ nm icit quant _) t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> pprint' 0 (nm :: names) t
 -- TODO would be nice to make Meta app prettier, we could funArgs it, but might not be able
 -- to drop them because we do want to show if the meta is applied to _extra_ args
 pprint' p names (App _ t u _) = parens 0 p $ pprint' 0 names t <+> pprint' 1 names u
 pprint' p names (UU _) = text "U"
-pprint' p names (Pi _ nm Auto rig t u) = parens 0 p $
+pprint' p names (Pi _ (BI _ nm Auto rig t) u) = parens 0 p $
   text "{{" ++ text (show rig) <+> text nm <+> text ":" <+> pprint' 0 names t <+> text "}}" <+> text "->" <+> pprint' 0 (nm :: names) u
-pprint' p names (Pi _ nm Implicit rig t u) = parens 0 p $
+pprint' p names (Pi _ (BI _ nm Implicit rig t) u) = parens 0 p $
   text "{" ++ text (show rig) <+> text nm <+> text ":" <+> pprint' 0 names t <+> text "}" <+> text "->" <+> pprint' 0 (nm :: names) u
-pprint' p names (Pi _ "_" Explicit Many t u) =
+pprint' p names (Pi _ (BI _ "_" Explicit Many t) u) =
   parens 0 p $ pprint' 1 names t <+> text "->" <+> pprint' 0 ("_" :: names) u
-pprint' p names (Pi _ nm Explicit rig t u) = parens 0 p $
+pprint' p names (Pi _ (BI _ nm Explicit rig t) u) = parens 0 p $
   text "(" ++  text (show rig) <+> text nm <+> text ":" <+> pprint' 0 names t ++ text ")" <+> text "->" <+> pprint' 0 (nm :: names) u
 pprint' p names (Case _ sc alts) = parens 0 p $ text "case" <+> pprint' 0 names sc <+> text "of" ++ (nest 2 (line ++ stack (map (pprintAlt 0 names) alts)))
 pprint' p names (Lit _ lit) = text (show lit)
@@ -198,8 +217,8 @@ data Val : U where
   VRef : FC -> (nm : QName) -> (sp : VSpine) -> Val
   VCase : FC -> (sc : Val) -> Env -> List CaseAlt -> Val
   VMeta : FC -> QName -> (sp : VSpine) -> Val
-  VLam : FC -> Name -> Icit -> Quant -> Closure -> Val
-  VPi : FC -> Name -> Icit -> Quant -> (a : Val) -> (b : Closure) -> Val
+  VLam : FC → BindInfo Unit → (b : Closure) → Val
+  VPi : FC → BindInfo Val → (b : Closure) → Val
   -- not substing let, like idris
   VLet : FC -> Name -> Val -> Closure -> Val
   VLetRec : FC -> Name -> Val -> Closure -> Closure -> Val
@@ -221,8 +240,8 @@ getValFC (VDelay fc _) = fc
 getValFC (VRef fc _ _) = fc
 getValFC (VCase fc _ _ _) = fc
 getValFC (VMeta fc _ _) = fc
-getValFC (VLam fc _ _ _ _) = fc
-getValFC (VPi fc _ _ _ a b) = fc
+getValFC (VLam fc _ _) = fc
+getValFC (VPi fc _ b) = fc
 getValFC (VU fc) = fc
 getValFC (VErased fc) = fc
 getValFC (VLit fc _) = fc
@@ -241,10 +260,10 @@ instance Show Val where
   show (VRef _ nm Lin) = show nm
   show (VRef _ nm sp) = "(\{show nm} \{unwords $ map show $ map fst (sp <>> Nil)})"
   show (VMeta _ ix sp) = "(%meta \{show ix} [\{show $ snoclen sp} sp])"
-  show (VLam _ str icit quant x) = "(%lam \{show quant}\{str} \{showClosure x})"
-  show (VPi fc str Implicit rig x y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{showClosure  y})"
-  show (VPi fc str Explicit rig x y) = "(%pi (\{show rig} \{str} : \{show  x}). \{showClosure  y})"
-  show (VPi fc str Auto rig x y) = "(%pi {{\{show rig} \{str} : \{show  x}}}. \{showClosure  y})"
+  show (VLam fc (BI _ str icit quant _) x) = "(%lam \{show quant}\{str} \{showClosure x})"
+  show (VPi fc (BI fc str Implicit rig x) y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{showClosure  y})"
+  show (VPi fc (BI fc str Explicit rig x) y) = "(%pi (\{show rig} \{str} : \{show  x}). \{showClosure  y})"
+  show (VPi fc (BI fc str Auto rig x) y) = "(%pi {{\{show rig} \{str} : \{show  x}}}. \{showClosure  y})"
   show (VCase fc sc env alts) = "(%case \{show sc} \{unwords $ map show alts})"
   show (VU _) = "U"
   show (VLit _ lit) = show lit
@@ -433,7 +452,7 @@ record Context where
   -- I was going to recombine them, but realized I'd have to regenerate env for eval
   env : Env                  -- Values in scope
   -- TODO add fc, maybe add BD and make this a proper type
-  types : List (String × Val × Quant) -- types and names in scope
+  types : List (BindInfo Val) -- types and names in scope
   -- so we'll try "bds" determines length of local context
   bds : List BD          -- bound or defined
 
@@ -441,15 +460,16 @@ record Context where
   ctxFC : FC
   marker : Marker
 
+
 -- add a binding to environment
-extend : Context -> String -> Val -> Quant → Context
-extend (MkCtx lvl env types bds ctxFC mark) name ty quant =
-  MkCtx (1 + lvl) (VVar emptyFC name lvl Lin :: env) ((name, ty, quant) :: types) (Bound :: bds) ctxFC mark
+extend : Context → BindInfo Val → Context
+extend (MkCtx lvl env types bds ctxFC mark) info =
+  MkCtx (1 + lvl) (VVar emptyFC info.biName lvl Lin :: env) (info :: types) (Bound :: bds) ctxFC mark
 
 -- add a def to the environment
-define : Context -> String -> Val -> Val → Quant -> Context
-define (MkCtx lvl env types bds ctxFC mark) name val ty quant =
-  MkCtx (1 + lvl) (val :: env) ((name, ty, quant) :: types) (Defined :: bds) ctxFC mark
+define : Context → BindInfo Val → Val → Context
+define (MkCtx lvl env types bds ctxFC mark) info val =
+  MkCtx (1 + lvl) (val :: env) (info :: types) (Defined :: bds) ctxFC mark
 
 instance Show MetaEntry where
   show (Unsolved pos k ctx ty kind) = "Unsolved \{show pos} \{show k} \{show kind} : \{show ty} \{show ctx.bds} cs"
@@ -460,7 +480,11 @@ withPos : Context -> FC -> Context
 withPos ctx fc = { ctxFC := fc } ctx
 
 names : Context -> List String
-names ctx = map fst ctx.types
+-- FIXME - let's not do the slice with postfix
+names ctx = map (\a => a.biName) ctx.types
+
+.names : Context → List String
+ctx.names = map (\a => a.biName) ctx.types
 
 -- Enter an erased section
 enterMarker : Context → Context
@@ -558,7 +582,7 @@ debugM : M String -> M Unit
 debugM x = logM 2 x
 
 instance Show Context where
-  show ctx = "Context \{show $ map fst $ ctx.types}"
+  show ctx = "Context \{show ctx.names}"
 
 
 error : ∀ a. FC -> String -> M a

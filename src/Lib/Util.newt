@@ -7,7 +7,7 @@ import Data.List1
 
 -- pi arity is primitive functions
 piArity : Tm -> List Quant
-piArity (Pi _ _ _ quant _ b) = quant :: piArity b
+piArity (Pi _ info b) = info.biQuant :: piArity b
 piArity _ = Nil
 
 funArgs : Tm -> (Tm × List (Tm × Quant))
@@ -17,17 +17,15 @@ funArgs tm = go tm Nil
     go (App _ t u p) args = go t ((u,p) :: args)
     go t args = (t, args)
 
-data Binder : U where
-  MkBinder : FC -> String -> Icit -> Quant -> Tm -> Binder
+alias Binder = BindInfo Tm
 
-instance Show Binder where
-  show (MkBinder _ nm icit quant t) = "[\{show quant}\{nm} \{show icit} : ...]"
 
+-- only used in ProcessDecl
 splitTele : Tm -> (Tm × List Binder)
 splitTele = go Nil
   where
     go : List Binder -> Tm -> (Tm × List Binder)
-    go ts (Pi fc nm icit quant t u) = go (MkBinder fc nm icit quant t :: ts) u
+    go ts (Pi fc info u) = go (info :: ts) u
     go ts tm = (tm, reverse ts)
 
 -- given a filename and split module name, return the base path or an error
