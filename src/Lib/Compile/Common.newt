@@ -44,7 +44,7 @@ record OrderedNames where
 
 sortedNames : SortedMap QName CExp → List QName → List QName
 sortedNames defs names =
-  .names $ foldl (go Nil) (MkON Nil emptyMap) $ map (_,_ True) names
+  (foldl (go Nil) (MkON Nil emptyMap) $ map (_,_ True) names).names
   where
     elem' : Bool × QName → OrderedNames → Bool
     elem' key acc = isJust $ lookupMap' key acc.done

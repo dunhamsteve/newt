@@ -83,7 +83,7 @@ strongConnect {k} st vtx =
 tarjan : ∀ k. {{Eq k}} {{Ord k}} → List (k × List k) → List (List k)
 tarjan {k} nodes =
   let g = foldMap const emptyMap $ map mkVertex nodes in
-  .result $ foldl checkVertex (MkTState 0 Nil Nil g) $ map fst nodes
+  (foldl checkVertex (MkTState 0 Nil Nil g) $ map fst nodes).result
   where
     mkVertex : k × List k → k × TVertex k
     mkVertex (n,out) = (n, MkTV n out 0 0 False)

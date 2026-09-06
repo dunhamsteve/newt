@@ -192,6 +192,7 @@ pArg = do
 
 alias AppSpine = List (Icit × FC × Raw)
 
+-- pratt takes an operator table 
 pratt : Operators -> Int -> String -> Raw -> AppSpine -> Parser (Raw × AppSpine)
 pratt ops prec stop left spine = do
   (left, spine) <- runPrefix stop left spine
@@ -265,15 +266,17 @@ pratt ops prec stop left spine = do
 
     -- run any prefix operators
     runPrefix : String -> Raw -> AppSpine -> Parser (Raw × AppSpine)
-    runPrefix stop (RVar fc nm) spine =
-      case lookupMap' nm ops of
-           -- TODO False should be an error here
+    runPrefix stop tm@(RVar fc nm) spine =
+      -- a bit of a hack, eta expand a `(.foo)` so `map (.foo)` isn't treated like `map foo`
+      -- TODO fix this issue by pulling pratt out into a desugaring step
+      if isPrefixOf "." nm
+      then pure (RLam fc (BI fc "$hack" Explicit Many Nothing) (RApp fc tm (RVar fc "$hack") Explicit),spine)
+      else case lookupMap' nm ops of
          Just (MkOp name p fix True rule) => do
             runRule p fix stop rule (RVar fc name) spine
          Just (MkOp name p fix False rule) =>
             -- REVIEW We could also use a lambda with a fresh name
             runRule p fix stop rule (RApp fc (RVar fc "flip") (RVar fc name) Explicit) spine
-            -- fail "got infix \{show name} in prefix position"
          _ =>
           pure (left, spine)
     runPrefix stop left spine = pure (left, spine)
@@ -285,6 +288,7 @@ parseOp = do
   fc <- getPos
   ops <- getOps
   hd <- atom
+  -- FIXME map (.bar) ends up treated like `map .bar`
   rest <- many pArg
   (res, Nil) <- pratt ops 0 "" hd rest
     | (res, xs) => fail "extra stuff \{show xs}"

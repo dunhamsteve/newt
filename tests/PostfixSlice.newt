@@ -1,0 +1,12 @@
+module PostfixSlice
+
+import Prelude
+
+record Foo where
+  bar : String
+
+foo : List Int → Int
+foo xs = foldr (+) 0 xs
+
+main : IO Unit
+main = printLn $ map (.bar) [MkFoo "woo"]
