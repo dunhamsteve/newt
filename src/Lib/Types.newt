@@ -51,10 +51,6 @@ instance ∀ a. HasFC (BindInfo a) where
 instance Traversable BindInfo where
   traverse f (BI fc name icit q ty) = pure (BI fc name icit q) <*> f ty
 
--- FIXME we need to treat (.biName) differently
-biName : ∀ a . BindInfo a → String
-biName info = info.biName
-
 data Tm : U
 
 data Literal = LString String | LInt Int | LChar Char | LBool Bool
@@ -480,11 +476,10 @@ withPos : Context -> FC -> Context
 withPos ctx fc = { ctxFC := fc } ctx
 
 names : Context -> List String
--- FIXME - let's not do the slice with postfix
-names ctx = map (\a => a.biName) ctx.types
+names ctx = map (.biName) ctx.types
 
 .names : Context → List String
-ctx.names = map (\a => a.biName) ctx.types
+ctx.names = map (.biName) ctx.types
 
 -- Enter an erased section
 enterMarker : Context → Context

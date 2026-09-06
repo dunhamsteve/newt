@@ -488,7 +488,7 @@ processData ns fc (nameFC, nm) ty cons = do
           -- We know it's in U because it's part of a checked Pi type
           let (codomain, tele) = splitTele dty
           -- for printing
-          let tnames = reverse $ map biName tele
+          let tnames = reverse $ map (.biName) tele
           let (Ref _ hn, args) = funArgs codomain
             | (tm, _) => error (getFC tm) "expected \{nm} got \{render 90 $ pprint tnames tm}"
           when (hn /= QN ns nm) $

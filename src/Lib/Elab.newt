@@ -54,13 +54,13 @@ lookupName ctx name = go 0 ctx.types
     go : Int -> List (BindInfo Val) -> Maybe (Tm × (BindInfo Val))
     go ix Nil = Nothing
     -- FIXME - we should stuff a Binder of some sort into "types"
-    go ix (info :: xs) = if biName info == name then Just (Bnd emptyFC ix, info) else go (1 + ix) xs
+    go ix (info :: xs) = if info.biName == name then Just (Bnd emptyFC ix, info) else go (1 + ix) xs
 
 lookupDef : Context -> String -> Maybe Val
 lookupDef ctx name = go 0 ctx.types ctx.env
   where
     go : Int -> List (BindInfo Val) -> List Val -> Maybe Val
-    go ix (ce :: xs) (v :: vs) = if biName ce == name then Just v else go (1 + ix) xs vs
+    go ix (ce :: xs) (v :: vs) = if ce.biName == name then Just v else go (1 + ix) xs vs
     go ix _ _ = Nothing
 
 -- get metas referenced in a term
