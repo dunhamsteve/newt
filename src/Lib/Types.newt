@@ -385,7 +385,8 @@ data EditorInfo
   -- Not sure we need Context here?
   | MissingCases FC Context (List QName)
 
-data TypeInfo = MkTypeInfo FC String Env Val
+-- that last one is the definition FC
+data TypeInfo = MkTypeInfo FC String Env Val FC
 
 record ModContext where
   constructor MkModCtx

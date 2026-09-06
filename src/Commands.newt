@@ -58,6 +58,8 @@ getHoverInfo : FileSource → String → Int → Int → M HoverInfo
 getHoverInfo repo modns row col = do
     Just mod <- switchModule repo modns | _ => pure NeedCheck
     top <- getTop
+
+    -- check type at point info in module
     let (Nothing) = checkMod mod.modTypes | Just res => res
 
     -- Find the token at the point
@@ -80,11 +82,11 @@ getHoverInfo repo modns row col = do
     where
         checkMod : List TypeInfo → Maybe $ M HoverInfo
         checkMod Nil = Nothing
-        checkMod (MkTypeInfo fc nm env vty :: xs) = 
+        checkMod (MkTypeInfo fc nm env vty fc' :: xs) = 
           if posInFC row col fc
           then Just $ do
                   ty <- quote (length' env) vty
-                  pure $ HasHover fc ("\{nm} : \{rpprint Nil ty}")
+                  pure $ HasHover fc' ("\{nm} : \{rpprint Nil ty} (\{show fc'})")
           else checkMod xs
         -- We don't want to pick up the paren token when on the border
         isIdent : BTok → Bool
