@@ -1,6 +1,7 @@
 
 ## TODO
 
+- [ ] Allow types on lambda args
 - [ ] Fix "`.a` not in scope" for record update, if record has an implicit arg
 - [ ] Build single name map on import
   - Check performance - cost to build the map vs not walking $n$ maps
@@ -11,8 +12,6 @@
   - comments stored aside (location, whether it is a tail or standalone) and re-integrated
   - how do we want to handle `$` and parens? we could preserve or normalize
 - [ ] consider postponing `case` if scrutinee type is an unsolved meta
-- [ ] in batch mode, stop at first erroring module
-  - We could also gain performance by not collecting LSP data in batch mode
 - [ ] maybe `let case` instead of `let (...)` (which is a little subtle)
   - Or simply put a term in there and treat as a variable iff it is lowercase and non-applied
 - [x] Use while-TCO for mutual recursion, drop `bouncer`

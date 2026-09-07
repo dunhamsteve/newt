@@ -37,24 +37,11 @@ showCtx : Context -> M String
 showCtx ctx =
   unlines ∘ reverse <$> go (names ctx) 0 (reverse $ zip ctx.env ctx.types) Nil
   where
-    isVar : Int -> Val -> Bool
-    isVar k (VVar _ nm k' Lin) = k == k'
-    isVar _ _ = False
-
     go : List String -> Int -> List (Val × (BindInfo Val)) -> List String -> M (List String)
     go _ _ Nil acc = pure acc
     go names k ((v, BI _ n _ q ty) :: xs) acc = do
         tty <- quote ctx.lvl ty
         go names (1 + k) xs ("  \{show q}\{n} : \{rpprint names tty}" :: acc)
-
--- return Bnd and type for name
-lookupName : Context -> String -> Maybe (Tm × (BindInfo Val))
-lookupName ctx name = go 0 ctx.types
-  where
-    go : Int -> List (BindInfo Val) -> Maybe (Tm × (BindInfo Val))
-    go ix Nil = Nothing
-    -- FIXME - we should stuff a Binder of some sort into "types"
-    go ix (info :: xs) = if info.biName == name then Just (Bnd emptyFC ix, info) else go (1 + ix) xs
 
 lookupDef : Context -> String -> Maybe Val
 lookupDef ctx name = go 0 ctx.types ctx.env
@@ -100,7 +87,7 @@ getMetas (VCase _ sc _ alts) = join $ getMetas sc :: map getAltMetas alts
 getMetas (VLetRec _ _ ty (MkClosure _ t) (MkClosure _ u)) = getMetas ty ++ getTMetas t ++ getTMetas u
 getMetas _ = []
 
--- currently only used for pattern matching
+-- Variable assignments needed by unification, currently only used for pattern matching
 record UnifyResult where
   constructor MkResult
   -- these correspond to v₁ ≡ val from indicies
@@ -132,7 +119,7 @@ isCandidate ty (App fc t u q) = isCandidate ty t
 isCandidate _ _ = False
 
 setMetaMode : MetaMode → M Unit
--- ideally we would support dotted paths like metaCtx.mcmode := CheckFirst
+-- ideally we would support dotted paths like currentMod.metaCtx.mcmode := CheckFirst
 setMetaMode mcmode = modifyTop { currentMod $= {modMetaCtx $= {mcmode := mcmode} } }
 
 setMetaContext : MetaContext → M Unit
@@ -164,14 +151,12 @@ findMatches ctx ty ((name, type) :: xs) = do
       findMatches ctx ty xs)
 
 contextMatches : Context -> Val -> M (List (Tm × Val))
--- REVIEW consider not zipping
-contextMatches ctx ty = go (zip ctx.env ctx.types)
+contextMatches ctx ty = go ctx.env ctx.types
   where
-    go : List (Val × (BindInfo Val)) -> M (List (Tm × Val))
-    go Nil = pure Nil
-    go ((tm, BI _ nm _ _ vty) :: xs) = do
+    go : List Val → List (BindInfo Val) -> M (List (Tm × Val))
+    go (tm :: tms) (BI _ nm _ _ vty :: bis) = do
       type <- quote ctx.lvl vty
-      let (True) = isCandidate ty type | False => go xs
+      let (True) = isCandidate ty type | False => go tms bis
       top <- getTop
       let mc = top.currentMod.modMetaCtx
       catchError(do
@@ -179,11 +164,12 @@ contextMatches ctx ty = go (zip ctx.env ctx.types)
           unifyCatch (getFC ty) ctx ty vty
           setMetaContext mc
           tm <- quote ctx.lvl tm
-          (_::_ (tm, vty )) <$> go xs)
+          (_::_ (tm, vty )) <$> go tms bis)
         (\ err => do
           debug "auto: No match \{show ty} \{rpprint (names ctx) type} \{show err}"
           setMetaContext mc
-          go xs)
+          go tms bis)
+    go _ _ = pure Nil
 
 getArity : Tm -> List Quant
 getArity (Pi x (BI _ str icit rig t) u) = rig :: getArity u
