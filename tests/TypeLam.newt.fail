@@ -1,0 +1,13 @@
+*** Process tests/TypeLam.newt
+module Prelude
+module TypeLam
+ERROR at tests/TypeLam.newt:7:33--7:34: unification failure: vref mismatch
+  failed to unify Prim.Int
+             with Prelude.Nat
+  
+  -- this should be an error
+  foo : List Int → List Int
+  foo x = map (\ (x : Nat) => x * 2) x
+                                  ^
+
+Stop on error

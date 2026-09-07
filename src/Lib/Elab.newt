@@ -1646,14 +1646,20 @@ check ctx tm ty = do
     -- rendered in ProcessDecl
     (RHole fc, ty) => freshMeta ctx fc ty User
 
-    -- TODO use type if present
-    (t@(RLam fc (BI nmfc nm icit _ _) tm), ty@(VPi fc' info'@(BI nm'fc nm' icit' rig' a) b)) => do
+    (t@(RLam fc (BI nmfc nm icit _ mty) tm), ty@(VPi fc' info'@(BI nm'fc nm' icit' rig' a) b)) => do
             debug "icits \{nm} \{show icit} \{nm'} \{show icit'}"
             if icit == icit' then do
                 -- we don't have surface syntax to put quantity on the lambda
                 -- For now, pull it off of the type
                 let var = VVar fc nm ctx.lvl Lin
                 addTypeInfo nmfc nm ctx.env a nmfc
+                -- if the user provided a type, do a conversion check
+                case mty of
+                  Just a' => do
+                    a' <- check (enterMarker ctx) a' (VU emptyFC)
+                    va' <- eval ctx.env a'
+                    unifyCatch (getFC tm) (enterMarker ctx) a va'
+                  Nothing => pure MkUnit
                 let ctx' = extend ctx (BI nmfc nm icit rig' a)
                 bapp <- b $$ var
                 tm' <- check ctx' tm bapp

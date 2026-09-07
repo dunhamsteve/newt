@@ -1,0 +1,7 @@
+module TypeLam
+
+import Prelude
+
+-- this should be an error
+foo : List Int → List Int
+foo x = map (\ (x : Nat) => x * 2) x
