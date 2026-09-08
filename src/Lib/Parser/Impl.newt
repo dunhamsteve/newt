@@ -208,13 +208,13 @@ manySame pa = many $ sameLevel pa
 
 -- check indent on next token and run parser
 
-indented : ∀ a. Parser a -> Parser a
-indented (P p) = P $ \last toks com ops indent => case toks of
+indented : ∀ a. String → Parser a → Parser a
+indented msg (P p) = P $ \last toks com ops indent => case toks of
   Nil => p last toks com ops indent
   (t :: _) =>
     let (tl,tc) = getStart t
     in if tc > fcCol indent || tl == fcLine indent then p last toks com ops indent
-    else Fail (perror indent.file toks "unexpected outdent") last toks com ops
+    else Fail (perror indent.file toks "unexpected outdent\{msg}") last toks com ops
 
 -- expect token of given kind
 
@@ -227,11 +227,11 @@ keyword' kw = ignore $ satisfy (\t => t.val.text == kw && (t.val.kind == Keyword
 -- expect indented token of given kind
 
 token : Kind -> Parser String
-token = indented ∘ token'
+token k = indented " - expected a \{show k} token" $ token' k
 
 
 keyword : String -> Parser Unit
-keyword kw = indented $ keyword' kw
+keyword kw = indented " - expected \{kw}" $ keyword' kw
 
 symbol : String -> Parser Unit
 symbol = keyword
