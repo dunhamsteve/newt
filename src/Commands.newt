@@ -274,29 +274,6 @@ getRenameInfo ctx row col = do
     mismatch : String → TypeInfo → Bool
     mismatch nm (MkTypeInfo fc nm' _ _ _) =  nm /= nm'
 
-
--- Just position
--- Range | placeholder
-getRenameRange : FileSource → String → Int → Int → M Unit
-getRenameRange repo modns row col = do
-  Just mod <- switchModule repo modns | _ => pure MkUnit
-  top <- getTop
-  (prep :: rest) <- getRenameInfo mod row col
-    | _ => pure MkUnit
-
-
-  pure MkUnit
-
--- https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_rename
--- result: WorkspaceEdit | null
--- error: code/message
-renameVariable : FileSource → String → Int → Int → M Unit
-renameVariable repo modns row col = do
-  Just mod <- switchModule repo modns | _ => pure MkUnit
-  top <- getTop
-
-  pure MkUnit
-
 getHole : ModContext → Int → Int → Maybe MetaEntry
 getHole mod row col =
   find isUserMeta $ listValues mod.modMetaCtx.metas
