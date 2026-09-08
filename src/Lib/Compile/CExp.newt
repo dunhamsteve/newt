@@ -246,9 +246,9 @@ compileTerm env (Case fc t alts) = do
     newTypeMatch sc [ CConAlt _ _ NewTypeCon [arg] tm ] = Just $ CLet "nt" sc tm
     newTypeMatch _ _ = Nothing
 
-    filterArgs : List Quant → List String → List String
-    filterArgs (Many :: qs) (x :: xs) = x :: filterArgs qs xs
-    filterArgs (_ :: qs) (x :: xs) = filterArgs qs xs
+    filterArgs : List Quant → Nat → List String
+    filterArgs (Many :: qs) (S k) = "_" :: filterArgs qs k
+    filterArgs (_ :: qs) (S k) = filterArgs qs k
     filterArgs _ _ = Nil
 
     numAltP : CAlt → Bool

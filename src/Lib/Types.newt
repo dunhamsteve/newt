@@ -63,7 +63,7 @@ instance Show Literal where
 
 data CaseAlt : U where
   CaseDefault : Tm -> CaseAlt
-  CaseCons : (name : QName) -> (args : List String) -> Tm ->  CaseAlt
+  CaseCons : (name : QName) -> Nat -> Tm ->  CaseAlt
   CaseLit : Literal -> Tm ->  CaseAlt
 
 0 Def : U
@@ -133,7 +133,7 @@ instance Show Tm where
 
 
 showCaseAlt (CaseDefault tm) = "_ => \{show tm}"
-showCaseAlt (CaseCons nm args tm) = "\{show nm} \{unwords args} => \{show tm}"
+showCaseAlt (CaseCons nm args tm) = "\{show nm} \{unwords $ replicate args "_"} => \{show tm}"
 showCaseAlt (CaseLit lit tm) = "\{show lit} => \{show tm}"
 
 instance Show CaseAlt where
@@ -147,7 +147,7 @@ instance Show CaseAlt where
 pprint' : Int -> List String -> Tm -> Doc
 pprintAlt : Int -> List String -> CaseAlt -> Doc
 pprintAlt p names (CaseDefault t) = text "_" <+> text "=>" <+> pprint' p ("_" :: names) t
-pprintAlt p names (CaseCons name args t) = text (show name) <+> spread (map text args) <+> (nest 2 $ text "=>" <+/> pprint' p (reverse args ++ names) t)
+pprintAlt p names (CaseCons name args t) = text (show name) <+> spread (replicate args $ text "_") <+> (nest 2 $ text "=>" <+/> pprint' p (replicate args "_" ++ names) t)
 -- `;` is not in surface syntax, but sometimes we print on one line
 pprintAlt p names (CaseLit lit t) = text (show lit) <+> (nest 2 $ text "=>" <+/> pprint' p names t ++ text ";")
 

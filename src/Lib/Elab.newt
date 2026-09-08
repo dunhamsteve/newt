@@ -1064,7 +1064,7 @@ forcedCase ctx prob@(MkProb clauses ty) ((ix , (VRef _ dcName sp)) :: scons) = d
   when (length' clauses == 0) $ error ctx.ctxFC "Missing case for \{show dcName} splitting \{show ix}"
   tm <- forcedCase ctx' (MkProb clauses prob.ty) $ scons ++ scons'
 
-  pure $ Case ctx.ctxFC (Bnd ctx.ctxFC (lvl2ix ctx.lvl ix)) [CaseCons dcName (map (const "_") vars) tm]
+  pure $ Case ctx.ctxFC (Bnd ctx.ctxFC (lvl2ix ctx.lvl ix)) [CaseCons dcName (length vars) tm]
 
 forcedCase ctx prob ((ix , l@(VLit _ _)) :: scons) = do
   debug "forced Lit \{show l}"
@@ -1130,12 +1130,10 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         -- TODO error hole (continue with other cases on error)
         when (length' clauses == 0) $ error ctx.ctxFC "Missing case for \{show dcName} splitting \{show scnm}"
         tm <- forcedCase ctx' (MkProb clauses prob.ty) res.constraints
-        pure $ Just $ CaseCons dcName (map getName vars) tm
+        -- FIXME drop the names
+        pure $ Just $ CaseCons dcName (length vars) tm
     Just v => fatalError "Weird thing \{show v} in buildCase"
     Nothing => fatalError "Bad index in buildCase"
-  where
-    getName : Bind -> String
-    getName (MkBind nm _ _) = "_"
 
 
 splitArgs : Raw -> List (Raw × Icit) -> (Raw × List (Raw × Icit))

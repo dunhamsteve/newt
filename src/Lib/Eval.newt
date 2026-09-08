@@ -32,9 +32,9 @@ vapp (VCase fc sc env [CaseCons nm args tm]) u q = do
   tm' <- quote (length' env') val'
   pure $ VCase fc sc env [CaseCons nm args tm']
   where
-    mkenv : Int → Env → List String → Env
-    mkenv l env Nil = env
-    mkenv l env (n :: ns) = mkenv (l + 1) (VVar emptyFC n l Lin :: env) ns
+    mkenv : Int → Env → Nat → Env
+    mkenv l env Z = env
+    mkenv l env (S k) = mkenv (l + 1) (VVar emptyFC "_" l Lin :: env) k
 -- not really impossible, could be a stuck VCase.
 vapp t u q = error' "unhandled vapp \{show t} to \{show u}\n"
 
@@ -136,10 +136,10 @@ evalCase env sc@(VRef _ nm sp) (cc@(CaseCons name nms t) :: xs) = do
       _ => pure Nothing
   where
     -- put constructor args into scope
-    pushArgs : Env -> List (Val × Quant) -> List String -> M (Maybe Val)
-    pushArgs env ((arg,q) :: args) (nm :: nms) = pushArgs (arg :: env) args nms
-    pushArgs env Nil Nil = Just <$> eval env t
-    pushArgs env args Nil = fatalError "Extra args \{show args} on \{show name}"
+    pushArgs : Env -> List (Val × Quant) -> Nat -> M (Maybe Val)
+    pushArgs env ((arg,q) :: args) (S k) = pushArgs (arg :: env) args k
+    pushArgs env Nil Z = Just <$> eval env t
+    pushArgs env args Z = fatalError "Extra args \{show args} on \{show name}"
     pushArgs env Nil rest = fatalError "Missing args \{show rest} on \{show name}"
 
 evalCase env sc (CaseDefault u :: xs) = Just <$> eval env u
@@ -231,12 +231,12 @@ normAlt env l (CaseLit lit tm) = do
    CaseLit lit <$> quote l val
 normAlt env l (CaseCons nm args tm) = do
   val <- eval (mkenv l env args) tm
-  tm <- quote (length' args + l) val
+  tm <- quote (cast args + l) val
   pure $ CaseCons nm args tm
   where
-    mkenv : Int → Env → List String → Env
-    mkenv l env Nil = env
-    mkenv l env (n :: ns) = mkenv (l + 1) (VVar emptyFC n l Lin :: env) ns
+    mkenv : Int → Env → Nat → Env
+    mkenv l env Z = env
+    mkenv l env (S k) = mkenv (l + 1) (VVar emptyFC "_" l Lin :: env) k
 
 quote l (VVar fc nm k sp) = if k < l
   then quoteSp l (Bnd fc (lvl2ix l k )) sp -- level to index
@@ -253,7 +253,7 @@ quote l (VLam fc info t) = do
   tm <- quote (1 + l) val
   pure $ Lam fc info tm
 quote l (VPi fc info b) = do
-  info' <- traverse (quote l) info 
+  info' <- traverse (quote l) info
   val <- b $$ VVar emptyFC info.biName l Lin
   tm <- quote (1 + l) val
   pure $ Pi fc info' tm
@@ -417,9 +417,9 @@ zonkAlt top l env (CaseDefault t) = CaseDefault <$> zonk top l env t
 zonkAlt top l env (CaseLit lit t) = CaseLit lit <$> zonk top l env t
 zonkAlt top l env (CaseCons name args t) = CaseCons name args <$> go l env args t
   where
-    go : Int -> Env -> List String -> Tm -> M Tm
-    go l env Nil tm = zonk top l env tm
-    go l env (x :: xs) tm = go (1 + l) (VVar (getFC tm) x l Lin :: env) xs tm
+    go : Int -> Env -> Nat -> Tm -> M Tm
+    go l env Z tm = zonk top l env tm
+    go l env (S k) tm = go (1 + l) (VVar (getFC tm) "_" l Lin :: env) k tm
 
 zonk top l env t =
   case t of

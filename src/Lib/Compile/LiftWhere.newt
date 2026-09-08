@@ -39,7 +39,7 @@ liftWhereTm name env tm@(Case fc t alts) = do
       -- TODO add quantity to args
       top <- getTop
       let (Just (MkEntry _ _ name type (DCon _ _ qs str) _)) = lookup qn top | _ => fatalError "\{show qn} not dcon"
-      let args = map (const "_") qs
+      let args = length qs
       CaseCons qn args <$> liftWhereTm name ((map (\ q => (q, Nothing)) $ reverse qs) ++ env) tm
 -- Lift local functions to top level and mark environment
 -- TODO Instead of Nothing, put some magic in to let us thin out the LetRec
