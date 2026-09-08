@@ -35,3 +35,16 @@ ERROR 9:0--9:8 "no definition for show : LSPStuff.Foo -> Prim.String"
 * Intro b
 - LSPStuff.newt 16:12--16:13 "b"
 
+*** rename LSPStuff.newt 20 17 woot
+- LSPStuff.newt 20:0--20:3 "woot"
+- LSPStuff.newt 19:0--19:3 "woot"
+- LSPStuff.newt 20:17--20:20 "woot"
+- LSPStuff.newt 18:0--18:3 "woot"
+
+*** rename LSPStuff.newt 27 20 woot
+- LSPStuff.newt 23:11--23:13 "woot"
+- LSPStuff.newt 27:20--27:22 "woot"
+- LSPStuff.newt 25:4--25:6 "woot"
+- LSPStuff.newt 27:4--27:6 "woot"
+- LSPStuff.newt 26:4--26:6 "woot"
+

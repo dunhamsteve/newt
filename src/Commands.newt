@@ -52,6 +52,16 @@ switchModule repo modns = do
 
 data HoverInfo = NoHoverInfo | NeedCheck | HasHover FC String
 
+checkMod : Int → Int → List TypeInfo → Maybe TypeInfo
+checkMod row col Nil = Nothing
+checkMod row col (info@(MkTypeInfo fc nm env vty fc') :: xs) =
+  if posInFC row col fc
+  -- try to skip the $_ from do desugaring - might want virtual FC
+  then case isPrefixOf "$" nm of
+    True => checkMod row col xs
+    False => Just info
+  else checkMod row col xs
+
 -- The cheap version of type at point, find the token, lookup in global context
 -- Later we will either get good FC for entries or scan them all and build a cache.
 getHoverInfo : FileSource → String → Int → Int → M HoverInfo
@@ -60,7 +70,10 @@ getHoverInfo repo modns row col = do
     top <- getTop
 
     -- check type at point info in module
-    let (Nothing) = checkMod mod.modTypes | Just res => res
+    let (Nothing) = checkMod row col mod.modTypes
+      | Just (MkTypeInfo fc nm env vty fc') => do
+        ty <- quote (length' env) vty
+        pure $ HasHover fc' "\{nm} : \{rpprint Nil ty}"
 
     -- Find the token at the point
     let lines = split mod.modSource "\n"
@@ -80,14 +93,6 @@ getHoverInfo repo modns row col = do
     pure $ HasHover e.fc ("\{show e.name} : \{rpprint Nil ty}")
 
     where
-        checkMod : List TypeInfo → Maybe $ M HoverInfo
-        checkMod Nil = Nothing
-        checkMod (MkTypeInfo fc nm env vty fc' :: xs) = 
-          if posInFC row col fc
-          then Just $ do
-                  ty <- quote (length' env) vty
-                  pure $ HasHover fc' ("\{nm} : \{rpprint Nil ty} (\{show fc'})")
-          else checkMod xs
         -- We don't want to pick up the paren token when on the border
         isIdent : BTok → Bool
         isIdent (MkBounded (Tok Ident _) _) = True
@@ -101,6 +106,7 @@ getHoverInfo repo modns row col = do
         getTok (tok :: toks) =
             if tok.bounds.startCol <= col && col <= tok.bounds.endCol && isIdent tok
             then Just $ value tok else getTok toks
+
 
 data FileEdit = MkEdit FC String
 data CodeAction
@@ -233,12 +239,63 @@ getCaseSplit row col fc@(MkFC uri (MkBounds sr sc er ec)) ctx nm scty = do
   top <- getTop
   cons <- getConstructors ctx fc scty
   ty <- quote ctx.lvl scty
+  scty <- eval ctx.env ty
+  ty <- quote ctx.lvl scty
   cons <- filterM (checkCase ctx nm scty) cons
   let cons' = map (resugarOper ∘ applyDCon) cons
   edits <- makeEdits fc cons' True
   -- TODO if constructor is not in scope, add import too.
   pure [CaseSplitAction edits]
 
+
+derive Show TypeInfo
+
+-- Return a list of all FC that are the same name (in scope)
+-- The first entry shoudl be at row/col
+getRenameInfo : ModContext → Int → Int → M (List FC)
+getRenameInfo ctx row col = do
+  let (Just $ MkTypeInfo fc nm _ _ root) = checkMod row col ctx.modTypes
+    | _ => pure []
+  -- let ranges = filter (\case MkTypeInfo _ _ _ _ root' => root' == root) ctx.modTypes
+  let infos = filter ((root ==) ∘ sourceFC) ctx.modTypes
+  case any (mismatch nm) infos of
+    True => do
+      putStrLn "MISMATCH! \{show infos}"
+      pure []
+    False => pure $ fc :: map getFC infos
+
+  where
+    getFC : TypeInfo → FC
+    getFC (MkTypeInfo fc _ _ _ _) = fc
+
+    sourceFC : TypeInfo → FC
+    sourceFC (MkTypeInfo _ _ _ _ root) = root
+
+    mismatch : String → TypeInfo → Bool
+    mismatch nm (MkTypeInfo fc nm' _ _ _) =  nm /= nm'
+
+
+-- Just position
+-- Range | placeholder
+getRenameRange : FileSource → String → Int → Int → M Unit
+getRenameRange repo modns row col = do
+  Just mod <- switchModule repo modns | _ => pure MkUnit
+  top <- getTop
+  (prep :: rest) <- getRenameInfo mod row col
+    | _ => pure MkUnit
+
+
+  pure MkUnit
+
+-- https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_rename
+-- result: WorkspaceEdit | null
+-- error: code/message
+renameVariable : FileSource → String → Int → Int → M Unit
+renameVariable repo modns row col = do
+  Just mod <- switchModule repo modns | _ => pure MkUnit
+  top <- getTop
+
+  pure MkUnit
 
 getHole : ModContext → Int → Int → Maybe MetaEntry
 getHole mod row col =

@@ -68,9 +68,10 @@ instance HasFC Raw where
 data Import = MkImport FC (FC × Name)
 
 alias Telescope = List (BindInfo Raw)
+alias FCName = FC × Name
 
 data Decl
-  = TypeSig FC Quant (List Name) Raw
+  = TypeSig FC Quant (List FCName) Raw
   | FunDef FC Name (List (Raw × Maybe Raw))
   | DCheck FC Raw Raw
   | DDerive FC (FC × String) (FC × String)
@@ -151,7 +152,7 @@ instance Pretty Pattern where
   pretty (PatImpossible _) = text "()"
   pretty (PatVar _ icit str) = wrap icit $ text str
   pretty (PatCon _ icit nm args Nothing) = text (show nm) <+> spread (map pretty args)
-  pretty (PatCon _ icit nm args (Just as)) = text as ++ text "@(" ++ text (show nm) <+> spread (map pretty args) ++ text ")"
+  pretty (PatCon _ icit nm args (Just as)) = text (snd as) ++ text "@(" ++ text (show nm) <+> spread (map pretty args) ++ text ")"
   pretty (PatWild _ icit) = text "_"
   pretty (PatLit _ lit) = pretty lit
 
@@ -213,7 +214,7 @@ pipeSep = folddoc (\a b => a <+/> text "|" <+> b)
 
 
 instance Pretty Decl where
-  pretty (TypeSig _ q nm ty) = text (show q) ++ spread (map text nm) <+> text ":" <+> nest 2 (pretty ty)
+  pretty (TypeSig _ q nms ty) = text (show q) ++ spread (map (text ∘ snd)  nms) <+> text ":" <+> nest 2 (pretty ty)
   pretty (DLog _ level) = text "#log" <+> text (show level)
   pretty (DAlias _ nm args tm) = text "alias" <+> text (snd nm) <+> spread (map prettyBind args) <+> text "=" <+> pretty tm
   pretty (DDerive _ x y) = text "derive" <+> text (snd x) <+> text (snd y)

@@ -1,7 +1,8 @@
 
 ## TODO
 
-- [ ] Allow types on lambda args
+- [ ] Expected `in` at EOF should point to EOF
+- [ ] Check scope on rename?
 - [ ] Fix "`.a` not in scope" for record update, if record has an implicit arg
 - [ ] Build single name map on import
   - Check performance - cost to build the map vs not walking $n$ maps
@@ -35,7 +36,7 @@
   - [ ] Duplicate data constructor errors point to `data`
   - [ ] Allow Qualified names in surface syntax
   - Don't disambiguate on type for now
-- [ ] Suppress code actions in `derive` statements
+- [x] Suppress code actions in `derive` statements
 - [ ] Could we disambiguate just Data constructors on type?
 - [ ] maybe add fat arrows, I keep wanting to type them, `{{...}}` is a little ugly
   - There may be ambiguity issues at the parsing level, but we don't have typecase, so.

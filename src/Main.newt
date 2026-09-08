@@ -164,7 +164,7 @@ execRaw exp = do
   prev <- getTop
   let fc = emptyFC
   let exp' = RApp fc (RVar fc "printLn") exp Explicit
-  processTypeSig prev.currentMod.modName emptyFC Many ["main"] (RApp fc (RVar fc "IO") (RVar fc "Unit") Explicit)
+  processTypeSig prev.currentMod.modName emptyFC Many [(emptyFC,"main")] (RApp fc (RVar fc "IO") (RVar fc "Unit") Explicit)
   processDef prev.currentMod.modName emptyFC "main" [(RVar fc "main",Just exp')]
   docs <- compileJavascript
   putTop prev
@@ -213,6 +213,17 @@ runString line = do
     | Left (err, _) => showError line err >>= putStrLn
   catchError (runCommand $ fst cmd) (showError line >=> putStrLn)
 
+-- for debugging TypeInfo accuracy, run it on all of the modules
+-- It's fairly naive and simply checks if the length of the FC matches the name
+checkNames : List TypeInfo → M Unit
+checkNames Nil = pure MkUnit
+checkNames (MkTypeInfo fc nm env ty sfc  :: xs) =
+ if isPrefixOf "$" nm || isPrefixOf "f$" nm then checkNames xs
+  else do
+    when (fc.bnds.endCol - fc.bnds.startCol /= slen nm) $
+      putStrLn "Bad name \{nm} at \{show fc}"
+    checkNames xs
+
 runRepl : M Unit
 runRepl = do
   liftIO $ putStr "> "
@@ -242,6 +253,8 @@ main' = do
       -- else if isSuffixOf ".c" name then writeC name
       else if isSuffixOf ".js" name then writeJS name
       else exitFailure "Unknown extension for output file \{show name} - I only know .c, .js, and .ss"
+  -- top <- getTop
+  -- traverse_ (checkNames ∘ (.modTypes)) $ (listValues top.modules)
 
 main : IO Unit
 main = do

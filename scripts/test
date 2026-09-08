@@ -10,6 +10,7 @@ failed=0
 tests=$(find tests -name '*.newt')
 faillist=()
 for fn in $tests; do
+  if [ x$1 != "x-u" ] && [[ "$fn" != *"$1"* ]]; then continue; fi
   total=$((total + 1))
   echo Test $fn
   bn=$(basename $fn)

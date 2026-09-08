@@ -41,6 +41,9 @@ jsonToJObject (JsonStr x) = js_castStr x
 -- IMPERROR - if I leave off the `map` I get an error that is hard to sort out
 jsonToJObject (JsonObj xs) = js_castObj $ listToArray $ map (mapSnd jsonToJObject) xs
 
+single : String → Json → Json
+single k v = JsonObj $ (k,v) :: Nil
+
 record LSPState where
     topContext : TopContext
     baseDir : String
@@ -151,8 +154,6 @@ codeActionInfo uri line col = unsafePerformIO $ do
   modifyIORef state $ { topContext := top }
   pure $ jsonToJObject $ JsonArray $ map actionToJson actions
   where
-    single : String → Json → Json
-    single k v = JsonObj $ (k,v) :: Nil
 
     editToJson : FileEdit → Json
     editToJson (MkEdit fc text) =
@@ -252,6 +253,35 @@ getInfos = do
         go acc (_ :: es) = go acc es
 
 
+-- https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_prepareRename
+prepareRename : String → Int → Int → JSObject
+prepareRename fn row col = wrapper fn
+  (do
+    top <- getTop
+    (prep :: rest) <- getRenameInfo top.currentMod row col
+      | _ => pure JsonNull
+    pure $ fcToRange prep
+  )
+  (\ err => pure $ jsonToJObject $ JsonNull)
+
+
+-- https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_rename
+-- result: WorkspaceEdit | null
+-- error: code/message
+lspRename : String → Int → Int → String → JSObject
+lspRename uri row col text = wrapper uri
+  (do
+    top <- getTop
+    (_ :: rest) <- getRenameInfo top.currentMod row col
+      | _ => pure JsonNull
+    pure $ single "changes" $ single uri $ JsonArray $ map makeChange rest
+  )
+  (\ err => pure $ jsonToJObject $ JsonNull)
+  where
+    makeChange : FC → Json
+    makeChange fc = JsonObj $ ("range", fcToRange fc) :: ("newText", JsonStr text) :: Nil
+
+
 checkFile : String → JSObject
 checkFile fn = wrapper fn
   (do
@@ -299,4 +329,4 @@ compileToScheme fn = unsafePerformIO $ do
   modifyIORef state { topContext := top }
   pure $ js_castStr src
 
-#export updateFile checkFile hoverInfo codeActionInfo compileJS docSymbols compileToScheme
+#export updateFile checkFile hoverInfo codeActionInfo compileJS docSymbols compileToScheme prepareRename lspRename

@@ -1,4 +1,4 @@
-import { LSP_codeActionInfo, LSP_checkFile } from '../build/lsp.js'
+import { LSP_codeActionInfo, LSP_checkFile, LSP_lspRename } from '../build/lsp.js'
 
 export let clog = console.log
 console.log = () => { }
@@ -16,6 +16,20 @@ export function checkFile(fn) {
   }
   clog()
 }
+
+export function rename(fn, row, col, name) {
+  const urn = `file://${process.cwd()}/tests/${fn}`
+  clog(`*** rename ${fn} ${row} ${col} ${name}`)
+  let edit = LSP_lspRename(urn, row, col, name)
+  for (let fn in edit.changes) {
+    for (let change of edit.changes[fn]) {
+      let base = fn.split('/').at(-1)
+      clog(`- ${base} ${showRange(change.range)} ${jstr(change.newText)}`)
+    }
+  }
+  clog()
+}
+
 export function showActions(fn, row, col) {
   const urn = `file://${process.cwd()}/tests/${fn}`
   clog(`*** Actions ${fn} ${row} ${col}`)

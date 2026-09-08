@@ -61,10 +61,10 @@ logMetas (Unsolved fc k ctx ty kind :: rest) = do
 
 
 -- Used for Class and Record
-getSigs : List Decl -> List (FC × Quant × String × Raw)
+getSigs : List Decl -> List (BindInfo Raw)
 getSigs Nil = Nil
 getSigs ((TypeSig _ q Nil _) :: xs) = getSigs xs
-getSigs ((TypeSig fc q (nm :: nms) ty) :: xs) = (fc, q, nm, ty) :: getSigs xs
+getSigs ((TypeSig fc q ((_,nm) :: nms) ty) :: xs) = (BI fc nm Explicit q ty) :: getSigs (TypeSig fc q nms ty :: xs)
 getSigs (_ :: xs) = getSigs xs
 
 teleToPi : Telescope -> Raw -> Raw
@@ -78,8 +78,8 @@ impTele tele = map foo tele
     foo (BI fc nm _ _ ty) = (BI fc nm Implicit Zero ty)
 
 
-checkAlreadyDef : FC → Name → M Unit
-checkAlreadyDef fc nm = do
+checkAlreadyDef : FCName → M Unit
+checkAlreadyDef (fc,nm) = do
   top <- getTop
   case lookup (QN top.currentMod.modName nm) top of
     Nothing => pure MkUnit
@@ -88,15 +88,18 @@ checkAlreadyDef fc nm = do
 
 processDecl :  String -> Decl -> M Unit
 
-processTypeSig :  String → FC → Quant → List Name → Raw → M Unit
-processTypeSig ns fc q names tm = do
+processTypeSig :  String → FC → Quant → List FCName → Raw → M Unit
+processTypeSig ns fc q fcnames tm = do
   log 1 "-----"
   top <- getTop
-  traverse (checkAlreadyDef fc) names
+  traverse_ checkAlreadyDef fcnames
   ty <- check (mkCtx fc Zero) tm (VU fc)
-  log 1 "TypeSig \{unwords names} : \{render 90 $ pprint Nil ty}"
-  ignore $ for names $ \nm => setDef (QN ns nm) fc q ty Axiom Nil
-
+  vty <- eval Nil ty
+  log 1 "TypeSig \{unwords $ map snd fcnames} : \{render 90 $ pprint Nil ty}"
+  for_ fcnames $ \case
+    (fc,nm) => do
+      setDef (QN ns nm) fc q ty Axiom Nil
+      addTypeInfo fc nm [] vty fc
 
 processPrimType : String → FC → Name → Maybe Raw → M Unit
 processPrimType ns fc nm ty = do
@@ -157,6 +160,8 @@ processDef ns fc nm clauses = do
 
   debug "Add def \{nm} \{render 90 $ pprint Nil tm} : \{render 90 $ pprint Nil ty}"
   updateDef (QN ns nm) fc ty (Fn tm)
+  vty <- eval [] ty
+  traverse_ (registerClause fc [] vty) $ map fst clauses
   let name = show $ QN ns nm
   if shouldInline tm
      || name == "Prelude.Prelude.Monad Prelude.IO,bind"
@@ -198,12 +203,12 @@ processClass ns classFC (nameFC, nm) tele decls = do
 
   log 1 "tcon type \{render 90 $ pretty tcType}"
   log 1 "dcon type \{render 90 $ pretty dcType}"
-  let decl = Data classFC (nameFC, nm) tcType (Just $ TypeSig classFC Many [dcName] dcType :: Nil)
+  let decl = Data classFC (nameFC, nm) tcType (Just $ TypeSig classFC Many [(nameFC,dcName)] dcType :: Nil)
   log 1 "Decl:"
   log 1 $ render 90 $ pretty decl
   processDecl ns decl
   ignore $ for fields $ \case
-    (fc,q,name,ty) => do
+    BI fc name _ q ty => do
       let funType = teleToPi (impTele tele) $ RPi fc (BI fc "_" Auto Many tail) ty
       let autoPat = foldl mkAutoApp (RVar classFC dcName) fields
       let lhs = makeLHS (RVar fc name) tele
@@ -212,7 +217,7 @@ processClass ns classFC (nameFC, nm) tele decls = do
 
       log 1 "\{name} : \{render 90 $ pretty funType}"
       log 1 "\{render 90 $ pretty decl}"
-      processDecl ns $ TypeSig fc q [name] funType
+      processDecl ns $ TypeSig fc q [(nameFC,name)] funType
       setFlag (QN ns name) fc Inline
       processDecl ns decl
   where
@@ -220,12 +225,11 @@ processClass ns classFC (nameFC, nm) tele decls = do
     makeLHS acc ((BI fc' nm icit quant _) :: tele) = RApp fc' (makeLHS acc tele) (RVar fc' nm) Implicit
     makeLHS acc Nil = acc
 
-    -- TODO probably should just do the fold ourselves then.
-    mkAutoApp : Raw → FC × Quant × String × Raw → Raw
-    mkAutoApp acc (fc, q, nm, ty) = RApp fc acc (RVar fc nm) Explicit
+    mkAutoApp : Raw → BindInfo Raw → Raw
+    mkAutoApp acc (BI fc nm icit q ty) = RApp fc acc (RVar fc nm) Explicit
 
-    mkPi : FC × Quant × String × Raw → Raw → Raw
-    mkPi (fc, q, nm, ty) acc = RPi fc (BI fc nm Explicit q ty) acc
+    mkPi : BindInfo Raw → Raw → Raw
+    mkPi info acc = RPi info.biFC info acc
 
     mkApp : Raw → BindInfo Raw → Raw
     mkApp acc (BI fc nm icit _ _) = RApp fc acc (RVar fc nm) icit
@@ -248,7 +252,7 @@ processInstance ns instfc rawty decls = do
 
   -- a hack for a unique name
   let instname = render 90 $ pprint Nil codomain
-  let sigDecl = TypeSig instfc Many (instname :: Nil) rawty
+  let sigDecl = TypeSig instfc Many ((instfc,instname) :: Nil) rawty
   -- The instance needs to be declared before processing the defs, but the defs need to be
   -- defined before this - side effect is that a duplicate def is noted at the first
   -- member
@@ -376,7 +380,7 @@ processShortData ns fc lhs sigs = do
     mkDecl args acc (RVar fc' name) = do
       let base = foldr (\ ty acc => RPi (getFC ty) (BI (getFC ty) "_" Explicit Many ty) acc) lhs acc
       let ty = foldr mkPi base args
-      pure $ TypeSig fc' Many (name :: Nil) ty
+      pure $ TypeSig fc' Many ((fc',name) :: Nil) ty
       where
         mkPi : FC × String → Raw → Raw
         mkPi (fc,nm) acc = RPi fc (BI fc nm Implicit Zero (RU fc)) acc
@@ -479,7 +483,7 @@ processData ns fc (nameFC, nm) ty cons = do
   -- check cons, return list of type,con
   allCons <- join <$> (for cons $ \x => case x of
       (TypeSig fc q names tm) => do
-          traverse (checkAlreadyDef fc) names
+          traverse checkAlreadyDef names
           debug "check dcon \{show names} \{show tm}"
           dty <- check (mkCtx fc Zero) tm (VU fc)
           debug "dty \{show names} is \{render 90 $ pprint Nil dty}"
@@ -493,7 +497,7 @@ processData ns fc (nameFC, nm) ty cons = do
             | (tm, _) => error (getFC tm) "expected \{nm} got \{render 90 $ pprint tnames tm}"
           when (hn /= QN ns nm) $
             error (getFC codomain) "Constructor codomain is \{render 90 $ pprint tnames codomain} rather than \{nm}"
-          pure $ map (_,_ dty) names
+          pure $ (_,_ dty) <$> map snd names
       decl => throwError $ E (getFC decl) "expected constructor declaration")
   -- type level autos like _++_
   solveAutos
@@ -523,22 +527,21 @@ processRecord ns recordFC (nameFC, nm) tele cname decls = do
   let (dcFC,dcName) = fromMaybe (nameFC,"Mk\{show nm}") cname
   let tcType = teleToPi tele (RU recordFC)
   let tail = foldl (\ acc bi => case bi : BindInfo Raw of (BI fc nm icit _ _) => RApp fc acc (RVar fc nm) icit) (RVar nameFC nm) tele
-  let dcType = teleToPi (impTele tele) $
-        foldr (\ x acc => case x : FC × Quant × String × Raw of (fc, q, nm, ty) =>  RPi fc (BI fc nm Explicit q ty) acc) tail fields
+  let dcType = teleToPi (impTele tele) $ foldr (\ info acc =>  RPi info.biFC info acc) tail fields
 
   log 1 "tcon type \{render 90 $ pretty tcType}"
   log 1 "dcon type \{render 90 $ pretty dcType}"
-  let decl = Data recordFC (nameFC,nm) tcType (Just $ TypeSig recordFC Many [dcName] dcType :: Nil)
+  let decl = Data recordFC (nameFC,nm) tcType (Just $ TypeSig recordFC Many [(dcFC,dcName)] dcType :: Nil)
   log 1 "Decl:"
   log 1 $ render 90 $ pretty decl
   processDecl ns decl
   -- pattern to peel out fields on LHS
-  let autoPat = foldl (\acc x => case x : FC × Quant × String × Raw of (fc,q,nm,ty) => RApp fc acc (RVar nameFC nm) Explicit) (RVar nameFC dcName) fields
+  let autoPat = foldl (\acc x => RApp x.biFC acc (RVar x.biFC x.biName) Explicit) (RVar nameFC dcName) fields
   processFields autoPat tail Nil fields
   where
-    processFields : Raw → Raw → List (String × Raw) → List (FC × Quant × String × Raw) → M Unit
+    processFields : Raw → Raw → List (String × Raw) → List (BindInfo Raw) → M Unit
     processFields _ _ _ Nil = pure MkUnit
-    processFields autoPat tail deps ((fc,q,name,ty) :: rest) = do
+    processFields autoPat tail deps ((BI fc name _ q ty) :: rest) = do
       let funType = substRaw deps $ teleToPi (impTele tele) $ RPi fc (BI fc "$self" Explicit Many tail) ty
 
       -- Add `.fieldName` function
@@ -548,7 +551,7 @@ processRecord ns recordFC (nameFC, nm) tele cname decls = do
       let pdecl = FunDef fc pname ((lhs, (Just $ RVar fc name)) :: Nil)
       log 1 "\{pname} : \{render 90 $ pretty funType}"
       log 1 "\{render 90 $ pretty pdecl}"
-      processDecl ns $ TypeSig fc Many (pname :: Nil) funType
+      processDecl ns $ TypeSig fc Many ((fc,pname) :: Nil) funType
       processDecl ns pdecl
       setFlag (QN ns pname) fc Inline
       let deps = ((name, RApp fc (RVar fc pname) (RVar fc "$self") Explicit) :: deps)
@@ -556,6 +559,7 @@ processRecord ns recordFC (nameFC, nm) tele cname decls = do
 
 processDerive : String → FC → FC × String → (FC × String) → M Unit
 processDerive ns fc (clFC, clName) (fc, name) = do
+  top <- getTop
   case clName of
     "Eq" => do
         decls <- deriveEq fc name
@@ -564,13 +568,15 @@ processDerive ns fc (clFC, clName) (fc, name) = do
         decls <- deriveShow fc name
         for_ decls $ processDecl ns
     _ => error fc "derive \{clName} is not supported"
+  -- Drop IDE data for synthesized code
+  modifyTop { currentMod $= { modInfos := top.currentMod.modInfos; modTypes := top.currentMod.modTypes } }
 
 processAlias : FC → FC × String → Telescope → Raw → M Unit
 processAlias fc (fc', nm) args rhs = do
   top <- getTop
   let ns = top.currentMod.modName
   let ty = mkty args
-  processTypeSig ns fc Zero [nm] ty
+  processTypeSig ns fc Zero [(fc',nm)] ty
   let lhs = mklhs $ Lin <>< args
   processDef ns fc (nm) [(lhs, Just rhs)]
   pure MkUnit
@@ -613,6 +619,6 @@ processDecl ns (Instance instfc ty decls) = processInstance ns instfc ty decls
 processDecl ns (ShortData fc lhs sigs) = processShortData ns fc lhs sigs
 processDecl ns (Data fc nm ty (Just cons)) = processData ns fc nm ty cons
 -- TODO distinguish from function signatures
-processDecl ns (Data fc (_, nm) ty Nothing) = processTypeSig ns fc Zero [nm] ty
+processDecl ns (Data fc name ty Nothing) = processTypeSig ns fc Zero [name] ty
 processDecl ns (Record recordFC nm tele cname decls) = processRecord ns recordFC nm tele cname decls
 processDecl ns (Exports fc names) = processExports ns fc names

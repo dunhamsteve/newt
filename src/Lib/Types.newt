@@ -611,7 +611,7 @@ mkCtx fc q = MkCtx 0 Nil Nil Nil fc (if q == Many then Absent else Present)
 
 data Pattern
   = PatVar FC Icit Name
-  | PatCon FC Icit QName (List Pattern) (Maybe Name)
+  | PatCon FC Icit QName (List Pattern) (Maybe $ FC × Name)
   | PatWild FC Icit
   | PatLit FC Literal
   | PatImpossible FC

@@ -12,8 +12,12 @@ pretty: build/newt2.js
 
 newt3: build/newt3.js
 
+TESTFLAGS= 
+ifdef update
+	TESTFLAGS += -u
+endif
 test: build/newt.js lsp
-	scripts/test
+	scripts/test $(TESTFLAGS)
 
 cheztest: build/newt.so lsp
 	make test NEWT='chez --program build/newt.so' RUNOUT="chez --script" OUTFILE=tmp/out.ss

@@ -123,6 +123,7 @@ instance Add FC where
 instance ToJSON FC where
   toJson (MkFC file (MkBounds line col endline endcol)) = JsonObj (("file", toJson file) :: ("line", toJson line) :: ("col", toJson col) :: ("endline", toJson endline) :: ("endcol", toJson endcol):: Nil)
 
+derive Eq FC
 
 fcLine : FC -> Int
 fcLine fc = fc.bnds.startLine

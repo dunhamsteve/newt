@@ -3,7 +3,7 @@
  * vscode LSP server module.
  */
 
-import { LSP_checkFile, LSP_updateFile, LSP_hoverInfo, LSP_codeActionInfo, LSP_docSymbols } from './newt.js'
+import { LSP_checkFile, LSP_updateFile, LSP_hoverInfo, LSP_codeActionInfo, LSP_docSymbols, LSP_prepareRename, LSP_lspRename } from './newt.js'
 
 import {
   createConnection,
@@ -88,6 +88,19 @@ documents.onDidChangeContent(async (change) => {
   addChange(change.document);
 });
 
+connection.onPrepareRename((params) => {
+  const uri = params.textDocument.uri;
+  const pos = params.position;
+  return LSP_prepareRename(uri, pos.line, pos.character);
+})
+
+connection.onRenameRequest((params) => {
+  const uri = params.textDocument.uri;
+  const pos = params.position;
+  const newName = params.newName
+  return LSP_lspRename(uri, pos.line, pos.character, newName);
+})
+
 connection.onHover((params): Hover | null => {
   // wait until quiesced (REVIEW after query-based)
   if (running) return null
@@ -138,6 +151,7 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => ({
     hoverProvider: true,
     definitionProvider: true,
     codeActionProvider: true,
+    renameProvider: {prepareProvider: true},
     documentSymbolProvider: true,
   },
 }));

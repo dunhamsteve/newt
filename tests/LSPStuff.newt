@@ -16,3 +16,14 @@ blah A = 41
 foo : (Int × String) → String
 foo (a,b) = ?
 
+add : Nat → Nat → Nat
+add Z m = m
+add (S n) m = S (add n m)
+
+add2 : Nat → Nat → Nat
+add2 x y = go x y
+  where
+    go : Nat → Nat → Nat
+    go Z m = m
+    go (S n) m = S (go n m)
+

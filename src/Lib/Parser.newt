@@ -192,7 +192,7 @@ pArg = do
 
 alias AppSpine = List (Icit × FC × Raw)
 
--- pratt takes an operator table 
+-- pratt takes an operator table
 pratt : Operators -> Int -> String -> Raw -> AppSpine -> Parser (Raw × AppSpine)
 pratt ops prec stop left spine = do
   (left, spine) <- runPrefix stop left spine
@@ -314,37 +314,44 @@ letExpr = do
       t <- typeExpr
       pure (name,fc,ty,t)
 
-pLamArg : Parser (Icit × String × Maybe Raw)
-pLamArg = impArg <|> expArg
-       <|> (\ x => (Explicit, x, Nothing)) <$> (ident <|> uident)
-       <|> keyword "_" *> pure (Explicit, "_", Nothing)
+pLamArg : Parser (BindInfo $ Maybe Raw)
+pLamArg = impArg <|> expArg <|> plainArg
   where
     -- TODO - we're moving away from uppercase variables, but a test uses them
-    impArg : Parser (Icit × String × Maybe Raw)
+    impArg : Parser (BindInfo (Maybe Raw))
     impArg = braces $ do
+      fc <- getPos
       nm <- (ident <|> uident)
       ty <- optional (symbol ":" >> typeExpr)
-      pure (Implicit, nm, ty)
+      pure (BI fc nm Implicit Many ty)
 
-    expArg : Parser (Icit × String × Maybe Raw)
+    plainArg : Parser (BindInfo (Maybe Raw))
+    plainArg = do
+      fc <- getPos
+      nm <- ident <|> uident <|> (keyword "_" *> pure "_")
+      pure $ BI fc nm Explicit Many Nothing
+
+
+    expArg : Parser (BindInfo (Maybe Raw))
     expArg = parenWrap $ do
+      fc <- getPos
       nm <- ident
       ty <- optional (symbol ":" >> typeExpr)
-      pure (Explicit, nm, ty)
+      pure (BI fc nm Explicit Many ty)
 
 lamExpr : Parser Raw
 lamExpr = do
   pos <- getPos
   (fc, args, scope) <- withFC $ do
     keyword "\\" <|> keyword "λ"
-    args <- some $ addPos pLamArg
+    args <- some pLamArg
     keyword "=>"
     scope <- typeExpr
     pure (args, scope)
-  pure $ foldr (mkLam fc) scope args
+  pure $ foldr mkLam scope args
   where
-    mkLam : FC → FC × Icit × Name × Maybe Raw → Raw → Raw
-    mkLam fc (nfc, icit, name, ty) sc = RLam fc (BI nfc name icit Many ty) sc
+    mkLam : BindInfo (Maybe Raw) → Raw → Raw
+    mkLam info sc = RLam info.biFC info sc
 
 
 caseAlt : Parser RCaseAlt
@@ -418,8 +425,9 @@ doArrow = do
 
 doLet : Parser DoStmt
 doLet = do
-  fc <- getPos
   keyword "let"
+  -- TODO get an FC of the name _and_ one for the whole expression
+  fc <- getPos
   nm <- ident
   keyword "="
   tm <- term
@@ -557,7 +565,7 @@ typeExpr
 
 
 parseSig : Parser Decl
-parseSig = try (TypeSig <$> getPos <*> quantity <*> some (ident <|> uident <|> token Projection) <* keyword ":") <*> typeExpr
+parseSig = try (TypeSig <$> getPos <*> quantity <*> some (addPos $ ident <|> uident <|> token Projection) <* keyword ":") <*> typeExpr
 
 parseImport : Parser Import
 parseImport = do

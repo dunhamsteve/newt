@@ -958,9 +958,9 @@ rewriteConstraint k tcname dcname vars (c@(PC nm y) :: xs) acc =
             rest <- makeConstr fc vars ys
             pure $ Just $ rest ++ xs ++ acc
           -- putting this in constraints causes it to be renamed k -> nm' when we check body.
-          Just nm' => do
+          Just (fc',nm') => do
             rest <- makeConstr fc vars ys
-            pure $ Just $ (PC k (PatVar fc icit nm')) :: rest ++ xs ++ acc
+            pure $ Just $ (PC k (PatVar fc' icit nm')) :: rest ++ xs ++ acc
         else do
           -- TODO can we check this when we make the PatCon?
           top <- getTop
@@ -1143,12 +1143,12 @@ splitArgs (RApp fc t u icit) args = splitArgs t ((u, icit) :: args)
 splitArgs tm args = (tm, args)
 
 mkPat : (Raw × Icit) -> M Pattern
-mkPat (RAs fc as tm, icit) = do
+mkPat (RAs asfc as tm, icit) = do
   pat <- mkPat (tm, icit)
   case pat of
-    (PatCon fc icit nm args Nothing) => pure $ PatCon fc icit nm args (Just as)
+    (PatCon fc icit nm args Nothing) => pure $ PatCon fc icit nm args (Just (asfc,as))
     (PatCon fc icit nm args _) => error fc "Double as pattern \{show tm}"
-    t => error fc "Can't put as on non-constructor \{show tm}"
+    t => error asfc "Can't put as on non-constructor \{show tm}"
 mkPat (tm, icit) = do
   top <- getTop
   case splitArgs tm Nil of
@@ -1178,6 +1178,11 @@ makeClause (lhs, rhs) = do
   pats <- traverse mkPat args
   pure $ MkClause (getFC lhs) Nil pats rhs
 
+registerClause : FC → Env → Val → Raw → M Unit
+registerClause rfc env ty (RVar fc nm) = addTypeInfo fc nm env ty rfc
+registerClause rfc env ty (RApp fc t u icit) = registerClause rfc env ty t
+registerClause rfc _ _ _ = pure MkUnit
+
 -- we'll want both check and infer, we're augmenting a context
 -- so probably a continuation:
 -- Context -> List Decl -> (Context -> M a) -> M a
@@ -1185,7 +1190,7 @@ checkWhere : Context -> List Decl -> Raw -> Val -> M Tm
 checkWhere ctx decls body ty = do
   -- we're going to be very proscriptive here, no forward declaration
   -- need multiple defs in letrec if we want to loosen this
-  let (TypeSig sigFC q (name :: Nil) rawtype :: decls) = decls
+  let (TypeSig sigFC q ((nfc,name) :: Nil) rawtype :: decls) = decls
     | x :: _ => error (getFC x) "expected type signature"
     | _ => check ctx body ty
   let (Many) = q | _ => error sigFC "Zero quantity not supported in where clauses"
@@ -1199,15 +1204,11 @@ checkWhere ctx decls body ty = do
   top <- getTop
   clauses' <- traverse makeClause clauses
   vty <- eval ctx.env funTy
+  traverse_ (registerClause nfc ctx.env vty) $ map fst clauses
+  addTypeInfo nfc name ctx.env vty nfc
   debug "\{name} vty is \{show vty}"
-  -- FIXME name FC
-  let ctx' = extend ctx (BI sigFC name Explicit Many vty)
+  let ctx' = extend ctx (BI nfc name Explicit Many vty)
 
-  -- if I lift, I need to namespace it, add args, and add args when
-  -- calling locally
-  -- context could hold a Name -> Val (not Tm because levels) to help with that
-  -- e.g. "go" -> (VApp ... (VApp (VRef "ns.go") ...)
-  -- But I'll attempt letrec first
   tm <- buildTree (withPos ctx' defFC) (MkProb clauses' vty)
   vtm <- eval ctx'.env tm
   ty' <- checkWhere ctx' decls' body ty
@@ -1252,14 +1253,15 @@ checkDone fc ctx (PC x (PatWild pvfc icit) :: xs) body ty = do
 checkDone fc ctx (PC nm (PatVar pvfc _ nm') :: xs) body ty = do
   scty <- levelType ctx nm
   addInfo $ CaseSplit pvfc ctx nm scty
+  addTypeInfo pvfc nm' ctx.env scty pvfc
 
   let ctx = the Context { types $= rename (lvl2ix ctx.lvl nm) } ctx
   checkDone fc ctx xs body ty
   where
     rename : Int → List (BindInfo Val) -> List (BindInfo Val)
     rename _ Nil = Nil
-    -- slip in the new type, too
-    rename 0 (BI fc _ icit q ty :: xs) = BI fc nm' icit q ty :: xs
+    -- slip in the new type and fc, too
+    rename 0 (BI fc _ icit q ty :: xs) = BI pvfc nm' icit q ty :: xs
     rename k (x :: xs) = x :: rename (k - 1) xs
 
 -- I'm running this at the end to ensure everything relevant has been split
@@ -1511,7 +1513,7 @@ undo ((DoExpr fc tm) :: xs) = do
   xs' <- undo xs
   -- Not sure if it helps inference or not (and now fails with erasure thing)
   -- pure $ RApp fc (RApp fc (RVar fc "_>>_") tm Explicit) xs' Explicit
-  pure $ RApp fc (RApp fc (RVar fc "bind") tm Explicit) (RLam fc (BI fc "_" Explicit Many Nothing) xs') Explicit
+  pure $ RApp fc (RApp fc (RVar fc "bind") tm Explicit) (RLam fc (BI fc "$_" Explicit Many Nothing) xs') Explicit
 undo ((DoLet fc nm tm) :: xs) = RLet fc nm (RImplicit fc) tm <$> undo xs
 undo ((DoArrow fc left@(RVar fc' nm) right Nil) :: xs) = do
   top <- getTop
@@ -1745,10 +1747,11 @@ infer ctx (RVar fc nm) = go 0 ctx.types
     go i Nil = do
       top <- getTop
       case lookupRaw nm top of
-        Just (MkEntry _ q name ty def _) => do
+        Just (MkEntry vfc q name ty def _) => do
           debug "lookup \{show name} as \{show def}"
           checkMarker fc ctx.marker q
           vty <- eval Nil ty
+          addTypeInfo fc nm ctx.env vty vfc
           pure (Ref fc name, vty)
         -- Can we soften this without introducing a meta for the type
         -- a meta might be additional errors, but also could lead to narrowing of possible names...
