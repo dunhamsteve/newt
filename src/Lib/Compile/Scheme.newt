@@ -107,9 +107,9 @@ cexpToScm env (CCase sc alts) = do
     withVar env sc $ \ nm => doCase nm alts
   where
     -- add a bunch of lets then do body
-    conAlt : SCEnv → String → Int → List String → CExp → String
-    conAlt env nm ix Nil  body = cexpToScm env body
-    conAlt env nm ix (arg :: args) body =
+    conAlt : SCEnv → String → Int → Nat → CExp → String
+    conAlt env nm ix Z  body = cexpToScm env body
+    conAlt env nm ix (S args) body =
         conAlt ("(vector-ref \{nm} \{show ix})" :: env) nm (ix + 1) args body
 
     nilAlt : SCEnv → List Quant → CExp → String

@@ -111,9 +111,9 @@ litToJS (LChar c) = LitChar c
 litToJS (LInt i) = LitInt i
 
 -- Stuff nm.h1, nm.h2, ... into environment for constructor match
-conAltEnv : JSExp -> Int -> JSEnv -> List String -> JSEnv
-conAltEnv sc k env Nil = env
-conAltEnv sc k env (_ :: xs) = conAltEnv sc (1 + k) (push env (Dot sc k)) xs
+conAltEnv : JSExp -> Int -> JSEnv -> Nat -> JSEnv
+conAltEnv sc k env Z = env
+conAltEnv sc k env (S xs) = conAltEnv sc (1 + k) (push env (Dot sc k)) xs
 
 -- given a name, find a similar one that doesn't shadow in Env
 freshName : String -> JSEnv -> String

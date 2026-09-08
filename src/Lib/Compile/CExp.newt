@@ -57,7 +57,7 @@ push (MkCEnv cenv clvl) Many = MkCEnv (Just clvl :: cenv) (clvl + 1)
 push (MkCEnv cenv clvl) Zero = MkCEnv (Nothing :: cenv) clvl
 
 data CAlt : U where
-  CConAlt : Nat → String → ConInfo → List String → CExp → CAlt
+  CConAlt : Nat → String → ConInfo → Nat → CExp → CAlt
   -- REVIEW keep var name?
   CDefAlt : CExp -> CAlt
   -- literal
@@ -232,8 +232,7 @@ compileTerm env (Case fc t alts) = do
       case def of
         DCon ix info qs _ => do
           let env = foldl push env qs
-          let qs = filter (/= Zero) qs
-          let args = filterArgs qs args
+          let args = length $ filter (/= Zero) qs
           CConAlt ix nm info args <$> compileTerm env tm
         _ => error fc "\{show nm} is not a data constructor"
 
@@ -243,13 +242,8 @@ compileTerm env (Case fc t alts) = do
   pure $ CCase t' $ fancyCons t' alts'
   where
     newTypeMatch : CExp → List CAlt → Maybe CExp
-    newTypeMatch sc [ CConAlt _ _ NewTypeCon [arg] tm ] = Just $ CLet "nt" sc tm
+    newTypeMatch sc [ CConAlt _ _ NewTypeCon (S Z) tm ] = Just $ CLet "nt" sc tm
     newTypeMatch _ _ = Nothing
-
-    filterArgs : List Quant → Nat → List String
-    filterArgs (Many :: qs) (S k) = "_" :: filterArgs qs k
-    filterArgs (_ :: qs) (S k) = filterArgs qs k
-    filterArgs _ _ = Nil
 
     numAltP : CAlt → Bool
     numAltP (CConAlt _ _ SuccCon _ _) = True

@@ -16,9 +16,9 @@ alias ExpMap = SortedMap QName CExp
 -- True if deBruijn sees the entry, False if we've added it
 alias LiftEnv = SnocList Bool
 
-pushArgs : LiftEnv → List String → LiftEnv
-pushArgs env Nil = env
-pushArgs env (x :: xs) = pushArgs (env :< True) xs
+pushArgs : LiftEnv → Nat → LiftEnv
+pushArgs env Z = env
+pushArgs env (S xs) = pushArgs (env :< True) xs
 
 envNames : LiftEnv → List String
 envNames env = go env Nil
@@ -40,7 +40,7 @@ makeApp k (xs :< True) acc = makeApp (k + 1) xs (CBnd k :: acc)
 makeApp k (xs :< _ ) acc = makeApp k xs (CErased :: acc)
 
 liftLambdaTm : QName → LiftEnv → CExp → State ExpMap CExp
-liftLambdaTm name env (CFun nms t) = CFun nms <$> liftLambdaTm name (pushArgs env nms) t
+liftLambdaTm name env (CFun nms t) = CFun nms <$> liftLambdaTm name (pushArgs env $ length nms) t
 liftLambdaTm name env (CLetLoop nms t) = CLetLoop nms <$> liftLambdaTm name env t
 liftLambdaTm name env (CConstr tag nm args info) = do
   args <- traverse (liftLambdaTm name env) args
@@ -85,9 +85,9 @@ liftLambdaTm name env (CThunk t) = do
   pure $ CAppRef qn (makeApp 0 env Nil) (length names)
 liftLambdaTm name@(QN ns nm) env tm@(CLam nm t) = do
   let (nms, t) = splitLam tm Lin
-  t' <- liftLambdaTm name (pushArgs env nms) t
+  let env' = pushArgs env $ length nms
+  t' <- liftLambdaTm name env' t
   -- extra args for closure
-  let env' = pushArgs env nms
   qn <- getName name "lifted"
   let names = envNames env'
   modify $ updateMap qn (CFun names t')
