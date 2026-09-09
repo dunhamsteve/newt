@@ -8,10 +8,12 @@
   - Check performance - cost to build the map vs not walking $n$ maps
   - This will likely be needed for qualified / partial imports
   - [ ] Add `public` keyword
+- [ ] use a worker for lsp to handle requests while processing.
 - [ ] code formatter
   - [ ] consider moving caselet, operator, etc. desugaring out of the parser
   - comments stored aside (location, whether it is a tail or standalone) and re-integrated
   - how do we want to handle `$` and parens? we could preserve or normalize
+  - there is a now a parsing hack to deal with parens not being preserved in the AST.
 - [ ] consider postponing `case` if scrutinee type is an unsolved meta
 - [ ] maybe `let case` instead of `let (...)` (which is a little subtle)
   - Or simply put a term in there and treat as a variable iff it is lowercase and non-applied

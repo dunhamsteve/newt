@@ -274,8 +274,8 @@ lspRename uri row col text = wrapper uri
     top <- getTop
     (_ :: rest) <- getRenameInfo top.currentMod row col
       | _ => pure JsonNull
-    pure $ single "changes" $ single uri $ JsonArray $ map makeChange $ nub rest
-  )
+    -- nub because case RHS are sometimes duplicated
+    pure $ single "changes" $ single uri $ JsonArray $ map makeChange $ nub rest)
   (\ err => pure $ jsonToJObject $ JsonNull)
   where
     makeChange : FC → Json

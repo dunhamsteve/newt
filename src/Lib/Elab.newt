@@ -141,7 +141,7 @@ findMatches ctx ty ((name, type) :: xs) = do
       let (QN ns nm) = name
       setMetaMode CheckFirst
       -- Check is filling in implicit arguments here
-      tm <- check ctx (RVar fc nm) ty
+      tm <- check ctx (RVar emptyFC nm) ty
       debug "auto: Found \{rpprint Nil tm} for \{show ty}"
       setMetaContext mc
       (_::_ name) <$> findMatches ctx ty xs)
@@ -210,7 +210,8 @@ trySolveAuto (Unsolved fc k ctx ty AutoSolve) = do
           debug "GLOBAL FAILED to solve \{show ty}, matches: \{show res}"
           pure False
       -- The `check` fills in implicits
-      tm <- check ctx (RVar fc nm) ty
+      -- no FC or we end up adding type at point (nub says it is Eq Int)
+      tm <- check ctx (RVar emptyFC nm) ty
       val <- eval ctx.env tm
       debug "SOLUTION \{rpprint Nil tm} evaled to \{show val}"
       debug "GLOBAL SOLUTION \{show val}"

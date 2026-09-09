@@ -1,4 +1,4 @@
-import { LSP_codeActionInfo, LSP_checkFile, LSP_lspRename } from '../build/lsp.js'
+import { LSP_codeActionInfo, LSP_checkFile, LSP_lspRename, LSP_hoverInfo } from '../build/lsp.js'
 
 export let clog = console.log
 console.log = () => { }
@@ -43,6 +43,14 @@ export function showActions(fn, row, col) {
       }
     }
   }
+  clog()
+}
+
+export function hover(fn, row, col, name) {
+  const urn = `file://${process.cwd()}/tests/${fn}`
+  clog(`*** info ${fn} ${row} ${col}`)
+  let info = LSP_hoverInfo(urn, row, col)
+  clog(`${showRange(info.location.range)} ${info.info}`)
   clog()
 }
 

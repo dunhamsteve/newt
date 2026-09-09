@@ -27,3 +27,5 @@ add2 x y = go x y
     go Z m = m
     go (S n) m = S (go n m)
 
+test : List Int
+test = nub [1,2,3]
