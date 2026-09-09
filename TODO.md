@@ -4,6 +4,7 @@
 - [ ] Expected `in` at EOF should point to EOF
 - [ ] Check scope on rename?
 - [ ] Fix "`.a` not in scope" for record update, if record has an implicit arg
+- [ ] Add rename to playground
 - [ ] Build single name map on import
   - Check performance - cost to build the map vs not walking $n$ maps
   - This will likely be needed for qualified / partial imports

@@ -105,14 +105,14 @@ doOptimize ((qn, exp) :: Nil) = do
 
 doOptimize fns = do
   splitFuns <- traverse splitFun fns
-  let arity = foldl (\a b => max a $ getArity b) 0 splitFuns
+  let maxArity = foldl (\a b => max a $ getArity b) 0 splitFuns
   let nms = map fst fns
-  let alts = map (mkAlt arity nms) $ enumerate splitFuns
+  let alts = map (mkAlt maxArity nms) $ enumerate splitFuns
   recName <- mkRecName nms
   -- case and
-  let args = ("arg" :: replicate (cast arity) "_")
-  let recfun = CFun args $ CLetLoop args $ CCase (CBnd arity) alts
-  wrapped <- traverse (mkWrap recName arity) (enumerate fns)
+  let args = ("arg" :: replicate (cast maxArity) "_")
+  let recfun = CFun args $ CLetLoop args $ CCase (CBnd maxArity) alts
+  wrapped <- traverse (mkWrap recName maxArity) (enumerate fns)
   pure $ (recName, recfun) :: wrapped
   where
     getArity : QName × List String × CExp → Int

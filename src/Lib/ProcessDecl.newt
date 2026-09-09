@@ -69,7 +69,7 @@ getSigs (_ :: xs) = getSigs xs
 
 teleToPi : Telescope -> Raw -> Raw
 teleToPi Nil end = end
-teleToPi (info@(BI fc nm _ _ ty) :: tele) end = RPi (getFC info) info (teleToPi tele end)
+teleToPi (info :: tele) end = RPi (getFC info) info (teleToPi tele end)
 
 impTele : Telescope -> Telescope
 impTele tele = map foo tele
@@ -526,7 +526,7 @@ processRecord ns recordFC (nameFC, nm) tele cname decls = do
   let fields = getSigs decls
   let (dcFC,dcName) = fromMaybe (nameFC,"Mk\{show nm}") cname
   let tcType = teleToPi tele (RU recordFC)
-  let tail = foldl (\ acc bi => case bi : BindInfo Raw of (BI fc nm icit _ _) => RApp fc acc (RVar fc nm) icit) (RVar nameFC nm) tele
+  let tail = foldl (\ acc bi => RApp bi.biFC acc (RVar bi.biFC bi.biName) bi.biIcit) (RVar nameFC nm) tele
   let dcType = teleToPi (impTele tele) $ foldr (\ info acc =>  RPi info.biFC info acc) tail fields
 
   log 1 "tcon type \{render 90 $ pretty tcType}"
@@ -546,7 +546,7 @@ processRecord ns recordFC (nameFC, nm) tele cname decls = do
 
       -- Add `.fieldName` function
       let pname = "." ++ name
-      let lhs = foldl (\acc x => case x : BindInfo Raw of (BI fc' nm icit quant _) => RApp fc' acc (RVar fc' nm) Implicit) (RVar fc pname) tele
+      let lhs = foldl (\acc x => RApp x.biFC acc (RVar x.biFC x.biName) Implicit) (RVar fc pname) tele
       let lhs = RApp recordFC lhs autoPat Explicit
       let pdecl = FunDef fc pname ((lhs, (Just $ RVar fc name)) :: Nil)
       log 1 "\{pname} : \{render 90 $ pretty funType}"
