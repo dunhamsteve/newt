@@ -5,8 +5,8 @@
 - [ ] Check scope on rename?
 - [ ] Fix "`.a` not in scope" for record update, if record has an implicit arg
   - Maybe rework as a case statement, otherwise we inline a bunch of case statements
-- [ ] support derive with args:
-  - `derive Show (∀ a. {{Show a}} → BindInfo a)`
+- [x] support derive with args:
+  - `derive ∀ a. {{Show a}} → Show (BindInfo a)`
   - `instance (∀ a. {{Show a}} → Show (BindInfo a))`
 - [ ] Add rename to playground
 - [ ] Build single name map on import

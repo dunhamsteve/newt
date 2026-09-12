@@ -1,0 +1,8 @@
+module DeriveImpl
+
+import Prelude
+
+data Foo a = Cons a (Foo a) | End
+
+derive ∀ a. {{Show a}} → Show (Foo a)
+

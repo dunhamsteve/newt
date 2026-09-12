@@ -5,6 +5,7 @@ import Lib.Common
 import Lib.Types
 import Lib.Syntax
 import Lib.TopContext
+import Lib.Util
 
 import Lib.Elab -- (lookupDCon)
 import Lib.Prettier
@@ -27,9 +28,12 @@ getExplictNames acc (Pi fc (BI _ nm Explicit quant a) b) = getExplictNames (acc 
 getExplictNames acc (Pi fc _ b) = getExplictNames acc b
 getExplictNames acc _ = acc <>> Nil
 
-deriveEq : FC → String → M (List Decl)
-deriveEq fc name = do
+deriveEq : FC → Raw → Tm → M (List Decl)
+deriveEq fc raw target = do
   top <- getTop
+  let (a,b) = splitApp target
+  let (Ref _ (QN _ name)) = a
+    | _ => throwError $ E fc "\{show target} is not a type constructor application"
   let (Just (MkEntry fc q qname type (TCon _ names) eflags)) = lookupRaw name top
     | Just _ => throwError $ E fc "\{name} is not a type constructor"
     | _ => throwError $ ENotInScope fc name
@@ -71,11 +75,16 @@ deriveEq fc name = do
       pure (left, Just right)
 
 
+
+
 -- This is a little more of a pain, we'll generate a number for each constructor
 -- and use that as the fallback. Eventually we'll want something like quasi-quote
-deriveShow : FC → String → M (List Decl)
-deriveShow fc name = do
+deriveShow : FC → Raw → Tm → M (List Decl)
+deriveShow fc raw target = do
   top <- getTop
+  let (a,b) = splitApp target
+  let (Ref _ (QN _ name)) = a
+    | _ => throwError $ E fc "\{show target} is not a type constructor application"
   let (Just (MkEntry fc q qname type (TCon _ names) eflags)) = lookupRaw name top
     | Just _ => throwError $ E fc "\{name} is not a type constructor"
     | _ => throwError $ ENotInScope fc name
@@ -83,7 +92,7 @@ deriveShow fc name = do
   clauses <- traverse makeClause dcons
 
   let eqDecl = FunDef fc "show" clauses
-  let inst = Instance fc (buildApp "Show" (rvar name :: Nil)) (Just $ eqDecl :: Nil)
+  let inst = Instance fc raw (Just $ eqDecl :: Nil)
   pure $ inst :: Nil
 
   where

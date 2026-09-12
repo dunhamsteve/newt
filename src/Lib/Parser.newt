@@ -722,9 +722,8 @@ parseDerive : Parser Decl
 parseDerive = do
   loc <- getPos
   keyword "derive"
-  className <- withFC uident
-  name <- withFC uident
-  pure $ DDerive loc className name
+  tm <- typeExpr
+  pure $ DDerive loc tm
 
 parseAlias : Parser Decl
 parseAlias = do

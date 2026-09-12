@@ -19,8 +19,14 @@ funArgs tm = go tm Nil
 
 alias Binder = BindInfo Tm
 
+splitApp : Tm → Tm × List Tm
+splitApp tm = go tm Lin
+  where
+    go : Tm → SnocList Tm → Tm × List Tm
+    go (App _ t u Zero) tele = go t tele
+    go (App _ t u Many) tele = go t (tele :< u)
+    go tm tele = (tm, tele <>> Nil)
 
--- only used in ProcessDecl
 splitTele : Tm -> (Tm × List Binder)
 splitTele = go Nil
   where

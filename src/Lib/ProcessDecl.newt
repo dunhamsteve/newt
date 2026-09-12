@@ -422,13 +422,6 @@ populateConInfo entries =
         go (Pi fc (BI _ _ _ Many a) b) tele = go b (tele :< a)
         go tl tele = (tele <>> Nil, tl)
 
-    splitApp : Tm → Tm × List Tm
-    splitApp tm = go tm Lin
-      where
-        go : Tm → SnocList Tm → Tm × List Tm
-        go (App _ t u Zero) tele = go t tele
-        go (App _ t u Many) tele = go t (tele :< u)
-        go tm tele = (tm, tele <>> Nil)
 
     setInfo : TopEntry → ConInfo → TopEntry
     setInfo (MkEntry fc q nm dty (DCon ix _ arity hn) flags) info = MkEntry fc q nm dty (DCon ix info arity hn) flags
@@ -557,19 +550,28 @@ processRecord ns recordFC (nameFC, nm) tele cname decls = do
       let deps = ((name, RApp fc (RVar fc pname) (RVar fc "$self") Explicit) :: deps)
       processFields autoPat tail deps rest
 
-processDerive : String → FC → FC × String → (FC × String) → M Unit
-processDerive ns fc (clFC, clName) (fc, name) = do
+processDerive : String → FC → Raw  → M Unit
+processDerive ns fc raw = do
   top <- getTop
+  ty <- check (mkCtx fc Zero) raw (VU fc)
+  let (codomain, tele) = splitTele ty
+  let (Just (clName, target)) = getKind codomain
+    | _ => error (getFC codomain) "Expected Eq or Show application"
   case clName of
     "Eq" => do
-        decls <- deriveEq fc name
+        decls <- deriveEq fc raw target
         for_ decls $ processDecl ns
     "Show" => do
-        decls <- deriveShow fc name
+        decls <- deriveShow fc raw target
         for_ decls $ processDecl ns
     _ => error fc "derive \{clName} is not supported"
   -- Drop IDE data for synthesized code
   modifyTop { currentMod $= { modInfos := top.currentMod.modInfos; modTypes := top.currentMod.modTypes } }
+  where
+    getKind : Tm -> Maybe (String × Tm)
+    getKind (App _ (Ref _ name) u _) = Just (name.baseName, u)
+    getKind (_) = Nothing
+
 
 processAlias : FC → FC × String → Telescope → Raw → M Unit
 processAlias fc (fc', nm) args rhs = do
@@ -608,7 +610,7 @@ processDecl ns (DLog _ lvl)  = do
   isBatch <- getCFlag batchModeFlag
   when isBatch $ modifyTop { verbose := lvl }
 processDecl ns (DAlias fc nm args rhs)  = processAlias fc nm args rhs
-processDecl ns (DDerive fc tclass name)  = processDerive ns fc tclass name
+processDecl ns (DDerive fc tm)  = processDerive ns fc tm
 processDecl ns (TypeSig fc q names tm) = processTypeSig ns fc q names tm
 processDecl ns (PType fc nm ty) = processPrimType ns fc nm ty
 processDecl ns (PFunc fc nm used ty src) = processPrimFn ns fc nm used ty src

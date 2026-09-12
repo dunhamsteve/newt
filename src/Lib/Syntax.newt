@@ -74,7 +74,7 @@ data Decl
   = TypeSig FC Quant (List FCName) Raw
   | FunDef FC Name (List (Raw × Maybe Raw))
   | DCheck FC Raw Raw
-  | DDerive FC (FC × String) (FC × String)
+  | DDerive FC Raw
   | DAlias FC (FC × String) Telescope Raw
   -- TODO maybe add Telescope (before `:`) and auto-add to constructors...
   | Data FC (FC × Name) Raw (Maybe $ List Decl)
@@ -104,7 +104,7 @@ instance HasFC Decl where
   getFC (Class x str xs ys) = x
   getFC (Instance x tm xs) = x
   getFC (Record x str tm str1 xs) = x
-  getFC (DDerive x _ _) = x
+  getFC (DDerive x _) = x
 
 
 record Module where
@@ -217,7 +217,7 @@ instance Pretty Decl where
   pretty (TypeSig _ q nms ty) = text (show q) ++ spread (map (text ∘ snd)  nms) <+> text ":" <+> nest 2 (pretty ty)
   pretty (DLog _ level) = text "#log" <+> text (show level)
   pretty (DAlias _ nm args tm) = text "alias" <+> text (snd nm) <+> spread (map prettyBind args) <+> text "=" <+> pretty tm
-  pretty (DDerive _ x y) = text "derive" <+> text (snd x) <+> text (snd y)
+  pretty (DDerive _ x) = text "derive" <+> pretty x
   pretty (FunDef _ nm clauses) = stack $ map prettyPair clauses
     where
       prettyPair : Raw × Maybe Raw → Doc
