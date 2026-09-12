@@ -11,3 +11,4 @@ export function LSP_codeActionInfo(name: string, row: number, col: number): Code
 export function LSP_docSymbols(name: string): DocumentSymbol[] | null;
 export function LSP_lspRename(uri: string, row: number, col: number, newName: string): WorkspaceEdit | null
 export function LSP_prepareRename(uri: string, row: number, col: number): Range | null
+export function LSP_findReferences(uri: string, row: number, col: number): Location[] | null

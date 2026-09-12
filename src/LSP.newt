@@ -108,6 +108,9 @@ fcToRange (MkFC uri (MkBounds sr sc er ec)) =
         mkPosition : Int → Int → Json
         mkPosition l c = JsonObj $ ("line", JsonInt l) :: ("character", JsonInt c) :: Nil
 
+fcToLocation : FC → Json
+fcToLocation fc = JsonObj [ ("uri", JsonStr fc.file), ("range", fcToRange fc) ]
+
 hoverInfo : String → Int → Int → JSObject
 hoverInfo uri line col = unsafePerformIO $ do
     let (base,modns) = decomposeName uri
@@ -118,7 +121,9 @@ hoverInfo uri line col = unsafePerformIO $ do
         else pure MkUnit
     st <- readIORef state
     repo <- lspFileSource
-    -- We're proactively running check if there is no module information, make sure we save it
+    -- There is a hack here where we tell the caller to schedule a check
+    -- but return nothing if the context is stale
+    -- See if that's still needed
     Right (top, HasHover fc msg) <- (getHoverInfo repo modns line col).runM st.topContext
         | Right (top, NeedCheck)  => do
             modifyIORef state $ { topContext := top }
@@ -133,7 +138,7 @@ hoverInfo uri line col = unsafePerformIO $ do
             pure $ jsonToJObject JsonNull
     modifyIORef state $ { topContext := top }
     let location = JsonObj $ ("uri", JsonStr fc.file) :: ("range", fcToRange fc) :: Nil
-    pure $ jsonToJObject $ JsonObj $ ("info", JsonStr msg) :: ("location", location) :: Nil
+    pure $ jsonToJObject $ JsonObj $ ("info", JsonStr msg) :: ("location", fcToLocation fc) :: Nil
 
 codeActionInfo : String → Int → Int → JSObject
 codeActionInfo uri line col = unsafePerformIO $ do
@@ -264,6 +269,14 @@ prepareRename fn row col = wrapper fn
   )
   (\ err => pure $ jsonToJObject $ JsonNull)
 
+-- https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_references
+findReferences : String → Int → Int → JSObject
+findReferences fn row col = wrapper fn
+  (do
+    top <- getTop
+    Just res <- getReferences row col | _ => pure JsonNull
+    pure $ JsonArray $ map fcToLocation res)
+  (\ err => pure $ jsonToJObject $ JsonNull)
 
 -- https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_rename
 -- result: WorkspaceEdit | null
@@ -329,4 +342,4 @@ compileToScheme fn = unsafePerformIO $ do
   modifyIORef state { topContext := top }
   pure $ js_castStr src
 
-#export updateFile checkFile hoverInfo codeActionInfo compileJS docSymbols compileToScheme prepareRename lspRename
+#export updateFile checkFile hoverInfo codeActionInfo compileJS docSymbols compileToScheme prepareRename lspRename findReferences

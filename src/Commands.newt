@@ -62,6 +62,21 @@ checkMod row col (info@(MkTypeInfo fc nm env vty fc') :: xs) =
     False => Just info
   else checkMod row col xs
 
+-- Get the source and then pull all of the references
+getReferences : Int → Int → M (Maybe (List FC))
+getReferences row col = do
+    top <- getTop
+    let typeInfo = top.currentMod.modTypes
+    case checkMod row col top.currentMod.modTypes of
+      Nothing => pure Nothing
+      Just (MkTypeInfo fc nm env vty fc') => do
+        let typeInfos = map (.modTypes) $ listValues $ top.modules
+        let fcs = map getFC $ join $ map (filter (isMatch fc')) typeInfos
+        pure $ Just fcs
+    where
+      isMatch : FC → TypeInfo → Bool
+      isMatch fc (MkTypeInfo _ _ _ _ fc') = fc == fc'
+
 -- The cheap version of type at point, find the token, lookup in global context
 -- Later we will either get good FC for entries or scan them all and build a cache.
 getHoverInfo : FileSource → String → Int → Int → M HoverInfo

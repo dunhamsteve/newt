@@ -3,7 +3,16 @@
  * vscode LSP server module.
  */
 
-import { LSP_checkFile, LSP_updateFile, LSP_hoverInfo, LSP_codeActionInfo, LSP_docSymbols, LSP_prepareRename, LSP_lspRename } from './newt.js'
+import {
+  LSP_checkFile,
+  LSP_updateFile,
+  LSP_hoverInfo,
+  LSP_codeActionInfo,
+  LSP_docSymbols,
+  LSP_prepareRename,
+  LSP_lspRename,
+  LSP_findReferences,
+} from "./newt.js";
 
 import {
   createConnection,
@@ -16,8 +25,8 @@ import {
   Location,
   TextDocumentIdentifier,
 } from "vscode-languageserver/node";
-import fs from 'node:fs';
-import path from 'node:path';
+import fs from "node:fs";
+import path from "node:path";
 import { TextDocument } from "vscode-languageserver-textdocument";
 
 const connection = createConnection(ProposedFeatures.all);
@@ -25,51 +34,51 @@ const documents = new TextDocuments(TextDocument);
 
 // the last is the most important to the user, but we run FIFO
 // to ensure dependencies are seen in causal order
-let changes: (TextDocument|TextDocumentIdentifier)[] = []
-let running = false
-let lastChange = 0
+let changes: (TextDocument | TextDocumentIdentifier)[] = [];
+let running = false;
+let lastChange = 0;
 function addChange(doc: TextDocument | TextDocumentIdentifier) {
-  console.log('enqueue', doc.uri)
+  console.log("enqueue", doc.uri);
   // drop stale pending changes
-  let before = changes.length
-  changes = changes.filter(ch => ch.uri != doc.uri)
-  console.log('DROPPED', before - changes.length);
-  changes.push(doc)
-  lastChange = +new Date()
-  if (!running) runChange()
+  let before = changes.length;
+  changes = changes.filter((ch) => ch.uri != doc.uri);
+  console.log("DROPPED", before - changes.length);
+  changes.push(doc);
+  lastChange = +new Date();
+  if (!running) runChange();
 }
 
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function runChange() {
   try {
     running = true;
     while (changes.length) {
-      console.log('LOOP TOP')
+      console.log("LOOP TOP");
       // Wait until things stop changing
-      let prev = lastChange
+      let prev = lastChange;
       while (1) {
-        await sleep(100)
-        if (prev == lastChange) break
-        prev = lastChange
-        console.log('DELAY')
+        await sleep(100);
+        if (prev == lastChange) break;
+        prev = lastChange;
+        console.log("DELAY");
       }
-      let doc = changes.shift()
+      let doc = changes.shift();
       if (!doc) {
-        running = false
-        return
+        running = false;
+        return;
       }
-      const uri = doc.uri
-      const start = +new Date()
-      const diagnostics = LSP_checkFile(doc.uri)
-      const end = +new Date()
-      console.log('CHECK', doc.uri, 'in', end - start);
+      const uri = doc.uri;
+      const start = +new Date();
+      const diagnostics = LSP_checkFile(doc.uri);
+      const end = +new Date();
+      console.log("CHECK", doc.uri, "in", end - start);
       await sleep(1);
-      if (!changes.find(ch => ch.uri === uri)) {
-        console.log('SEND', diagnostics.length, 'for', uri)
-        connection.sendDiagnostics({ uri, diagnostics })
+      if (!changes.find((ch) => ch.uri === uri)) {
+        console.log("SEND", diagnostics.length, "for", uri);
+        connection.sendDiagnostics({ uri, diagnostics });
       } else {
-        console.log('STALE result not sent for', uri)
+        console.log("STALE result not sent for", uri);
       }
     }
   } catch (e) {
@@ -79,7 +88,7 @@ async function runChange() {
   }
 }
 documents.onDidChangeContent(async (change) => {
-  console.log('DIDCHANGE', change.document.uri)
+  console.log("DIDCHANGE", change.document.uri);
   const uri = change.document.uri;
   const text = change.document.getText();
   // update/invalidate happens now, check happens on quiesce.
@@ -92,29 +101,33 @@ connection.onPrepareRename((params) => {
   const uri = params.textDocument.uri;
   const pos = params.position;
   return LSP_prepareRename(uri, pos.line, pos.character);
-})
+});
 
 connection.onRenameRequest((params) => {
   const uri = params.textDocument.uri;
   const pos = params.position;
-  const newName = params.newName
+  const newName = params.newName;
   return LSP_lspRename(uri, pos.line, pos.character, newName);
-})
-
+});
+connection.onReferences((params) => {
+  const uri = params.textDocument.uri;
+  const pos = params.position;
+  return LSP_findReferences(uri, pos.line, pos.character);
+});
 connection.onHover((params): Hover | null => {
   // wait until quiesced (REVIEW after query-based)
-  if (running) return null
+  if (running) return null;
 
   const uri = params.textDocument.uri;
   const pos = params.position;
-  console.log('HOVER', uri, pos)
-  let res = LSP_hoverInfo(uri, pos.line, pos.character)
-  if (!res) return null
+  console.log("HOVER", uri, pos);
+  let res = LSP_hoverInfo(uri, pos.line, pos.character);
+  if (!res) return null;
   if (res == true) {
-    addChange(params.textDocument)
-    return null
+    addChange(params.textDocument);
+    return null;
   } else {
-    console.log('HOVER is ', res)
+    console.log("HOVER is ", res);
     return { contents: { kind: "plaintext", value: res.info } };
   }
 });
@@ -122,28 +135,31 @@ connection.onHover((params): Hover | null => {
 connection.onDefinition((params): Location | null => {
   const uri = params.textDocument.uri;
   const pos = params.position;
-  let value = LSP_hoverInfo(uri, pos.line, pos.character)
+  let value = LSP_hoverInfo(uri, pos.line, pos.character);
   if (!value || value == true) return null;
-  return value.location
-})
+  return value.location;
+});
 
-connection.onCodeAction(({textDocument, range}) => {
-  let actions = LSP_codeActionInfo(textDocument.uri, range.start.line, range.start.character);
-  console.log('ACTIONS is ', JSON.stringify(actions,null,'  '))
-  return actions
-})
+connection.onCodeAction(({ textDocument, range }) => {
+  let actions = LSP_codeActionInfo(
+    textDocument.uri,
+    range.start.line,
+    range.start.character,
+  );
+  console.log("ACTIONS is ", JSON.stringify(actions, null, "  "));
+  return actions;
+});
 
 connection.onDocumentSymbol((params) => {
   try {
-
-  const uri = params.textDocument.uri;
-  let symbols = LSP_docSymbols(uri);
-  console.log("docs got", symbols)
-  return symbols;
+    const uri = params.textDocument.uri;
+    let symbols = LSP_docSymbols(uri);
+    console.log("docs got", symbols);
+    return symbols;
   } catch (e) {
-    console.error('ERROR in onDocumentSymbol', e);
+    console.error("ERROR in onDocumentSymbol", e);
   }
-})
+});
 
 connection.onInitialize((_params: InitializeParams): InitializeResult => ({
   capabilities: {
@@ -151,7 +167,8 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => ({
     hoverProvider: true,
     definitionProvider: true,
     codeActionProvider: true,
-    renameProvider: {prepareProvider: true},
+    referencesProvider: true,
+    renameProvider: { prepareProvider: true },
     documentSymbolProvider: true,
   },
 }));
@@ -159,18 +176,17 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => ({
 function writeCache(fn: string, content: string) {
   const home = process.env.HOME;
   if (!home) return;
-  const dname = path.join(home, '.cache/newt-lsp');
+  const dname = path.join(home, ".cache/newt-lsp");
   const fname = path.join(dname, fn);
   try {
-    fs.mkdirSync(dname, {recursive: true});
-  } catch (e) {
-  }
+    fs.mkdirSync(dname, { recursive: true });
+  } catch (e) {}
   try {
-    fs.writeFileSync(fname, content, 'utf8');
+    fs.writeFileSync(fname, content, "utf8");
   } catch (e) {
     console.error(e);
   }
 }
 documents.listen(connection);
 connection.listen();
-console.log('STARTED')
+console.log("STARTED");

@@ -4,6 +4,10 @@
 - [ ] Expected `in` at EOF should point to EOF
 - [ ] Check scope on rename?
 - [ ] Fix "`.a` not in scope" for record update, if record has an implicit arg
+  - Maybe rework as a case statement, otherwise we inline a bunch of case statements
+- [ ] support derive with args:
+  - `derive Show (∀ a. {{Show a}} → BindInfo a)`
+  - `instance (∀ a. {{Show a}} → Show (BindInfo a))`
 - [ ] Add rename to playground
 - [ ] Build single name map on import
   - Check performance - cost to build the map vs not walking $n$ maps
@@ -72,7 +76,7 @@
   - I've been wanting to try holes for parse errors too.
   - Does softening up check errors break `auto`?
   - [ ] Missing `∀ k` in type is error -> no declaration for, if we insert a hole, we can get the declaration.
-- [ ] in-scope type at point in vscode
+- [x] in-scope type at point in vscode
   - So the idea here is that the references will be via FC, we remember the type at declaration and then point the usage back to the declaration (FC -> FC). We could dump all of this. (If we're still doing json.)
   - This information _could_ support renaming, too (but there may be indentation issues).
   - Do we want to (maybe later) keep the scope as a FC? We could do scope at point then.
@@ -80,8 +84,10 @@
 - [ ] LSP and/or more editor support
   - [ ] refactor to query based?  E.g. importing a module
   - [ ] restart mid file (we could save state per top level decl)
-  - [ ] rename in editor (need to accumulate all names and what they reference)
-  - [ ] who calls X?  We can only do this scoped to the current context for now. Someday whole source dir. #lsp
+  - [x] rename in editor (need to accumulate all names and what they reference)
+    - works scoped to current file
+  - [x] who calls X?  We can only do this scoped to the current context for now. Someday whole source dir. #lsp
+    - scoped to current context
 - [ ] Pretty print
   - Can we format code? Maybe pull nearby comments or attach them like FC to tokens?
   - We would need to address stack and laziness issues in prettier printer (or make it merely pretty)

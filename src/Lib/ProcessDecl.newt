@@ -20,6 +20,8 @@ import Lib.Derive
 logConstraints : M Unit
 logConstraints = do
   top <- getTop
+  -- REVIEW These tend to be noisy, maybe a warning to deemphasize
+  -- but they are fatal in the absence of errors
   for_ top.currentMod.modMetaCtx.mpost $ \case
     MkMc fc nms env ty' ty => addError $ E fc "Constraint: \{show ty'} =?= \{show ty} deps \{show nms}"
 
@@ -33,7 +35,7 @@ logMetas (Unsolved fc k ctx ty User :: rest) = do
       let msg = "\{env}\n  -----------\n  \{render 90 $ pprint ctx.names ty'}"
       info fc "User Hole\n\{msg}"
       logMetas rest
--- error is reported separately
+-- errors are reported elsewhere
 logMetas (Unsolved fc k ctx ty ErrorHole :: rest) = logMetas rest
 logMetas (Unsolved fc k ctx ty kind :: rest) = do
       ty' <- forceMeta ty
@@ -46,8 +48,6 @@ logMetas (Unsolved fc k ctx ty kind :: rest) = do
           x <- quote ctx.lvl ty
           ty <- eval ctx.env x
           debug "AUTO ---> \{show ty}"
-          -- we want the context here too.
-          top <- getTop
           let (VRef _ tyname _) = ty | _ => pure Nil
           -- TODO maybe log matches from ctx, too
           let cands = fromMaybe Nil $ lookupMap' tyname top.hints

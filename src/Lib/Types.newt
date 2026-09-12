@@ -388,6 +388,9 @@ data EditorInfo
 -- that last one is the definition FC
 data TypeInfo = MkTypeInfo FC String Env Val FC
 
+instance HasFC TypeInfo where
+  getFC (MkTypeInfo fc _ _ _ _) = fc
+
 record ModContext where
   constructor MkModCtx
   modName : String
