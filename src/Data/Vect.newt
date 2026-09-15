@@ -11,7 +11,6 @@ data Vect : (0 n : Nat) → (0 a : U) → U where
 vindex : ∀ n a. Fin n → Vect n a → a
 vindex FZ (x :- _) = x
 vindex (FS k) (x :- rest) = vindex k rest
-vindex () VNil -- Idris doesn't need this hint.
 
 instance ∀ k. Functor (Vect k) where
   map f VNil = VNil
@@ -49,4 +48,17 @@ vset : ∀ n a. Fin n → a → Vect n a → Vect n a
 vset () el VNil
 vset FZ el (x :- xs) = el :- xs
 vset (FS k) el (x :- xs) = x :- vset k el xs
+
+vfilterLen : ∀ a n. (a → Bool) → Vect n a → Nat
+vfilterLen f VNil = Z
+vfilterLen f (x :- xs) = ite (f x) (S $ vfilterLen f xs) (vfilterLen f xs)
+
+vfilter : ∀ a n. (f : a → Bool) → (xs : Vect n a) → Vect (vfilterLen f xs) a
+vfilter f VNil = VNil
+-- TODO when we support it, this can be a `with` clause
+vfilter {a} f (x :- xs) = vfilterWith (f x)
+  where
+    vfilterWith : (z : Bool) → Vect (ite z (S $ vfilterLen f xs) (vfilterLen f xs)) a
+    vfilterWith False = vfilter f xs 
+    vfilterWith True = x :- vfilter f xs
 

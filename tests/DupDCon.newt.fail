@@ -1,0 +1,16 @@
+*** Process tests/DupDCon.newt
+module Prelude
+module DupDCon
+ERROR at tests/DupDCon.newt:8:12--8:15: One is already defined at tests/DupDCon.newt:5:1--5:5
+  
+  
+  data Bar = One
+             ^^^
+
+ERROR at tests/DupDCon.newt:11:3--11:6: One is already defined at tests/DupDCon.newt:5:1--5:5
+  
+  data Baz : U where
+    One : Baz
+    ^^^
+
+Stop on error

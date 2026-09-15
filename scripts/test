@@ -7,7 +7,7 @@ OUTFILE=${OUTFILE:="tmp/out.js"}
 mkdir -p tmp
 total=0
 failed=0
-tests=$(find tests -name '*.newt')
+tests=$(find tests -name '*.newt' -o -name '*.newt.md')
 faillist=()
 for fn in $tests; do
   if [ x$1 != "x-u" ] && [[ "$fn" != *"$1"* ]]; then continue; fi

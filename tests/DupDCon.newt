@@ -1,0 +1,12 @@
+module DupDCon
+
+import Prelude
+
+data Foo = One | Two
+
+
+data Bar = One
+
+data Baz : U where
+  One : Baz
+

@@ -9,6 +9,7 @@
   - `derive ∀ a. {{Show a}} → Show (BindInfo a)`
   - `instance (∀ a. {{Show a}} → Show (BindInfo a))`
 - [ ] Add rename to playground
+- [x] Add test for literate newt
 - [ ] Build single name map on import
   - Check performance - cost to build the map vs not walking $n$ maps
   - This will likely be needed for qualified / partial imports
@@ -30,6 +31,7 @@
 - [ ] preserve information on record / class / instance for LSP "document symbols" kind
   - We will want some of this for default implementations in class
   - It may help avoid reverse-engineering the class when processing implementation
+- [ ] Maybe use a worker thread for LSP
 - [-] Put a copy of the `Def` on `Ref` terms
   - It may be Axiom for forward/recursive functions, but it would get us DCon and TCon info without lookup - and may save passing around the Ref2 (+lookup) during Compilation.
   - We can do lookup for Axiom via helper
@@ -59,6 +61,7 @@
 - [ ] consider moving primitive functions to a support file
   - Downside here is that we lose some dead code elimination
   - it better supports bootstrapping when calling convention changes.
+  - this is how scheme works
 - [ ] allow declaration of primitive operators
   - Removes assumptions of hack in Compile.newt, but might not support other backends
   - Alternate solution would be to pull from Prelude and hard code for all backends

@@ -109,6 +109,10 @@ join mma = mma >>= id
 _>=>_ : ∀ m a b c. {{Monad m}} → (a → m b) → (b → m c) → a → m c
 (mab >=> mac) a = mab a >>= mac
 
+infixr 1 _**_
+data Sg : (A : U) -> (A -> U) -> U where
+  _**_ : {0 A : U} {0 B : A -> U} -> (a : A) -> B a -> Sg A B
+
 -- Equality
 
 infixl 1 _≡_
@@ -123,6 +127,10 @@ cong f Refl = Refl
 
 sym : ∀ A. {0 a b : A} → a ≡ b → b ≡ a
 sym Refl = Refl
+
+-- capture the value of an application to use in replace
+inspect : ∀ a b . (f : a → b) → (x : a) → Sg b (\ n => f x ≡ n)
+inspect f x = (f x ** Refl)
 
 data Void : U where
 
@@ -964,4 +972,3 @@ pfunc _&&&_ : Int → Int → Int := `(x,y) => x & y`
 isNil : ∀ a. List a → Bool
 isNil Nil = True
 isNil _ = False
-
