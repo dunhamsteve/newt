@@ -202,7 +202,7 @@ instance Pretty Raw where
             go ((MkAlt lhs Nothing) :: alts) acc = go alts $ acc ++ nest 2 (line ++ text "|" <+> asDoc 0 lhs)
 
     asDoc p (RIf _ x y z) = paren p 0 $ text "if" <+> asDoc 0 x <+/> text "then" <+> asDoc 0 y <+/> text "else" <+> asDoc 0 z
-    asDoc p (RWhere _ dd b) = text "TODO pretty RWhere"
+    asDoc p (RWhere _ dd b) = asDoc 0 b </> text "where" <+> (nest 2 (line ++ stack (map pretty dd)))
     asDoc p (RAs _ nm x) = text nm ++ text "@(" ++ asDoc 0 x ++ text ")"
     asDoc p (RUpdateRec _ clauses tm) = text "{" <+> text "TODO RUpdateRec" <+> text "}"
 

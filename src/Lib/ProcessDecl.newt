@@ -564,6 +564,10 @@ processDerive ns fc raw = do
     "Show" => do
         decls <- deriveShow fc raw target
         for_ decls $ processDecl ns
+    "Ord" => do
+        decls <- deriveOrd fc raw target
+        -- for_ decls $ \ x => liftIO $ putStrLn $ render 90 $ pretty x 
+        for_ decls $ processDecl ns
     _ => error fc "derive \{clName} is not supported"
   -- Drop IDE data for synthesized code
   modifyTop { currentMod $= { modInfos := top.currentMod.modInfos; modTypes := top.currentMod.modTypes } }

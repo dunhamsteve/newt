@@ -1,0 +1,35 @@
+module OrdEg
+import Prelude
+
+data Foo = A String Int | B Int | C Foo
+derive Ord Foo
+derive Show Ordering
+
+data Pair a b = MkPair a b
+derive ∀ a b. {{Ord a}} {{Ord b}} → Ord (Pair a b)
+
+
+main : IO Unit
+main = do
+  printLn $ compare (A "foo" 3) (B 2)
+  printLn $ compare (A "foo" 3) (A "foo" 3) 
+  printLn $ compare (A "foo" 31) (A "foo" 3) 
+  printLn $ compare (MkPair 1 2) (MkPair 1 3)
+
+
+-- instance Ord Foo where
+--   -- nine clauses or some kind of number for the clause
+--   -- we could do:
+--   compare (A x y) (A a b) = 
+--     case compare x a of
+--       EQ => compare y b
+--       x => x
+--   compare (B x) (B y) = compare x y
+--   compare (C x) (C y) = compare x y
+--   compare x y = compare (aux x) (aux y)
+--     where
+--       aux : Foo → Int
+--       aux (A _ _) = 1
+--       aux (B _) = 2
+--       aux (C _) = 3
+

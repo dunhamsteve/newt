@@ -75,10 +75,82 @@ deriveEq fc raw target = do
       pure (left, Just right)
 
 
-
-
 -- This is a little more of a pain, we'll generate a number for each constructor
 -- and use that as the fallback. Eventually we'll want something like quasi-quote
+deriveOrd : FC → Raw → Tm → M (List Decl)
+deriveOrd fc raw target = do
+  top <- getTop
+  let (a,b) = splitApp target
+  let (Ref _ (QN _ name)) = a
+    | _ => throwError $ E fc "\{show target} is not a type constructor application"
+  let (Just (MkEntry fc q qname type (TCon _ names) eflags)) = lookupRaw name top
+    | Just _ => throwError $ E fc "\{name} is not a type constructor"
+    | _ => throwError $ ENotInScope fc name
+  let (Just target) = getTarget raw | _ => error fc "Can't sort out the type from \{show raw}"
+  dcons <- traverse lookupDCon names
+  clauses <- traverse makeClause dcons
+  let auxDecl = TypeSig fc Many [(fc,"aux")] (arr target (rvar "Int"))
+  auxClauses <- traverse makeAux $ enumerate dcons
+  let auxFun = FunDef fc "aux" auxClauses
+  let fallback = (buildApp "compare" [rvar "x", rvar "y"]
+         , Just (RWhere fc [auxDecl,auxFun] (buildApp "compare" [buildApp "aux" [rvar "x"], buildApp "aux" [rvar "y"]])))
+  let compDecl = FunDef fc "compare" (snoc clauses fallback)
+  let inst = Instance fc raw (Just [compDecl])
+  pure $ inst :: Nil
+
+  where
+    getTarget : Raw → Maybe Raw
+    getTarget (RPi fc _ sc) = getTarget sc
+    getTarget (RApp fc (RVar fc nm) u icit) = Just u
+    getTarget _ = Nothing
+
+    arr : Raw → Raw → Raw
+    arr a b = RPi fc (BI fc "_" Explicit Many a) b
+
+    rvar : String → Raw
+    rvar nm = RVar fc nm
+
+
+    buildApp : String → List Raw → Raw
+    buildApp nm nms = foldl (\ t u => RApp fc t u Explicit) (rvar nm) $  nms
+
+    comp : String → String → Raw
+    comp x y = buildApp "compare" [rvar x, rvar y]
+
+    -- assign a number to each constructor
+    makeAux : (Nat × QName × Int × Tm) → M (Raw × Maybe Raw)
+    makeAux (ix, (QN ns nm), arity, ty) = do
+      let names = getExplictNames Lin ty
+      anames <- map rvar <$> traverse freshName names
+      let left = buildApp "aux" [buildApp nm anames]
+      let right = RLit fc $ LInt $ cast ix
+      pure (left, Just right)
+
+
+    mkrhs : List (String × String) → Raw
+    mkrhs Nil = rvar "EQ"
+    mkrhs [(a,b)] = comp a b
+    mkrhs ((a,b) :: x :: xs) = RCase fc (comp a b) Nothing
+      [ MkAlt (rvar "EQ") (Just $ mkrhs (x :: xs))
+      , MkAlt (rvar "x") (Just $ rvar "x")
+      ]
+
+    makeClause : (QName × Int × Tm) → M (Raw × Maybe Raw)
+    makeClause ((QN ns nm), _, ty) = do
+      -- We're only looking at explicit args for now.
+      -- TODO check quantity
+      let names = getExplictNames Lin ty
+      anames <- traverse freshName names
+      bnames <- traverse freshName names
+
+      let a = buildApp nm (map rvar anames)
+      let b = buildApp nm (map rvar bnames)
+      let left = buildApp "comp" [a,b]
+      let right = mkrhs $ zip anames bnames
+
+      pure (left, Just right)
+
+
 deriveShow : FC → Raw → Tm → M (List Decl)
 deriveShow fc raw target = do
   top <- getTop
@@ -128,3 +200,4 @@ deriveShow fc raw target = do
               buildApp "_++_" $ buildApp "joinBy" (lstring " " :: parts :: Nil)  :: lstring ")" :: Nil
 
       pure (left, Just right)
+

@@ -49,5 +49,5 @@ ERROR 9:0--9:8 "no definition for show : LSPStuff.Foo -> Prim.String"
 - LSPStuff.newt 26:4--26:6 "woot"
 
 *** info LSPStuff.newt 30 7
-812:0--812:3 nub : {0  a : U } -> {{ _ : Prelude.Eq a:0 }} -> (Prelude.List a:1) -> Prelude.List a:2
+811:0--811:3 nub : {0  a : U } -> {{ _ : Prelude.Eq a:0 }} -> (Prelude.List a:1) -> Prelude.List a:2
 
