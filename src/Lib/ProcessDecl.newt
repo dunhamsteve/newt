@@ -550,31 +550,15 @@ processRecord ns recordFC (nameFC, nm) tele cname decls = do
       let deps = ((name, RApp fc (RVar fc pname) (RVar fc "$self") Explicit) :: deps)
       processFields autoPat tail deps rest
 
+
 processDerive : String → FC → Raw  → M Unit
 processDerive ns fc raw = do
+  addInfo $ ExpandDerive fc raw
   top <- getTop
-  ty <- check (mkCtx fc Zero) raw (VU fc)
-  let (codomain, tele) = splitTele ty
-  let (Just (clName, target)) = getKind codomain
-    | _ => error (getFC codomain) "Expected Eq or Show application"
-  case clName of
-    "Eq" => do
-        decls <- deriveEq fc raw target
-        for_ decls $ processDecl ns
-    "Show" => do
-        decls <- deriveShow fc raw target
-        for_ decls $ processDecl ns
-    "Ord" => do
-        decls <- deriveOrd fc raw target
-        -- for_ decls $ \ x => liftIO $ putStrLn $ render 90 $ pretty x 
-        for_ decls $ processDecl ns
-    _ => error fc "derive \{clName} is not supported"
+  decls <- expandDerive fc raw
+  for_ decls $ processDecl ns
   -- Drop IDE data for synthesized code
   modifyTop { currentMod $= { modInfos := top.currentMod.modInfos; modTypes := top.currentMod.modTypes } }
-  where
-    getKind : Tm -> Maybe (String × Tm)
-    getKind (App _ (Ref _ name) u _) = Just (name.baseName, u)
-    getKind (_) = Nothing
 
 
 processAlias : FC → FC × String → Telescope → Raw → M Unit

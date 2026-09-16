@@ -145,7 +145,7 @@ deriveOrd fc raw target = do
 
       let a = buildApp nm (map rvar anames)
       let b = buildApp nm (map rvar bnames)
-      let left = buildApp "comp" [a,b]
+      let left = buildApp "compare" [a,b]
       let right = mkrhs $ zip anames bnames
 
       pure (left, Just right)
@@ -201,3 +201,19 @@ deriveShow fc raw target = do
 
       pure (left, Just right)
 
+expandDerive : FC → Raw → M (List Decl)
+expandDerive fc raw = do
+  top <- getTop
+  ty <- check (mkCtx fc Zero) raw (VU fc)
+  let (codomain, tele) = splitTele ty
+  let (Just (clName, target)) = getKind codomain
+    | _ => error (getFC codomain) "Expected Eq or Show application"
+  case clName of
+    "Eq" => deriveEq fc raw target
+    "Show" => deriveShow fc raw target
+    "Ord" =>  deriveOrd fc raw target
+    _ => error fc "derive \{clName} is not supported"
+  where
+    getKind : Tm -> Maybe (String × Tm)
+    getKind (App _ (Ref _ name) u _) = Just (name.baseName, u)
+    getKind (_) = Nothing

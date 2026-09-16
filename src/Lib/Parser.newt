@@ -721,8 +721,7 @@ parseExport = do
 parseDerive : Parser Decl
 parseDerive = do
   loc <- getPos
-  keyword "derive"
-  tm <- typeExpr
+  (loc, tm) <- withFC $ keyword "derive" *> typeExpr
   pure $ DDerive loc tm
 
 parseAlias : Parser Decl

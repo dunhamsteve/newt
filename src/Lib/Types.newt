@@ -3,63 +3,20 @@ module Lib.Types
 import Prelude
 import Lib.Common
 import Lib.Prettier
+import Lib.Syntax
 import Data.IORef
 import Data.SnocList
 import Data.SortedMap
 import Data.String
 
-alias Name = String
-
-data Icit = Implicit | Explicit | Auto
-derive Show Icit
-derive Eq Icit
 
 data BD = Bound | Defined
 derive Eq BD
 derive Show BD
 
-data Quant = Zero | Many
-derive Eq Quant
-
-instance Mul Quant where
-  Zero * b = Zero
-  a * Zero = Zero
-  a * b = Many
-
--- Used for pretty-printing
-instance Show Quant where
-  show Zero = "0 "
-  show Many = ""
-
--- There were a lot of tuples similar to this, and we need
--- to propogate FC for rename operations.
-record BindInfo a where
-  constructor BI
-  -- FC of the name
-  biFC : FC
-  biName : String
-  biIcit : Icit
-  biQuant : Quant
-  biTy : a
-
-instance Functor BindInfo where
-  map f (BI fc name icit quant ty) = (BI fc name icit quant (f ty))
-
-instance ∀ a. HasFC (BindInfo a) where
-  getFC (BI fc _ _ _ _) = fc
-
-instance Traversable BindInfo where
-  traverse f (BI fc name icit q ty) = pure (BI fc name icit q) <*> f ty
 
 data Tm : U
 
-data Literal = LString String | LInt Int | LChar Char | LBool Bool
-
-instance Show Literal where
-  show (LString str) = quoteString str
-  show (LBool b) = if b then "true" else "false"
-  show (LInt i) = show i
-  show (LChar c) = "\{show c}"
 
 data CaseAlt : U where
   CaseDefault : Tm -> CaseAlt
@@ -384,6 +341,7 @@ data EditorInfo
   = CaseSplit FC Context Int Val
   -- Not sure we need Context here?
   | MissingCases FC Context (List QName)
+  | ExpandDerive FC Raw
 
 -- that last one is the definition FC
 data TypeInfo = MkTypeInfo FC String Env Val FC
@@ -412,8 +370,12 @@ alias HintTable = SortedMap QName (List (QName × Tm))
 
 
 -- DERIVE - HasFC would be an example of a user-defined derived
+-- random idea - a "split; solve" tactic would work here too..
+-- derive HasFC EditorInfo by split; solve ? 
+-- But both of these break with multiple FC
 instance HasFC EditorInfo where
   getFC (CaseSplit fc _ _ _) = fc
+  getFC (ExpandDerive fc _) = fc
   getFC (MissingCases fc _ _) = fc
 
 -- InlineEval is used in inlining
@@ -611,34 +573,6 @@ mkCtx : FC -> Quant -> Context
 mkCtx fc q = MkCtx 0 Nil Nil Nil fc (if q == Many then Absent else Present)
 
 -- Used by Syntax and Elab
-
-data Pattern
-  = PatVar FC Icit Name
-  | PatCon FC Icit QName (List Pattern) (Maybe $ FC × Name)
-  | PatWild FC Icit
-  | PatLit FC Literal
-  | PatImpossible FC
-
-getIcit : Pattern -> Icit
-getIcit (PatVar x icit str) = icit
-getIcit (PatCon x icit str xs as) = icit
-getIcit (PatWild x icit) = icit
-getIcit (PatLit fc lit) = Explicit
-getIcit (PatImpossible _) = Explicit
-
-instance HasFC Pattern where
-  getFC (PatVar fc _ _) = fc
-  getFC (PatCon fc _ _ _ _) = fc
-  getFC (PatWild fc _) = fc
-  getFC (PatLit fc lit) = fc
-  getFC (PatImpossible fc) = fc
-
-instance Show Pattern where
-  show (PatVar _ icit str) = "(PatVar " ++ show icit ++ " " ++ show str ++ ")"
-  show (PatImpossible _) = "PatImp"
-  show (PatCon _ icit str xs as) = "(PatCon " ++ show icit ++ " " ++ show str ++ " " ++ show xs ++ " " ++ show as ++ ")"
-  show (PatWild _ icit) = "(PatWild " ++ show icit ++ ")"
-  show (PatLit _ lit) = "(PatLit " ++ show lit ++ ")"
 
 -- Lazy because `let` would do work at the top of a `M a`
 profile : ∀ a. String → Lazy (M a) → M a

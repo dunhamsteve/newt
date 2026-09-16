@@ -188,3 +188,79 @@ alias Operators = SortedMap String OpDef
 
 isUpperName : String → Bool
 isUpperName nm = isUpper $ strIndex nm 0
+
+alias Name = String
+
+data Icit = Implicit | Explicit | Auto
+derive Show Icit
+derive Eq Icit
+
+data Quant = Zero | Many
+derive Eq Quant
+
+instance Mul Quant where
+  Zero * b = Zero
+  a * Zero = Zero
+  a * b = Many
+
+-- Used for pretty-printing
+instance Show Quant where
+  show Zero = "0 "
+  show Many = ""
+
+-- There were a lot of tuples similar to this, and we need
+-- to propogate FC for rename operations.
+record BindInfo a where
+  constructor BI
+  -- FC of the name
+  biFC : FC
+  biName : String
+  biIcit : Icit
+  biQuant : Quant
+  biTy : a
+
+instance Functor BindInfo where
+  map f (BI fc name icit quant ty) = (BI fc name icit quant (f ty))
+
+instance ∀ a. HasFC (BindInfo a) where
+  getFC (BI fc _ _ _ _) = fc
+
+instance Traversable BindInfo where
+  traverse f (BI fc name icit q ty) = pure (BI fc name icit q) <*> f ty
+
+data Literal = LString String | LInt Int | LChar Char | LBool Bool
+
+instance Show Literal where
+  show (LString str) = quoteString str
+  show (LBool b) = if b then "true" else "false"
+  show (LInt i) = show i
+  show (LChar c) = "\{show c}"
+
+data Pattern
+  = PatVar FC Icit Name
+  | PatCon FC Icit QName (List Pattern) (Maybe $ FC × Name)
+  | PatWild FC Icit
+  | PatLit FC Literal
+  | PatImpossible FC
+
+getIcit : Pattern → Icit
+getIcit (PatVar x icit str) = icit
+getIcit (PatCon x icit str xs as) = icit
+getIcit (PatWild x icit) = icit
+getIcit (PatLit fc lit) = Explicit
+getIcit (PatImpossible _) = Explicit
+
+instance HasFC Pattern where
+  getFC (PatVar fc _ _) = fc
+  getFC (PatCon fc _ _ _ _) = fc
+  getFC (PatWild fc _) = fc
+  getFC (PatLit fc lit) = fc
+  getFC (PatImpossible fc) = fc
+
+instance Show Pattern where
+  show (PatVar _ icit str) = "(PatVar " ++ show icit ++ " " ++ show str ++ ")"
+  show (PatImpossible _) = "PatImp"
+  show (PatCon _ icit str xs as) = "(PatCon " ++ show icit ++ " " ++ show str ++ " " ++ show xs ++ " " ++ show as ++ ")"
+  show (PatWild _ icit) = "(PatWild " ++ show icit ++ ")"
+  show (PatLit _ lit) = "(PatLit " ++ show lit ++ ")"
+

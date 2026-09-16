@@ -7,6 +7,7 @@ setlocal tabstop=2
 setlocal makeprg=make
 " setlocal makeprg=newt\ %
 setlocal errorformat=ERROR\ at\ %f:%l:%c--%e:%k:\ %m
+setlocal formatoptions+=r
 
 " Single-character sequences
 inoremap <buffer> \r  →
