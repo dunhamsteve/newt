@@ -1,8 +1,12 @@
 *** Check LSPStuff.newt
-INFO 16:12--16:13 "  _$0 : Prelude._×_ Prim.Int Prim.String\n  0 a$1 : U\n  0 b$2 : U\n  a : Prim.Int\n  b : Prim.String\n--------\nPrim.String"
-INFO 5:11--5:12 "  n : Prelude.Nat\n  m : Prelude.Nat\n--------\nPrelude.Nat"
 ERROR 12:5--12:6 "missing cases: [LSPStuff.B]"
 ERROR 9:0--9:8 "no definition for show : LSPStuff.Foo -> Prim.String"
+WARN 5:5--5:6 "Unused name n"
+WARN 5:7--5:8 "Unused name m"
+WARN 16:5--16:6 "Unused name a"
+WARN 16:7--16:8 "Unused name b"
+INFO 16:12--16:13 "  _$0 : Prelude._×_ Prim.Int Prim.String\n  0 a$1 : U\n  0 b$2 : U\n  a : Prim.Int\n  b : Prim.String\n--------\nPrim.String"
+INFO 5:11--5:12 "  n : Prelude.Nat\n  m : Prelude.Nat\n--------\nPrelude.Nat"
 
 *** Actions LSPStuff.newt 5 6
 * Case split

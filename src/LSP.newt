@@ -203,8 +203,17 @@ errorToDiag err = do
     :: ("message", JsonStr msg)
     :: ("source", JsonStr "newt") -- what is this key for?
     :: Nil
+
 -- These shouldn't escape
 errorToDiag (Postpone fc qn msg) = errorToDiag $ E fc "Postpone \{show qn} \{msg}"
+
+warningToDiag : TypeInfo → Json
+warningToDiag (MkTypeInfo fc nm _ _ _) = JsonObj
+  $ ("severity", JsonInt 2)
+  :: ("range", fcToRange fc)
+  :: ("message", JsonStr "Unused name \{show nm}")
+  :: ("source", JsonStr "newt")
+  :: Nil
 
 getSymbols : M Json
 getSymbols = do
@@ -301,8 +310,9 @@ checkFile fn = wrapper fn
     -- pull out errors and infos
     top <- getTop
     errors <- traverse (errorToDiag) top.currentMod.modErrors
+    warns <- map warningToDiag <$> getUnused
     infos <- getInfos
-    pure $ JsonArray $ infos ++ errors)
+    pure $ JsonArray $ errors ++ warns ++ infos)
   ( \ err => do
       putStrLn {IO} "**** Error without updating top:"
       putStrLn $ show err

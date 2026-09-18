@@ -27,6 +27,9 @@ getIndent : Int → List Char → Int
 getIndent acc (' ' :: rest) = getIndent (1 + acc) rest
 getIndent acc _ = acc
 
+internalName : String → Bool
+internalName nm = isPrefixOf "$" nm
+
 -- For now we cheat and assume capitalized directories are a module component
 decomposeName : String → String × String
 decomposeName fn =
@@ -55,11 +58,11 @@ switchModule repo modns = do
 data HoverInfo = NoHoverInfo | NeedCheck | HasHover FC String
 
 checkMod : Int → Int → List TypeInfo → Maybe TypeInfo
-checkMod row col Nil = Nothing
+checkMod _ _ Nil = Nothing
 checkMod row col (info@(MkTypeInfo fc nm env vty fc') :: xs) =
   if posInFC row col fc
   -- try to skip the $_ from do desugaring - might want virtual FC
-  then case isPrefixOf "$" nm of
+  then case internalName nm of
     True => checkMod row col xs
     False => Just info
   else checkMod row col xs
@@ -68,7 +71,6 @@ checkMod row col (info@(MkTypeInfo fc nm env vty fc') :: xs) =
 getReferences : Int → Int → M (Maybe (List FC))
 getReferences row col = do
     top <- getTop
-    let typeInfo = top.currentMod.modTypes
     case checkMod row col top.currentMod.modTypes of
       Nothing => pure Nothing
       Just (MkTypeInfo fc nm env vty fc') => do
@@ -124,6 +126,28 @@ getHoverInfo repo modns row col = do
             if tok.bounds.startCol <= col && col <= tok.bounds.endCol && isIdent tok
             then Just $ value tok else getTok toks
 
+-- move to Lib.Types or something
+derive Ord Bounds
+derive Ord FC
+
+-- Find a place to put this, we might want it for batch mode
+getUnused : M (List TypeInfo)
+getUnused = do
+  top <- getTop
+  let defs = foldl addDef emptyMap top.currentMod.modTypes
+  pure $ listValues $ foldl removeDef defs $ top.currentMod.modTypes
+
+  where
+    addDef : SortedMap FC TypeInfo → TypeInfo → SortedMap FC TypeInfo
+    addDef map info@(MkTypeInfo fc nm _ _ fc') = 
+      -- TODO filter out globals instead of column 0, to catch DCon, etc
+      if fc == fc' && fc.bnds.startCol /= 0 && not (internalName nm)
+      then updateMap fc info map else map
+
+    removeDef : SortedMap FC TypeInfo → TypeInfo → SortedMap FC TypeInfo
+    removeDef map (MkTypeInfo fc _ _ _ fc') = if fc /= fc'
+      then deleteMap fc' map
+      else map
 
 data FileEdit = MkEdit FC String
 data CodeAction
