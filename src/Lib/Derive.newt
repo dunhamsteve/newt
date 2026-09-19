@@ -89,14 +89,20 @@ deriveOrd fc raw target = do
   let (Just target) = getTarget raw | _ => error fc "Can't sort out the type from \{show raw}"
   dcons <- traverse lookupDCon names
   clauses <- traverse makeClause dcons
-  let auxDecl = TypeSig fc Many [(fc,"aux")] (arr target (rvar "Int"))
-  auxClauses <- traverse makeAux $ enumerate dcons
-  let auxFun = FunDef fc "aux" auxClauses
-  let fallback = (buildApp "compare" [rvar "x", rvar "y"]
-         , Just (RWhere fc [auxDecl,auxFun] (buildApp "compare" [buildApp "aux" [rvar "x"], buildApp "aux" [rvar "y"]])))
-  let compDecl = FunDef fc "compare" (snoc clauses fallback)
-  let inst = Instance fc raw (Just [compDecl])
-  pure $ inst :: Nil
+  case dcons of
+    [x] => do
+      let compDecl = FunDef fc "compare" clauses
+      let inst = Instance fc raw (Just [compDecl])
+      pure $ inst :: Nil
+    _ => do
+      let auxDecl = TypeSig fc Many [(fc,"aux")] (arr target (rvar "Int"))
+      auxClauses <- traverse makeAux $ enumerate dcons
+      let auxFun = FunDef fc "aux" auxClauses
+      let fallback = (buildApp "compare" [rvar "x", rvar "y"]
+             , Just (RWhere fc [auxDecl,auxFun] (buildApp "compare" [buildApp "aux" [rvar "x"], buildApp "aux" [rvar "y"]])))
+      let compDecl = FunDef fc "compare" (snoc clauses fallback)
+      let inst = Instance fc raw (Just [compDecl])
+      pure $ inst :: Nil
 
   where
     getTarget : Raw → Maybe Raw
