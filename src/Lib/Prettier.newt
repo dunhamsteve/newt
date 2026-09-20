@@ -92,10 +92,9 @@ best w k x = fromMaybe Nil $ be False Lin w k ((0,x) :: Nil)
 class Pretty a where
   pretty : a -> Doc
 
-
 render : Int -> Doc -> String
-render w x = layout (best w 0 (noAlt x)) Lin
-
+-- render w x = layout (best w 0 (noAlt x)) Lin
+render w x = layout (best w 0 x) Lin
 
 instance Semigroup Doc where x <+> y = Seq x (Seq (Text " ") y)
 

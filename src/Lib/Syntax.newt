@@ -222,7 +222,7 @@ instance Pretty Decl where
     where
       prettyPair : Raw × Maybe Raw → Doc
       prettyPair (a, Nothing) = pretty a
-      prettyPair (a, Just b) = pretty a <+> text "=" <+> pretty b
+      prettyPair (a, Just b) = pretty a <+> text "=" ++ (nest 2 $ emptyDoc <+/> pretty b)
   pretty (Data _ (_,nm) x Nothing) = text "data" <+> text nm <+> text ":" <+>  pretty x
   pretty (Data _ (_,nm) x (Just xs)) = text "data" <+> text nm <+> text ":" <+>  pretty x <+> (nest 2 $ text "where" </> stack (map pretty xs))
   pretty (DCheck _ x y) = text "#check" <+> pretty x <+> text ":" <+> pretty y
