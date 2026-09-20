@@ -70,7 +70,8 @@ async function runChange() {
       }
       const uri = doc.uri;
       const start = +new Date();
-      const diagnostics = LSP_checkFile(doc.uri);
+      let diagnostics = LSP_checkFile(doc.uri);
+      if (!showWarnings) diagnostics = diagnostics.filter(diag => diag.severity != 2)
       const end = +new Date();
       console.log("CHECK", doc.uri, "in", end - start);
       await sleep(1);
@@ -161,17 +162,21 @@ connection.onDocumentSymbol((params) => {
   }
 });
 
-connection.onInitialize((_params: InitializeParams): InitializeResult => ({
-  capabilities: {
-    textDocumentSync: TextDocumentSyncKind.Incremental,
-    hoverProvider: true,
-    definitionProvider: true,
-    codeActionProvider: true,
-    referencesProvider: true,
-    renameProvider: { prepareProvider: true },
-    documentSymbolProvider: true,
+let showWarnings = true
+connection.onInitialize((_params: InitializeParams): InitializeResult => {
+  showWarnings = _params.initializationOptions?.warnings ?? true
+  return ({
+    capabilities: {
+      textDocumentSync: TextDocumentSyncKind.Incremental,
+      hoverProvider: true,
+      definitionProvider: true,
+      codeActionProvider: true,
+      referencesProvider: true,
+      renameProvider: { prepareProvider: true },
+      documentSymbolProvider: true,
   },
-}));
+})
+});
 
 function writeCache(fn: string, content: string) {
   const home = process.env.HOME;
