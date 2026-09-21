@@ -1241,7 +1241,10 @@ checkDone fc ctx Nil (Just body) ty = do
   ty <- eval ctx.env ty
 
   debug "check at \{show ty}"
-  got <- check ctx body ty
+  got <- catchError (check ctx body ty) $ \err => do
+      addError err
+      freshMeta ctx fc ty ErrorHole
+
   debug "DONE<- got \{rpprint (names ctx) got}"
   pure got
 checkDone fc ctx (PC x (PatWild pvfc icit) :: xs) body ty = do
