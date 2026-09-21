@@ -137,6 +137,9 @@ data Void : U where
 0 ¬ : U → U
 ¬ x = x → Void
 
+absurd : ∀ a. Void → a
+absurd ()
+
 data Dec : U → U where
   Yes : ∀ prop. (prf : prop) → Dec prop
   No : ∀ prop. (contra : ¬ prop) → Dec prop
@@ -971,3 +974,7 @@ pfunc _&&&_ : Int → Int → Int := `(x,y) => x & y`
 isNil : ∀ a. List a → Bool
 isNil Nil = True
 isNil _ = False
+
+assoc : ∀ a b. {{Eq a}} → List (a × b) → a → Maybe b
+assoc Nil _ = Nothing
+assoc ((a,b) :: xs) x = if a == x then Just b else assoc xs x

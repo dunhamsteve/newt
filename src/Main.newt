@@ -95,7 +95,6 @@ processFile fn = do
   invalidateModule modName
   let repo = dirFileSource base
   mod <- processModule emptyFC repo Nil modName
-  top <- getTop
   log 1 "will show errors"
   showErrors fn mod.modSource
   pure MkUnit
