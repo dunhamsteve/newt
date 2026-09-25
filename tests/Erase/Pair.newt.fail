@@ -9,9 +9,9 @@ ERROR at tests/Erase/Pair.newt:7:15--7:16: unification failure: Erased value use
   blah = MkPair 1 2
                 ^
 
-ERROR at tests/Erase/Pair.newt:14:10--14:11: unification failure: Erased value used in unerased context for Erase.Pair.$m0 [] =?= Prim.Int
+ERROR at tests/Erase/Pair.newt:14:10--14:11: unification failure: Erased value used in unerased context for Erase.Pair.$m1 [] =?= Prim.Int
   failed to unify Prim.Int
-             with ?$m0
+             with ?$m1
   
   
   bar : Int
