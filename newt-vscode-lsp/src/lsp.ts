@@ -164,7 +164,7 @@ connection.onDocumentSymbol((params) => {
 
 let showWarnings = true
 connection.onInitialize((_params: InitializeParams): InitializeResult => {
-  showWarnings = _params.initializationOptions?.warnings ?? true
+  showWarnings = _params.initializationOptions?.warnings ?? false
   return ({
     capabilities: {
       textDocumentSync: TextDocumentSyncKind.Incremental,

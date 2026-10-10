@@ -1,7 +1,7 @@
 module Combinatory
 
 -- "A correct-by-construction conversion from lambda calculus to combinatory logic", Wouter Swierstra
--- prj/menagerie/papers/combinatory
+-- https://doi.org/10.1017/S0956796823000084
 
 data Unit : U where
   MkUnit : Unit

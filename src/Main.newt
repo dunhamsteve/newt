@@ -101,7 +101,6 @@ processFile fn = do
 
 cmdLine : List String -> M (Maybe String × List String)
 cmdLine Nil = pure (Nothing, Nil)
-cmdLine ("--top" :: args) = cmdLine args -- handled later
 cmdLine ("-v" :: args) = do
   modifyTop { verbose $= _+_ 1 }
   cmdLine args
