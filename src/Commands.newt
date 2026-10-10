@@ -139,7 +139,7 @@ getUnused = do
 
   where
     addDef : SortedMap FC TypeInfo → TypeInfo → SortedMap FC TypeInfo
-    addDef map info@(MkTypeInfo fc nm _ _ fc') = 
+    addDef map info@(MkTypeInfo fc nm _ _ fc') =
       -- TODO filter out globals instead of column 0, to catch DCon, etc
       if fc == fc' && fc.bnds.startCol /= 0 && not (internalName nm)
       then updateMap fc info map else map
@@ -274,6 +274,12 @@ addMissingCases _ _ fc@(MkFC uri (MkBounds sr sc er ec)) ctx names = do
       fb <- makeEdits fc [["_"]] False
       pure [AddMissingAction edits, GenericAction "Add fallback case" fb]
     else pure [AddMissingAction edits]
+
+getUpdate : FC → Raw → M (List CodeAction)
+getUpdate fc raw = do
+  let lines = render 90 $ pretty raw
+  pure [GenericAction "Expand record update" [MkEdit fc lines]]
+
 getExpand : FC → Raw → M (List CodeAction)
 getExpand fc raw = do
   catchError (do
@@ -451,6 +457,8 @@ getActions repo modns row col = do
     getAction : EditorInfo → M (List CodeAction)
     getAction (CaseSplit fc ctx nm scty) = getCaseSplit row col fc ctx nm scty
     getAction (ExpandDerive fc raw) = getExpand fc raw
+    -- The printer is not up to this task and maybe not useful beyond diagnostics - consider making it hover info instead
+    getAction (ExpandUpdate fc raw) = getUpdate fc raw
     getAction (MissingCases fc ctx names) = addMissingCases row col fc ctx names
 
     go : List CodeAction → List EditorInfo → M (List CodeAction)

@@ -1545,6 +1545,8 @@ undo ((DoArrow fc left right alts) :: xs) = do
 -- updateRec makes a list of fields and a term for the current value (collect), swaps in
 -- any updates present in the code (doClause), and generates an application of the
 -- constructor.
+
+-- We could add our code action..
 updateRec : Context → FC → List UpdateClause → Maybe Raw → Val → M Tm
 updateRec ctx fc clauses arg ty = do
   ((QN _ conname), args) <- getTele arg ty
@@ -1553,6 +1555,7 @@ updateRec ctx fc clauses arg ty = do
   let tm = case arg of
         Just arg => tm
         Nothing => RLam fc (BI fc "$ru" Explicit Many Nothing) tm
+  addInfo $ ExpandUpdate fc tm
   check ctx tm ty
   where
     app : FC → Raw → Raw → Raw
@@ -1577,7 +1580,8 @@ updateRec ctx fc clauses arg ty = do
         go (x :: xs) = if fst x == nm then pure $ (nm, tm) :: xs else _::_ x <$> go xs
 
     collect : Raw → Tm → List (String × Raw)
-    collect arg (Pi _ (BI _ nm _ _ a) b) = (nm, RApp fc (RVar fc $ "." ++ nm) arg Explicit) :: collect arg b
+    -- emptyFC - we don't want this to show up for type at point
+    collect arg (Pi _ (BI _ nm _ _ a) b) = (nm, RApp fc (RVar emptyFC $ "." ++ nm) arg Explicit) :: collect arg b
     collect _ _ = Nil
 
     getTele : Maybe Raw → Val → M (QName × List (String × Raw))
@@ -1593,6 +1597,7 @@ updateRec ctx fc clauses arg ty = do
       a <- forceType ctx.env a
       getTele (Just $ RVar fc "$ru") a
     getTele Nothing v = error fc "Expected \{show v}, missing argument to record update."
+    -- Possible we could delay here or simply pull the type off of the projection name
     getTele (Just tm) v = error (getFC tm) "Expected a record type, got \{show v}"
 
 -- The type on a lambda arg is optional, check it or create a fresh meta

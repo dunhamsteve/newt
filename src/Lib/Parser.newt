@@ -174,10 +174,7 @@ updateClause = do
     _    => pure $ ModifyField fc nm tm
 
 recordUpdate = do
-  fc <- getPos
-  symbol "{"
-  clauses <- sepBy (symbol ";") updateClause
-  symbol "}"
+  (fc, clauses) <- withFC $ symbol "{" *> sepBy (symbol ";") updateClause <* symbol "}"
   tm <- optional atom
   pure $ RUpdateRec fc clauses tm
 

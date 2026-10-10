@@ -342,6 +342,7 @@ data EditorInfo
   -- Not sure we need Context here?
   | MissingCases FC Context (List QName)
   | ExpandDerive FC Raw
+  | ExpandUpdate FC Raw
 
 -- that last one is the definition FC
 data TypeInfo = MkTypeInfo FC String Env Val FC
@@ -371,10 +372,11 @@ alias HintTable = SortedMap QName (List (QName × Tm))
 
 -- DERIVE - HasFC would be an example of a user-defined derived
 -- random idea - a "split; solve" tactic would work here too..
--- derive HasFC EditorInfo by split; solve ? 
+-- derive HasFC EditorInfo by split; solve ?
 -- But both of these break with multiple FC
 instance HasFC EditorInfo where
   getFC (CaseSplit fc _ _ _) = fc
+  getFC (ExpandUpdate fc _) = fc
   getFC (ExpandDerive fc _) = fc
   getFC (MissingCases fc _ _) = fc
 
