@@ -5,7 +5,7 @@ import { h, render, VNode } from "preact";
 import { ChangeEvent } from "preact/compat";
 import { archive, preload } from "./preload.ts";
 import { b64decode, b64encode } from "./base64";
-import { AbstractEditor, EditorDelegate, TopData, Marker } from "./types.ts";
+import { AbstractEditor, EditorDelegate, TopData } from "./types.ts";
 import { CMEditor, scheme } from "./cmeditor.ts";
 import { deflate } from "./deflate.ts";
 import { inflate } from "./inflate.ts";
@@ -188,6 +188,8 @@ const state = {
   files: signal<string[]>(["Tour.newt"]),
   currentFile: signal<string>(localStorage.currentFile ?? "Tour.newt"),
   viMode: signal(false),
+  // this should go away and work off of filename
+  markdown: signal(false),
   selected: signal(localStorage.tab ?? RESULTS),
   diags: signal<Diag[]>([]),
 };
@@ -263,10 +265,17 @@ const language: EditorDelegate = {
     console.log("LINT");
     let src = view.state.doc.toString();
     localStorage.code = src;
+    // FIXME we need a better way to manage the file name
     let module = src.match(/module\s+([^\s]+)/)?.[1];
     if (module) {
       // This causes problems with stuff like aoc/...
-      state.currentFile.value = "./" + module.replace(".", "/") + ".newt";
+      let filename = "./" + module.replace(".", "/") + ".newt";
+      // fragile..
+      let isMarkdown = !!src.match(/```/)
+      if (isMarkdown) filename += '.md'
+      state.currentFile.value = filename
+      state.markdown.value = isMarkdown
+      state.editor.value?.setMarkdown(isMarkdown)
     }
     // This is a little flashy
     // state.javascript.value = ''
@@ -320,7 +329,6 @@ interface ViewerProps {
 function SourceViewer({ language }: ViewerProps) {
   const text = state[language].value;
 
-  // return h("div", { id: "javascript" }, text);
   const ref = useRef<HTMLDivElement>(null);
   const editorView = useRef<EditorView>(null);
   const themeRef = useRef<Compartment>(null);
@@ -340,9 +348,6 @@ function SourceViewer({ language }: ViewerProps) {
         EditorView.editable.of(false),
       ],
     });
-    // const editor = new CMEditor(container, text, language);
-    // state.editor.value = editor;
-    // editor.setDark(state.dark.value);
     editorView.current = editor;
   }, []);
   let isDark = state.dark.value;
@@ -443,6 +448,7 @@ preload.then(() => {
     let files = [];
     for (let name in archive.entries) {
       if (name.endsWith(".newt")) files.push(name);
+      if (name.endsWith(".newt.md")) files.push(name);
     }
     files.sort();
     state.files.value = files;
@@ -501,6 +507,7 @@ function EditWrap() {
       h('div', { onClick: toggleViMode, className: state.viMode.value ? 'vimon' : 'vimoff' }, "vi"),
       // Maybe add an "ESC" button, with preventDefault for mobile
       h('div', { onMouseDown: doEscape, className: state.viMode.value ? 'vimon' : 'vimoff' }, "esc"),
+      h('div', { className: 'fileName' }, state.currentFile.value),
       h("div", { style: { flex: "1 1" } }),
       h(
         "div",
@@ -537,50 +544,3 @@ function App() {
 
 render(h(App, {}), document.getElementById("app")!);
 
-const processOutput = (output: string) => {
-  console.log("process output", output);
-  let markers: Marker[] = [];
-  let lines = output.split("\n");
-  let m = lines[0].match(/.*Process (.*)/);
-  let fn = "";
-  if (m) fn = m[1];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const match = line.match(
-      /(INFO|ERROR) at ([^:]+):(\d+):(\d+)--(\d+):(\d+):\s*(.*)/,
-    );
-    if (match) {
-      let [_full, kind, file, line, col, eline, ecol, message] = match;
-      let startLineNumber = +line;
-      let startColumn = +col;
-      let endLineNumber = +eline;
-      let endColumn = +ecol;
-      // FIXME - pass the real path in
-      if (file.startsWith("./")) file = file.slice(2);
-      if (fn && fn !== file) {
-        startLineNumber = startColumn = 0;
-      }
-      // we don't have the full range, so grab the surrounding word
-      // let endColumn = startColumn + 1;
-
-      // heuristics to grab the entire message:
-      // anything indented
-      // Context:, or Goal: are part of PRINTME
-      // unexpected / expecting appear in parse errors
-      while (lines[i + 1]?.match(/^(  )/)) {
-        message += "\n" + lines[++i];
-      }
-      if (kind === "ERROR" || startLineNumber)
-        markers.push({
-          severity: kind === "ERROR" ? "error" : "info",
-          message,
-          startLineNumber,
-          endLineNumber,
-          startColumn,
-          endColumn,
-        });
-    }
-  }
-  console.log("markers", markers);
-  return markers;
-};

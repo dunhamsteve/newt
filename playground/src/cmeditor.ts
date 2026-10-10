@@ -1,6 +1,7 @@
 import { AbstractEditor, EditorDelegate, Marker } from "./types";
 import { basicSetup } from "codemirror";
 import { getCM, Vim, vim } from '@replit/codemirror-vim';
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import {
   indentMore,
   indentLess,
@@ -25,6 +26,7 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { linter, setDiagnosticsEffect } from "@codemirror/lint";
 import {
   indentService,
+  LanguageDescription,
   LanguageSupport,
   StreamLanguage,
   StringStream,
@@ -212,9 +214,15 @@ function newt() {
   return new LanguageSupport(newtLanguage2);
 }
 
+const newtDescription = LanguageDescription.of({
+  name: 'Newt',
+  alias: ['newt'],
+  extensions: ['newt', 'newt.md'],
+  load: async () => newt()
+})
+
 export function applyWorkspaceEdit(view: EditorView, edits: TextEdit[]) {
   const state = view.state;
-
   const posToOffset = (pos: Position) => {
     // CodeMirror lines start at 1
     const line = state.doc.line(pos.line + 1);
@@ -340,6 +348,7 @@ export class CMEditor implements AbstractEditor {
   delegate: EditorDelegate;
   theme: Compartment;
   vimCompartment: Compartment
+  language: Compartment
 
   setVim(enabled: boolean) {
     if (enabled)
@@ -350,6 +359,18 @@ export class CMEditor implements AbstractEditor {
       })
     else this.view.dispatch({ effects: this.vimCompartment.reconfigure([]) })
   }
+  setMarkdown(isMarkdown: boolean) {
+    if (isMarkdown) {
+      let languages = [newt()]
+      this.view.dispatch({
+        effects: this.language.reconfigure( markdown({ base: markdownLanguage, codeLanguages: [newtDescription]}))
+      })
+    } else {
+      this.view.dispatch({
+        effects: this.language.reconfigure(newt())
+      })
+    }
+  }
   escape() {
     Vim.handleKey(getCM(this.view)!, '<Esc>','')
   }
@@ -359,7 +380,8 @@ export class CMEditor implements AbstractEditor {
   constructor(container: HTMLElement, doc: string, delegate: EditorDelegate) {
     this.delegate = delegate;
     this.theme = new Compartment();
-    this.vimCompartment = new Compartment
+    this.vimCompartment = new Compartment()
+    this.language = new Compartment()
 
     this.view = new EditorView({
       doc,
@@ -458,7 +480,7 @@ export class CMEditor implements AbstractEditor {
           // let entry = delegate.getEntry(word, line, col)
           return null;
         }),
-        newt(),
+        this.language.of(newt()),
       ],
     });
   }

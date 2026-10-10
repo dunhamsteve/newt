@@ -77,12 +77,14 @@ export interface Marker {
   endColumn: number;
   endLineNumber: number;
 }
+// This should go away, there is only one editor type
 export interface AbstractEditor {
   setValue: (_: string) => unknown;
   getValue: () => string;
   setMarkers: (_: Marker[]) => unknown;
   setDark(isDark: boolean): unknown;
   setVim(isVim: boolean): unknown;
+  setMarkdown(isMarkdown: boolean): unknown;
   focus(): unknown;
   escape(): unknown;
 }

@@ -1,4 +1,7 @@
-if &filetype =~# 'markdown'
+
+" This can load for newt files or be loaded for code blocks in markdown.newt,
+" but not for the entire markdown.newt file
+if exists("b:current_syntax") && !exists("main_syntax")
   finish
 endif
 syn keyword newtInfix infix infixl infixr
