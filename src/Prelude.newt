@@ -134,7 +134,9 @@ inspect f x = (f x ** Refl)
 
 data Void : U where
 
-0 ¬ : U → U
+infixl 1 ¬_
+
+0 ¬_ : U → U
 ¬ x = x → Void
 
 absurd : ∀ a. Void → a
