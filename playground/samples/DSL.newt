@@ -1,6 +1,6 @@
 module DSL
 
--- "A DSL for finite types and enumeration"
+-- "A DSL for finite types and enumeration", Patrik Jansson
 -- https://www.youtube.com/watch?v=sFyy9sssK50
 
 data Nat : U where
@@ -53,7 +53,6 @@ card (Mul x y) = card x * card y
 data Empty : U where
 
 data Unit : U where
-  -- unit accepted but case building thinks its a var
   MkUnit : Unit
 
 data Either : U -> U -> U where

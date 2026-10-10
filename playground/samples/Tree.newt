@@ -1,6 +1,8 @@
 module Tree
 
 -- adapted from Conor McBride's 2-3 tree example
+
+-- "What Are Types For, Or Are They Only Against?"
 -- youtube video: https://youtu.be/v2yXrOkzt5w?t=3013
 
 data Nat : U where
@@ -90,3 +92,4 @@ insert (intv x lx xu) (node3 y z tly tyz tzu) = case cmp x y of
     inr zx => case insert (intv x zx xu) tzu of
       inl (w , (tzw , twu)) => inl (z , (node2 y tly tyz , node2 w tzw twu))
       inr tzu' => inr (node3 y z tly tyz tzu')
+

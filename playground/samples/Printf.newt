@@ -1,6 +1,7 @@
 module Printf
 
 -- Example from "Principles of Dependent Type Theory" by Carlo Angiuli and Daniel Gratzer
+-- https://www.danielgratzer.com/papers/type-theory-book.pdf
 
 import Prelude
 

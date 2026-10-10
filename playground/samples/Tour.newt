@@ -16,9 +16,9 @@
 -- it must match the filename
 module Tour
 
--- We can import other modules with no cycles, diamonds are ok, cycles
--- are an error. Prelude is not imported by default. Only explicitly
--- imported modules are in scope. Duplicate names are not allowed.
+-- We can import other modules. Cycles are an error, but diamonds are ok.
+-- Prelude is not imported by default. Only explicitly
+-- imported modules are in scope.
 
 -- Example import is commented out because we redefine Prelude
 -- functions below.
@@ -30,17 +30,16 @@ import Prelude
 -/
 
 
--- The universe is U and are doing type in type for now.
+-- The universe is called U and are doing type in type. We have quantity 0 and ω.
 
--- INDUCTIVE TYPES
+-- ## INDUCTIVE TYPES
 
 -- Inductive type definitions are similar to Idris, Agda, or Haskell
 data Nat : U where
   Z : Nat
   S : Nat -> Nat
 
--- Like in Idris, Nat-shaped data is turned into numbers at runtime.
--- We are not yet ignoring erased fields though.
+-- Like in Idris, anything Nat-shaped after erasure is turned into numbers at runtime.
 
 -- Multiple names are allowed on the left:
 data Bool : U where
@@ -54,7 +53,8 @@ data Tree a = Node a (Tree a) (Tree a) | Leaf
 
 data Answer = Yes | No | Maybe
 
--- FUNCTIONS
+
+-- ## FUNCTIONS AND PATTERN MATCHING
 
 -- function definitions are equations using dependent pattern matching
 plus : Nat -> Nat -> Nat
@@ -69,6 +69,13 @@ plus' = \ n m => case n of
     Z => m
     S n => S (plus' n m)
 
+data Void : U where
+
+-- "impossible" clauses work like Agda - a `()` is placed where
+-- no constructor is valid, and the right hand side is omitted:
+absurd : ∀ a. Void → a
+absurd ()
+
 -- We can define operators. Mixfix is supported, but we don't
 -- allow ambiguity (so you can't have both [_] and [_,_]). See
 -- the Reasoning.newt sample file for a mixfix example.
@@ -76,7 +83,7 @@ infixl 2 _≡_
 
 -- Here is an equality, like Idris, everything goes to the right of the colon
 -- Implicits are denoted with braces `{ }`
--- unlike idris, you have to declare all of your implicits
+-- Unlike idris, you have to declare all of your implicits
 data _≡_ : {0 A : U} -> A -> A -> U where
   Refl : {0 A : U} {0 a : A} -> a ≡ a
 
@@ -84,37 +91,36 @@ data _≡_ : {0 A : U} -> A -> A -> U where
 test : plus (S Z) (S Z) ≡ S (S Z)
 test = Refl
 
--- Ok now we do typeclasses. `class` and `instance` are sugar for
--- ordinary data and functions:
 
--- Let's say we want a generic `_+_` operator
-infixl 7 _+_
+-- ## HOLES AND LSP SUPPORT
 
-class Add a where
-  _+_ : a -> a -> a
+-- We can leave a hole in an expression with ?
+-- On hover, the editor will show the expected type and the scope
+-- There are also code actions to intro a constructor or variable from scope
 
-instance Add Nat where
-  Z + m = m
-  (S n) + m = S (n + m)
-
-two : Nat
-two = S Z + S Z
-
--- We can leave a hole in an expression with ? and the editor will show us the
--- scope and expected type (hover to see)
+-- On the left, we have code actions to case split the patterns.
+-- If a case were missing, we'd have an option to add missing cases
 foo : Nat -> Nat -> Nat
 foo a b = ?
 
+-- The LSP also supports additional operations that are not exposed in the playground:
+-- - go to definition
+-- - show references
+-- - rename in scope
+-- - warnings for unused variables
+
+
+-- ## PRIMITIVE FUNCTIONS
+
 -- Newt compiles to javascript, there is a tab to the right that shows the
--- javascript output. There is some erasure, but inlining is not being done
--- yet.
+-- javascript output.
 
 -- We can define native types, if the type is left off, it defaults to U
 
 ptype SomePrimType : U
 
 -- The types Int, String, Char are special. Primitive numbers, strings,
--- and characters inhabit them, respectively. We can match on primitives, but
+-- and characters inhabit them, respectively. We can match on these primitives, but
 -- must provide a default case:
 
 isVowel : Char -> Bool
@@ -125,15 +131,42 @@ isVowel 'o' = True
 isVowel 'u' = True
 isVowel _ = False
 
--- And primitive functions have a type and a javascript definition:
+-- Primitive functions have a type and a javascript definition:
 
 pfunc addInt : Int -> Int -> Int := `(x,y) => x + y`
 pfunc addString : String -> String -> String := `(x,y) => x + y`
 
+-- For the scheme backend, the primitives are defined in a separate file.
+
+
+-- ## TYPE CLASSES
+
+-- Let's say we want a generic `_+_` operator
+infixl 7 _+_
+
+-- We define a class:
+class Add a where
+  _+_ : a -> a -> a
+
+-- This creates a function:
+-- _+_ : {0 a : U} → {{Add a}} → a → a → a
+
+-- Here the {{Add a}} is an "auto" implicit, the compiler will find a unique solution
+-- and fill it in as an argument when `+` is invoked.
+
+-- and an instance for `Nat`
+instance Add Nat where
+  Z + m = m
+  (S n) + m = S (n + m)
+
+-- And it will be used when we add two `Nat` values
+
+two : Nat
+two = S Z + S Z
+
 
 instance Add Int where
   _+_ = addInt
-
 
 infixr 7 _++_
 class Concat a where
@@ -142,29 +175,10 @@ class Concat a where
 instance Concat String where
   _++_ = addString
 
-
-
 -- Now we define Monad
 class Monad (m : U -> U) where
   pure : ∀ a. a -> m a
   bind : ∀ a b. m a -> (a -> m b) -> m b
-
-/-
-This desugars to:
-
-data Monad : (m : U -> U) -> U where
-  MkMonad : {m : U -> U} ->
-            (pure : {a : _} -> a -> m a) ->
-            (bind : {a : _} -> {b : _} -> m a -> a -> m b -> m b) ->
-            Monad m
-
-pure : {m : U -> U} -> {{_ : Monad m}} -> {a : _} -> a -> m a
-pure {m} {{MkMonad pure bind}} = pure
-
-bind : {m : U -> U} -> {{_ : Monad m}} -> {a : _} -> {b : _} -> m a -> a -> m b -> m b
-bind {m} {{MkMonad pure bind}} = bind
-
--/
 
 -- we can declare multiple infix operators at once
 infixl 1 _>>=_ _>>_
@@ -213,7 +227,10 @@ prod xs ys = do
   y <- ys
   pure (x, y)
 
--- The prelude defines Eq and Show, which can be derived
+-- ## DERIVE
+
+-- The prelude defines Eq, Ord, and Show
+-- Instances of these can be derived automatically with `derive`
 
 infixl 6 _==_
 class Eq a where
@@ -226,13 +243,23 @@ class Show a where
 
 derive Show Nat
 
+-- If you place the cursor on a derive statement, there is a code action
+-- to expand the derived code in-place
+
+-- IO AND MAIN
+
+-- The compilation does dead code elimination, so we define a main function to
+-- trigger code generation.
+
+-- First we build the IO Monad:
+
 data Unit = MkUnit
 
 ptype World
 
 data IORes a = MkIORes a World
 
--- `alias` is sugar for a function that returns a type
+-- `alias` is sugar for an erased function that returns a type
 alias IO a = World -> IORes a
 
 instance Monad IO where
@@ -240,12 +267,16 @@ instance Monad IO where
     MkIORes a w => mab a w
   pure = MkIORes
 
+-- A primitive to print:
+
 pfunc putStrLn uses (MkIORes MkUnit) : String -> IO Unit := `(s) => (w) => {
   console.log(s)
   return Tour_MkIORes(Tour_MkUnit, w)
 }`
 
+-- And our main function:
 main : IO Unit
 main = do
   putStrLn "Hello, World!"
   putStrLn $ show (S (S Z))
+
