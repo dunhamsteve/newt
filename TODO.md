@@ -1,7 +1,7 @@
 
 ## TODO
 
-- [ ] Expected `in` at EOF should point to EOF
+- [x] Expected `in` at EOF should point to EOF
 - [ ] Check scope for conflicts on rename?
 - [ ] Fix "`.a` not in scope" for record update, if record has an implicit arg
   - Maybe rework as a case statement, otherwise we inline a bunch of case statements

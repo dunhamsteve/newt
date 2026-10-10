@@ -46,6 +46,8 @@ perror : String -> TokenList -> String -> Error
 perror fn Nil msg = E (emptyFC' fn) msg
 perror fn ((MkBounded val bnds) :: _) msg = E (MkFC fn bnds) msg
 
+perror' : String -> Bounds -> String -> Error
+perror' fn bnds msg = E (MkFC fn bnds) msg
 
 parse : ∀ a. String -> Parser a -> TokenList -> Either Error a
 parse fn pa toks = case runP pa emptyBounds toks False emptyMap (MkFC fn (MkBounds -1 -1  -1 -1)) of
@@ -123,7 +125,7 @@ satisfy : (BTok -> Bool) -> String -> Parser String
 satisfy f msg = P $ \last toks com ops col =>
   case toks of
     (t :: ts) => if f t then OK (value t) t.bounds ts True ops else Fail (perror col.file toks "\{msg} at \{show t.val.kind}:\{value t}") last toks com ops
-    Nil => Fail (perror col.file toks "\{msg} at EOF") last toks com ops
+    Nil => Fail (perror' col.file last "\{msg} at EOF") last toks com ops
 
 
 some : ∀ a. Parser a -> Parser (List a)

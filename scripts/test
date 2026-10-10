@@ -7,10 +7,19 @@ OUTFILE=${OUTFILE:="tmp/out.js"}
 mkdir -p tmp
 total=0
 failed=0
+update=${update:-false}
+filter=${filter:-}
+for arg in "$@"; do
+  if [ "$arg" = "-u" ]; then 
+    update=true; 
+  else
+    filter="$arg"
+  fi
+done
 tests=$(find tests -name '*.newt' -o -name '*.newt.md')
 faillist=()
 for fn in $tests; do
-  if [ x$1 != "x-u" ] && [[ "$fn" != *"$1"* ]]; then continue; fi
+  if [ -n "$filter" ] && [[ "$fn" != *"$filter"* ]]; then continue; fi
   total=$((total + 1))
   echo Test $fn
   bn=$(basename $fn)
@@ -32,7 +41,7 @@ for fn in $tests; do
         diff ${fn}.fail tmp/${bn}.compile
         failed=$((failed + 1))
         faillist+=$fn
-        if [ x$1 = "x-u" ]; then
+        if [ "$update" = true ]; then
           cp tmp/${bn}.compile ${fn}.fail
         fi
         continue
@@ -58,7 +67,7 @@ for fn in $tests; do
       echo "Output mismatch for $fn"
       diff ${fn}.golden tmp/${bn}.out
       failed=$((failed + 1))
-      if [ x$1 = "x-u" ]; then
+      if [ "$update" = true ]; then
         cp tmp/${bn}.out ${fn}.golden
       fi
     fi
