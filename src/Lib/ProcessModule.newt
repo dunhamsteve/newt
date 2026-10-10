@@ -74,6 +74,7 @@ importHints (entry :: entries) = do
 mergeOps : Operators → Operators → Operators
 mergeOps mod top = foldMap (flip const) top $ toList mod
 
+
 -- processModule might reset the currentModule in the topContext
 -- do not rely on topContext state afterwards - it may or may not contain the module
 processModule : FC → FileSource → List String → String → M ModContext
@@ -112,11 +113,7 @@ processModule importFC repo stk modns = do
   let (Right (imports, ops, toks)) = partialParse fn parseImports ops toks
     | Left (err, toks) => reportError err
 
-  imported <- for imports $ \case
-    MkImport fc (nameFC, name') => do
-      when (elem name' stk) $ error nameFC "import loop \{modns} → \{name'}"
-      mod <- processModule nameFC repo (modns :: stk) name'
-      pure $ name'
+  imported <- loadImports imports Nil
 
   processModule nameFC repo (modns :: stk) primNS
   let imported = snoc imported primNS
@@ -176,6 +173,14 @@ processModule importFC repo stk modns = do
 
   pure top.currentMod
   where
+    loadImports : List Import → List String → M (List String)
+    loadImports Nil acc = pure acc
+    loadImports (MkImport fc (nameFC, name') :: xs) acc = do
+      when (elem name' stk) $ error nameFC "import loop \{modns} → \{name'}"
+      when (elem name' acc) $ error nameFC "duplicate import \{name'}"
+      ignore $ processModule nameFC repo (modns :: stk) name'
+      loadImports xs (name' :: acc)
+
     reportError : Error → M ModContext
     reportError err = do
       addError err

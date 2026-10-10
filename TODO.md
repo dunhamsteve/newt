@@ -5,6 +5,8 @@
 - [ ] Check scope for conflicts on rename?
 - [ ] Fix "`.a` not in scope" for record update, if record has an implicit arg
   - Maybe rework as a case statement, otherwise we inline a bunch of case statements
+  - need a bunch of fresh nams, since we're generating raw code
+  - or just skip the implicits...
 - [x] support derive with args:
   - `derive ∀ a. {{Show a}} → Show (BindInfo a)`
   - `instance (∀ a. {{Show a}} → Show (BindInfo a))`
@@ -15,6 +17,9 @@
   - This will likely be needed for qualified / partial imports
   - [ ] Add `public` keyword
 - [ ] use a worker for lsp to handle requests while processing.
+- [ ] Elaboration of `RUpdate` inserts name info records for synthesized code
+  - We maybe should kill the FC on those (or mark them as FC for errors only)
+  - Also double check that we don't treat emptyFC as valid for rename, etc.
 - [ ] code formatter
   - [ ] consider moving caselet, operator, etc. desugaring out of the parser
   - comments stored aside (location, whether it is a tail or standalone) and re-integrated
@@ -121,7 +126,6 @@
 - [ ] There are issues with matching inside do blocks
     - I may have handled a lot of this by reworking autos to check just one level of constraints (with a 20% speedup)
     - Do we need to guess scrutinee? Or we could refine a meta scrutinee type to match the constructor being split. This happens during checking for pi, where we create ?m -> ?m and unifiy it with the meta. Could we do the same in a case, where `Just ...` says the meta must be `Maybe ?m`?
-  - ~~`newt/Fixme.newt` - I can drop `do` _and_ put `bind {IO}` to push it along. It may need to try to solve autos earlier and better.~~
 
 ### Error messages
 

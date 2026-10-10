@@ -63,8 +63,9 @@ audit: .PHONY
 build:
 	mkdir -p build
 
+# @ because vi is annoying me with this message
 src/Revision.newt: .PHONY build
-	sh ./scripts/mkrevision
+	@sh ./scripts/mkrevision
 
 build/newt.js: ${SRCS} src/Revision.newt
 	node bootstrap/newt.js src/Main.newt -o build/newt.js

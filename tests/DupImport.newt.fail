@@ -1,0 +1,3 @@
+*** Process tests/DupImport.newt
+module Prelude
+ERROR at tests/DupImport.newt:4:8--4:15: duplicate import Prelude
