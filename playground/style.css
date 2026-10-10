@@ -185,3 +185,9 @@ svg.icon {
   color: grey;
   border: solid 1px grey;
 }
+.diag {
+  margin-bottom: 1em;
+}
+.diag .range {
+  font-weight: bold;
+}

@@ -9,7 +9,7 @@ import { AbstractEditor, EditorDelegate, TopData, Marker } from "./types.ts";
 import { CMEditor, scheme } from "./cmeditor.ts";
 import { deflate } from "./deflate.ts";
 import { inflate } from "./inflate.ts";
-import { IPC, Position } from "./ipc.ts";
+import { IPC, Range, Position, Diagnostic as Diag} from "./ipc.ts";
 import helpText from "./help.md?raw";
 import { basicSetup, EditorView } from "codemirror";
 import { Compartment, EditorState } from "@codemirror/state";
@@ -19,6 +19,15 @@ import { oneDark } from "@codemirror/theme-one-dark";
 let topData: undefined | TopData;
 
 const ipc = new IPC();
+
+// TODO double check the last two are right
+const SEVERITY: Diagnostic["severity"][] = [
+  "error",
+  "error",
+  "warning",
+  "info",
+  "hint",
+];
 
 function mdline2nodes(s: string) {
   let cs: (VNode<any> | string)[] = [];
@@ -107,6 +116,7 @@ async function runOutput() {
   }
 }
 
+// deprecated, we're getting nothing from res.output now
 function setOutput(output: string) {
   let lines = output.split("\n");
   output = lines.filter((l) => !l.startsWith("TOP:")).join("\n");
@@ -179,6 +189,7 @@ const state = {
   currentFile: signal<string>(localStorage.currentFile ?? "Tour.newt"),
   viMode: signal(false),
   selected: signal(localStorage.tab ?? RESULTS),
+  diags: signal<Diag[]>([]),
 };
 
 // Monitor dark mode state (TODO - let user override system setting)
@@ -265,25 +276,12 @@ const language: EditorDelegate = {
       await ipc.sendMessage("updateFile", [fileName, src]);
       let res = await ipc.sendMessage("typeCheck", [fileName]);
       let diags: Diagnostic[] = [];
+      state.diags.value = res.diags
       for (let marker of res.diags) {
         let { start, end } = marker.range;
         let xlate = (pos: Position): number =>
           view.state.doc.line(pos.line + 1).from + pos.character;
 
-        // TODO double check the last two are right
-        const SEVERITY: Diagnostic["severity"][] = [
-          "error",
-          "error",
-          "warning",
-          "info",
-          "hint",
-        ];
-        console.error({
-          from: xlate(start),
-          to: xlate(end),
-          severity: SEVERITY[marker.severity ?? 1],
-          message: marker.message,
-        });
         diags.push({
           from: xlate(start),
           to: xlate(end),
@@ -362,7 +360,11 @@ function SourceViewer({ language }: ViewerProps) {
 
 function Result() {
   const text = state.output.value;
-  return h("div", { id: "result" }, text);
+  const diags = state.diags.value;
+  const showRange = (range: Range) => h('div', {className: 'range'}, `${range.start.line}:${range.start.character}--${range.end.line}:${range.end.character}`) 
+  return h("div", { id: "result" }, ...diags.map(diag =>
+    h("div", { className: 'diag' }, showRange(diag.range), diag.message)
+  ));
 }
 
 function Help() {
