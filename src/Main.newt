@@ -109,7 +109,7 @@ cmdLine ("-o" :: fn :: args) = do
   pure ((out <|> Just fn), files)
 
 cmdLine (fn :: args) = do
-  let (True) = isSuffixOf ".newt" fn || isSuffixOf ".newt.md" fn
+  let (True) = isSuffixOf ".newt" fn || isSuffixOf ".newt.md" fn || isSuffixOf ".newt.typ" fn
     | _ => error emptyFC "Bad argument \{show fn}"
   (out, files) <- cmdLine args
   pure (out, fn :: files)

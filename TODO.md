@@ -182,7 +182,8 @@
   - [ ] mechanism to capture the range for a production
   - [ ] FC on more names (rather than relying on the expression FC
 - [ ] Parse error not ideal for `\x y z b=> b` (points to lambda)
-- [ ] Consider `.newt.md` support.
+- [x] Consider `.newt.md` support.
+- [x] `.newt.typ` support
 
 ### LSP
 

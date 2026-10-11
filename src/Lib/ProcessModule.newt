@@ -17,7 +17,7 @@ import Node
 
 illiterate : String → String → String
 illiterate fn src =
-  if isSuffixOf ".md" fn then unlines $ filterLit Lin False $ lines src else src
+  if isSuffixOf ".md" fn  || isSuffixOf ".typ" fn then unlines $ filterLit Lin False $ lines src else src
   where
     filterLit : SnocList String → Bool → List String → List String
     filterLit acc _ Nil = acc <>> Nil
@@ -96,6 +96,7 @@ processModule importFC repo stk modns = do
   Right (fn,src) <- do
         -- try for literate first
         (Left _) <- tryError $ repo.getFile importFC "\{fn}.md" | x => pure x
+        (Left _) <- tryError $ repo.getFile importFC "\{fn}.typ" | x => pure x
         tryError $ repo.getFile importFC fn
     | Left err => reportError err  -- TODO maybe want a better FC.
   modifyTop { currentMod $= { modSource := src }}
