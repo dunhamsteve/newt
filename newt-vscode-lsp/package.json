@@ -50,6 +50,16 @@
         }
       },
       {
+        "path": "./syntaxes/inject.json",
+        "scopeName": "newt.injection",
+        "injectTo": [
+          "source.markdown"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.newt": "newt"
+        }
+      },
+      {
         "path": "./syntaxes/injectTypst.json",
         "scopeName": "newt.injection.typst",
         "injectTo": [
