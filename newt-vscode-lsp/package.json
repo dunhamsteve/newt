@@ -15,7 +15,10 @@
   "categories": [
     "Programming Languages"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "workspaceContains:**/*.newt.md",
+    "workspaceContains:**/*.newt.typ"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "languages": [
@@ -43,7 +46,17 @@
           "text.html.markdown"
         ],
         "embeddedLanguages": {
-          "meta.embedded.block.idris": "newt"
+          "meta.embedded.block.newt": "newt"
+        }
+      },
+      {
+        "path": "./syntaxes/injectTypst.json",
+        "scopeName": "newt.injection.typst",
+        "injectTo": [
+          "source.typst"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.newt": "newt"
         }
       }
     ],

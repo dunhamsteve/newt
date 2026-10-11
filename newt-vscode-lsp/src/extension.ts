@@ -34,7 +34,11 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: 'file', language: 'newt' }],
+    documentSelector: [
+      { scheme: 'file', language: 'newt' },
+      { scheme: 'file', language: 'markdown', pattern: '*/**/*.newt.md' },
+      { scheme: 'file', language: 'typst', pattern: '*/**/*.newt.typ' },
+    ],
     synchronize: {
       fileEvents: vscode.workspace.createFileSystemWatcher('*.newt')
     }
