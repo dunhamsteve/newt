@@ -1,15 +1,14 @@
 import { signal } from "@preact/signals";
 import { Diagnostic } from "@codemirror/lint";
-import { useEffect, useRef, useState } from "preact/hooks";
-import { h, render, VNode } from "preact";
-import { ChangeEvent } from "preact/compat";
+import { useEffect, useRef } from "preact/hooks";
+import { h, render, TargetedEvent, VNode } from "preact";
 import { archive, preload } from "./preload.ts";
 import { b64decode, b64encode } from "./base64";
 import { AbstractEditor, EditorDelegate, TopData } from "./types.ts";
 import { CMEditor, scheme } from "./cmeditor.ts";
 import { deflate } from "./deflate.ts";
 import { inflate } from "./inflate.ts";
-import { IPC, Range, Position, Diagnostic as Diag} from "./ipc.ts";
+import { IPC, Range, Position, Diagnostic as Diag } from "./ipc.ts";
 import helpText from "./help.md?raw";
 import { basicSetup, EditorView } from "codemirror";
 import { Compartment, EditorState } from "@codemirror/state";
@@ -35,6 +34,7 @@ function mdline2nodes(s: string) {
     /\*\*(.*?)\*\*|\*(.*?)\*|_(.*?)_|!\[(.*?)\]\((.*?)\)|:(\w+):|[^*]+|\*/g,
   );
   for (let tok of toks) {
+    // oxlint-disable-next-line no-unused-expressions
     (tok[1] && cs.push(h("b", {}, tok[1]))) ||
       (tok[2] && cs.push(h("em", {}, tok[2]))) ||
       (tok[3] && cs.push(h("em", {}, tok[0].slice(1, -1)))) ||
@@ -240,14 +240,14 @@ interface EditorProps {
   initialValue: string;
 }
 const language: EditorDelegate = {
-  async getEntry(word, row, col) {
+  async getEntry(_, row, col) {
     let fileName = state.currentFile.value;
     let res = await ipc.sendMessage("hoverInfo", [fileName, row, col]);
     console.log("HOVER", res, "for", row, col);
     if (res == true) return null;
     return res || null;
   },
-  async getActions(word, row, col) {
+  async getActions(_, row, col) {
     let fileName = state.currentFile.value;
     let res = await ipc.sendMessage("codeActionInfo", [fileName, row, col]);
     console.log("ACTIONS", res, "for", row, col);
@@ -366,7 +366,7 @@ function SourceViewer({ language }: ViewerProps) {
 function Result() {
   const text = state.output.value;
   const diags = state.diags.value;
-  const showRange = (range: Range) => h('div', {className: 'range'}, `${range.start.line}:${range.start.character}--${range.end.line}:${range.end.character}`) 
+  const showRange = (range: Range) => h('div', { className: 'range' }, `${range.start.line}:${range.start.character}--${range.end.line}:${range.end.character}`)
   return h("div", { id: "result" }, ...diags.map(diag =>
     h("div", { className: 'diag' }, showRange(diag.range), diag.message)
   ));
@@ -464,12 +464,10 @@ function EditWrap() {
     h("option", { value }, value),
   );
 
-  const selectFile = async (ev: ChangeEvent) => {
-    if (ev.target instanceof HTMLSelectElement) {
-      let fn = ev.target.value;
-      ev.target.value = "";
-      loadFile(fn);
-    }
+  const selectFile = async (ev: TargetedEvent<HTMLSelectElement>) => {
+    let fn = ev.currentTarget.value;
+    ev.currentTarget.value = "";
+    loadFile(fn);
   };
   const toggleViMode = (ev: MouseEvent) => {
     state.viMode.value = !state.viMode.value
@@ -506,7 +504,7 @@ function EditWrap() {
       ),
       h('div', { onClick: toggleViMode, className: state.viMode.value ? 'vimon' : 'vimoff' }, "vi"),
       // Maybe add an "ESC" button, with preventDefault for mobile
-      h('div', { onMouseDown: doEscape, className: state.viMode.value ? 'vimon' : 'vimoff' }, "esc"),
+      h('div', { onMouseDown: doEscape, className: state.viMode.value ? 'vimon' : 'vimoff', style: {display: state.viMode.value ? 'block' : 'none'} }, "esc"),
       h('div', { className: 'fileName' }, state.currentFile.value),
       h("div", { style: { flex: "1 1" } }),
       h(
@@ -529,11 +527,6 @@ function EditWrap() {
 }
 
 function App() {
-  let [vertical, setVertical] = useState(initialVertical);
-  let toggle = () => {
-    setVertical(!vertical);
-    localStorage.vertical = !vertical;
-  };
   let toast;
   if (state.toast.value) {
     toast = h("p", { className: "toast" }, h("div", {}, state.toast.value));
