@@ -45,7 +45,7 @@ vappSpine t (xs :< (x,q)) = do
   vapp rest x q
 
 lookupVar : Env -> Int -> Maybe Val
-lookupVar env k = let l = cast $ length env in
+lookupVar env k = let l = length' env in
   if k > l
     then Nothing
     else case getAt (cast $ lvl2ix l k) env of

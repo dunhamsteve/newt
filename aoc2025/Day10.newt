@@ -73,7 +73,7 @@ pfunc _&_ : Int → Int → Int := `(x,y) => x & y`
 part2z3 : {{Context}} → Machine → Promise Int
 part2z3 {{context}} mach = do
   let rows = length mach.jolts
-  let (Just todo) = toVect rows mach.jolts | _ => fatalError "jolt/rows length"
+  let todo = vectFromList mach.jolts
   let vars = map (\i => z3const "x\{show $ fst i}") $ enumerate mach.buttons
   let solver = newOptimizer context
 

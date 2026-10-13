@@ -63,7 +63,13 @@ infixr 7 _::_
 data List a = Nil | a :: List a
 
 length : ∀ a. List a → Nat
-length {a} xs = go Z xs
+length (x :: xs) = S (length xs)
+length Nil = Z
+
+-- faster tail-recursive version, which doesn't play well with proofs
+-- TODO Ideally we'd have something like Idris "transform"
+lengthTC : ∀ a. List a → Nat
+lengthTC {a} xs = go Z xs
   where
     go : Nat → List a → Nat
     go acc Nil = acc

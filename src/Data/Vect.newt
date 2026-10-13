@@ -16,10 +16,11 @@ instance ∀ k. Functor (Vect k) where
   map f VNil = VNil
   map f (x :- xs) = f x :- map f xs
 
-toVect : ∀ a. (n : Nat) -> List a -> Maybe (Vect n a)
-toVect (S k) (x :: xs) = _:-_ x <$> toVect k xs
-toVect Z Nil = Just VNil
-toVect _ _ = Nothing
+-- Will be a test case for finding "identity" functions
+-- Map already took "fromList" until we get qualified names
+vectFromList : ∀ a. (xs : List a) → Vect (length xs) a
+vectFromList Nil = VNil
+vectFromList (x :: xs) = x :- vectFromList xs
 
 instance ∀ n a. Cast (Vect n a) (List a) where
   cast VNil = Nil
@@ -59,6 +60,6 @@ vfilter f VNil = VNil
 vfilter {a} f (x :- xs) = vfilterWith (f x)
   where
     vfilterWith : (z : Bool) → Vect (ite z (S $ vfilterLen f xs) (vfilterLen f xs)) a
-    vfilterWith False = vfilter f xs 
+    vfilterWith False = vfilter f xs
     vfilterWith True = x :- vfilter f xs
 

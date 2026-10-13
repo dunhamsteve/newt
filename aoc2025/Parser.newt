@@ -9,7 +9,12 @@ instance Monad Parser where
   return a = \ cs => Right (a, cs)
   bind ma mab = \ cs => ma cs >>= uncurry mab
 
+
+fail : ∀ a. String -> Parser a
+fail msg = \ cs => Left msg
+
 instance Alternative Parser where
+  empty = fail "empty"
   pa <|> pb = \ cs => case pa cs of
     Left msg => pb cs
     res => res
@@ -22,10 +27,6 @@ instance Functor Parser where
 instance Applicative Parser where
   pure a = return a
   pa <*> pb = pa >>= (\ f => map f pb)
-
-
-fail : ∀ a. String -> Parser a
-fail msg = \ cs => Left msg
 
 -- TODO, case builder isn't expanding Parser Unit to count lambdas
 eof : Parser Unit
