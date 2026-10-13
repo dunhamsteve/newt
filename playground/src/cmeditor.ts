@@ -13,6 +13,7 @@ import {
   keymap,
   Panel,
   showPanel,
+  showTooltip,
   Tooltip,
 } from "@codemirror/view";
 import {
@@ -343,6 +344,18 @@ function actionsPanel(delegate: EditorDelegate) {
   });
   return [actionsPanelState, keymap.of(actionsKeymap)];
 }
+  const setVimTooltip = StateEffect.define<Tooltip|null>()
+  const vimTooltipField = StateField.define<Tooltip | null>({
+    create: () => null,
+    update(tooltip, xact) {
+      if (xact.selection || xact.docChanged) return null
+      for (let e of xact.effects) {
+        if (e.is(setVimTooltip)) return e.value
+      }
+      return tooltip
+    },
+    provide: (f) => showTooltip.from(f)
+  })
 export class CMEditor implements AbstractEditor {
   view: EditorView;
   delegate: EditorDelegate;
@@ -389,6 +402,7 @@ export class CMEditor implements AbstractEditor {
       extensions: [
         this.vimCompartment.of([]),
         basicSetup,
+        vimTooltipField,
         actionsPanel(delegate),
         linter((view) => this.delegate.lint(view)),
         // For indent on return
@@ -483,6 +497,25 @@ export class CMEditor implements AbstractEditor {
         this.language.of(newt()),
       ],
     });
+    Vim.defineEx("hover", undefined, async () => {
+      let pos = this.view.state.selection.ranges[0].from
+      let cursor = this.view.state.doc.lineAt(pos)
+      let line = cursor.number - 1
+      let col = pos - cursor.from
+      let entry = await this.delegate.getEntry("",line, col)
+      if (!entry) return
+        let tooltip: Tooltip = {
+          pos, above: true,
+          create: () => {
+            let dom = document.createElement('div');
+            dom.className = 'tooltip'
+            dom.textContent = entry.info
+            return {dom}
+          },
+        };
+        this.view.dispatch({ effects: setVimTooltip.of(tooltip)})
+    })
+    Vim.map("K", ":hover<CR>", "normal")
   }
   setDark(isDark: boolean) {
     this.view.dispatch({
