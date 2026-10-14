@@ -209,9 +209,12 @@ trySolveAuto (Unsolved fc k ctx ty AutoSolve) = do
         | res => do
           debug "GLOBAL FAILED to solve \{show ty}, matches: \{show res}"
           pure False
+      -- TODO The FC is a problem here because e.g. `nub` ended up coded as the implementation its auto was solved with
+      -- I put emptyFC, but then the errors for unsolved autos were pointing to the wrong place.
+      -- (e.g for a Show (List Foo) tests/NoShow.newt)
+      -- HACK is to put a $ on the instance name so it counts as internal, but we probably should consider virtual FC.
       -- The `check` fills in implicits
-      -- no FC or we end up adding type at point (nub says it is Eq Int)
-      tm <- check ctx (RVar emptyFC nm) ty
+      tm <- check ctx (RVar fc nm) ty
       val <- eval ctx.env tm
       debug "SOLUTION \{rpprint Nil tm} evaled to \{show val}"
       debug "GLOBAL SOLUTION \{show val}"

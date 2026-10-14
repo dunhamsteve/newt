@@ -250,8 +250,8 @@ processInstance ns instfc rawty decls = do
   debug "codomain \{render 90 $ pprint Nil codomain}"
   debug "tele is \{show tele}"
 
-  -- a hack for a unique name
-  let instname = render 90 $ pprint Nil codomain
+  -- a hack for a unique name, mark internal
+  let instname = "$" ++ (render 90 $ pprint Nil codomain)
   let sigDecl = TypeSig instfc Many ((instfc,instname) :: Nil) rawty
   -- The instance needs to be declared before processing the defs, but the defs need to be
   -- defined before this - side effect is that a duplicate def is noted at the first
