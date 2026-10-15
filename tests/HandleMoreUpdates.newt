@@ -1,0 +1,15 @@
+module HandleMoreUpdates
+
+import Prelude
+import Data.List1
+
+length' : ∀ a. List1 a -> Nat
+length' (x ::: xs) = S (length xs)
+
+-- ok, so with `Refl`, Idris is complains that k is length' tail
+-- It wants `S (length' xs)` there - but will dot applications of functions on the LHS (it's an error for us at the moment)
+-- We're getting missing case, because the Refl happens after the `S k` match.
+-- TODO Possibly need dotting, maybe automatic for quantity 0 (and add a 0 to the test case)
+aux : ∀ a. (xs : List1 a) -> (n : Nat) -> (p : length' xs ≡ n) -> Unit
+aux (head ::: tail) (S k) Refl = MkUnit
+aux (head ::: tail) Z ()

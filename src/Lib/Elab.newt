@@ -868,8 +868,12 @@ updateContext ctx ((k, val) :: cs) =
     (Just val') => do
       -- var k is both val' and val
       -- We need a more appropriate unify for pattern matching
+      -- val <- forceType ctx.env val
       MkResult Nil <- unify ctx.env UPattern val val'
-        | res => error (getFC val) "TODO: Handle more updates \{show res.constraints}"
+        | res => do
+          debug "TODO: updateContext yielded constraints \{show res.constraints} - var \{show k} is \{show val'} and update says \{show val}"
+          -- Not quite right? We're _forcing_ a value and I'm getting missing case
+          updateContext ctx (res.constraints ++ cs)
       updateContext ctx cs
     Nothing => error (getFC val) "INTERNAL ERROR: bad index in updateContext"
   where
