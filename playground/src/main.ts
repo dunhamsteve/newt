@@ -284,13 +284,14 @@ const language: EditorDelegate = {
     try {
       await ipc.sendMessage("updateFile", [fileName, src]);
       let res = await ipc.sendMessage("typeCheck", [fileName]);
+      // TODO user flag to turn this on / off - the "unused variable" is noisy
+      let lspDiags = res.diags.filter(diag => diag.severity !== 2)
       let diags: Diagnostic[] = [];
-      state.diags.value = res.diags
-      for (let marker of res.diags) {
+      state.diags.value = lspDiags
+      for (let marker of lspDiags) {
         let { start, end } = marker.range;
         let xlate = (pos: Position): number =>
           view.state.doc.line(pos.line + 1).from + pos.character;
-
         diags.push({
           from: xlate(start),
           to: xlate(end),
