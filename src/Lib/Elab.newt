@@ -1770,7 +1770,14 @@ infer ctx (RVar fc nm) = go 0 ctx.types
         -- Can we soften this without introducing a meta for the type
         -- a meta might be additional errors, but also could lead to narrowing of possible names...
         -- especially when we hit this for .foo
-        Nothing => throwError $ ENotInScope fc nm
+        Nothing => do
+          ty <- freshMeta (enterMarker ctx) fc (VU emptyFC) Normal
+          vty <- eval ctx.env ty
+          let err = ENotInScope fc nm ctx vty
+          addError err
+          tm <- freshMeta ctx fc vty ErrorHole
+          pure (tm, vty)
+
     go i ((BI vfc x icit q ty) :: xs) =
       if x == nm
       then do
@@ -1855,3 +1862,4 @@ infer ctx (RLit fc (LInt i)) = pure (Lit fc (LInt i), VRef fc intType Lin)
 infer ctx (RLit fc (LChar c)) = pure (Lit fc (LChar c), VRef fc charType Lin)
 infer ctx (RAs fc _ _) = error fc "@ can only be used in patterns"
 infer ctx tm = error (getFC tm) "Implement infer \{show tm}"
+

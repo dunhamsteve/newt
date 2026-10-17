@@ -240,7 +240,7 @@ rpprint names tm = render 90 $ pprint names tm
 -- In types so we can have Val / Tm / Context
 data Error
   = E FC String
-  | ENotInScope FC String
+  | ENotInScope FC String Context Val
   | EMissingMethod FC String Tm
   -- Postpone signals a meta that needs to be solved first
   | Postpone FC String
@@ -249,7 +249,7 @@ data Error
 instance HasFC Error where
   getFC (E x str) = x
   getFC (UnificationError fc _ _ _ _) = fc
-  getFC (ENotInScope x _) = x
+  getFC (ENotInScope x _ _ _) = x
   getFC (Postpone x str) = x
   getFC (EMissingMethod fc _ _) = fc
 
@@ -257,7 +257,7 @@ instance HasFC Error where
 errorMsg : Error -> String
 errorMsg (E x str) = str
 errorMsg (EMissingMethod x nm ty) = "no definition for \{nm} : \{rpprint Nil ty}"
-errorMsg (ENotInScope x nm) = "\{nm} not in scope"
+errorMsg (ENotInScope x nm ctx vty) = "\{nm} not in scope"
 errorMsg (Postpone x str) = str
 errorMsg (UnificationError fc names a b err) =
   "unification failure: \{errorMsg err}\n  failed to unify \{show a}\n             with \{show b}\n  "

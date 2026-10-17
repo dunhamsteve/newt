@@ -9,7 +9,7 @@ import Lib.Common
 
 prettyErrorMsg : Error -> M String
 prettyErrorMsg (E x str) = pure str
-prettyErrorMsg (ENotInScope x nm) = pure "\{nm} not in scope"
+prettyErrorMsg (ENotInScope x nm ctx vty) = pure "\{nm} not in scope"
 prettyErrorMsg (Postpone x str) = pure str
 prettyErrorMsg (UnificationError fc names a b err) = do
   let lvl = length' names

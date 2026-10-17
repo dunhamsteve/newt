@@ -18,6 +18,7 @@ import Data.SortedMap
 import Lib.Parser
 import Lib.Syntax
 import Lib.Parser.Impl
+import Lib.Util
 
 posInFC : Int → Int → FC → Bool
 posInFC row col (MkFC _ (MkBounds 0 0 0 0)) = False
@@ -388,10 +389,66 @@ introActions (Just $ Unsolved fc qn ctx vty User) =
 
 introActions _ = pure Nil
 
+-- so we'll use this to see if a candidate is "compatible" - a very loose unify
+-- We want to accept functions that would work with a few arguments filled in and don't want to spend too much time.
+-- how do we handle Bnd? wildcard? must match? (they're deBruijn), but we're going to be looking inside a pi on one side.
+filterType : Tm → Tm → Bool
+filterType exp cand = go exp (fst $ splitTele cand)
+  where
+    go : Tm → Tm → Bool
+    -- Assume Bnd from the pi is implicit solved to match
+    go _ (Bnd _ _) = True
+    go (Ref _ nm) (Ref _ nm') = trace "CMP \{show nm} \{show nm'}" nm == nm'
+    go (App _ t u _) (App _ t' u' _) = if go t t' then go u u' else False
+    -- needed when we have say IO ?m10, but has the side effect of allowing anything
+    -- If we're looking at an unsolved meta. (The do blocks are full of them.)
+    go (Meta _ _) _ = True
+    -- Log when we get other stuff, so I can sort out how this function should work
+    go x y = case x of
+      (App _ _ _ _) => False
+      (Ref _ _) => False
+      _ => trace "TODO \{show x} \{show y}" False
+
+getCompletions : Int → Int → M (List (String × Maybe FileEdit))
+getCompletions row col = do
+  top <- getTop
+  let mod = top .currentMod
+  let deps = mod .modDeps
+  let mods = mod :: mapMaybe (\ k => lookupMap' k top.modules) mod.modDeps
+  putStrLn "find SC \{show $ find scopeError mod.modErrors}"
+  let (Just err@(ENotInScope fc nm ctx vty)) = find scopeError mod.modErrors | _ => pure []
+  ty <- quote ctx.lvl vty
+  let expected = fst $ splitTele ty
+
+  -- crude filtering by type, if we don't have a good type we might want to fall back to everything
+  putStrLn "filter type \{show expected}"
+  let cands = filter (\ x => filterType expected $ x .type) $ handleError mods err
+  pure $ map toComp cands
+    where
+      scopeError : Error → Bool
+      scopeError (ENotInScope fc _ _ _) = posInFC row col fc
+      scopeError _ = False
+
+      toComp : TopEntry → String × Maybe FileEdit
+      toComp (MkEntry fc quant name type def eflags) = (name.baseName, Nothing)
+
+      pred : String → (QName × TopEntry) → Bool
+      pred key (QN _ nm, _) = isPrefixOf key nm
+
+      getCandidates : String → SortedMap QName TopEntry → List TopEntry
+      getCandidates key defs = map snd $ filter (pred key) $ toList defs
+
+      handleError : List ModContext → Error → List TopEntry
+      handleError mods (ENotInScope fc n ctx vty) = join $ map (\ mod => getCandidates n mod.modDefs) mods
+      handleError _ _ = []
+
 errorActions : Int → Int → Error → M (List CodeAction)
 errorActions row col err =
   case err of
-    ENotInScope fc nm => do
+    ENotInScope fc nm ctx vty => do
+      -- TODO check type
+      ty <- quote ctx.lvl vty
+      putStrLn "TODO: Check type \{show ty}"
       top <- getTop
       let mods = map (\e => e.name.qns) $ lookupAll nm top
       case mods of

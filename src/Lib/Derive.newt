@@ -36,7 +36,7 @@ deriveEq fc raw target = do
     | _ => throwError $ E fc "\{show target} is not a type constructor application"
   let (Just (MkEntry fc q qname type (TCon _ names) eflags)) = lookupRaw name top
     | Just _ => throwError $ E fc "\{name} is not a type constructor"
-    | _ => throwError $ ENotInScope fc name
+    | _ => throwError $ ENotInScope fc name (mkCtx emptyFC Many) (VU emptyFC)
   dcons <- traverse lookupDCon names
   clauses <- traverse makeClause dcons
   let fallback = (buildApp "_==_" (rvar "_" :: rvar "_" :: Nil), Just (rvar "False"))
@@ -85,7 +85,7 @@ deriveOrd fc raw target = do
     | _ => throwError $ E fc "\{show target} is not a type constructor application"
   let (Just (MkEntry fc q qname type (TCon _ names) eflags)) = lookupRaw name top
     | Just _ => throwError $ E fc "\{name} is not a type constructor"
-    | _ => throwError $ ENotInScope fc name
+    | _ => throwError $ ENotInScope fc name (mkCtx emptyFC Many) (VU emptyFC)
   let (Just target) = getTarget raw | _ => error fc "Can't sort out the type from \{show raw}"
   dcons <- traverse lookupDCon names
   clauses <- traverse makeClause dcons
@@ -165,7 +165,7 @@ deriveShow fc raw target = do
     | _ => throwError $ E fc "\{show target} is not a type constructor application"
   let (Just (MkEntry fc q qname type (TCon _ names) eflags)) = lookupRaw name top
     | Just _ => throwError $ E fc "\{name} is not a type constructor"
-    | _ => throwError $ ENotInScope fc name
+    | _ => throwError $ ENotInScope fc name (mkCtx emptyFC Many) (VU emptyFC)
   dcons <- traverse lookupDCon names
   clauses <- traverse makeClause dcons
 

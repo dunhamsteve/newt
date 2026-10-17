@@ -1,4 +1,4 @@
-import { CodeAction, Diagnostic, DocumentSymbol, Location, Range, WorkspaceEdit } from "vscode-languageserver";
+import { CodeAction, Diagnostic, DocumentSymbol, CompletionItem, Location, Range, WorkspaceEdit } from "vscode-languageserver";
 
 export function LSP_updateFile(name: string, content: string): (eta: any) => any;
 export function LSP_checkFile(name: string): Diagnostic[];
@@ -12,3 +12,4 @@ export function LSP_docSymbols(name: string): DocumentSymbol[] | null;
 export function LSP_lspRename(uri: string, row: number, col: number, newName: string): WorkspaceEdit | null
 export function LSP_prepareRename(uri: string, row: number, col: number): Range | null
 export function LSP_findReferences(uri: string, row: number, col: number): Location[] | null
+export function LSP_completions(uri: string, row: number, col: number): CompletionItem[] | null

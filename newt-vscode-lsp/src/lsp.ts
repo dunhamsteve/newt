@@ -12,6 +12,7 @@ import {
   LSP_prepareRename,
   LSP_lspRename,
   LSP_findReferences,
+  LSP_completions,
 } from "./newt.js";
 
 import {
@@ -162,6 +163,16 @@ connection.onDocumentSymbol((params) => {
   }
 });
 
+connection.onCompletion(({textDocument, position: {line, character}}) => {
+  try {
+    const completions = LSP_completions(textDocument.uri, line, character)
+    console.log("COMPLETIONS is", JSON.stringify(completions, null, "  "))
+    return completions
+  } catch (e) {
+    console.error("ERROR in onCompletion", e)
+  }
+})
+
 let showWarnings = true
 connection.onInitialize((_params: InitializeParams): InitializeResult => {
   showWarnings = _params.initializationOptions?.warnings ?? false
@@ -171,6 +182,7 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
       hoverProvider: true,
       definitionProvider: true,
       codeActionProvider: true,
+      completionProvider: { },
       referencesProvider: true,
       renameProvider: { prepareProvider: true },
       documentSymbolProvider: true,

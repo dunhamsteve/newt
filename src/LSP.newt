@@ -302,7 +302,19 @@ lspRename uri row col text = wrapper uri
   where
     makeChange : FC → Json
     makeChange fc = JsonObj $ ("range", fcToRange fc) :: ("newText", JsonStr text) :: Nil
-
+-- https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_completion
+-- result: CompletionItem[] | null
+-- { label: string; detail?: string; additionalTextEdits?: TextEdit[] }
+-- detail might be type
+completions : String → Int → Int → JSObject
+completions uri row col = wrapper uri
+  (do
+      completions <- getCompletions row col
+      pure $ JsonArray $ map toJson completions)
+  (\ err => pure $ jsonToJObject JsonNull)
+  where
+    toJson : (String × Maybe FileEdit) → Json
+    toJson (nm, _) = JsonObj [ ("label", JsonStr nm) ]
 
 checkFile : String → JSObject
 checkFile fn = wrapper fn
@@ -352,4 +364,4 @@ compileToScheme fn = unsafePerformIO $ do
   modifyIORef state { topContext := top }
   pure $ js_castStr src
 
-#export updateFile checkFile hoverInfo codeActionInfo compileJS docSymbols compileToScheme prepareRename lspRename findReferences
+#export updateFile checkFile hoverInfo codeActionInfo compileJS docSymbols compileToScheme prepareRename lspRename findReferences completions
