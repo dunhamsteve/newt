@@ -2,7 +2,7 @@
 ## TODO
 
 - [x] Expected `in` at EOF should point to EOF
-- [ ] Check scope for conflicts on rename?
+- [ ] Check scope for conflicts on rename? (i.e. new name is already in _local_ scope)
 - [ ] Fix "`.a` not in scope" for record update, if record has an implicit arg
   - Maybe rework as a case statement, otherwise we inline a bunch of case statements
   - need a bunch of fresh nams, since we're generating raw code
@@ -16,12 +16,14 @@
   - Check performance - cost to build the map vs not walking $n$ maps
   - This will likely be needed for qualified / partial imports
   - [ ] Add `public` keyword
-- [ ] use a worker for lsp to handle requests while processing.
+- [ ] use a worker for lsp to accumulate / debounce requests while newt is processing the previous one.
+- [ ] virtual FC
+  - We're starting to hit issues where e.g. we want an FC for errors (auto solution) but not for type at point, etc. Currently, I'm stuffing a `$` in front of the name in one of those cases as a temporary hack. 
 - [ ] Elaboration of `RUpdate` inserts name info records for synthesized code
   - We maybe should kill the FC on those (or mark them as FC for errors only)
   - Also double check that we don't treat emptyFC as valid for rename, etc.
 - [ ] code formatter
-  - [ ] consider moving caselet, operator, etc. desugaring out of the parser
+  - [ ] consider moving caselet, operator, paren, `$`, etc. desugaring out of the parser
   - comments stored aside (location, whether it is a tail or standalone) and re-integrated
   - how do we want to handle `$` and parens? we could preserve or normalize
   - there is a now a parsing hack to deal with parens not being preserved in the AST.
@@ -29,13 +31,13 @@
 - [ ] maybe `let case` instead of `let (...)` (which is a little subtle)
   - Or simply put a term in there and treat as a variable iff it is lowercase and non-applied
 - [x] Use while-TCO for mutual recursion, drop `bouncer`
-- [ ] Importing Prelude twice should be an error (currently it causes double hints and breaks auto)
+- [x] Importing Prelude twice should be an error (currently it causes double hints and breaks auto)
   - or relax to no-op to aid repl usage
 - [ ] maybe allow "Main" module name for any file
   - possibly allow eliding `module` for Main?
 - [ ] preserve information on record / class / instance for LSP "document symbols" kind
   - We will want some of this for default implementations in class
-  - It may help avoid reverse-engineering the class when processing implementation
+  - It may help avoid reverse-engineering the class when processing an implementation
 - [ ] Maybe use a worker thread for LSP
 - [-] Put a copy of the `Def` on `Ref` terms
   - It may be Axiom for forward/recursive functions, but it would get us DCon and TCon info without lookup - and may save passing around the Ref2 (+lookup) during Compilation.
