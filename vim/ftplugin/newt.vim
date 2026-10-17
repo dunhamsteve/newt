@@ -8,7 +8,8 @@ setlocal makeprg=make
 " setlocal makeprg=newt\ %
 setlocal errorformat=ERROR\ at\ %f:%l:%c--%e:%k:\ %m
 setlocal formatoptions+=r
-setlocal iskeyword=@,33-39,42-58,60-63,92,94,95,124,126
+" leaving out . but we would like to have it at the beginning of a name
+setlocal iskeyword=@,33-39,42-43,45,47-58,60-63,92,94,95,124,126
 
 " Single-character sequences
 inoremap <buffer> \r  →
