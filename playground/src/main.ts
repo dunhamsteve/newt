@@ -247,6 +247,12 @@ const language: EditorDelegate = {
     if (res == true) return null;
     return res || null;
   },
+  async getCompletions(row, col) {
+    let fileName = state.currentFile.value;
+    let res = await ipc.sendMessage("completions", [fileName, row, col]);
+    console.log("COMPLETE for", row, col, res);
+    return res ?? null
+  },
   async getActions(_, row, col) {
     let fileName = state.currentFile.value;
     let res = await ipc.sendMessage("codeActionInfo", [fileName, row, col]);

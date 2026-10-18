@@ -9,12 +9,12 @@ export interface TextEdit { range: Range; newText: string; }
 export type DiagnosticSeverity = 1 | 2 | 3 | 4
 export interface DiagnosticRelatedInformation { location: Location; message: string; }
 export interface Diagnostic {
-    range: Range
-    message: string
-    severity?: DiagnosticSeverity
-    source?: string
-    // we don't emit this yet, but I think we will
-    relatedInformation?: DiagnosticRelatedInformation[]
+  range: Range
+  message: string
+  severity?: DiagnosticSeverity
+  source?: string
+  // we don't emit this yet, but I think we will
+  relatedInformation?: DiagnosticRelatedInformation[]
 }
 
 export interface WorkspaceEdit {
@@ -39,6 +39,8 @@ export type Result<A> =
   | { status: "ok"; value: A }
   | { status: "err"; error: string };
 
+export interface Completion { label: string }
+
 export interface API {
   // Invalidates stuff and writes to an internal cache that overlays the "filesystem"
   updateFile(fileName: string, content: string): unknown;
@@ -48,8 +50,9 @@ export interface API {
   // The playground rarely hits this situation at the moment
   hoverInfo(fileName: string, row: number, col: number): HoverResult | boolean | null;
   codeActionInfo(fileName: string, row: number, col: number): CodeAction[] | null;
+  completions(fileName: string, row: number, col: number): Completion[] | null;
   // we need to add this to the LSP build
-  compile(fileName: string, language: 'javascript'|'scheme'):  string;
+  compile(fileName: string, language: 'javascript' | 'scheme'): string;
 }
 
 export interface Message<K extends keyof API> {

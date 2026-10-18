@@ -1,6 +1,7 @@
 import { AbstractEditor, EditorDelegate, Marker } from "./types";
 import { basicSetup } from "codemirror";
 import { getCM, Vim, vim } from '@replit/codemirror-vim';
+import { autocompletion, CompletionContext, CompletionResult } from '@codemirror/autocomplete';
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import {
   indentMore,
@@ -344,18 +345,18 @@ function actionsPanel(delegate: EditorDelegate) {
   });
   return [actionsPanelState, keymap.of(actionsKeymap)];
 }
-  const setVimTooltip = StateEffect.define<Tooltip|null>()
-  const vimTooltipField = StateField.define<Tooltip | null>({
-    create: () => null,
-    update(tooltip, xact) {
-      if (xact.selection || xact.docChanged) return null
-      for (let e of xact.effects) {
-        if (e.is(setVimTooltip)) return e.value
-      }
-      return tooltip
-    },
-    provide: (f) => showTooltip.from(f)
-  })
+const setVimTooltip = StateEffect.define<Tooltip | null>()
+const vimTooltipField = StateField.define<Tooltip | null>({
+  create: () => null,
+  update(tooltip, xact) {
+    if (xact.selection || xact.docChanged) return null
+    for (let e of xact.effects) {
+      if (e.is(setVimTooltip)) return e.value
+    }
+    return tooltip
+  },
+  provide: (f) => showTooltip.from(f)
+})
 export class CMEditor implements AbstractEditor {
   view: EditorView;
   delegate: EditorDelegate;
@@ -374,9 +375,8 @@ export class CMEditor implements AbstractEditor {
   }
   setMarkdown(isMarkdown: boolean) {
     if (isMarkdown) {
-      let languages = [newt()]
       this.view.dispatch({
-        effects: this.language.reconfigure( markdown({ base: markdownLanguage, codeLanguages: [newtDescription]}))
+        effects: this.language.reconfigure(markdown({ base: markdownLanguage, codeLanguages: [newtDescription] }))
       })
     } else {
       this.view.dispatch({
@@ -385,7 +385,7 @@ export class CMEditor implements AbstractEditor {
     }
   }
   escape() {
-    Vim.handleKey(getCM(this.view)!, '<Esc>','')
+    Vim.handleKey(getCM(this.view)!, '<Esc>', '')
   }
   focus() {
     this.view.focus()
@@ -403,6 +403,22 @@ export class CMEditor implements AbstractEditor {
         this.vimCompartment.of([]),
         basicSetup,
         vimTooltipField,
+        autocompletion({
+          override: [async function(ctx) {
+            const word = ctx.matchBefore(/\w*/);
+
+            if (!word || (word.from === word.to && !ctx.explicit)) return null;
+
+            const doc = ctx.state.doc
+            let line = doc.lineAt(ctx.pos)
+            let row = line.number - 1
+            let col = ctx.pos - line.from
+
+            let options = await delegate.getCompletions(row, col)
+            if (options == null) return null
+            return {from: word.from, options}
+          }]
+        }),
         actionsPanel(delegate),
         linter((view) => this.delegate.lint(view)),
         // For indent on return
@@ -502,18 +518,18 @@ export class CMEditor implements AbstractEditor {
       let cursor = this.view.state.doc.lineAt(pos)
       let line = cursor.number - 1
       let col = pos - cursor.from
-      let entry = await this.delegate.getEntry("",line, col)
+      let entry = await this.delegate.getEntry("", line, col)
       if (!entry) return
-        let tooltip: Tooltip = {
-          pos, above: true,
-          create: () => {
-            let dom = document.createElement('div');
-            dom.className = 'tooltip'
-            dom.textContent = entry.info
-            return {dom}
-          },
-        };
-        this.view.dispatch({ effects: setVimTooltip.of(tooltip)})
+      let tooltip: Tooltip = {
+        pos, above: true,
+        create: () => {
+          let dom = document.createElement('div');
+          dom.className = 'tooltip'
+          dom.textContent = entry.info
+          return { dom }
+        },
+      };
+      this.view.dispatch({ effects: setVimTooltip.of(tooltip) })
     })
     Vim.map("K", ":hover<CR>", "normal")
   }

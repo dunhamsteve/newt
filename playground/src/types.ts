@@ -1,6 +1,6 @@
 import { EditorView } from "codemirror";
 import { Diagnostic } from "@codemirror/lint";
-import { CodeAction, HoverResult } from "./ipc";
+import { CodeAction, Completion, HoverResult } from "./ipc";
 
 export interface CompileReq {
   id: string;
@@ -68,6 +68,7 @@ export interface EditorDelegate {
   onChange(value: string): unknown;
   getFileName(): string;
   lint(view: EditorView): Promise<Diagnostic[]> | Diagnostic[];
+  getCompletions(row: number, col: number): Promise<Completion[] | null>;
 }
 export interface Marker {
   severity: "error" | "info" | "warning";

@@ -2,6 +2,7 @@ import { shim } from "./emul";
 import { API, Message, ResponseMSG } from "./ipc";
 import { archive, preload } from "./preload";
 import { LSP_checkFile, LSP_codeActionInfo, LSP_compileJS, LSP_compileToScheme, LSP_hoverInfo, LSP_updateFile } from './newt';
+import { LSP_completions } from "./newt";
 
 const LOG = console.log
 
@@ -28,6 +29,10 @@ const api: API = {
   compile: (fn, lang) => {
     if (lang == 'scheme') return LSP_compileToScheme(fn);
     return LSP_compileJS(fn);
+  },
+  completions: (fn, row, col) => {
+    console.log('RUN', fn, row, col)
+    return LSP_completions(fn, row, col)
   }
 }
 
