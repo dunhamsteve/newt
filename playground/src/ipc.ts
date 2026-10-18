@@ -53,6 +53,8 @@ export interface API {
   completions(fileName: string, row: number, col: number): Completion[] | null;
   // we need to add this to the LSP build
   compile(fileName: string, language: 'javascript' | 'scheme'): string;
+  prepareRename(filename: string, row: number, col: number): Range | null
+  lspRename(filename: string, row: number, col: number, newName: string): WorkspaceEdit | null
 }
 
 export interface Message<K extends keyof API> {

@@ -247,6 +247,18 @@ const language: EditorDelegate = {
     if (res == true) return null;
     return res || null;
   },
+  async prepareRename(row,col) {
+    let fileName = state.currentFile.value;
+    let res = await ipc.sendMessage("prepareRename", [fileName, row, col]);
+    console.log("PREPARE", res, "for", row, col);
+    return res ;
+  },
+  async lspRename(row,col,newName) {
+    let fileName = state.currentFile.value;
+    let res = await ipc.sendMessage("lspRename", [fileName, row, col, newName]);
+    console.log("PREPARE", res, "for", row, col);
+    return res ;
+  },
   async getCompletions(row, col) {
     let fileName = state.currentFile.value;
     let res = await ipc.sendMessage("completions", [fileName, row, col]);

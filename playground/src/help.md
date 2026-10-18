@@ -27,5 +27,6 @@ The editor will typecheck the file with newt and render errors as the file is ch
 *C-s or M-s* - Embed the current file in the URL and copy to clipboard
 
 *f1* - Toggle actions panel
+*f2* - Rename variable
 
 There is an experimental vi mode. Click on the `vi` button at the top.  An `esc` button is provided for mobile keyboards.

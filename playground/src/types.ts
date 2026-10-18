@@ -1,6 +1,6 @@
 import { EditorView } from "codemirror";
 import { Diagnostic } from "@codemirror/lint";
-import { CodeAction, Completion, HoverResult } from "./ipc";
+import { Range, CodeAction, Completion, HoverResult, WorkspaceEdit } from "./ipc";
 
 export interface CompileReq {
   id: string;
@@ -69,6 +69,8 @@ export interface EditorDelegate {
   getFileName(): string;
   lint(view: EditorView): Promise<Diagnostic[]> | Diagnostic[];
   getCompletions(row: number, col: number): Promise<Completion[] | null>;
+  prepareRename(row: number, col: number): Promise<Range | null>;
+  lspRename(row: number, col: number, newName: string): Promise<WorkspaceEdit|null>;
 }
 export interface Marker {
   severity: "error" | "info" | "warning";

@@ -20,6 +20,7 @@ import {
 import {
   ChangeSpec,
   Compartment,
+  EditorState,
   Prec,
   StateEffect,
   StateField,
@@ -35,6 +36,10 @@ import {
 } from "@codemirror/language";
 import { ABBREV } from "./abbrev.js";
 import { CodeAction, Position, TextEdit } from "./ipc.js";
+
+function posToOffset(state: EditorState, pos: Position) {
+  return state.doc.line(pos.line + 1).from + pos.character
+}
 
 // prettier flattened this...
 const keywords = [
@@ -395,7 +400,6 @@ export class CMEditor implements AbstractEditor {
     this.theme = new Compartment();
     this.vimCompartment = new Compartment()
     this.language = new Compartment()
-
     this.view = new EditorView({
       doc,
       parent: container,
@@ -416,7 +420,7 @@ export class CMEditor implements AbstractEditor {
 
             let options = await delegate.getCompletions(row, col)
             if (options == null) return null
-            return {from: word.from, options}
+            return { from: word.from, options }
           }]
         }),
         actionsPanel(delegate),
@@ -440,16 +444,16 @@ export class CMEditor implements AbstractEditor {
               run: indentMore,
             },
             {
+              key: "F2",
+              preventDefault: true,
+              run: (view) => {
+                renameVariable(view)
+                return true
+              }
+            },
+            {
               key: "Cmd-/",
               run: toggleLineComment,
-            },
-            // ok, we can do multiple keys (we'll want this for Idris)
-            {
-              key: "c-c c-s",
-              run: () => {
-                console.log("C-c C-s");
-                return false;
-              },
             },
             {
               key: "Shift-Tab",
@@ -532,6 +536,30 @@ export class CMEditor implements AbstractEditor {
       this.view.dispatch({ effects: setVimTooltip.of(tooltip) })
     })
     Vim.map("K", ":hover<CR>", "normal")
+    async function renameVariable(view: EditorView) {
+      const state = view.state
+      const pos = state.selection.ranges[0].from
+      const line = state.doc.lineAt(pos)
+      const row = line.number - 1
+      // const row = line.number
+      const col = pos - line.from
+
+      const renameRange = await delegate.prepareRename(row, col)
+      if (!renameRange) return false;
+
+      console.log("range is", renameRange)
+      const oldName = view.state.sliceDoc(posToOffset(state, renameRange.start), posToOffset(state, renameRange.end))
+      console.log('oldname', oldName)
+      const newName = window.prompt('Rename symbol', oldName)
+      if (!newName || newName === oldName) return true;
+      console.log('RENAME', oldName, 'to', newName)
+      const edit = await delegate.lspRename(row, col, newName)
+      console.log('EDIT', edit)
+      if (edit?.changes) {
+        for (let id in edit.changes) applyWorkspaceEdit(view, edit.changes[id])
+      }
+      return true
+    }
   }
   setDark(isDark: boolean) {
     this.view.dispatch({
