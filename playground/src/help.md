@@ -28,5 +28,6 @@ The editor will typecheck the file with newt and render errors as the file is ch
 
 *f1* - Toggle actions panel
 *f2* - Rename variable
+*c-1*, *c-2*, ... - Run code actions listed at bottom of buffer
 
 There is an experimental vi mode. Click on the `vi` button at the top.  An `esc` button is provided for mobile keyboards.

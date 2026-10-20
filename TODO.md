@@ -10,7 +10,7 @@
 - [x] support derive with args:
   - `derive ∀ a. {{Show a}} → Show (BindInfo a)`
   - `instance (∀ a. {{Show a}} → Show (BindInfo a))`
-- [ ] Add rename to playground
+- [x] Add rename to playground
 - [x] Add test for literate newt
 - [ ] Build single name map on import
   - Check performance - cost to build the map vs not walking $n$ maps
@@ -189,12 +189,13 @@
 
 ### LSP
 
-- [ ] add jump to definition for non-top-level functions
+- [x] add jump to definition for non-top-level functions
 - [ ] Maybe run whole project for completion search and "all errors in project"
 - [x] code action to add clause
 - [ ] Add missing args code action?
   - when a constructor is underapplied
   - is this useful? we would probably have to add at the end
+  - there may be something similar given a unification error with a pi type
 - [x] case split
   - We could fake this up:
     - given a name and a point in the editor
@@ -204,11 +205,10 @@
     - Repeat the line with each, applied to args
     - For `<-` or `let` we'd want to fudge some `|` lines
     - [ ] `let` has issues for multiline split / add missing
-    - [ ] `derive` has phantom split actions in it
+    - [x] `derive` has phantom split actions in it
 
 ### Code generation
 
-- [ ] add default failing case for constructor matching to catch errors
 - [ ] C backend
   - [x] Rework the Javascript AST to be more generic semi-A-Normal form (WIP)
   - [x] Generated code accepted by C compiler
@@ -218,7 +218,6 @@
 
 ### Misc
 
-- [ ] White box tests in `test` directory (I can't get this to work right with pack et al)
 - [x] Put worker in iframe on safari
 - [ ] Warnings or errors for missing definitions (e.g. on `Axiom` in codegen)
 - [ ] literals for double
