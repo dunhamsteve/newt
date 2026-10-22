@@ -55,3 +55,5 @@ INFO 5:11--5:12 "  n : Prelude.Nat\n  m : Prelude.Nat\n--------\nPrelude.Nat"
 *** info LSPStuff.newt 30 7
 822:0--822:3 nub : {0  a : U } -> {{ _ : Prelude.Eq a:0 }} -> (Prelude.List a:1) -> Prelude.List a:2
 
+*** Actions LSPStuff.newt 34 12
+

@@ -1,7 +1,7 @@
 module LSPStuff
 
 import Prelude
-
+import Data.Vect
 plus : Nat → Nat → Nat
 plus n m = ?
 
@@ -29,3 +29,8 @@ add2 x y = go x y
 
 test : List Int
 test = nub [1,2,3]
+
+vfoo : ∀ n a.  Vect n a → Nat
+-- The first _ ends up with a stray case split if the `when` is not there
+vfoo (_:-_ _ _) = Z
+vfoo (VNil) = Z

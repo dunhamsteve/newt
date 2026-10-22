@@ -762,8 +762,8 @@ buildTree : Context -> Problem -> M Tm
 introClause : Int -> Icit -> Val -> Clause -> M Clause
 introClause nm icit ty (MkClause fc cons (pat :: pats) expr) =
   if icit == getIcit pat then pure $ MkClause fc (cons ++ [PC nm pat]) pats expr
-  else if icit == Implicit then pure $ MkClause fc (PC nm (PatWild fc Implicit) :: cons) (pat :: pats) expr
-  else if icit == Auto then pure $ MkClause fc (PC nm (PatWild fc Auto) :: cons) (pat :: pats) expr
+  else if icit == Implicit then pure $ MkClause fc cons (pat :: pats) expr
+  else if icit == Auto then pure $ MkClause fc cons (pat :: pats) expr
   else error fc "Explicit arg and \{show $ getIcit pat} pattern \{show nm}  \{show pat}"
 introClause nm Implicit ty (MkClause fc cons Nil expr) = pure $ MkClause fc (PC nm (PatWild fc Implicit) :: cons) Nil expr
 introClause nm Auto ty (MkClause fc cons Nil expr) = pure $ MkClause fc (PC nm (PatWild fc Auto) :: cons) Nil expr
@@ -927,12 +927,8 @@ makeConstr : FC -> List Bind -> List Pattern -> M (List PMatch)
 makeConstr fc Nil Nil = pure $ Nil
 makeConstr fc Nil (pat :: pats) = error (getFC pat) "too many patterns"
 
-makeConstr fc ((MkBind nm Implicit ty) :: xs) Nil  = do
-  rest <- makeConstr fc xs Nil
-  pure $ PC nm (PatWild emptyFC Implicit) :: rest
-makeConstr fc ((MkBind nm Auto ty) :: xs) Nil = do
-  rest <- makeConstr fc xs Nil
-  pure $ PC nm (PatWild emptyFC Auto) :: rest
+makeConstr fc ((MkBind nm Implicit ty) :: xs) Nil  = makeConstr fc xs Nil
+makeConstr fc ((MkBind nm Auto ty) :: xs) Nil = makeConstr fc xs Nil
 makeConstr fc ((MkBind nm Explicit ty) :: xs) Nil = error fc "not enough patterns"
 makeConstr fc ((MkBind nm Explicit ty) :: xs) (pat :: pats) =
   if getIcit pat == Explicit
@@ -942,9 +938,7 @@ makeConstr fc ((MkBind nm Explicit ty) :: xs) (pat :: pats) =
     else error fc "mismatch between Explicit and \{show $ getIcit pat}"
 makeConstr fc ((MkBind nm icit ty) :: xs) (pat :: pats) =
   if getIcit pat /= icit -- Implicit/Explicit Implicit/Auto, etc
-    then do
-      rest <- makeConstr fc xs (pat :: pats)
-      pure $ PC nm (PatWild (getFC pat) icit) :: rest
+    then makeConstr fc xs (pat :: pats)
     else do
       rest <- makeConstr fc xs pats
       pure $ PC nm pat :: rest
@@ -1255,9 +1249,8 @@ checkDone fc ctx Nil (Just body) ty = do
   debug "DONE<- got \{rpprint (names ctx) got}"
   pure got
 checkDone fc ctx (PC x (PatWild pvfc icit) :: xs) body ty = do
-  -- sometimes have the same FC as real arguments
   scty <- levelType ctx x
-  when (icit == Explicit) $ addInfo $ CaseSplit pvfc ctx x scty
+  addInfo $ CaseSplit pvfc ctx x scty
   checkDone fc ctx xs body ty
 checkDone fc ctx (PC nm (PatVar pvfc _ nm') :: xs) body ty = do
   scty <- levelType ctx nm
