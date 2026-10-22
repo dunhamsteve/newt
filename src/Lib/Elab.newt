@@ -1183,37 +1183,6 @@ registerClause rfc env ty (RVar fc nm) = addTypeInfo fc nm env ty rfc
 registerClause rfc env ty (RApp fc t u icit) = registerClause rfc env ty t
 registerClause rfc _ _ _ = pure MkUnit
 
--- we'll want both check and infer, we're augmenting a context
--- so probably a continuation:
--- Context -> List Decl -> (Context -> M a) -> M a
-checkWhere : Context -> List Decl -> Raw -> Val -> M Tm
-checkWhere ctx decls body ty = do
-  -- we're going to be very proscriptive here, no forward declaration
-  -- need multiple defs in letrec if we want to loosen this
-  let (TypeSig sigFC q ((nfc,name) :: Nil) rawtype :: decls) = decls
-    | x :: _ => error (getFC x) "expected type signature"
-    | _ => check ctx body ty
-  let (Many) = q | _ => error sigFC "Zero quantity not supported in where clauses"
-  funTy <- checkIn ctx Zero rawtype (VU sigFC)
-  debug "where clause \{name} : \{rpprint (names ctx) funTy}"
-  let (FunDef defFC name' clauses :: decls') = decls
-    | x :: _ => error (getFC x) "expected function definition"
-    | _ => error sigFC "expected function definition after this signature"
-  unless (name == name') $ error defFC "Expected def for \{name}"
-  -- REVIEW is this right, cribbed from my top level code
-  top <- getTop
-  clauses' <- traverse makeClause clauses
-  vty <- eval ctx.env funTy
-  traverse_ (registerClause nfc ctx.env vty) $ map fst clauses
-  addTypeInfo nfc name ctx.env vty nfc
-  debug "\{name} vty is \{show vty}"
-  let ctx' = extend ctx (BI nfc name Explicit Many vty)
-
-  tm <- buildTree (withPos ctx' defFC) (MkProb clauses' vty)
-  vtm <- eval ctx'.env tm
-  ty' <- checkWhere ctx' decls' body ty
-  pure $ LetRec sigFC name funTy tm ty'
-
 levelType : Context → Int → M Val
 levelType ctx k = case getAt' (lvl2ix ctx.lvl k) ctx.types of
   Just info => pure info.biTy
@@ -1536,6 +1505,37 @@ undo ((DoArrow fc left right alts) :: xs) = do
   rest <- pure $ RCase fc (RVar fc nm) Nothing (MkAlt left (Just xs') :: alts)
   pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
     (RLam fc (BI fc nm Explicit Many Nothing) rest) Explicit
+
+-- we'll want both check and infer, we're augmenting a context
+-- so probably a continuation:
+-- Context -> List Decl -> (Context -> M a) -> M a
+checkWhere : Context -> List Decl -> Raw -> Val -> M Tm
+checkWhere ctx decls body ty = do
+  -- we're going to be very proscriptive here, no forward declaration
+  -- need multiple defs in letrec if we want to loosen this
+  let (TypeSig sigFC q ((nfc,name) :: Nil) rawtype :: decls) = decls
+    | x :: _ => error (getFC x) "expected type signature"
+    | _ => check ctx body ty
+  let (Many) = q | _ => error sigFC "Zero quantity not supported in where clauses"
+  funTy <- checkIn ctx Zero rawtype (VU sigFC)
+  debug "where clause \{name} : \{rpprint (names ctx) funTy}"
+  let (FunDef defFC name' clauses :: decls') = decls
+    | x :: _ => error (getFC x) "expected function definition"
+    | _ => error sigFC "expected function definition after this signature"
+  unless (name == name') $ error defFC "Expected def for \{name}"
+  -- REVIEW is this right, cribbed from my top level code
+  top <- getTop
+  clauses' <- traverse makeClause clauses
+  vty <- eval ctx.env funTy
+  traverse_ (registerClause nfc ctx.env vty) $ map fst clauses
+  addTypeInfo nfc name ctx.env vty nfc
+  debug "\{name} vty is \{show vty}"
+  let ctx' = extend ctx (BI nfc name Explicit Many vty)
+
+  tm <- buildTree (withPos ctx' defFC) (MkProb clauses' vty)
+  vtm <- eval ctx'.env tm
+  ty' <- checkWhere ctx' decls' body ty
+  pure $ LetRec sigFC name funTy tm ty'
 
 
 -- REVIEW should `arg` be assigned to a variable with `RLet`?
