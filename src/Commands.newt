@@ -295,9 +295,9 @@ getExpand fc raw = do
 getCaseSplit : Int → Int → FC → Context → Int → Val → M (List CodeAction)
 getCaseSplit row col fc@(MkFC uri (MkBounds sr sc er ec)) ctx nm scty = do
   top <- getTop
-  cons <- getConstructors ctx fc scty
   ty <- quote ctx.lvl scty
   scty <- eval ctx.env ty
+  cons <- getConstructors ctx fc scty
   ty <- quote ctx.lvl scty
   cons <- filterM (checkCase ctx nm scty) cons
   let cons' = map (resugarOper ∘ applyDCon) cons
@@ -525,6 +525,8 @@ getActions repo modns row col = do
     go acc Nil = pure acc
     go acc (x :: xs) = do
       Right res <- tryError $ getAction x
-        | _ => go acc xs
+        | Left err => do
+            putStrLn "ERR: \{show err}"
+            go acc xs
       go (res ++ acc) xs
 
