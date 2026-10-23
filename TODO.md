@@ -7,6 +7,7 @@
   - Maybe rework as a case statement, otherwise we inline a bunch of case statements
   - need a bunch of fresh nams, since we're generating raw code
   - or just skip the implicits...
+- [ ] playground - case split doesn't work on last line of file
 - [x] support derive with args:
   - `derive ∀ a. {{Show a}} → Show (BindInfo a)`
   - `instance (∀ a. {{Show a}} → Show (BindInfo a))`

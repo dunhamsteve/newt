@@ -208,6 +208,8 @@ makeCons names = do
   cons <- map applyDCon <$> traverse lookupDCon names
   return $ map resugarOper cons
 
+-- Try to make edits for case split / add missing cases
+-- The heuristics can be dicey for monad assignments and let
 makeEdits : FC → List (List String) → Bool → M (List FileEdit)
 makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) cons inPlace = do
   top <- getTop
@@ -219,7 +221,7 @@ makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) cons inPlace = do
   let tail = drop (S $ cast (ec - 1)) cs
   let (splitKind, before, _after) = splitEquals Lin tail
 
-  let (splitKind, head) = the (Flavor × List Char) $ case letHead 0 head of
+  let (splitKind, head) = the (Flavor × List Char) $ case letHead Z head of
     Just head => (MonadSplit,head)
     Nothing => (splitKind, head)
   let np = needParens (Lin <>< head) tail
@@ -249,9 +251,10 @@ makeEdits fc@(MkFC uri (MkBounds sr sc er ec)) cons inPlace = do
   putStrLn "edits \{debugStr edits}"
   pure edits
   where
-    letHead : Int → List Char → Maybe (List Char)
-    letHead acc ('l' :: 'e' :: 't' :: xs) = Just $ replicate (cast $ acc) ' ' ++ xs
-    letHead acc (x :: xs) = letHead (1 + acc) xs
+    -- FIXME if `in` is on the same line, the | ends up after in
+    letHead : Nat → List Char → Maybe (List Char)
+    letHead acc (' ' :: 'l' :: 'e' :: 't' :: ' ' :: xs) = Just $ replicate (S acc) ' ' ++ xs
+    letHead acc (x :: xs) = letHead (S acc) xs
     letHead acc Nil = Nothing
 
 
