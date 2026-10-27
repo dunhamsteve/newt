@@ -1,0 +1,10 @@
+*** Process tests/EqIssue.newt
+module Prelude
+module EqIssue
+ERROR at tests/EqIssue.newt:6:7--6:8: vref mismatch Prelude.Z Prelude.S
+  
+  -- Matching Refl should be an error here
+  foo : Z ≡ S Z → Nat
+        ^
+
+Stop on error

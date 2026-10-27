@@ -1,7 +1,7 @@
 *** Process tests/TypeLam.newt
 module Prelude
 module TypeLam
-ERROR at tests/TypeLam.newt:7:33--7:34: unification failure: vref mismatch
+ERROR at tests/TypeLam.newt:7:33--7:34: unification failure: vref mismatch Prim.Int Prelude.Nat
   failed to unify Prim.Int
              with Prelude.Nat
   

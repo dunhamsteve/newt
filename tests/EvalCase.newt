@@ -1,0 +1,7 @@
+module EvalCase
+
+import Prelude
+
+foo : String ≡ (the (Int → U) $ if True then \ x => String else const Int) 42
+foo = Refl
+

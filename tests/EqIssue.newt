@@ -1,0 +1,12 @@
+module EqIssue
+
+import Prelude
+
+-- Matching Refl should be an error here
+foo : Z ≡ S Z → Nat
+foo Refl = Z
+
+-- This one should be ok
+test2 : Z ≡ Z → Nat
+test2 Refl = Z
+

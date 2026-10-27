@@ -1,0 +1,10 @@
+*** Process tests/ParseError.newt
+module Prelude
+module ParseError
+ERROR at tests/ParseError.newt:7:15--7:16: Expected 'in' at EOF
+  -- checking location of error
+  foo : Nat
+  foo = let x = Z
+                ^
+
+Stop on error

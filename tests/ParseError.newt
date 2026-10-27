@@ -1,0 +1,7 @@
+module ParseError
+
+import Prelude
+
+-- checking location of error
+foo : Nat
+foo = let x = Z
