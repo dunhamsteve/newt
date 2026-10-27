@@ -702,7 +702,8 @@ lazyType ty   = (False,ty)
 
 insert : (ctx : Context) -> Tm -> Val -> M (Tm × Val)
 insert ctx tm ty = do
-  ty' <- forceMeta ty
+  -- We want metas and type aliases expanded
+  ty' <- forceType ctx.env ty
   case ty' of
     VPi fc (BI _ _ Auto rig a) b => do
       m <- freshMeta (enterMarker' rig ctx) (getFC tm) a AutoSolve
@@ -1161,6 +1162,7 @@ mkPat (tm, icit) = do
                 -- Just _ => error (getFC tm) "\{show nm} is not a data constructor"
                 _ => if isUpperName nm
                         -- This is not entirely accurate - it could be a function def
+                        -- Also we might want to allow dotted function applications
                         then error (getFC tm) "\{nm} not in scope"
                         else case b of
                           Nil => pure $ PatVar fc icit nm
@@ -1727,7 +1729,7 @@ check ctx tm ty = do
       sc <- check (extend ctx info) tm ty'
       pure $ Lam (getFC tm) (const MkUnit <$> info) sc
 
-    -- this ends up in the tree a couple of times, pull it into a function
+    -- this code ends up in the case tree a couple of times, pull it into a function
     (tm, ty) => do
       (tm', ty') <- infer ctx tm
       (tm', ty') <- insert ctx tm' ty'
@@ -1782,7 +1784,6 @@ infer ctx (RVar fc nm) = go 0 ctx.types
 infer ctx (RApp fc t u icit) = do
   (t, tty) <- infer ctx t
   let (lazy, tty) = lazyType tty
-  -- force lazy
   -- If the app is explicit, add any necessary metas
   (icit, t, tty) <- case icit of
       Explicit => do
