@@ -10,13 +10,14 @@ mkday.py
 tmp
 min.js.gz
 src/Revision.newt
+# editor junk
 .calva
 .clj-kondo
 .joyride
 .lsp
 .vscode
 .helix
-bootstrap/serializer.js
+.zed
 /newt-vscode-lsp/src/newt.js
 /playground/src/newt.js
 .vite
@@ -24,3 +25,4 @@ bs
 /aside
 bench*.txt
 *.dylib
+NOW.md
