@@ -38,7 +38,7 @@ jsonToJObject (JsonNull) = js_null
 jsonToJObject (JsonArray xs) = js_castArray $ listToArray $ map jsonToJObject xs
 jsonToJObject (JsonBool x) = js_castBool x
 jsonToJObject (JsonStr x) = js_castStr x
--- IMPERROR - if I leave off the `map` I get an error that is hard to sort out
+-- TODO ERRORS - if I leave off the `map` I get an error that is hard to sort out
 jsonToJObject (JsonObj xs) = js_castObj $ listToArray $ map (mapSnd jsonToJObject) xs
 
 single : String → Json → Json
@@ -60,16 +60,18 @@ resetState base = do
 lspFileSource : IO FileSource
 lspFileSource = do
   st <- readIORef state
-  pure $ MkFileSource st.baseDir $ \fc fn => do
-    let fn = st.baseDir ++ "/" ++ fn
+  pure $ MkFileSource st.baseDir $ \fc baseFn => do
+    let fn = st.baseDir ++ "/" ++ baseFn
     let (Nothing) = lookupMap' fn st.files
         | Just src => pure (fn,src)
     let fn' = case split fn "file://" of
           x :: fn :: _ => fn
           _ => fn
-    (Right src) <- liftIO {M} $ readFile fn'
-        | Left err => throwError $ E fc "error reading \{fn}: \{show err}"
-    pure (fn,src)
+    (Left err) <- liftIO {M} $ readFile fn' | Right src => pure (fn,src)
+    Just dname <- liftIO {M} $ getEnvVar "NEWT_LIB" | _ => throwError $ E fc "error reading \{fn}: \{show err}"
+    let libfn = dname ++ "/" ++ baseFn
+    Left _ <- liftIO {M} $ readFile libfn | Right src => pure (libfn,src)
+    throwError $ E fc "error reading \{fn}: \{show err}"
 
 -- load fn and run M in state
 wrapper : String → M Json → (Error → IO JSObject) → JSObject

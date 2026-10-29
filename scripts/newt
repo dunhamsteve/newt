@@ -1,0 +1,4 @@
+#!/bin/zsh
+NEWT_HOME=${NEWT_HOME:=$HOME/prj/newt}
+NEWT_LIB=${NEWT_LIB:=$NEWT_HOME/lib}
+exec node $NEWT_HOME/build/newt.js $*

@@ -14,6 +14,12 @@ pfunc readFile uses (MkIORes Left Right) : (fn : String) -> IO (Either String St
   return Prelude_MkIORes(result, w)
 }`
 
+-- getEnvVar gets an environment variable
+pfunc getEnvVar uses (Just Nothing) : String → IO (Maybe String) := `(s) => (w) => {
+  let rval = process.env[s]
+  return Prelude_MkIORes(rval ? Prelude_Just(rval) : Prelude_Nothing, w)
+}`
+
 -- I wonder if I should automatically `uses` the constructors in the types
 pfunc writeFile uses (MkIORes MkUnit) : String → String → IO (Either String Unit) := `(fn, content) => (w) => {
   let result

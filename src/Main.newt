@@ -25,11 +25,13 @@ import Node
 import Revision
 
 dirFileSource : String → FileSource
-dirFileSource base = MkFileSource base $ \fc fn => do
-        let fn = base ++ "/" ++ fn
-        (Right src) <- liftIO {M} $ readFile fn
-            | Left err => throwError $ E fc "error reading \{fn}: \{show err}"
-        pure (fn,src)
+dirFileSource base = MkFileSource base $ \fc baseFn => do
+        let fn = base ++ "/" ++ baseFn
+        Left err <- liftIO {M} $ readFile fn | Right src => pure (fn,src)
+        Just dname <- liftIO {M} $ getEnvVar "NEWT_LIB" | _ => throwError $ E fc "error reading \{fn}: \{show err}"
+        let libfn = dname ++ "/" ++ baseFn
+        Left _ <- liftIO {M} $ readFile libfn | Right src => pure (libfn,src)
+        throwError $ E fc "error reading \{fn}: \{show err}"
 
 writeScheme : String → M Unit
 writeScheme fn = do
@@ -55,14 +57,6 @@ writeJS fn = do
   (Right _) <- liftIO {M} $ writeFile fn src
     | Left err => throwError $ E (MkFC fn $ MkBounds 0 0 0 0) err
   pure MkUnit
-
--- unwind the module part of the path name
-baseDir : SnocList String -> SnocList String -> Either String String
-baseDir dirs Lin = Right $ joinBy "/" (dirs <>> Nil)
-baseDir (dirs :< d) (ns :< n) = if d == n
-  then baseDir dirs ns
-  else Left "module path doesn't match directory"
-baseDir Lin _ = Left "module path doesn't match directory"
 
 showErrors : String -> String -> M Unit
 showErrors fn src = do
