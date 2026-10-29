@@ -103,7 +103,7 @@ getHoverInfo repo modns row col = do
 
     let (Left _) = partialParse "" parseImport emptyMap toks
       | Right ((MkImport _ (fc, nm)), _, _) => do
-        let (baseDir, _) = splitFileName fc.file
+        -- FIXME - doesn't work with stuff in NEWT_LIB
         let fc = MkFC ("\{repo.baseDir}/\{joinBy "/" (split nm ".")}.newt") (MkBounds 0 0 0 0)
         pure $ HasHover fc "module \{nm}"
     putStrLn "Hover name is \{show name}"

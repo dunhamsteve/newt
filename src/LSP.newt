@@ -70,7 +70,7 @@ lspFileSource = do
     (Left err) <- liftIO {M} $ readFile fn' | Right src => pure (fn,src)
     Just dname <- liftIO {M} $ getEnvVar "NEWT_LIB" | _ => throwError $ E fc "error reading \{fn}: \{show err}"
     let libfn = dname ++ "/" ++ baseFn
-    Left _ <- liftIO {M} $ readFile libfn | Right src => pure (libfn,src)
+    Left _ <- liftIO {M} $ readFile libfn | Right src => pure ("file://\{libfn}",src)
     throwError $ E fc "error reading \{fn}: \{show err}"
 
 -- load fn and run M in state

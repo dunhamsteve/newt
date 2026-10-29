@@ -1,4 +1,5 @@
 SRCS=$(shell find src -name "*.newt")
+export NEWT_LIB=lib
 
 .PHONY:
 
