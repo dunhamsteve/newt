@@ -31,7 +31,7 @@ getExplictNames acc _ = acc <>> Nil
 deriveEq : FC → Raw → Tm → M (List Decl)
 deriveEq fc raw target = do
   top <- getTop
-  let (a,b) = splitApp target
+  let (a,b) = splitAppExplicit target
   let (Ref _ (QN _ name)) = a
     | _ => throwError $ E fc "\{show target} is not a type constructor application"
   let (Just (MkEntry fc q qname type (TCon _ names) eflags)) = lookupRaw name top
@@ -80,7 +80,7 @@ deriveEq fc raw target = do
 deriveOrd : FC → Raw → Tm → M (List Decl)
 deriveOrd fc raw target = do
   top <- getTop
-  let (a,b) = splitApp target
+  let (a,b) = splitAppExplicit target
   let (Ref _ (QN _ name)) = a
     | _ => throwError $ E fc "\{show target} is not a type constructor application"
   let (Just (MkEntry fc q qname type (TCon _ names) eflags)) = lookupRaw name top
@@ -160,7 +160,7 @@ deriveOrd fc raw target = do
 deriveShow : FC → Raw → Tm → M (List Decl)
 deriveShow fc raw target = do
   top <- getTop
-  let (a,b) = splitApp target
+  let (a,b) = splitAppExplicit target
   let (Ref _ (QN _ name)) = a
     | _ => throwError $ E fc "\{show target} is not a type constructor application"
   let (Just (MkEntry fc q qname type (TCon _ names) eflags)) = lookupRaw name top

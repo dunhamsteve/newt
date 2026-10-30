@@ -35,7 +35,7 @@ data Tm : U where
   Bnd : FC -> Int -> Tm
   -- Maybe Def here instead of Maybe Tm, we'll have DCon, TCon, etc.
   Ref : FC -> QName -> Tm
-  Meta : FC -> QName -> Tm
+  Meta : FC -> QName -> Nat -> Tm
   -- do we need type here?
   Lam : FC → BindInfo Unit → Tm → Tm
   App : FC -> Tm -> Tm -> Quant -> Tm
@@ -57,7 +57,7 @@ instance HasFC Tm where
   getFC (Force fc _) = fc
   getFC (Delay fc _) = fc
   getFC (Ref fc str) = fc
-  getFC (Meta fc k) = fc
+  getFC (Meta fc k _) = fc
   getFC (Lam fc _ t) = fc
   getFC (App fc t u _) = fc
   getFC (UU fc) = fc
@@ -77,7 +77,7 @@ instance Show Tm where
   show (Ref _ str) = "(Ref \{show str})"
   show (Lam _ (BI fc nm icit rig _) t) = "(\\ \{show rig}\{nm}  => \{show  t})"
   show (App _ t u _) = "(\{show t} \{show u})"
-  show (Meta _ i) = "(Meta \{show i})"
+  show (Meta _ i _) = "(Meta \{show i})"
   show (Lit _ l) = "(Lit \{show l})"
   show (UU _) = "U"
   show (Pi _ (BI _ str Explicit rig t) u) = "(Pi (\{show rig}\{str} : \{show t}) => \{show u})"
@@ -121,11 +121,15 @@ pprint' p names (Force _ t) = text "%force" <+> pprint' p names t
 pprint' p names (Delay _ t) = parens 0 p $ text "%delay" <+> pprint' 0 names t
 pprint' p names (Ref _ qn) = text $ show qn
 pprint' p names (Ref _ (QN qns baseName)) = text baseName
-pprint' p names (Meta _ (QN qns baseName)) = text "?\{baseName}"
+pprint' p names (Meta _ (QN qns baseName) _) = text "?\{baseName}"
 pprint' p names (Lam _ (BI _ nm icit quant _) t) = parens 0 p $ nest 2 $ text "\\ \{show quant}\{nm} =>" <+/> pprint' 0 (nm :: names) t
--- TODO would be nice to make Meta app prettier, we could funArgs it, but might not be able
--- to drop them because we do want to show if the meta is applied to _extra_ args
-pprint' p names (App _ t u _) = parens 0 p $ pprint' 0 names t <+> pprint' 1 names u
+pprint' p names tm@(App _ t _ _) = parens 0 p $ go tm
+  where
+    -- FIXME? We don't have implicit/explicit at this level
+    go : Tm → Doc
+    go (App _ t u quant) = go t <+> pprint' 1 names u
+    go tm = pprint' 1 names tm
+
 pprint' p names (UU _) = text "U"
 pprint' p names (Pi _ (BI _ nm Auto rig t) u) = parens 0 p $
   text "{{" ++ text (show rig) <+> text nm <+> text ":" <+> pprint' 0 names t <+> text "}}" <+> text "->" <+> pprint' 0 (nm :: names) u
@@ -169,7 +173,7 @@ data Val : U where
   VVar : FC -> (nm : String) -> (k : Int) -> (sp : VSpine) -> Val
   VRef : FC -> (nm : QName) -> (sp : VSpine) -> Val
   VCase : FC -> (sc : Val) -> Env -> List CaseAlt -> Val
-  VMeta : FC -> QName -> (sp : VSpine) -> Val
+  VMeta : FC → QName → Nat → (sp : VSpine) → Val
   VLam : FC → BindInfo Unit → (b : Closure) → Val
   VPi : FC → BindInfo Val → (b : Closure) → Val
   -- not substing let, like idris
@@ -192,7 +196,7 @@ getValFC (VForce fc _) = fc
 getValFC (VDelay fc _) = fc
 getValFC (VRef fc _ _) = fc
 getValFC (VCase fc _ _ _) = fc
-getValFC (VMeta fc _ _) = fc
+getValFC (VMeta fc _ _ _) = fc
 getValFC (VLam fc _ _) = fc
 getValFC (VPi fc _ b) = fc
 getValFC (VU fc) = fc
@@ -205,14 +209,20 @@ instance HasFC Val where getFC = getValFC
 
 showClosure : Closure → String
 
+instance Show Val
+
+showVSpine : VSpine → String
+showVSpine sp = unwords $ map show $ map fst (sp <>> Nil)
+
 instance Show Val where
   show (VVar _ nm k Lin) = "\{show nm}:\{show k}"
   show (VForce _ t) = "(%force \{show t})"
   show (VDelay _ t) = "(%delay \{show t})"
-  show (VVar _ nm k sp) = "(\{show nm}:\{show k} \{unwords $ map show $ map fst (sp <>> Nil)})"
+  show (VVar _ nm k sp) = "(\{show nm}:\{show k} \{showVSpine sp})"
   show (VRef _ nm Lin) = show nm
-  show (VRef _ nm sp) = "(\{show nm} \{unwords $ map show $ map fst (sp <>> Nil)})"
-  show (VMeta _ ix sp) = "(%meta \{show ix} [\{show $ snoclen sp} sp])"
+  show (VRef _ nm sp) = "(\{show nm} \{showVSpine sp})"
+  show (VMeta _ ix arity Lin) = show ix
+  show (VMeta _ ix arity sp) = "(\{show ix} \{unwords $ map show $ map fst $ drop arity (sp <>> Nil)})"
   show (VLam fc (BI _ str icit quant _) x) = "(%lam \{show quant}\{str} \{showClosure x})"
   show (VPi fc (BI fc str Implicit rig x) y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{showClosure  y})"
   show (VPi fc (BI fc str Explicit rig x) y) = "(%pi (\{show rig} \{str} : \{show  x}). \{showClosure  y})"

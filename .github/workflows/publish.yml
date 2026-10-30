@@ -39,6 +39,7 @@ jobs:
       - name: build todomvc
         run: |
           cd todomvc
+          export NEWT_LIB=../lib
           node ../build/newt.js src/Todo.newt -o app.js
           vite build --base /todomvc --outDir ../playground/dist/todomvc
       - name: Upload playground

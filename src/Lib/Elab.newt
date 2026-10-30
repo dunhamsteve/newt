@@ -52,7 +52,7 @@ lookupDef ctx name = go 0 ctx.types ctx.env
 
 -- get metas referenced in a term
 getTMetas : Tm → List QName
-getTMetas (Meta _ nm) = [nm]
+getTMetas (Meta _ nm _) = [nm]
 getTMetas (App _ t u q) = getTMetas t ++ getTMetas u
 getTMetas (Pi fc (BI _ _ _ _ a) b) = getTMetas a ++ getTMetas b
 getTMetas (Lam _ _ sc) = getTMetas sc
@@ -70,7 +70,7 @@ getTMetas _ = Nil
 
 -- get metas referenced in a value
 getMetas : Val → List QName
-getMetas (VMeta _ ix sp) = [ix]
+getMetas (VMeta _ ix _ sp) = [ix]
 getMetas (VVar _ nm k sp) = join $ map (getMetas ∘ fst) (sp <>> Nil)
 getMetas (VRef _ nm sp) = join $ map (getMetas ∘ fst) (sp <>> Nil)
 getMetas (VPi _ (BI _ _ _ _ a) (MkClosure _ b)) = getMetas a ++ getTMetas b
@@ -276,7 +276,7 @@ checkAutos ix (cand :: rest) = do
   where
     checkMeta : SnocList (Val × Quant) → Bool
     checkMeta Lin = False
-    checkMeta (sp :< (VMeta _ nm _, _)) = if nm == ix then True else checkMeta sp
+    checkMeta (sp :< (VMeta _ nm _ _, _)) = if nm == ix then True else checkMeta sp
     checkMeta (sp :< _) = checkMeta sp
 
 checkAutos ix (_ :: rest) = checkAutos ix rest
@@ -344,7 +344,7 @@ rename meta Absent ren lvl v@(VRef fc nm sp) = do
 rename meta mark ren lvl (VRef fc nm sp) = do
   -- FIXME lookup quantity of VRef (if mark absent) - we should keep this on the VRef..
   renameSpine meta mark ren lvl (Ref fc nm) sp
-rename meta mark ren lvl (VMeta fc ix sp) = do
+rename meta mark ren lvl (VMeta fc ix size sp) = do
   -- So sometimes we have an unsolved meta in here which reference vars out of scope.
   debug "rename Meta \{show ix} spine \{show sp}"
   if ix == meta
@@ -359,7 +359,7 @@ rename meta mark ren lvl (VMeta fc ix sp) = do
           rename meta mark ren lvl val'
         _ => do
           debug "rename: \{show ix} is unsolved"
-          catchError (renameSpine meta mark ren lvl (Meta fc ix) sp) (\err => throwError $ Postpone fc (errorMsg err))
+          catchError (renameSpine meta mark ren lvl (Meta fc ix size) sp) (\err => throwError $ Postpone fc (errorMsg err))
 rename meta mark ren lvl (VLam fc info t) = do
   tapp <- t $$ VVar fc info.biName lvl Lin
   scope <- rename meta mark ((lvl, info.biQuant) :: ren) (1 + lvl) tapp
@@ -415,7 +415,7 @@ solve env m sp t = do
       debug "meta \{show m} (\{show ix}) applied to \{show $ snoclen sp} args instead of \{show size}"
       debug "CONSTRAINT \{show ix} \{show sp} =?= \{show t}"
       -- FC might depend on which direction the solution occurred in?
-      addConstraint env metaFC (VMeta (getFC t) m sp) t
+      addConstraint env metaFC (VMeta (getFC t) m size sp) t
   let l = length' env
   debug "meta \{show meta}"
 
@@ -423,7 +423,7 @@ solve env m sp t = do
   Right ren <- tryError $ invert l sp
     | Left err => do
         debug "postpone constraint \{show err}"
-        addConstraint env (getFC t) (VMeta (getFC t) m sp) t
+        addConstraint env (getFC t) (VMeta (getFC t) m size sp) t
   catchError (do
     tm <- rename m ctx.marker ren l t
     let tm = lams (snoclen sp) (reverse ctx.boundNames) tm
@@ -459,7 +459,7 @@ solve env m sp t = do
     (\case
       Postpone fc msg => do
         debug "CONSTRAINT2 \{show ix} \{show sp} =?= \{show t}"
-        addConstraint env fc (VMeta fc m sp) t
+        addConstraint env fc (VMeta fc m size sp) t
       err => throwError (E (getFC err) "\{errorMsg err} for \{show ix} \{show sp} =?= \{show t}")
     )
   where
@@ -469,7 +469,7 @@ solve env m sp t = do
 -- check if we're stuck on a meta and throw a postpone
 -- TODO we may need to wire this into more places in unfication, but I need test cases
 checkPostpone : FC → Val → M Unit
-checkPostpone fc (VCase _ (VMeta _ qn sp) _ _) = throwError $ Postpone fc "postponed stuck meta \{show qn}"
+checkPostpone fc (VCase _ (VMeta _ qn _ sp) _ _) = throwError $ Postpone fc "postponed stuck meta \{show qn}"
 checkPostpone fc _ = return MkUnit
 
 unifySpine : Env -> UnifyMode -> SnocList (Val × Quant) -> SnocList (Val × Quant) -> M UnifyResult
@@ -623,14 +623,14 @@ unify env mode t u = do
 
     unifyMeta : Val -> Val -> M UnifyResult
     -- flex/flex
-    unifyMeta t@(VMeta fc k sp) t'@(VMeta fc' k' sp') =
+    unifyMeta t@(VMeta fc k _ sp) t'@(VMeta fc' k' _ sp') =
       if k == k' then unifySpine env mode sp sp'
       -- TODO, might want to try the other way, too.
       else if snoclen sp < snoclen sp'
-        then solve' env k' sp' (VMeta fc k sp) >> pure neutral
-        else solve' env k sp (VMeta fc' k' sp') >> pure neutral
-    unifyMeta t (VMeta fc' i' sp') = solve env i' sp' t >> pure neutral
-    unifyMeta (VMeta fc i sp) t' = solve env i sp t' >> pure neutral
+        then solve' env k' sp' t >> pure neutral
+        else solve' env k sp t' >> pure neutral
+    unifyMeta t (VMeta fc' i' _ sp') = solve env i' sp' t >> pure neutral
+    unifyMeta (VMeta fc i _ sp) t' = solve env i sp t' >> pure neutral
     unifyMeta t v = unifyLam t v
 
     unifyPattern : Val -> Val -> M UnifyResult
@@ -683,12 +683,13 @@ freshMeta ctx fc ty kind = do
       _ => return MkUnit
     else pure MkUnit
 
+  let size = length $ filter (\x => x == Bound) ctx.bds
   -- I tried checking Auto immediately if CheckAll, but there isn't enough information yet.
-  pure $ applyBDs 0 (Meta fc qn) ctx.bds ctx.types
+  pure $ applyBDs 0 (Meta fc qn size) ctx.bds ctx.types
   where
     checkAuto : SnocList (Val × Quant) → Bool
     checkAuto Lin = True
-    checkAuto (sp :< (VMeta _ nm _, q)) = False
+    checkAuto (sp :< (VMeta _ nm _ _, q)) = False
     checkAuto (sp :< _) = checkAuto sp
 
     applyBDs : Int -> Tm -> List BD -> List (BindInfo Val) -> Tm
@@ -1406,7 +1407,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
   scty' <- eval ctx.env tmp
   scty' <- forceType ctx.env scty'
   scty' <- case scty' of
-    (VMeta fc1 ix sp) => do
+    (VMeta fc1 ix _ sp) => do
       meta <- lookupMeta ix
       case meta of
         (Solved _ k t) => forceType ctx.env scty'
@@ -1683,7 +1684,7 @@ check ctx tm ty = do
               else
                 error fc "Icity issue checking \{show t} at \{show ty}"
     -- Unify unsolved metas with appropriate Pi of metas
-    (t@(RLam fc info@(BI nmFC nm icit quant mty) tm), tty@(VMeta _ _ _)) => do
+    (t@(RLam fc info@(BI nmFC nm icit quant mty) tm), tty@(VMeta _ _ _ _)) => do
         debug "unify PI for \{show tty} at \{show $ getFC tty}"
         a <- maybeType nmFC ctx mty
         let ctx' = extend ctx (BI fc nm icit quant a)

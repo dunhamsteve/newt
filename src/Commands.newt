@@ -405,7 +405,7 @@ filterType exp cand = go exp (fst $ splitTele cand)
     go (App _ t u _) (App _ t' u' _) = if go t t' then go u u' else False
     -- needed when we have say IO ?m10, but has the side effect of allowing anything
     -- If we're looking at an unsolved meta. (The do blocks are full of them.)
-    go (Meta _ _) _ = True
+    go (Meta _ _ _ ) _ = True
     -- Log when we get other stuff, so I can sort out how this function should work
     go x y = case x of
       (App _ _ _ _) => False

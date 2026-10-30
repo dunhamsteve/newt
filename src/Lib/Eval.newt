@@ -23,7 +23,7 @@ vapp (VLam _ _ t) u q = t $$ u
 vapp (VPi _ _ t) u q = t $$ u
 vapp (VVar fc nm k sp) u q = pure $ VVar fc nm k (sp :< (u,q))
 vapp (VRef fc nm sp) u q = pure $ VRef fc nm (sp :< (u,q))
-vapp (VMeta fc k sp) u q = pure $ VMeta fc k (sp :< (u,q))
+vapp (VMeta fc k sz sp) u q = pure $ VMeta fc k sz (sp :< (u,q))
 -- Used for inlining, remove after it gets a separate eval
 vapp (VCase fc sc env [CaseCons nm args tm]) u q = do
   let env' = mkenv (length' env) env args
@@ -110,11 +110,11 @@ tryEval _ _ = pure Nothing
 -- Force far enough to compare types
 
 forceType : Env -> Val -> M Val
-forceType env (VMeta fc ix sp) = do
+forceType env tm@(VMeta fc ix sz sp) = do
   meta <- lookupMeta ix
   case meta of
     (Solved _ k t) => vappSpine t sp >>= forceType env
-    _ => pure (VMeta fc ix sp)
+    _ => pure tm
 
 forceType env x = do
   Just x' <- tryEval env x
@@ -172,11 +172,11 @@ eval env (App _ t u q) = do
   vapp t' u' q
 eval env (UU fc) = pure (VU fc)
 eval env (Erased fc) = pure (VErased fc)
-eval env (Meta fc i) = do
+eval env (Meta fc i sz) = do
   meta <- lookupMeta i
   case meta of
         (Solved _ k t) => pure $ t
-        _ => pure $ VMeta fc i Lin
+        _ => pure $ VMeta fc i sz Lin
 eval env (Lam fc info t) = pure $ VLam fc info (MkClosure env t)
 eval env (Pi fc info b) = do
   info' <- traverse (eval env) info
@@ -243,11 +243,11 @@ quote l (VVar fc nm k sp) = if k < l
   else error fc "Bad level in quote \{nm}:\{show k} depth \{show l}"
 quote l (VForce fc t) = Force fc <$> quote l t
 quote l (VDelay fc t) = Delay fc <$> quote l t
-quote l (VMeta fc i sp) = do
+quote l (VMeta fc i sz sp) = do
   meta <- lookupMeta i
   case meta of
         (Solved _ k t) => vappSpine t sp >>= quote l
-        _ => quoteSp l (Meta fc i) sp
+        _ => quoteSp l (Meta fc i sz) sp
 quote l (VLam fc info t) = do
   val <- t $$ VVar fc info.biName l Lin
   tm <- quote (1 + l) val
@@ -280,11 +280,11 @@ quote l (VLit fc lit) = pure $ Lit fc lit
 quote l (VErased fc) = pure $ Erased fc
 
 forceMeta : Val -> M Val
-forceMeta (VMeta fc ix sp) = do
+forceMeta tm@(VMeta fc ix sz sp) = do
   meta <- lookupMeta ix
   case meta of
     (Solved _ k t) => vappSpine t sp >>= forceMeta
-    _ => pure (VMeta fc ix sp)
+    _ => pure tm
 forceMeta x = pure x
 
 -- Can we assume closed terms?
@@ -333,7 +333,7 @@ tweakFC fc (Force _ t) = Force fc t
 tweakFC fc (Delay _ t) = Delay fc t
 tweakFC fc (Ref fc1 nm) = Ref fc nm
 tweakFC fc (UU fc1) = UU fc
-tweakFC fc (Meta fc1 k) = Meta fc k
+tweakFC fc (Meta fc1 k sz) = Meta fc k sz
 tweakFC fc (Lam fc1 info t) = Lam fc info t
 tweakFC fc (App fc1 t u q) = App fc t u q
 tweakFC fc (Pi fc1 info u) = Pi fc info u
@@ -358,7 +358,7 @@ zonkApp : TopContext -> Int -> Env -> Tm -> List (Tm × Quant) -> M Tm
 -- skipping these gains us 2.5% time
 zonkApp top l env (App fc t u Zero) sp = zonkApp top l env t ((Erased fc, Zero):: sp)
 zonkApp top l env (App fc t u q) sp = zonkApp top l env t ((u, q):: sp)
-zonkApp top l env t@(Meta fc k) sp = do
+zonkApp top l env t@(Meta fc k sz) sp = do
   meta <- lookupMeta k
   case meta of
     (Solved _ j v) => do
@@ -423,7 +423,7 @@ zonkAlt top l env (CaseCons name args t) = CaseCons name args <$> go l env args 
 
 zonk top l env t =
   case t of
-  (Meta fc k) => zonkApp top l env t Nil
+  (Meta fc k sz) => zonkApp top l env t Nil
   (Force fc t) => Force fc <$> zonk top l env t
   (Delay fc t) => Delay fc <$> zonk top l env t
   (Lam fc info u) =>

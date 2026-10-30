@@ -437,7 +437,7 @@ populateConInfo entries =
 
     isSucc : TopEntry → Bool
     isSucc entry@(MkEntry fc _ nm dty@(Pi _ _ b) (DCon _ _ _ hn) _)  = case runtimeFields dty of
-      ([a],b) => case (splitApp a, splitApp b) of
+      ([a],b) => case (splitAppExplicit a, splitAppExplicit b) of
         ((Ref _ a, _), (Ref _ b, _)) => a == b
         (a,b) => False
       _ => False

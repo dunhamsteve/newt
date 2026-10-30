@@ -32,7 +32,7 @@ ERROR at tests/ConstraintErr.newt:14:17--14:21: Unsolved meta ConstraintErr.$m10
   foo = (1 +) <$> pure
                   ^^^^
 
-ERROR at tests/ConstraintErr.newt:14:17--14:21: Constraint: (%meta ConstraintErr.$m9 [1 sp]) =?= (Prelude.IORes (%meta ConstraintErr.$m5 [0 sp])) deps [ConstraintErr.$m9]
+ERROR at tests/ConstraintErr.newt:14:17--14:21: Constraint: (ConstraintErr.$m9 ConstraintErr.$m11) =?= (Prelude.IORes ConstraintErr.$m5) deps [ConstraintErr.$m9]
   
   foo : IO Int
   foo = (1 +) <$> pure
