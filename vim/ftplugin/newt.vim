@@ -29,6 +29,8 @@ inoremap <buffer> \]]  ⟧
 inoremap <buffer> \circ ∘
 inoremap <buffer> \cuL ⌈
 inoremap <buffer> \cuR ⌉
+inoremap <buffer> \< ⟨
+inoremap <buffer> \> ⟩
 
 " Sets and Types
 inoremap <buffer> \bN  ℕ
