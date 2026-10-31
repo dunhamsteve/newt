@@ -1223,6 +1223,7 @@ checkDone fc ctx Nil (Just body) ty = do
 checkDone fc ctx (PC x (PatWild pvfc icit) :: xs) body ty = do
   scty <- levelType ctx x
   addInfo $ CaseSplit pvfc ctx x scty
+  addTypeInfo pvfc "_" ctx.env scty pvfc
   checkDone fc ctx xs body ty
 checkDone fc ctx (PC nm (PatVar pvfc _ nm') :: xs) body ty = do
   scty <- levelType ctx nm
@@ -1584,7 +1585,8 @@ updateRec ctx fc clauses arg ty = do
 
     collect : Raw → Tm → List (String × Raw)
     -- emptyFC - we don't want this to show up for type at point
-    collect arg (Pi _ (BI _ nm _ _ a) b) = (nm, RApp fc (RVar emptyFC $ "." ++ nm) arg Explicit) :: collect arg b
+    collect arg (Pi _ (BI _ nm Explicit _ a) b) = (nm, RApp fc (RVar emptyFC $ "." ++ nm) arg Explicit) :: collect arg b
+    collect arg (Pi _ (BI _ nm _ _ a) b) = collect arg b
     collect _ _ = Nil
 
     getTele : Maybe Raw → Val → M (QName × List (String × Raw))

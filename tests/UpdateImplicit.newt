@@ -1,0 +1,11 @@
+module UpdateImplicit
+
+import Prelude
+
+record Foo a where
+  blah : Int
+  bar : a
+
+foo : ∀ a. Foo a → Int → Foo a
+foo rec x = { blah := x } rec
+

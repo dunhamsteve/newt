@@ -1,9 +1,12 @@
 
 ## TODO
 
+A poorly maintained list of todo items, as ideas for what to work on next.
+
+
 - [x] Expected `in` at EOF should point to EOF
-- [ ] Check scope for conflicts on rename? (i.e. new name is already in _local_ scope)
-- [ ] Fix "`.a` not in scope" for record update, if record has an implicit arg
+- [ ] Check scope for conflicts on rename? (i.e. if the new name is already in _local_ scope)
+- [x] Fix "`.a` not in scope" for record update, if record has an implicit arg
   - Maybe rework as a case statement, otherwise we inline a bunch of case statements
   - need a bunch of fresh nams, since we're generating raw code
   - or just skip the implicits...
@@ -16,13 +19,14 @@
 - [ ] Build single name map on import
   - Check performance - cost to build the map vs not walking $n$ maps
   - This will likely be needed for qualified / partial imports
-  - [ ] Add `public` keyword
+- [ ] Add `public` keyword for exported declarations
 - [ ] use a worker for lsp to accumulate / debounce requests while newt is processing the previous one.
 - [ ] virtual FC
   - We're starting to hit issues where e.g. we want an FC for errors (auto solution) but not for type at point, etc. Currently, I'm stuffing a `$` in front of the name in one of those cases as a temporary hack. 
 - [ ] Elaboration of `RUpdate` inserts name info records for synthesized code
   - We maybe should kill the FC on those (or mark them as FC for errors only)
   - Also double check that we don't treat emptyFC as valid for rename, etc.
+  - In general, we may need something like "virtual FC" in Idris, that are used for errors only.
 - [ ] code formatter
   - [ ] consider moving caselet, operator, paren, `$`, etc. desugaring out of the parser
   - comments stored aside (location, whether it is a tail or standalone) and re-integrated
@@ -45,6 +49,7 @@
   - We can do lookup for Axiom via helper
   - This was about 40ms saved, not worth the complexity
   - There was some lookup of DCon (from list on TCon) in case building and Defs for getEntries
+  - Or just the type of the name (with arity?)
 - [ ] Improve handling of names:
   - We need FC on names in a lot of places
   - [x] FC for duplicate `data`, `record`, `class` name is wrong (points to `data`)
@@ -220,6 +225,7 @@
 ### Misc
 
 - [x] Put worker in iframe on safari
+- [ ] `Tm` doesn't have implicit/explicit and can't be resugared
 - [ ] Warnings or errors for missing definitions (e.g. on `Axiom` in codegen)
 - [ ] literals for double
 - [ ] add unit test framework
@@ -259,6 +265,7 @@
   - I should have read this at the beginning. It looks like it has a lot of the approach taken in elaboration zoo, and adds inductive types - which I guessed at.
 - [ ] Finish reading dynamic pattern unification paper to see what is missing/wrong with the current implementation
 - [ ] Read "Unifiers as Equivalences" has unification with types.  Look into adapting some of that (or at least read/understand it).  Indexed types are mentioned here.
+- [ ] Figure out what SOGATs are
 
 ### Error Messages
 
