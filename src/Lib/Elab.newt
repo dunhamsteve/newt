@@ -482,6 +482,7 @@ unify env mode t u = do
   debug "Unify lvl \{show $ length env}"
   debug "  \{show t}"
   debug "  =?= \{show u}"
+  -- forceMeta instead of forceType, so we don't unfold too early
   t' <- forceMeta t
   u' <- forceMeta u
   debug "forced \{show t'}"
@@ -1635,7 +1636,7 @@ check ctx tm ty = do
           vscty <- eval ctx.env scty
           sc <- check ctx rsc vscty
           pure (sc, vscty)
-      scty <- forceMeta scty
+      scty <- forceType ctx.env scty
       debug "SCTM \{rpprint (names ctx) sc}"
       debug "SCTY \{show scty}"
 

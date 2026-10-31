@@ -345,7 +345,7 @@ introActions (Just $ Unsolved fc qn ctx vty User) =
   catchError (do
     -- Are there ever any constraints?
     top <- getTop
-    vty <- forceMeta vty
+    vty <- forceType ctx.env vty
     let row = fc.bnds.startLine
     let lines = split top.currentMod.modSource "\n"
     let line = fromMaybe "" (getAt' row lines)
