@@ -412,10 +412,11 @@ solve env m sp t = do
   let (True) = snoclen sp == size
     | _ => do
       let l = length' env
+      let meta = VMeta (getFC t) m size sp
       debug "meta \{show m} (\{show ix}) applied to \{show $ snoclen sp} args instead of \{show size}"
-      debug "CONSTRAINT \{show ix} \{show sp} =?= \{show t}"
+      debug "CONSTRAINT \{show meta} =?= \{show t}"
       -- FC might depend on which direction the solution occurred in?
-      addConstraint env metaFC (VMeta (getFC t) m size sp) t
+      addConstraint env metaFC meta t
   let l = length' env
   debug "meta \{show meta}"
 
