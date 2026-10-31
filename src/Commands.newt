@@ -142,7 +142,7 @@ getUnused = do
     addDef : SortedMap FC TypeInfo → TypeInfo → SortedMap FC TypeInfo
     addDef map info@(MkTypeInfo fc nm _ _ fc') =
       -- TODO filter out globals instead of column 0, to catch DCon, etc
-      if fc == fc' && fc.bnds.startCol /= 0 && not (internalName nm)
+      if fc == fc' && fc.bnds.startCol /= 0 && not (internalName nm) && nm /= "_"
       then updateMap fc info map else map
 
     removeDef : SortedMap FC TypeInfo → TypeInfo → SortedMap FC TypeInfo
