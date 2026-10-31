@@ -54,8 +54,17 @@ state = unsafePerformIO $ newIORef $ MkLSPState emptyTop "" emptyMap
 
 resetState : String → IO Unit
 resetState base = do
+    False <- checkLib | _ => putStrLn "Don't reset base to \{base}"
     putStrLn "Reset base to \{base}"
     writeIORef state $ MkLSPState emptyTop base emptyMap
+    where
+      checkLib : IO Bool
+      checkLib = do
+        lib <- getEnvVar "NEWT_LIB"
+        case lib of
+          Just nm => pure $ base == nm || base == "file://" ++ nm
+          Nothing => pure False
+
 
 lspFileSource : IO FileSource
 lspFileSource = do
