@@ -33,10 +33,10 @@ data Expr : ∀ n. Vect n Ty → Ty → U where
   App : ∀ n a t. {0 ctxt : Vect n Ty} → Expr ctxt (TyFun a t) → Expr ctxt a → Expr ctxt t
   Op  : ∀ a b c n. {0 ctxt : Vect n Ty} → (interpTy a → interpTy b → interpTy c) →
         Expr ctxt a → Expr ctxt b → Expr ctxt c
-  -- TODO Idris has Lazy on the arms, should work if we explicitly force
+  -- eval is infinite if the arms are not lazy
   If  : ∀ n a. {0 ctxt : Vect n Ty} → Expr ctxt TyBool →
-        (Expr ctxt a) →
-        (Expr ctxt a) → Expr ctxt a
+        Lazy (Expr ctxt a) →
+        Lazy (Expr ctxt a) → Expr ctxt a
 
 infixr 4 _:::_
 data Env : ∀ n. Vect n Ty → U where
@@ -66,7 +66,6 @@ fact = Lam (If (Op _==_ (Var Stop) (Val 0))
                (Op _*_ (App fact (Op _-_ (Var Stop) (Val 1)))
                        (Var Stop)))
 
--- main : IO Unit
--- main = do putStr "Enter a number: "
---           Right x <- readLine | _ => putStrLn "EOF"
---           printLn (interp Empty fact (stringToInt x))
+main : IO Unit
+main = printLn $ interp Empty fact 5
+

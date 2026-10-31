@@ -91,7 +91,7 @@ addHint qn = do
   case lookup qn top of
     Just entry => do
       let (Just tyname) = typeName entry.type
-        | Nothing => error entry.fc "can't find tcon name for \{show qn}"
+        | Nothing => error entry.fc "can't find tcon name for \{show qn} type \{show entry.type}"
       let xs = fromMaybe Nil $ lookupMap' tyname top.hints
       let hints = updateMap tyname ((qn, entry.type) :: xs) top.hints
       modifyTop { hints := hints }

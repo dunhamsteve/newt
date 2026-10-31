@@ -1,18 +1,12 @@
 module WellTyped
 
 -- Idris2's "Well Typed Interpreter" example
--- This is a little painful for lack of overloading.
--- I can add idris/haskell style sections.
--- This is revealing some issues. :/
 
--- I had to put {0 ctxt : Vect n Ty} →  in manually, the `∀ ctxt` wasn't inferring the type.
--- This may be because we have `n`, which becomes a parameter when do it manually.
--- That would explain why Idris adds those...
+-- https://idris2.readthedocs.io/en/latest/tutorial/interp.html
 
 import Prelude
 import Data.Vect
 import Data.Fin
-import Node
 
 data Ty = TyInt | TyBool | TyFun Ty Ty
 
@@ -32,10 +26,10 @@ data Expr : ∀ n. Vect n Ty → Ty → U where
   App : ∀ n a t. {0 ctxt : Vect n Ty} → Expr ctxt (TyFun a t) → Expr ctxt a → Expr ctxt t
   Op  : ∀ a b c n. {0 ctxt : Vect n Ty} → (interpTy a → interpTy b → interpTy c) →
         Expr ctxt a → Expr ctxt b → Expr ctxt c
-  -- TODO Idris has Lazy on the arms, should work if we explicitly force
+  -- Without the Lazy there is an infinite loop, because both branches are evaluated
   If  : ∀ n a. {0 ctxt : Vect n Ty} → Expr ctxt TyBool →
-        (Expr ctxt a) →
-        (Expr ctxt a) → Expr ctxt a
+        Lazy (Expr ctxt a) →
+        Lazy (Expr ctxt a) → Expr ctxt a
 
 infixr 4 _:::_
 data Env : ∀ n. Vect n Ty → U where
@@ -65,8 +59,17 @@ fact = Lam (If (Op _==_ (Var Stop) (Val 0))
                (Op _*_ (App fact (Op _-_ (Var Stop) (Val 1)))
                        (Var Stop)))
 
+-- We use prompt() because we don't have `readLine` on the web.
+pfunc prompt uses (MkIORes Left Right) : String → IO (Either String String) := `(msg) => (w) => {
+    let {readSync} = fs;
+    let value = prompt(msg)
+    if (value == null)
+    return Prelude_MkIORes(Prelude_Left("Canceled"));
+    return Prelude_MkIORes(Prelude_Right(value));
+}`
+
 main : IO Unit
-main = do putStr "Enter a number: "
-          Right x <- readLine | _ => putStrLn "EOF"
-          printLn (interp Empty fact (stringToInt x))
+main = do
+  Right x <- prompt "Enter a number:" | Left msg => putStrLn msg
+  printLn (interp Empty fact (stringToInt x))
 
