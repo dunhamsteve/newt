@@ -3,7 +3,7 @@
 
 A poorly maintained list of todo items, as ideas for what to work on next.
 
-
+- [ ] when playground compiler throws (e.g. process.env undefined) the user is not informed
 - [x] Expected `in` at EOF should point to EOF
 - [ ] Check scope for conflicts on rename? (i.e. if the new name is already in _local_ scope)
 - [x] Fix "`.a` not in scope" for record update, if record has an implicit arg
@@ -21,6 +21,7 @@ A poorly maintained list of todo items, as ideas for what to work on next.
   - This will likely be needed for qualified / partial imports
 - [ ] Add `public` keyword for exported declarations
 - [ ] use a worker for lsp to accumulate / debounce requests while newt is processing the previous one.
+- [ ] need something better than "Error in import Foo" for module not found at all
 - [ ] virtual FC
   - We're starting to hit issues where e.g. we want an FC for errors (auto solution) but not for type at point, etc. Currently, I'm stuffing a `$` in front of the name in one of those cases as a temporary hack. 
 - [ ] Elaboration of `RUpdate` inserts name info records for synthesized code

@@ -63,9 +63,18 @@ export interface Message<K extends keyof API> {
   args: Parameters<API[K]>;
 }
 
-export interface ResponseMSG<K extends keyof API> {
+export type ResponseMSG<K extends keyof API> = ResponseOK<K> | ResponseError
+
+export interface ResponseOK<K extends keyof API> {
   id: number;
+  kind: 'ok'
   result: Awaited<ReturnType<API[K]>>;
+}
+
+export interface ResponseError {
+  id: number
+  kind: 'error'
+  error: Error
 }
 
 type Suspense = {
@@ -82,8 +91,8 @@ export class IPC {
     this._postMessage = <K extends keyof API>(msg: Message<K>) =>
       newtWorker.postMessage(msg);
     // Safari/MobileSafari have small stacks in webworkers.
-    // But support for the frame needs to be fixed
-    if (navigator.vendor.includes("Apple") && false) {
+    // TODO But support for the frame needs to be fixed
+    if (navigator.vendor.includes("Apple FIXME")) {
       const workerFrame = document.createElement("iframe");
       workerFrame.src = "worker.html";
       workerFrame.style.display = "none";
@@ -101,11 +110,16 @@ export class IPC {
     // Maybe key off of type
     if (ev.data.id) {
       let suspense = this.callbacks[ev.data.id];
+      console.log("result", ev.data, "suspense", suspense);
       if (suspense) {
-        suspense.resolve(ev.data.result);
+        if (ev.data.kind === 'ok') {
+          suspense.resolve(ev.data.result);
+        } else {
+          console.log('ERROR', ev.data.error)
+          suspense.reject(ev.data.error)
+        }
         delete this.callbacks[ev.data.id];
       }
-      console.log("result", ev.data, "suspense", suspense);
     }
   }
   async sendMessage<K extends keyof API>(

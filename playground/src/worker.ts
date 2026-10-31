@@ -11,49 +11,51 @@ const LOG = console.log
 //   shim.stdout += "\n" + m;
 // };
 
-const invoke = <T extends (...args: any[]) => any>(fun:T, args: Parameters<T>): ReturnType<T> => {
+const invoke = <T extends (...args: any[]) => any>(fun: T, args: Parameters<T>): ReturnType<T> => {
   return fun.apply(undefined, args)
 }
 
 const api: API = {
-    // none of these are promises...
-    updateFile: LSP_updateFile,
-    typeCheck(filename) {
-        shim.stdout = "";
-        let diags = LSP_checkFile(filename);
-        let output = shim.stdout;
-        return { diags, output };
-    },
-    hoverInfo: LSP_hoverInfo,
-    codeActionInfo: LSP_codeActionInfo,
-    compile: (fn, lang) => {
-        if (lang == 'scheme') return LSP_compileToScheme(fn);
-        return LSP_compileJS(fn);
-    },
-    completions: (fn, row, col) => {
-        console.log('RUN', fn, row, col);
-        return LSP_completions(fn, row, col);
-    },
-    prepareRename: (filename: string, row: number, col: number): Range | null => {
-        return LSP_prepareRename(filename, row, col)
-    },
-    lspRename: function(filename: string, row: number, col: number, newName: string): WorkspaceEdit | null {
-      return LSP_lspRename(filename, row, col, newName);
-    }
+  // none of these are promises...
+  updateFile: LSP_updateFile,
+  typeCheck(filename) {
+    shim.stdout = "";
+    let diags = LSP_checkFile(filename);
+    let output = shim.stdout;
+    return { diags, output };
+  },
+  hoverInfo: LSP_hoverInfo,
+  codeActionInfo: LSP_codeActionInfo,
+  compile: (fn, lang) => {
+    if (lang == 'scheme') return LSP_compileToScheme(fn);
+    return LSP_compileJS(fn);
+  },
+  completions: (fn, row, col) => {
+    console.log('RUN', fn, row, col);
+    return LSP_completions(fn, row, col);
+  },
+  prepareRename: (filename: string, row: number, col: number): Range | null => {
+    return LSP_prepareRename(filename, row, col)
+  },
+  lspRename: function(filename: string, row: number, col: number, newName: string): WorkspaceEdit | null {
+    return LSP_lspRename(filename, row, col, newName);
+  }
 }
 
 const handleMessage = async function <K extends keyof API>(ev: { data: Message<K> }) {
   LOG("HANDLE", ev.data);
   await preload;
   shim.archive = archive;
+  let { id, key, args } = ev.data
   try {
     shim.stdout = ''
-    let {id, key, args} = ev.data
     let result = await invoke(api[key], args)
     LOG('got', result)
-    sendResponse<typeof key>({id, result})
+    sendResponse<typeof key>({ id, kind: 'ok', result })
   } catch (e) {
     console.error(e)
+    let error = e instanceof Error ? e : new Error('' + e)
+    sendResponse<typeof key>({ id, kind: 'error', error })
   }
   console.log(shim.stdout)
 

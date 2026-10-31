@@ -116,24 +116,6 @@ async function runOutput() {
   }
 }
 
-// deprecated, we're getting nothing from res.output now
-function setOutput(output: string) {
-  let lines = output.split("\n");
-  output = lines.filter((l) => !l.startsWith("TOP:")).join("\n");
-  let data = lines.find((l) => l.startsWith("TOP:"));
-  if (data) {
-    try {
-      topData = JSON.parse(data.slice(4));
-      console.log({ topData });
-    } catch (e) {
-      console.error(e);
-    }
-  } else {
-    topData = undefined;
-  }
-  state.output.value = output;
-}
-
 window.addEventListener("message", (ev) => {
   if (ev.data.id) return;
   console.log("window got", ev.data);
@@ -242,32 +224,32 @@ interface EditorProps {
 const language: EditorDelegate = {
   async getEntry(_, row, col) {
     let fileName = state.currentFile.value;
-    let res = await ipc.sendMessage("hoverInfo", [fileName, row, col]);
+    let res = await ipc.sendMessage("hoverInfo", [fileName, row, col]).catch(() => null);
     console.log("HOVER", res, "for", row, col);
     if (res == true) return null;
     return res || null;
   },
-  async prepareRename(row,col) {
+  async prepareRename(row, col) {
     let fileName = state.currentFile.value;
     let res = await ipc.sendMessage("prepareRename", [fileName, row, col]);
     console.log("PREPARE", res, "for", row, col);
-    return res ;
+    return res;
   },
-  async lspRename(row,col,newName) {
+  async lspRename(row, col, newName) {
     let fileName = state.currentFile.value;
     let res = await ipc.sendMessage("lspRename", [fileName, row, col, newName]);
     console.log("PREPARE", res, "for", row, col);
-    return res ;
+    return res;
   },
   async getCompletions(row, col) {
     let fileName = state.currentFile.value;
-    let res = await ipc.sendMessage("completions", [fileName, row, col]);
+    let res = await ipc.sendMessage("completions", [fileName, row, col]).catch(() => null);
     console.log("COMPLETE for", row, col, res);
     return res ?? null
   },
   async getActions(_, row, col) {
     let fileName = state.currentFile.value;
-    let res = await ipc.sendMessage("codeActionInfo", [fileName, row, col]);
+    let res = await ipc.sendMessage("codeActionInfo", [fileName, row, col]).catch(() => null);
     console.log("ACTIONS", res, "for", row, col);
     return res;
   },
@@ -317,12 +299,13 @@ const language: EditorDelegate = {
           message: marker.message,
         });
       }
-      setOutput(res.output);
+      state.output.value = res.output
       state.javascript.value = "";
       state.scheme.value = "";
       return diags;
     } catch (e) {
       console.log("ERR", e);
+      state.output.value = '' + e
     }
 
     return [];
@@ -386,7 +369,8 @@ function Result() {
   const text = state.output.value;
   const diags = state.diags.value;
   const showRange = (range: Range) => h('div', { className: 'range' }, `${range.start.line}:${range.start.character}--${range.end.line}:${range.end.character}`)
-  return h("div", { id: "result" }, ...diags.map(diag =>
+  const tdiv = text ? h("div", { className: "errorText" }, text) : null
+  return h("div", { id: "result" }, tdiv, ...diags.map(diag =>
     h("div", { className: 'diag' }, showRange(diag.range), diag.message)
   ));
 }
@@ -523,7 +507,7 @@ function EditWrap() {
       ),
       h('div', { onClick: toggleViMode, className: state.viMode.value ? 'vimon' : 'vimoff' }, "vi"),
       // Maybe add an "ESC" button, with preventDefault for mobile
-      h('div', { onMouseDown: doEscape, className: state.viMode.value ? 'vimon' : 'vimoff', style: {display: state.viMode.value ? 'block' : 'none'} }, "esc"),
+      h('div', { onMouseDown: doEscape, className: state.viMode.value ? 'vimon' : 'vimoff', style: { display: state.viMode.value ? 'block' : 'none' } }, "esc"),
       h('div', { className: 'fileName' }, state.currentFile.value),
       h("div", { style: { flex: "1 1" } }),
       h(

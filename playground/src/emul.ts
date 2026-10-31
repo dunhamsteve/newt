@@ -7,17 +7,17 @@ export interface Handle {
   buf: Uint8Array;
 }
 
-// Some of this was written for Idris and is not used by newt
 
 interface Process {
   argv: string[];
-  platform: string;
   exit(_: number): void;
+  env: Record<string,string>
+  // Used for Idris playground
+  platform: string;
   stdout: {
     write(s: string): unknown
   };
   cwd(): string;
-  env: Record<string,string>
   __lasterr: {errno: number}
 }
 export interface NodeShim {
@@ -57,10 +57,16 @@ export let shim: NodeShim = {
     }
   },
   process: {
+    env: {},
     argv: ["", ""],
     exit(v: number) {
       throw new Error(`exit ${v}`)
     },
+    // unused, make ts happy
+    platform: 'web',
+    __lasterr: { errno: 0 },
+    cwd: () => '.',
+    stdout: { write(s) { shim.stdout += s } },
   }
 };
 
@@ -73,4 +79,5 @@ declare global {
 }
 const requireStub: any = (x: string) => (shim as any)[x];
 self.require = requireStub;
-self.process = shim.process;
+self.process = shim.process as any; // typsecript is & Node.Process
+
