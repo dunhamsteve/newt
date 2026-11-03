@@ -1387,8 +1387,10 @@ buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ info
   -- REVIEW fc from a pat?
   vb <- b $$ VVar fc nm l Lin
   Lam fc (BI fc' nm icit q MkUnit) <$> buildTree ctx' (MkProb clauses vb)
-buildTree ctx prob@(MkProb ((MkClause fc cons pats@(x :: xs) expr) :: cs) ty) =
-  error fc "Extra pattern variables \{show pats}"
+buildTree ctx prob@(MkProb clauses@((MkClause fc cons pats@(x :: xs) expr) :: cs) ty) = do
+  -- If we run out of Pi's, we can unfold. Otherwise, I'd like to keep the goal type
+  ty'@(VPi _ _ _) <- forceType ctx.env ty | _ => error fc "Extra pattern variables \{show pats}"
+  buildTree ctx (MkProb clauses ty')
 -- need to find some name we can split in (x :: xs)
 -- so LHS of constraint is name (or VVar - if we do Val)
 -- then run the split
