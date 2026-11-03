@@ -1,0 +1,38 @@
+module LinearDec
+
+import Prelude
+
+mapEquiv : ∀ a b. (a → b) → (b → a) → Dec a → Dec b
+mapEquiv f g (Yes prf) = Yes $ f prf
+mapEquiv f g (No contra) = No $ contra ∘ g
+
+-- https://github.com/gallais/potpourri/blob/main/agda/poc/LinearDec.agda
+
+infixl 5 _~_ _≟_
+
+data _~_ : (m n : Nat) → U where
+  Zero : Z ~ Z
+  Suc : (m n : Nat) → S m ~ S n
+
+view : (m n : Nat) → Maybe (m ~ n)
+view Z Z = Just Zero
+view (S m) (S n) = Just $ Suc m n
+view _ _ = Nothing
+
+view-diag : (m : _) → ¬ (view m m ≡ Nothing)
+view-diag Z ()
+view-diag (S m) ()
+
+-- FIXME inline (\case Refl => Refl) didn't work below
+-- Maybe some unsolved metas when the Refl is matched
+succEqIsEq : ∀ n m. S n ≡ S m → n ≡ m
+succEqIsEq Refl = Refl
+
+
+_≟_ : (m n : Nat) → Dec (m ≡ n)
+
+m ≟ n = case inspect' {Nat} {\x => _} (view m) n of
+    Just Zero ** _ => Yes Refl
+    Just (Suc m n) ** _ => mapEquiv (cong S) succEqIsEq (m ≟ n)
+    Nothing ** pf => No (\z => case z : m ≡ n of Refl => view-diag m pf)
+

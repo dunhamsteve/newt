@@ -1,0 +1,36 @@
+module Data.Nat
+
+import Prelude
+
+data LTE : Nat → Nat → U where
+  LTEZero : ∀ k. LTE Z k
+  LTESucc : ∀ n m. LTE n m → LTE (S n) (S m)
+
+0 GT : Nat → Nat → U
+GT n m = LTE (S m) n
+
+succNotLTEZero : ∀ k. ¬ LTE (S k) Z
+succNotLTEZero ()
+
+fromLTESucc : ∀ n m. LTE (S n) (S m) → LTE n m
+fromLTESucc (LTESucc pf) = pf
+
+isLTE : (n m : Nat) → Dec (LTE n m)
+isLTE Z m = (Yes LTEZero)
+isLTE (S _) Z = No succNotLTEZero
+isLTE (S n) (S m) = case isLTE n m of
+  Yes prf => (Yes (LTESucc prf))
+  No contra => No (contra ∘ fromLTESucc)
+
+notLTEimpliesGT : ∀ n m. ¬ (LTE n m) → GT n m
+notLTEimpliesGT {Z} {m} q = absurd $ q LTEZero
+notLTEimpliesGT {S _} {Z} q = LTESucc LTEZero
+notLTEimpliesGT {S n} {(S m)} q = LTESucc $ notLTEimpliesGT (q ∘ LTESucc)
+
+lteSuccRight : ∀ n m . LTE n m → LTE n (S m)
+lteSuccRight LTEZero = LTEZero
+lteSuccRight (LTESucc lte) = LTESucc $ lteSuccRight lte
+
+lteSuccLeft : ∀ n m . LTE (S n) m → LTE n m
+lteSuccLeft (LTESucc lte) = lteSuccRight lte
+

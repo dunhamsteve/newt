@@ -138,6 +138,11 @@ sym Refl = Refl
 inspect : ∀ a b . (f : a → b) → (x : a) → Sg b (\ n => f x ≡ n)
 inspect f x = (f x ** Refl)
 
+-- FIXME dependent version, but we can't infer the b
+-- putting `inspect' {_} {\ x => _} ...` seems to provide enough of a hint
+inspect' : ∀ a . {0 b : a → U} (f : (x : a) → b x) → (x : a) → Sg (b x) (\ n => f x ≡ n)
+inspect' f x = (f x ** Refl)
+
 data Void : U where
 
 infixl 1 ¬_

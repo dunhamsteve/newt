@@ -31,6 +31,7 @@ inoremap <buffer> \cuL ⌈
 inoremap <buffer> \cuR ⌉
 inoremap <buffer> \< ⟨
 inoremap <buffer> \> ⟩
+inoremap <buffer> \iff ⇔
 
 " Sets and Types
 inoremap <buffer> \bN  ℕ

@@ -1,0 +1,32 @@
+module Leftist
+
+-- Leftist Heap
+
+-- I copied took the Haskell code from wikipedia and added a proof of the invariant
+
+import Prelude
+import Data.Nat
+
+-- forward declarations
+data LHeap : U → U
+rank : ∀ a. LHeap a -> Nat
+
+data LHeap : U → U where
+  Leaf : ∀ a . LHeap a
+  Node : ∀ a. a → (l : LHeap a) → (r : LHeap a) → (0 pf : LTE (rank r) (rank l)) → LHeap a
+
+rank Leaf = Z
+rank (Node _ _ r _) = S $ rank r
+
+merge : ∀ a. {{ Ord a }} -> LHeap a -> LHeap a -> LHeap a
+merge Leaf h = h
+merge h Leaf = h
+merge {a} h@(Node x l r pf) h'@(Node x' _ _ pf') =
+ if x > x' then merge h' h
+ else case isLTE (rank l) (rank r') of
+   Yes prf => Node x r' l prf
+   No contra => Node x l r' (lteSuccLeft $ notLTEimpliesGT contra)
+ where
+   r' : LHeap a
+   r' = merge r h'
+
