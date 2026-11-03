@@ -22,12 +22,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y zip
+          npm install -g esbuild vite
+          (cd newt-vscode-lsp && npm install)
       - name: build
         run: |
           make newt3
           make test
           cd playground
-          npm install -g esbuild vite
           npm install
           mkdir public
           ./build
@@ -35,6 +36,7 @@ jobs:
           # vite build --base /newt
       - name: build LSP
         run: |
+          # took this out of the makefile because it was slow
           make lsp
       - name: build todomvc
         run: |
