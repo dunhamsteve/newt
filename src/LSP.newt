@@ -20,6 +20,7 @@ import Lib.Prettier
 
 import Lib.Compile.JS
 import Lib.Compile.Scheme
+import Data.List1
 
 pfunc js_castArray : Array JSObject → JSObject := `x => x`
 pfunc js_castInt : Int → JSObject := `x => x`
@@ -71,7 +72,10 @@ lspFileSource = do
   st <- readIORef state
   pure $ MkFileSource st.baseDir $ \fc baseFn => do
     let fn = st.baseDir ++ "/" ++ baseFn
-    let (Nothing) = lookupMap' fn st.files
+    let (_,modName) = decomposeName fn
+    let ext = snd $ splitFileName fn
+    let key = modName ++ "." ++ ext
+    let (Nothing) = lookupMap' key st.files
         | Just src => pure (fn,src)
     let fn' = case split fn "file://" of
           x :: fn :: _ => fn
@@ -87,9 +91,7 @@ wrapper : String → M Json → (Error → IO JSObject) → JSObject
 wrapper fn op onError = unsafePerformIO $ do
   let (base, modName) = decomposeName fn
   st <- readIORef {IO} state
-  if st.baseDir /= base
-    then resetState base
-    else pure MkUnit
+  when (st.baseDir /= base) $ resetState base
   st <- readIORef {IO} state
   repo <- lspFileSource
   Right (top,json) <- (do
@@ -105,9 +107,13 @@ wrapper fn op onError = unsafePerformIO $ do
 
 updateFile : String → String → Unit
 updateFile fn src = unsafePerformIO $ do
-    modifyIORef state { files $= updateMap fn src }
-    st <- readIORef state
     let (base,modName) = decomposeName fn
+    let ext = snd $ splitFileName fn
+    let key = modName ++ "." ++ ext
+    putStrLn "update File \{fn} \{modName}"
+    putStrLn "data is \{show src}"
+    modifyIORef state { files $= updateMap key src }
+    st <- readIORef state
     Right (ctx,_) <- (invalidateModule modName).runM st.topContext
         | _ => writeIORef state st
     modifyIORef state { topContext := ctx }

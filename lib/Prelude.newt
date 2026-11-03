@@ -929,7 +929,7 @@ instance ∀ a b. {{Show a}} → {{Show b}} → Show (Either a b) where
 
 pfunc isPrefixOf uses (True False): String → String → Bool := `(pfx, s) => s.startsWith(pfx) ? Prelude_True : Prelude_False`
 pfunc isSuffixOf uses (True False): String → String → Bool := `(pfx, s) => s.endsWith(pfx) ? Prelude_True : Prelude_False`
-pfunc strIndex : String → Int → Char := `(s, ix) => s[ix]`
+pfunc strIndex : String → Int → Char := `(s, ix) => s[ix] ?? ''`
 
 instance ∀ a. {{Show a}} → Show (SnocList a) where
   show xs = show (xs <>> Nil)
