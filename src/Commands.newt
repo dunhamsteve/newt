@@ -492,7 +492,8 @@ addClause row col = do
   pure [GenericAction "Add clause" [MkEdit fc text]]
   where
     mkClause : SnocList String → Tm → String
-    mkClause acc (Pi fc (BI _ nm _ _ a) b) = mkClause (acc :< nm) b
+    mkClause acc (Pi fc (BI _ nm Explicit _ a) b) = mkClause (acc :< nm) b
+    mkClause acc (Pi fc (BI _ nm _ _ a) b) = mkClause acc b
     mkClause acc _ = unwords (acc <>> []) ++ " = ?\n"
 
     isDef : TopEntry → Bool
