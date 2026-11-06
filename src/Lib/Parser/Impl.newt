@@ -165,10 +165,10 @@ tokStart : TokenList → Bounds
 tokStart Nil = emptyBounds
 tokStart (t :: ts) = t.bounds
 
-bounded : ∀ a. Parser a → Parser (WithBounds a)
-bounded pa = P $ \last toks com ops indent =>
+addFC : ∀ a. {{SetFC a}} → Parser a → Parser a
+addFC pa = P $ \last toks com ops indent =>
     case runP pa last toks com ops indent of
-      (OK a last toks' com ops) => (OK (MkBounded a (tokStart toks + last)) last toks' com ops)
+      (OK a last toks' com ops) => (OK (setFC a (MkFC indent.file $ tokStart toks + last)) last toks' com ops)
       (Fail err last toks x ops) => Fail err last toks x ops
 
 withFC : ∀ a. Parser a → Parser (FC × a)

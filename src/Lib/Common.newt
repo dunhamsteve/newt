@@ -136,6 +136,9 @@ fcCol fc = fc.bnds.startCol
 class HasFC a where
   getFC : a -> FC
 
+class SetFC a where
+  setFC : a -> FC → a
+
 primNS : String
 primNS = "Prim"
 

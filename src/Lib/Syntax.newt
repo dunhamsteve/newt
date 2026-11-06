@@ -65,6 +65,25 @@ instance HasFC Raw where
   getFC (RUpdateRec fc _ _) = fc
   getFC (RImpossible fc) = fc
 
+instance SetFC Raw where
+  setFC (RVar fc nm) fc = RVar fc nm
+  setFC (RLam fc a sc) fc = RLam fc a sc
+  setFC (RApp fc t u icit) fc = RApp fc t u icit
+  setFC (RU fc) fc = RU fc
+  setFC (RImpossible fc) fc = RImpossible fc
+  setFC (RPi fc a sc) fc = RPi fc a sc
+  setFC (RLet fc nm ty v sc) fc = RLet fc nm ty v sc
+  setFC (RLit fc a) fc = RLit fc a
+  setFC (RCase fc scrut mty alts) fc = RCase fc scrut mty alts
+  setFC (RImplicit fc) fc = RImplicit fc
+  setFC (RHole fc) fc = RHole fc
+  setFC (RDo fc a) fc = RDo fc a
+  setFC (RIf fc a b c) fc = RIf fc a b c
+  setFC (RWhere fc a b) fc = RWhere fc a b
+  setFC (RAs fc a b) fc = RAs fc a b
+  setFC (RUpdateRec fc a b) fc = RUpdateRec fc a b
+
+
 data Import = MkImport FC (FC × Name)
 
 alias Telescope = List (BindInfo Raw)
@@ -106,6 +125,22 @@ instance HasFC Decl where
   getFC (Record x str tm str1 xs) = x
   getFC (DDerive x _) = x
 
+instance SetFC Decl where
+  setFC (TypeSig _ a b c) fc = TypeSig fc a b c
+  setFC (FunDef _ a b) fc = FunDef fc a b
+  setFC (DCheck _ a b) fc = DCheck fc a b
+  setFC (DDerive _ a) fc = DDerive fc a
+  setFC (DAlias _ a b c) fc = DAlias fc a b c
+  setFC (Data _ a b c) fc = Data fc a b c
+  setFC (ShortData _ a b) fc = ShortData fc a b
+  setFC (PType _ a b) fc = PType fc a b
+  setFC (PFunc _ a b c d) fc = PFunc fc a b c d
+  setFC (PMixFix _ a b c) fc = PMixFix fc a b c
+  setFC (Class _ a b c) fc = Class fc a b c
+  setFC (Instance _ a b) fc = Instance fc a b
+  setFC (Record _ a b c d) fc = Record fc a b c d
+  setFC (Exports _ a) fc = Exports fc a
+  setFC (DLog _ a) fc = DLog fc a
 
 record Module where
   constructor MkModule
