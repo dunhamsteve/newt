@@ -134,14 +134,10 @@ cong f Refl = Refl
 sym : ∀ A. {0 a b : A} → a ≡ b → b ≡ a
 sym Refl = Refl
 
--- capture the value of an application to use in replace
-inspect : ∀ a b . (f : a → b) → (x : a) → Sg b (\ n => f x ≡ n)
-inspect f x = (f x ** Refl)
-
--- FIXME dependent version, but we can't infer the b
--- putting `inspect' {_} {\ x => _} ...` seems to provide enough of a hint
-inspect' : ∀ a . {0 b : a → U} (f : (x : a) → b x) → (x : a) → Sg (b x) (\ n => f x ≡ n)
-inspect' f x = (f x ** Refl)
+-- Capture the result of a function application (e.g. `withProof (f x)`)
+-- Cribbed from Idris' Syntax.WithProof
+withProof : ∀ a. (t : a) → Sg a (\u => t ≡ u)
+withProof x = (x ** Refl)
 
 data Void : U where
 

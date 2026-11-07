@@ -30,8 +30,7 @@ succEqIsEq Refl = Refl
 
 
 _≟_ : (m n : Nat) → Dec (m ≡ n)
-
-m ≟ n = case inspect' {Nat} {\x => _} (view m) n of
+m ≟ n = case withProof (view m n) of
     Just Zero ** _ => Yes Refl
     Just (Suc m n) ** _ => mapEquiv (cong S) succEqIsEq (m ≟ n)
     Nothing ** pf => No (\z => case z : m ≡ n of Refl => view-diag m pf)
