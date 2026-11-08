@@ -1,11 +1,12 @@
 # disabled - takes to long (>5 min) on codeberg, runner is very slow
-on: {}
-  # push:
-  #   branches: [ main ]
+on: 
+  push:
+    branches: [ main ]
 jobs:
   build:
     # We're not using memory, but the node stuff is slow :(
-    runs-on: codeberg-small
+    # runs-on: newt-debian
+    runs-on: ubuntu-latest
     steps:
       - name: checkout
         uses: actions/checkout@v7
@@ -15,8 +16,8 @@ jobs:
           node-version: 24
       - name: install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y zip esbuild time
+          apt-get update
+          apt-get install -y zip esbuild time
           # npm install -g --allow-scripts=esbuild
           # npm install -g esbuild vite
           (cd newt-vscode-lsp && npm install)
