@@ -1,0 +1,33 @@
+# disabled - takes to long (>5 min) on codeberg, runner is very slow
+on: {}
+  # push:
+  #   branches: [ main ]
+jobs:
+  build:
+    # We're not using memory, but the node stuff is slow :(
+    runs-on: codeberg-small
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+      - name: install node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip esbuild time
+          # npm install -g --allow-scripts=esbuild
+          # npm install -g esbuild vite
+          (cd newt-vscode-lsp && npm install)
+      - name: build
+        run: |
+          make newt3
+          make test
+      - name: build todomvc
+        run: |
+          cd todomvc
+          export NEWT_LIB=../lib
+          node ../build/newt.js src/Todo.newt -o app.js
+          # vite build --base /todomvc --outDir ../playground/dist/todomvc
+
