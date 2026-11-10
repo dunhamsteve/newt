@@ -5,3 +5,7 @@ import Prelude
 lookup : ∀ a b. {{Eq a}} → a → List (a × b) → Maybe b
 lookup key Nil = Nothing
 lookup key ((k,v) :: rest) = if k == key then Just v else lookup key rest
+
+data NonEmpty : ∀ a. List a → U where
+  IsNonEmpty : ∀ a. {0 x : a} {0 xs : List a} → NonEmpty (x :: xs)
+

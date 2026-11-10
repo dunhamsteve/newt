@@ -432,8 +432,22 @@ doLet = do
   tm <- term
   pure $ DoLet fc nm tm
 
+-- if/then in do can leave out the else
+doIfThen : Parser DoStmt
+doIfThen = do
+  ifterm <- addFC $ do
+    keyword "if"
+    a <- term
+    keyword "then"
+    b <- term
+    fc <- getPos
+    c <- keyword "else" *> term <|> pure (RApp fc (RVar fc "return") (RVar fc "MkUnit") Explicit)
+    pure $ RIf emptyFC a b c
+  pure $ DoExpr (getFC ifterm) ifterm
+
 doStmt
   = doCaseLet
+  <|> doIfThen
   <|> doLet
   <|> doArrow
 
