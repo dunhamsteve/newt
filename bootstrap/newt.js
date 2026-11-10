@@ -342,9 +342,8 @@ let Lib_Types_pprint$27 = ( $$0, $$1, $$2 ) => {
         Lib_Prettier__$3C$2B$2F$3E_(Lib_Prettier_Text((((("\\ " + Lib_Common_$$Prelude_Show$20Lib_Common_Quant$2Cshow($$2.h2.h4)) + "") + $$2.h2.h2) + " =>")),
         Lib_Types_pprint$27(0, Prelude__$3A$3A_($$2.h2.h2, $$1), $$2.h3))));
       case 4:
-        return Lib_Types_parens(0, $$0,
-        Lib_Prettier_$$Prelude_Semigroup$20Lib_Prettier_Doc$2C_$3C$2B$3E_(Lib_Types_pprint$27(0,
-        $$1, $$2.h2), Lib_Types_pprint$27(1, $$1, $$2.h3)));
+        return Lib_Types_parens(0, $$0, Lib_Types_App_go($$0, $$1, $$2, $$2.h1, $$2.h2,
+        $$2.h3, $$2.h4, $$2));
       case 5:
         return Lib_Prettier_Text("U");
       case 6:
@@ -503,6 +502,15 @@ let Lib_Prettier_Empty = { tag: 0,  };
 let Lib_Prettier_stack =
   (eta1) => Lib_Prettier_folddoc((eta0) => (eta1) => Lib_Prettier__$3C$2F$3E_(eta0,
   eta1), eta1);
+let Lib_Types_App_go = ( $$0, $$1, $$2, $$3, $$4, $$5, $$6, $$7 ) => {
+    switch ($$7.tag) {
+      case 4:
+        return Lib_Prettier_$$Prelude_Semigroup$20Lib_Prettier_Doc$2C_$3C$2B$3E_(Lib_Types_App_go($$0,
+        $$1, $$2, $$3, $$4, $$5, $$6, $$7.h2), Lib_Types_pprint$27(1, $$1, $$7.h3));
+      default:
+        return Lib_Types_pprint$27(1, $$1, $$7);
+    }
+  };
 let Lib_Prettier_render = ( $$0, $$1 ) => (Lib_Prettier_layout(Lib_Prettier_best($$0, 0,
   $$1), Prelude_Lin));
 let Lib_Prettier_best = ( $$0, $$1, $$2 ) => (Prelude_fromMaybe(( $$3 ) => (Prelude_Nil),
@@ -1032,13 +1040,14 @@ let Lib_Eval_quote = ( $$0, $$1 ) => {
         $$6, $$7))))));
       case 3:
         return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_lookupMeta($$1.h2),
-        ( $$5 ) => {
-          switch ($$5.tag) {
+        ( $$6 ) => {
+          switch ($$6.tag) {
             case 1:
-              return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_vappSpine($$5.h3,
-              $$1.h3), (eta1) => Lib_Eval_quote($$0, eta1));
+              return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_vappSpine($$6.h3,
+              $$1.h4), (eta1) => Lib_Eval_quote($$0, eta1));
             default:
-              return Lib_Eval_quoteSp($$0, Lib_Types_Meta($$1.h1, $$1.h2), $$1.h3);
+              return Lib_Eval_quoteSp($$0, Lib_Types_Meta($$1.h1, $$1.h2, $$1.h3),
+              $$1.h4);
           }
         });
       case 4:
@@ -1129,13 +1138,13 @@ let Lib_Eval_eval = ( $$0, $$1 ) => {
         $$1.h2, Prelude_Lin));
       case 2:
         return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_lookupMeta($$1.h2),
-        ( $$4 ) => {
-          switch ($$4.tag) {
+        ( $$5 ) => {
+          switch ($$5.tag) {
             case 1:
-              return Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure($$4.h3);
+              return Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure($$5.h3);
             default:
               return Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Types_VMeta($$1.h1,
-              $$1.h2, Prelude_Lin));
+              $$1.h2, $$1.h3, Prelude_Lin));
           }
         });
       case 3:
@@ -1334,9 +1343,7 @@ let Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow = ( $$0 ) => {
           case 0:
             return (((("" + $$0.h2) + ":") + Prelude_showInt($$0.h3)) + "");
           default:
-            return (((((("(" + $$0.h2) + ":") + Prelude_showInt($$0.h3)) + " ") + Data_String_unwords(Prelude_$$Prelude_Functor$20Prelude_List$2Cmap((eta0) => Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow(eta0),
-            Prelude_$$Prelude_Functor$20Prelude_List$2Cmap((eta0) => Prelude_fst(eta0),
-            Prelude__$3C$3E$3E_($$0.h4, Prelude_Nil))))) + ")");
+            return (((((("(" + $$0.h2) + ":") + Prelude_showInt($$0.h3)) + " ") + Lib_Types_showVSpine($$0.h4)) + ")");
         }
         break;
       case 1:
@@ -1344,16 +1351,22 @@ let Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow = ( $$0 ) => {
           case 0:
             return Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$0.h2);
           default:
-            return (((("(" + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$0.h2)) + " ") + Data_String_unwords(Prelude_$$Prelude_Functor$20Prelude_List$2Cmap((eta0) => Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow(eta0),
-            Prelude_$$Prelude_Functor$20Prelude_List$2Cmap((eta0) => Prelude_fst(eta0),
-            Prelude__$3C$3E$3E_($$0.h3, Prelude_Nil))))) + ")");
+            return (((("(" + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$0.h2)) + " ") + Lib_Types_showVSpine($$0.h3)) + ")");
         }
         break;
       case 2:
         return (((("(%case " + Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow($$0.h2)) + " ") + Data_String_unwords(Prelude_$$Prelude_Functor$20Prelude_List$2Cmap(Lib_Types_$$Prelude_Show$20Lib_Types_CaseAlt$2Cshow,
         $$0.h4))) + ")");
       case 3:
-        return (((("(%meta " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$0.h2)) + " [") + Prelude_$$Prelude_Show$20Prelude_Nat$2Cshow(Data_SnocList_snoclen($$0.h3))) + " sp])");
+        switch ($$0.h4.tag) {
+          case 0:
+            return Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$0.h2);
+          default:
+            return (((("(" + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$0.h2)) + " ") + Data_String_unwords(Prelude_$$Prelude_Functor$20Prelude_List$2Cmap((eta0) => Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow(eta0),
+            Prelude_$$Prelude_Functor$20Prelude_List$2Cmap((eta0) => Prelude_fst(eta0),
+            Prelude_drop($$0.h3, Prelude__$3C$3E$3E_($$0.h4, Prelude_Nil)))))) + ")");
+        }
+        break;
       case 4:
         return (((((("(%lam " + Lib_Common_$$Prelude_Show$20Lib_Common_Quant$2Cshow($$0.h2.h4)) + "") + $$0.h2.h2) + " ") + Lib_Types_showClosure($$0.h3)) + ")");
       case 5:
@@ -1389,22 +1402,31 @@ let Lib_Types_showClosure =
 let Prelude_length = ( $$0 ) => (( ($$0.tag == 0) ? 0 : (1 + Prelude_length($$0.h2)) ));
 let Prelude_$$Prelude_Show$20Prelude_Nat$2Cshow = ( $$0 ) => (Prelude_showInt($$0));
 let Prelude_natToInt = (n) => n;
-let Data_SnocList_snoclen = ( $$0 ) => (Data_SnocList_snoclen_go($$0, $$0, 0));
-let Data_SnocList_snoclen_go = ( $$0, $$1, $$2 ) => {
+let Prelude_drop = ( $$0, $$1 ) => {
     for (;;) {
-      let $$3 = $$0;
-      let $$4 = $$1;
-      let $$5 = $$2;
-      if (($$4.tag == 0)) { return $$5; } else {
-        $$0 = $$3;
-        $$1 = $$4.h1;
-        $$2 = (1 + $$5);
-        continue;
+      let $$2 = $$0;
+      let $$3 = $$1;
+      if (($$3.tag == 0)) { return Prelude_Nil; } else {
+        switch ($$2) {
+          case 0:
+            return $$3;
+          default:
+          {
+            let $$6 = ($$2 - 1);
+            $$0 = $$6;
+            $$1 = $$3.h2;
+            continue;
+          }
+        }
       }
     }
   };
 let Lib_Types_$$Prelude_Show$20Lib_Types_CaseAlt$2Cshow =
   (eta0) => Lib_Types_showCaseAlt(eta0);
+let Lib_Types_showVSpine =
+  ( $$0 ) => (Data_String_unwords(Prelude_$$Prelude_Functor$20Prelude_List$2Cmap((eta0) => Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow(eta0),
+  Prelude_$$Prelude_Functor$20Prelude_List$2Cmap((eta0) => Prelude_fst(eta0),
+  Prelude__$3C$3E$3E_($$0, Prelude_Nil)))));
 let Lib_Types_debug = ( $$0 ) => (Lib_Types_log(2, $$0));
 let Lib_Types_log = ( $$0,
   $$1 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_getTop,
@@ -1602,14 +1624,13 @@ let Lib_Eval_forceType = ( $$0, $$1 ) => {
     switch ($$1.tag) {
       case 3:
         return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_lookupMeta($$1.h2),
-        ( $$5 ) => {
-          switch ($$5.tag) {
+        ( $$6 ) => {
+          switch ($$6.tag) {
             case 1:
-              return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_vappSpine($$5.h3,
-              $$1.h3), (eta1) => Lib_Eval_forceType($$0, eta1));
+              return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_vappSpine($$6.h3,
+              $$1.h4), (eta1) => Lib_Eval_forceType($$0, eta1));
             default:
-              return Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Types_VMeta($$1.h1,
-              $$1.h2, $$1.h3));
+              return Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure($$1);
           }
         });
       default:
@@ -1778,7 +1799,7 @@ let Lib_Eval_vapp = ( $$0, $$1, $$2 ) => {
         break;
       case 3:
         return Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Types_VMeta($$0.h1,
-        $$0.h2, Prelude__$3A$3C_($$0.h3, Prelude__$2C_($$1, $$2))));
+        $$0.h2, $$0.h3, Prelude__$3A$3C_($$0.h4, Prelude__$2C_($$1, $$2))));
       case 4:
         return Lib_Eval__$$$$_($$0.h3, $$1);
       case 5:
@@ -1789,7 +1810,8 @@ let Lib_Eval_vapp = ( $$0, $$1, $$2 ) => {
   };
 let Lib_Types_error$27 = ( $$0 ) => (Lib_Types_throwError(Lib_Types_E(Lib_Common_emptyFC,
   $$0)));
-let Lib_Types_VMeta = ( $$0, $$1, $$2 ) => ({ tag: 3, h1: $$0,  h2: $$1,  h3: $$2 });
+let Lib_Types_VMeta = ( $$0, $$1, $$2, $$3 ) => ({ tag: 3, h1: $$0,  h2: $$1,  h3: $$2, 
+  h4: $$3 });
 let Lib_Types_CaseCons = ( $$0, $$1, $$2 ) => ({ tag: 1, h1: $$0,  h2: $$1,  h3: $$2 });
 let Prelude_Nil_mkenv = ( $$0, $$1, $$2, $$3, $$4, $$5, $$6, $$7, $$8, $$9, $$10, $$11,
   $$12, $$13, $$14 ) => {
@@ -1910,7 +1932,7 @@ let Lib_Types_Let = ( $$0, $$1, $$2, $$3 ) => ({ tag: 8, h1: $$0,  h2: $$1,  h3:
   h4: $$3 });
 let Lib_Types_Pi = ( $$0, $$1, $$2 ) => ({ tag: 6, h1: $$0,  h2: $$1,  h3: $$2 });
 let Lib_Types_Lam = ( $$0, $$1, $$2 ) => ({ tag: 3, h1: $$0,  h2: $$1,  h3: $$2 });
-let Lib_Types_Meta = ( $$0, $$1 ) => ({ tag: 2, h1: $$0,  h2: $$1 });
+let Lib_Types_Meta = ( $$0, $$1, $$2 ) => ({ tag: 2, h1: $$0,  h2: $$1,  h3: $$2 });
 let Lib_Eval_quoteSp = ( $$0, $$1, $$2 ) => ((
     ($$2.tag == 0) ? Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure($$1) : Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_quoteSp($$0,
     $$1, $$2.h1),
@@ -2575,17 +2597,32 @@ let Lib_Elab_freshMeta = ( $$0, $$1, $$2,
             Lib_Elab_freshMeta_checkAuto($$0, $$1, $$2, $$3, $$2.h3),
             ( $$22 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Elab_trySolveAuto($$11),
             ( $$23 ) => (Lib_Types_debug(( $$24 ) => ((((("auto: instant " + Prelude_$$Prelude_Show$20Prelude_Bool$2Cshow($$23)) + " ") + Lib_Types_$$Prelude_Show$20Lib_Types_MetaEntry$2Cshow($$11)) + ""))))))),
-            ( $$16 ) => (Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Elab_freshMeta_applyBDs($$0,
-            $$1, $$2, $$3, 0, Lib_Types_Meta($$1, $$9), $$0.h4, $$0.h3))));
+            ( $$16 ) => {
+              let $$17 =
+                Prelude_length(Prelude_filter(( $$18 ) => (Lib_Types_$$Prelude_Eq$20Lib_Types_BD$2C_$3D$3D_($$18,
+                false)), $$0.h4));
+              return Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Elab_freshMeta_applyBDs($$0,
+              $$1, $$2, $$3, 0, Lib_Types_Meta($$1, $$9, $$17), $$0.h4, $$0.h3));
+            });
           default:
             return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Creturn(0),
-            ( $$16 ) => (Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Elab_freshMeta_applyBDs($$0,
-            $$1, $$2, $$3, 0, Lib_Types_Meta($$1, $$9), $$0.h4, $$0.h3))));
+            ( $$16 ) => {
+              let $$17 =
+                Prelude_length(Prelude_filter(( $$18 ) => (Lib_Types_$$Prelude_Eq$20Lib_Types_BD$2C_$3D$3D_($$18,
+                false)), $$0.h4));
+              return Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Elab_freshMeta_applyBDs($$0,
+              $$1, $$2, $$3, 0, Lib_Types_Meta($$1, $$9, $$17), $$0.h4, $$0.h3));
+            });
         }
       } else {
         return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(0),
-        ( $$16 ) => (Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Elab_freshMeta_applyBDs($$0,
-        $$1, $$2, $$3, 0, Lib_Types_Meta($$1, $$9), $$0.h4, $$0.h3))));
+        ( $$16 ) => {
+          let $$17 =
+            Prelude_length(Prelude_filter(( $$18 ) => (Lib_Types_$$Prelude_Eq$20Lib_Types_BD$2C_$3D$3D_($$18,
+            false)), $$0.h4));
+          return Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Elab_freshMeta_applyBDs($$0,
+          $$1, $$2, $$3, 0, Lib_Types_Meta($$1, $$9, $$17), $$0.h4, $$0.h3));
+        });
       }
     });
   }))));
@@ -2633,6 +2670,28 @@ let Lib_Elab_freshMeta_applyBDs = ( $$0, $$1, $$2, $$3, $$4, $$5, $$6, $$7 ) => 
         }
         default:
           return $$13;
+      }
+    }
+  };
+let Lib_Types_$$Prelude_Eq$20Lib_Types_BD$2C_$3D$3D_ = ( $$0, $$1 ) => ((
+    $$0 ? ( $$1 ? true : false ) : ( $$1 ? false : true )
+  ));
+let Prelude_filter = ( $$0, $$1 ) => (Prelude_filter_go($$0, $$1, $$1, Prelude_Lin));
+let Prelude_filter_go = ( $$0, $$1, $$2, $$3 ) => {
+    for (;;) {
+      let $$4 = $$0;
+      let $$5 = $$1;
+      let $$6 = $$2;
+      let $$7 = $$3;
+      if (($$6.tag == 0)) { return Prelude__$3C$3E$3E_($$7, Prelude_Nil); } else {
+        let $$10 = $$4($$6.h1);
+        if ($$10) {
+          $$0 = $$4;
+          $$1 = $$5;
+          $$2 = $$6.h2;
+          $$3 = Prelude__$3A$3C_($$7, $$6.h1);
+          continue;
+        } else { $$0 = $$4; $$1 = $$5; $$2 = $$6.h2; $$3 = $$7; continue; }
       }
     }
   };
@@ -3086,18 +3145,16 @@ let Lib_Elab_unify_unifyMeta = ( $$0, $$1, $$2, $$3, $$4, $$5 ) => {
         switch ($$5.tag) {
           case 3:
           {
-            let $$12 = Lib_Common_$$Prelude_Eq$20Lib_Common_QName$2C_$3D$3D_($$4.h2,
+            let $$14 = Lib_Common_$$Prelude_Eq$20Lib_Common_QName$2C_$3D$3D_($$4.h2,
               $$5.h2);
-            if ($$12) { return Lib_Elab_unifySpine($$0, $$1, $$4.h3, $$5.h3); } else {
-              let $$14 = Prelude__$3C_(Prelude_$$Prelude_Ord$20Prelude_Nat,
-                Data_SnocList_snoclen($$4.h3), Data_SnocList_snoclen($$5.h3));
+            if ($$14) { return Lib_Elab_unifySpine($$0, $$1, $$4.h4, $$5.h4); } else {
+              let $$16 = Prelude__$3C_(Prelude_$$Prelude_Ord$20Prelude_Nat,
+                Data_SnocList_snoclen($$4.h4), Data_SnocList_snoclen($$5.h4));
               return (
-                $$14 ? Prelude__$3E$3E_(Lib_Types_$$Prelude_Monad$20Lib_Types_M,
-                Lib_Elab_unify_solve$27($$0, $$1, $$2, $$3, $$0, $$5.h2, $$5.h3,
-                Lib_Types_VMeta($$4.h1, $$4.h2, $$4.h3)),
+                $$16 ? Prelude__$3E$3E_(Lib_Types_$$Prelude_Monad$20Lib_Types_M,
+                Lib_Elab_unify_solve$27($$0, $$1, $$2, $$3, $$0, $$5.h2, $$5.h4, $$4),
                 Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Elab_$$Prelude_Monoid$20Lib_Elab_UnifyResult$2Cneutral)) : Prelude__$3E$3E_(Lib_Types_$$Prelude_Monad$20Lib_Types_M,
-                Lib_Elab_unify_solve$27($$0, $$1, $$2, $$3, $$0, $$4.h2, $$4.h3,
-                Lib_Types_VMeta($$5.h1, $$5.h2, $$5.h3)),
+                Lib_Elab_unify_solve$27($$0, $$1, $$2, $$3, $$0, $$4.h2, $$4.h4, $$5),
                 Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Elab_$$Prelude_Monoid$20Lib_Elab_UnifyResult$2Cneutral))
               );
             }
@@ -3105,7 +3162,7 @@ let Lib_Elab_unify_unifyMeta = ( $$0, $$1, $$2, $$3, $$4, $$5 ) => {
           }
           default:
             return Prelude__$3E$3E_(Lib_Types_$$Prelude_Monad$20Lib_Types_M,
-            Lib_Elab_solve($$0, $$4.h2, $$4.h3, $$5),
+            Lib_Elab_solve($$0, $$4.h2, $$4.h4, $$5),
             Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Elab_$$Prelude_Monoid$20Lib_Elab_UnifyResult$2Cneutral));
         }
         break;
@@ -3113,7 +3170,7 @@ let Lib_Elab_unify_unifyMeta = ( $$0, $$1, $$2, $$3, $$4, $$5 ) => {
         switch ($$5.tag) {
           case 3:
             return Prelude__$3E$3E_(Lib_Types_$$Prelude_Monad$20Lib_Types_M,
-            Lib_Elab_solve($$0, $$5.h2, $$5.h3, $$4),
+            Lib_Elab_solve($$0, $$5.h2, $$5.h4, $$4),
             Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Elab_$$Prelude_Monoid$20Lib_Elab_UnifyResult$2Cneutral));
           default:
             return Lib_Elab_unify_unifyLam($$0, $$1, $$2, $$3, $$4, $$5);
@@ -3515,7 +3572,7 @@ let Lib_Elab_solve = ( $$0, $$1, $$2,
               $$2)), ( $$21 ) => ((
                 ($$21.tag == 0) ? Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$24 ) => ((("postpone constraint " + Lib_Types_$$Prelude_Show$20Lib_Types_Error$2Cshow($$21.h1)) + ""))),
                 ( $$24 ) => (Lib_Elab_addConstraint($$0, Lib_Types_getValFC($$3),
-                Lib_Types_VMeta(Lib_Types_getValFC($$3), $$1, $$2),
+                Lib_Types_VMeta(Lib_Types_getValFC($$3), $$1, $$13, $$2),
                 $$3))) : Lib_Types_catchError(Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Elab_rename($$1,
                 $$5.h3.h6, $$21.h1, $$18, $$3), ( $$24 ) => {
                   let $$25 = Lib_Elab_lams(Data_SnocList_snoclen($$2),
@@ -3579,7 +3636,7 @@ let Lib_Elab_solve = ( $$0, $$1, $$2,
                       Lib_Common_$$Prelude_Show$20Lib_Common_Quant),
                       $$2)) + " =?= ") + Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow($$3)) + ""))),
                       ( $$28 ) => (Lib_Elab_addConstraint($$0, $$24.h1,
-                      Lib_Types_VMeta($$24.h1, $$1, $$2), $$3)));
+                      Lib_Types_VMeta($$24.h1, $$1, $$13, $$2), $$3)));
                     default:
                       return Lib_Types_throwError(Lib_Types_E(Lib_Types_$$Lib_Common_HasFC$20Lib_Types_Error$2CgetFC($$24),
                       (((((((("" + Lib_Types_errorMsg($$24)) + " for ") + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$5.h2)) + " ") + Prelude_$$Prelude_Show$20$28Prelude_SnocList$20BND$3A1$29$2Cshow(Prelude_$$Prelude_Show$20$28Prelude__$D7_$20BND$3A3$20BND$3A2$29(Lib_Types_$$Prelude_Show$20Lib_Types_Val,
@@ -3590,12 +3647,10 @@ let Lib_Elab_solve = ( $$0, $$1, $$2,
               )))));
             } else {
               let $$18 = Prelude_length$27($$0);
-              return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$20 ) => ((((((((("meta " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$1)) + " (") + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$5.h2)) + ") applied to ") + Prelude_$$Prelude_Show$20Prelude_Nat$2Cshow(Data_SnocList_snoclen($$2))) + " args instead of ") + Prelude_$$Prelude_Show$20Prelude_Nat$2Cshow($$13)) + ""))),
-              ( $$20 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$21 ) => ((((((("CONSTRAINT " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$5.h2)) + " ") + Prelude_$$Prelude_Show$20$28Prelude_SnocList$20BND$3A1$29$2Cshow(Prelude_$$Prelude_Show$20$28Prelude__$D7_$20BND$3A3$20BND$3A2$29(Lib_Types_$$Prelude_Show$20Lib_Types_Val,
-              Lib_Common_$$Prelude_Show$20Lib_Common_Quant),
-              $$2)) + " =?= ") + Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow($$3)) + ""))),
-              ( $$21 ) => (Lib_Elab_addConstraint($$0, $$5.h1,
-              Lib_Types_VMeta(Lib_Types_getValFC($$3), $$1, $$2), $$3)))));
+              let $$20 = Lib_Types_VMeta(Lib_Types_getValFC($$3), $$1, $$13, $$2);
+              return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$22 ) => ((((((((("meta " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$1)) + " (") + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$5.h2)) + ") applied to ") + Prelude_$$Prelude_Show$20Prelude_Nat$2Cshow(Data_SnocList_snoclen($$2))) + " args instead of ") + Prelude_$$Prelude_Show$20Prelude_Nat$2Cshow($$13)) + ""))),
+              ( $$22 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$23 ) => ((((("CONSTRAINT " + Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow($$20)) + " =?= ") + Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow($$3)) + ""))),
+              ( $$23 ) => (Lib_Elab_addConstraint($$0, $$5.h1, $$20, $$3)))));
             }
           });
         });
@@ -3604,6 +3659,20 @@ let Lib_Elab_solve = ( $$0, $$1, $$2,
         (("Meta " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$1)) + " already solved! [solve]"));
     }
   }));
+let Data_SnocList_snoclen = ( $$0 ) => (Data_SnocList_snoclen_go($$0, $$0, 0));
+let Data_SnocList_snoclen_go = ( $$0, $$1, $$2 ) => {
+    for (;;) {
+      let $$3 = $$0;
+      let $$4 = $$1;
+      let $$5 = $$2;
+      if (($$4.tag == 0)) { return $$5; } else {
+        $$0 = $$3;
+        $$1 = $$4.h1;
+        $$2 = (1 + $$5);
+        continue;
+      }
+    }
+  };
 let Lib_Elab_checkAutos = ( $$0, $$1 ) => ((
     ($$1.tag == 0) ? Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(0) : Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_lookupMeta($$1.h1),
     ( $$5 ) => {
@@ -3650,9 +3719,9 @@ let Prelude__$3A$3A__checkMeta = ( $$0, $$1, $$2, $$3, $$4 ) => {
         switch ($$9.h2.h1.tag) {
           case 3:
           {
-            let $$17 =
+            let $$18 =
               Lib_Common_$$Prelude_Eq$20Lib_Common_QName$2C_$3D$3D_($$9.h2.h1.h2, $$5);
-            if ($$17) { return true; } else {
+            if ($$18) { return true; } else {
               $$0 = $$5;
               $$1 = $$6;
               $$2 = $$7;
@@ -3884,25 +3953,6 @@ let Lib_Elab_setMetaContext =
   ( $$0 ) => (Lib_Types_modifyTop(( $$1 ) => (Lib_Types_MkTop($$1.h1, $$1.h2,
   Lib_Types_MkModCtx($$1.h3.h1, $$1.h3.h2, $$1.h3.h3, $$0, $$1.h3.h5, $$1.h3.h6,
   $$1.h3.h7, $$1.h3.h8, $$1.h3.h9), $$1.h4, $$1.h5, $$1.h6, $$1.h7, $$1.h8))));
-let Prelude_filter = ( $$0, $$1 ) => (Prelude_filter_go($$0, $$1, $$1, Prelude_Lin));
-let Prelude_filter_go = ( $$0, $$1, $$2, $$3 ) => {
-    for (;;) {
-      let $$4 = $$0;
-      let $$5 = $$1;
-      let $$6 = $$2;
-      let $$7 = $$3;
-      if (($$6.tag == 0)) { return Prelude__$3C$3E$3E_($$7, Prelude_Nil); } else {
-        let $$10 = $$4($$6.h1);
-        if ($$10) {
-          $$0 = $$4;
-          $$1 = $$5;
-          $$2 = $$6.h2;
-          $$3 = Prelude__$3A$3C_($$7, $$6.h1);
-          continue;
-        } else { $$0 = $$4; $$1 = $$5; $$2 = $$6.h2; $$3 = $$7; continue; }
-      }
-    }
-  };
 let Lib_Elab__boundNames =
   ( $$0 ) => (Prelude_$$Prelude_Functor$20Prelude_List$2Cmap((eta0) => Prelude_snd(eta0),
   Prelude_filter(( $$1 ) => (Lib_Types_$$Prelude_Eq$20Lib_Types_BD$2C_$3D$3D_(Prelude_fst($$1),
@@ -3922,9 +3972,6 @@ let Prelude_zip = ( $$0, $$1 ) => {
         return Prelude_Nil;
     }
   };
-let Lib_Types_$$Prelude_Eq$20Lib_Types_BD$2C_$3D$3D_ = ( $$0, $$1 ) => ((
-    $$0 ? ( $$1 ? true : false ) : ( $$1 ? false : true )
-  ));
 let Lib_Elab_lams = ( $$0, $$1, $$2 ) => {
     switch ($$0) {
       case 0:
@@ -3965,24 +4012,24 @@ let Lib_Elab_rename = ( $$0, $$1, $$2, $$3, $$4 ) => {
           $$4.h3)
         );
       case 3:
-        return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$8 ) => ((((("rename Meta " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$4.h2)) + " spine ") + Prelude_$$Prelude_Show$20$28Prelude_SnocList$20BND$3A1$29$2Cshow(Prelude_$$Prelude_Show$20$28Prelude__$D7_$20BND$3A3$20BND$3A2$29(Lib_Types_$$Prelude_Show$20Lib_Types_Val,
-        Lib_Common_$$Prelude_Show$20Lib_Common_Quant), $$4.h3)) + ""))), ( $$8 ) => {
-          let $$9 = Lib_Common_$$Prelude_Eq$20Lib_Common_QName$2C_$3D$3D_($$4.h2, $$0);
+        return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$9 ) => ((((("rename Meta " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$4.h2)) + " spine ") + Prelude_$$Prelude_Show$20$28Prelude_SnocList$20BND$3A1$29$2Cshow(Prelude_$$Prelude_Show$20$28Prelude__$D7_$20BND$3A3$20BND$3A2$29(Lib_Types_$$Prelude_Show$20Lib_Types_Val,
+        Lib_Common_$$Prelude_Show$20Lib_Common_Quant), $$4.h4)) + ""))), ( $$9 ) => {
+          let $$10 = Lib_Common_$$Prelude_Eq$20Lib_Common_QName$2C_$3D$3D_($$4.h2, $$0);
           return (
-            $$9 ? Lib_Types_error($$4.h1,
+            $$10 ? Lib_Types_error($$4.h1,
             "meta occurs check") : Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_lookupMeta($$4.h2),
-            ( $$11 ) => {
-              switch ($$11.tag) {
+            ( $$12 ) => {
+              switch ($$12.tag) {
                 case 1:
-                  return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$16 ) => ((("rename: " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$4.h2)) + " is solved"))),
-                  ( $$16 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_vappSpine($$11.h3,
-                  $$4.h3), ( $$17 ) => (Lib_Elab_rename($$0, $$1, $$2, $$3, $$17)))));
+                  return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$17 ) => ((("rename: " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$4.h2)) + " is solved"))),
+                  ( $$17 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_vappSpine($$12.h3,
+                  $$4.h4), ( $$18 ) => (Lib_Elab_rename($$0, $$1, $$2, $$3, $$18)))));
                 default:
-                  return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$13 ) => ((("rename: " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$4.h2)) + " is unsolved"))),
-                  ( $$13 ) => (Lib_Types_catchError(Lib_Elab_renameSpine($$0, $$1, $$2,
-                  $$3, Lib_Types_Meta($$4.h1, $$4.h2), $$4.h3),
-                  ( $$14 ) => (Lib_Types_throwError(Lib_Types_Postpone($$4.h1,
-                  Lib_Types_errorMsg($$14)))))));
+                  return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$14 ) => ((("rename: " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$4.h2)) + " is unsolved"))),
+                  ( $$14 ) => (Lib_Types_catchError(Lib_Elab_renameSpine($$0, $$1, $$2,
+                  $$3, Lib_Types_Meta($$4.h1, $$4.h2, $$4.h3), $$4.h4),
+                  ( $$15 ) => (Lib_Types_throwError(Lib_Types_Postpone($$4.h1,
+                  Lib_Types_errorMsg($$15)))))));
               }
             })
           );
@@ -4309,14 +4356,13 @@ let Lib_Eval_forceMeta = ( $$0 ) => {
     switch ($$0.tag) {
       case 3:
         return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_lookupMeta($$0.h2),
-        ( $$4 ) => {
-          switch ($$4.tag) {
+        ( $$5 ) => {
+          switch ($$5.tag) {
             case 1:
-              return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_vappSpine($$4.h3,
-              $$0.h3), (eta0) => Lib_Eval_forceMeta(eta0));
+              return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_vappSpine($$5.h3,
+              $$0.h4), (eta0) => Lib_Eval_forceMeta(eta0));
             default:
-              return Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Types_VMeta($$0.h1,
-              $$0.h2, $$0.h3));
+              return Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure($$0);
           }
         });
       default:
@@ -4385,28 +4431,28 @@ let Lib_Elab_check = ( $$0, $$1,
       case 1:
         switch ($$5.h2.tag) {
           case 3:
-            return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$20 ) => ((((("unify PI for " + Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow($$5.h2)) + " at ") + Lib_Common_$$Prelude_Show$20Lib_Common_FC$2Cshow(Lib_Types_getValFC($$5.h2))) + ""))),
-            ( $$20 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Elab_maybeType($$5.h1.h2.h1,
-            $$0, $$5.h1.h2.h5), ( $$21 ) => {
-              let $$22 = Lib_Types_extend($$0, Lib_Common_BI($$5.h1.h1, $$5.h1.h2.h2,
-                $$5.h1.h2.h3, $$5.h1.h2.h4, $$21));
+            return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$21 ) => ((((("unify PI for " + Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow($$5.h2)) + " at ") + Lib_Common_$$Prelude_Show$20Lib_Common_FC$2Cshow(Lib_Types_getValFC($$5.h2))) + ""))),
+            ( $$21 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Elab_maybeType($$5.h1.h2.h1,
+            $$0, $$5.h1.h2.h5), ( $$22 ) => {
+              let $$23 = Lib_Types_extend($$0, Lib_Common_BI($$5.h1.h1, $$5.h1.h2.h2,
+                $$5.h1.h2.h3, $$5.h1.h2.h4, $$22));
               return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Prelude__$3C$$$3E_(Lib_Types_$$Prelude_Functor$20Lib_Types_M,
               (eta1) => Lib_Types_MkClosure($$0.h2, eta1),
-              Lib_Elab_freshMeta(Lib_Types_enterMarker($$22), $$5.h1.h1,
+              Lib_Elab_freshMeta(Lib_Types_enterMarker($$23), $$5.h1.h1,
               Lib_Types_VU(Lib_Common_emptyFC), 0)),
-              ( $$24 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Elab_unifyCatch($$5.h1.h1,
+              ( $$25 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Elab_unifyCatch($$5.h1.h1,
               $$0, $$5.h2, Lib_Types_VPi($$5.h1.h1, Lib_Common_BI($$5.h1.h2.h1, "_",
-              $$5.h1.h2.h3, $$5.h1.h2.h4, $$21), $$24)),
-              ( $$25 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_TopContext_addTypeInfo($$5.h1.h2.h1,
-              $$5.h1.h2.h2, $$0.h2, $$21, $$5.h1.h2.h1), ( $$26 ) => {
-                let $$27 = Lib_Types_VVar($$5.h1.h1, $$5.h1.h2.h2, $$0.h1, Prelude_Lin);
-                return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval__$$$$_($$24,
-                $$27),
-                ( $$29 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Elab_check($$22,
-                $$5.h1.h3, $$29),
-                ( $$30 ) => (Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Types_Lam($$5.h1.h1,
+              $$5.h1.h2.h3, $$5.h1.h2.h4, $$22), $$25)),
+              ( $$26 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_TopContext_addTypeInfo($$5.h1.h2.h1,
+              $$5.h1.h2.h2, $$0.h2, $$22, $$5.h1.h2.h1), ( $$27 ) => {
+                let $$28 = Lib_Types_VVar($$5.h1.h1, $$5.h1.h2.h2, $$0.h1, Prelude_Lin);
+                return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval__$$$$_($$25,
+                $$28),
+                ( $$30 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Elab_check($$23,
+                $$5.h1.h3, $$30),
+                ( $$31 ) => (Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Lib_Types_Lam($$5.h1.h1,
                 Lib_Common_BI($$5.h1.h2.h1, $$5.h1.h2.h2, $$5.h1.h2.h3, $$5.h1.h2.h4, 0),
-                $$30))))));
+                $$31))))));
               })))));
             })));
           case 5:
@@ -4500,7 +4546,8 @@ let Lib_Elab_check = ( $$0, $$1,
           $$5.h1.h2, $$16),
           ( $$17 ) => (Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(Prelude__$2C_($$17,
           $$16)))))))),
-          ( $$13 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_forceMeta($$13.h2),
+          ( $$13 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_forceType($$0.h2,
+          $$13.h2),
           ( $$17 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$18 ) => ((("SCTM " + Lib_Types_rpprint(Lib_Types_names($$0),
           $$13.h1)) + ""))),
           ( $$18 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$19 ) => ((("SCTY " + Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow($$17)) + ""))),
@@ -4528,7 +4575,8 @@ let Lib_Elab_check = ( $$0, $$1,
             })));
           }))))))) : Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Elab_infer($$0,
           $$5.h1.h2),
-          ( $$13 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_forceMeta($$13.h2),
+          ( $$13 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_forceType($$0.h2,
+          $$13.h2),
           ( $$17 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$18 ) => ((("SCTM " + Lib_Types_rpprint(Lib_Types_names($$0),
           $$13.h1)) + ""))),
           ( $$18 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$19 ) => ((("SCTY " + Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow($$17)) + ""))),
@@ -5334,13 +5382,37 @@ let Lib_Elab_updateRec_getTele = ( $$0, $$1, $$2, $$3, $$4, $$5, $$6 ) => {
     }
   };
 let Lib_Elab_updateRec_collect = ( $$0, $$1, $$2, $$3, $$4, $$5, $$6 ) => {
-    switch ($$6.tag) {
-      case 6:
-        return Prelude__$3A$3A_(Prelude__$2C_($$6.h2.h2, Lib_Syntax_RApp($$1,
-        Lib_Syntax_RVar(Lib_Common_emptyFC, ("." + $$6.h2.h2)), $$5, 1)),
-        Lib_Elab_updateRec_collect($$0, $$1, $$2, $$3, $$4, $$5, $$6.h3));
-      default:
-        return Prelude_Nil;
+    for (;;) {
+      let $$7 = $$0;
+      let $$8 = $$1;
+      let $$9 = $$2;
+      let $$10 = $$3;
+      let $$11 = $$4;
+      let $$12 = $$5;
+      let $$13 = $$6;
+      switch ($$13.tag) {
+        case 6:
+          switch ($$13.h2.h3) {
+            case 1:
+              return Prelude__$3A$3A_(Prelude__$2C_($$13.h2.h2, Lib_Syntax_RApp($$8,
+              Lib_Syntax_RVar(Lib_Common_emptyFC, ("." + $$13.h2.h2)), $$12, 1)),
+              Lib_Elab_updateRec_collect($$7, $$8, $$9, $$10, $$11, $$12, $$13.h3));
+            default:
+            {
+              $$0 = $$7;
+              $$1 = $$8;
+              $$2 = $$9;
+              $$3 = $$10;
+              $$4 = $$11;
+              $$5 = $$12;
+              $$6 = $$13.h3;
+              continue;
+            }
+          }
+          break;
+        default:
+          return Prelude_Nil;
+      }
     }
   };
 let Lib_Elab_collectDecl = ( $$0 ) => {
@@ -5523,11 +5595,11 @@ let Lib_Elab_buildTree = ( $$0, $$1 ) => {
                   switch ($$22.tag) {
                     case 3:
                       return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_lookupMeta($$22.h2),
-                      ( $$27 ) => {
-                        switch ($$27.tag) {
+                      ( $$28 ) => {
+                        switch ($$28.tag) {
                           case 0:
                             return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Elab_solveAutos,
-                            ( $$34 ) => (Lib_Eval_forceType($$0.h2, $$22)));
+                            ( $$35 ) => (Lib_Eval_forceType($$0.h2, $$22)));
                           case 1:
                             return Lib_Eval_forceType($$0.h2, $$22);
                           case 2:
@@ -5754,9 +5826,17 @@ let Lib_Elab_buildTree = ( $$0, $$1 ) => {
             { tag: 0, h1: $$25,  h2: $$26 }))))));
           }
           default:
-            return Lib_Types_error($$1.h1.h1.h1,
-            (("Extra pattern variables " + Prelude_$$Prelude_Show$20$28Prelude_List$20BND$3A1$29$2Cshow(Lib_Common_$$Prelude_Show$20Lib_Common_Pattern,
-            $$1.h1.h1.h3)) + ""));
+            return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_forceType($$0.h2,
+            $$1.h2), ( $$12 ) => {
+              switch ($$12.tag) {
+                case 5:
+                  return Lib_Elab_buildTree($$0, { tag: 0, h1: $$1.h1,  h2: $$12 });
+                default:
+                  return Lib_Types_error($$1.h1.h1.h1,
+                  (("Extra pattern variables " + Prelude_$$Prelude_Show$20$28Prelude_List$20BND$3A1$29$2Cshow(Lib_Common_$$Prelude_Show$20Lib_Common_Pattern,
+                  $$1.h1.h1.h3)) + ""));
+              }
+            });
         }
       }
     }
@@ -5899,8 +5979,10 @@ let Lib_Elab_checkDone = ( $$0, $$1, $$2, $$3, $$4 ) => {
           return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Elab_levelType($$1,
           $$2.h1.h1),
           ( $$11 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_TopContext_addInfo(Lib_Types_CaseSplit($$2.h1.h2.h1,
-          $$1, $$2.h1.h1, $$11)), ( $$12 ) => (Lib_Elab_checkDone($$0, $$1, $$2.h2, $$3,
-          $$4)))));
+          $$1, $$2.h1.h1, $$11)),
+          ( $$12 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_TopContext_addTypeInfo($$2.h1.h2.h1,
+          "_", $$1.h2, $$11, $$2.h1.h2.h1), ( $$13 ) => (Lib_Elab_checkDone($$0, $$1,
+          $$2.h2, $$3, $$4)))))));
         case 4:
           return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Elab_levelType($$1,
           $$2.h1.h1),
@@ -6095,6 +6177,13 @@ let Lib_Elab_levelType = ( $$0, $$1 ) => {
         return Lib_Types_error($$0.h5, "bad level");
     }
   };
+let Lib_TopContext_addTypeInfo = ( $$0, $$1, $$2, $$3,
+  $$4 ) => (Lib_Types_modifyTop(( $$5 ) => (Lib_Types_MkTop($$5.h1, $$5.h2,
+  Lib_Types_MkModCtx($$5.h3.h1, $$5.h3.h2, $$5.h3.h3, $$5.h3.h4, $$5.h3.h5, $$5.h3.h6,
+  $$5.h3.h7, $$5.h3.h8, Prelude__$3A$3A_(Lib_Types_MkTypeInfo($$0, $$1, $$2, $$3, $$4),
+  $$5.h3.h9)), $$5.h4, $$5.h5, $$5.h6, $$5.h7, $$5.h8))));
+let Lib_Types_MkTypeInfo = ( $$0, $$1, $$2, $$3, $$4 ) => ({ tag: 0, h1: $$0,  h2: $$1, 
+  h3: $$2,  h4: $$3,  h5: $$4 });
 let Lib_Types_CaseSplit = ( $$0, $$1, $$2, $$3 ) => ({ tag: 0, h1: $$0,  h2: $$1, 
   h3: $$2,  h4: $$3 });
 let Lib_Common_PatVar_rename = ( $$0, $$1, $$2, $$3, $$4, $$5, $$6, $$7, $$8, $$9, $$10,
@@ -6110,13 +6199,6 @@ let Lib_Common_PatVar_rename = ( $$0, $$1, $$2, $$3, $$4, $$5, $$6, $$7, $$8, $$
       }
     }
   };
-let Lib_TopContext_addTypeInfo = ( $$0, $$1, $$2, $$3,
-  $$4 ) => (Lib_Types_modifyTop(( $$5 ) => (Lib_Types_MkTop($$5.h1, $$5.h2,
-  Lib_Types_MkModCtx($$5.h3.h1, $$5.h3.h2, $$5.h3.h3, $$5.h3.h4, $$5.h3.h5, $$5.h3.h6,
-  $$5.h3.h7, $$5.h3.h8, Prelude__$3A$3A_(Lib_Types_MkTypeInfo($$0, $$1, $$2, $$3, $$4),
-  $$5.h3.h9)), $$5.h4, $$5.h5, $$5.h6, $$5.h7, $$5.h8))));
-let Lib_Types_MkTypeInfo = ( $$0, $$1, $$2, $$3, $$4 ) => ({ tag: 0, h1: $$0,  h2: $$1, 
-  h3: $$2,  h4: $$3,  h5: $$4 });
 let Lib_TopContext_addError =
   ( $$0 ) => (Lib_Types_modifyTop(( $$1 ) => (Lib_Types_MkTop($$1.h1, $$1.h2,
   Lib_Types_MkModCtx($$1.h3.h1, $$1.h3.h2, $$1.h3.h3, $$1.h3.h4, $$1.h3.h5, $$1.h3.h6,
@@ -7261,7 +7343,7 @@ let Lib_Elab_mkPat = ( $$0 ) => {
 let Lib_Common_PatLit = ( $$0, $$1 ) => ({ tag: 3, h1: $$0,  h2: $$1 });
 let Lib_Common_PatImpossible = ( $$0 ) => ({ tag: 4, h1: $$0 });
 let Lib_Common_isUpperName = ( $$0 ) => (Prelude_isUpper(Prelude_strIndex($$0, 0)));
-let Prelude_strIndex = (s, ix) => s[ix];
+let Prelude_strIndex = (s, ix) => s[ix] ?? '';
 let Prelude_isUpper = ( $$0 ) => {
     let $$1 = Prelude_ord($$0);
     return ((Prelude__$3C_(Prelude_$$Prelude_Ord$20Prim_Int, 64,
@@ -11450,34 +11532,34 @@ let Lib_Eval_zonkApp = ( $$0, $$1, $$2, $$3, $$4 ) => {
       switch ($$8.tag) {
         case 2:
           return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_lookupMeta($$8.h2),
-          ( $$12 ) => {
-            switch ($$12.tag) {
+          ( $$13 ) => {
+            switch ($$13.tag) {
               case 1:
-                return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$17 ) => ((((("zonk for " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$8.h2)) + " env ") + Prelude_$$Prelude_Show$20$28Prelude_List$20BND$3A1$29$2Cshow(Lib_Types_$$Prelude_Show$20Lib_Types_Val,
+                return Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$18 ) => ((((("zonk for " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$8.h2)) + " env ") + Prelude_$$Prelude_Show$20$28Prelude_List$20BND$3A1$29$2Cshow(Lib_Types_$$Prelude_Show$20Lib_Types_Val,
                 $$7)) + ""))),
-                ( $$17 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$18 ) => ((("spine " + Prelude_$$Prelude_Show$20$28Prelude_List$20BND$3A1$29$2Cshow(Prelude_$$Prelude_Show$20$28Prelude__$D7_$20BND$3A3$20BND$3A2$29(Lib_Types_$$Prelude_Show$20Lib_Types_Tm,
+                ( $$18 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$19 ) => ((("spine " + Prelude_$$Prelude_Show$20$28Prelude_List$20BND$3A1$29$2Cshow(Prelude_$$Prelude_Show$20$28Prelude__$D7_$20BND$3A3$20BND$3A2$29(Lib_Types_$$Prelude_Show$20Lib_Types_Tm,
                 Lib_Common_$$Prelude_Show$20Lib_Common_Quant), $$9)) + ""))),
-                ( $$18 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Prelude_$$Prelude_Traversable$20Prelude_List$2Ctraverse(Lib_Types_$$Prelude_Applicative$20Lib_Types_M,
+                ( $$19 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Prelude_$$Prelude_Traversable$20Prelude_List$2Ctraverse(Lib_Types_$$Prelude_Applicative$20Lib_Types_M,
                 (eta1) => Lib_Eval_eval$27($$7, eta1), $$9),
-                ( $$19 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$20 ) => ((((((("zonk meta " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$8.h2)) + " -> ") + Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow($$12.h3)) + " spine ") + Prelude_$$Prelude_Show$20$28Prelude_List$20BND$3A1$29$2Cshow(Prelude_$$Prelude_Show$20$28Prelude__$D7_$20BND$3A3$20BND$3A2$29(Lib_Types_$$Prelude_Show$20Lib_Types_Val,
-                Lib_Common_$$Prelude_Show$20Lib_Common_Quant), $$19)) + ""))),
-                ( $$20 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_vappSpine($$12.h3,
-                Prelude__$3C$3E$3C_(Prelude_Lin, $$19)),
-                ( $$21 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$22 ) => ((("-> result is " + Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow($$21)) + ""))),
-                ( $$22 ) => {
-                  let $$23 = Prelude__$2F$3D_(Prelude_$$Prelude_Eq$20Prim_Int,
+                ( $$20 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$21 ) => ((((((("zonk meta " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$8.h2)) + " -> ") + Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow($$13.h3)) + " spine ") + Prelude_$$Prelude_Show$20$28Prelude_List$20BND$3A1$29$2Cshow(Prelude_$$Prelude_Show$20$28Prelude__$D7_$20BND$3A3$20BND$3A2$29(Lib_Types_$$Prelude_Show$20Lib_Types_Val,
+                Lib_Common_$$Prelude_Show$20Lib_Common_Quant), $$20)) + ""))),
+                ( $$21 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Eval_vappSpine($$13.h3,
+                Prelude__$3C$3E$3C_(Prelude_Lin, $$20)),
+                ( $$22 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$23 ) => ((("-> result is " + Lib_Types_$$Prelude_Show$20Lib_Types_Val$2Cshow($$22)) + ""))),
+                ( $$23 ) => {
+                  let $$24 = Prelude__$2F$3D_(Prelude_$$Prelude_Eq$20Prim_Int,
                     Prelude_length$27($$7), $$6);
                   return (
-                    $$23 ? Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Prelude_fatalError((((("MM2 " + Prelude_showInt($$6)) + " /= ") + Prelude_showInt(Prelude_length$27($$7))) + "")),
-                    ( $$23 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Prelude__$3C$$$3E_(Lib_Types_$$Prelude_Functor$20Lib_Types_M,
-                    (eta1) => Lib_Eval_tweakFC($$8.h1, eta1), Lib_Eval_quote($$6, $$21)),
-                    ( $$24 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$25 ) => ((("quoted " + Lib_Types_$$Prelude_Show$20Lib_Types_Tm$2Cshow($$24)) + ""))),
-                    ( $$25 ) => (Lib_Eval_zonk($$5, $$6, $$7,
-                    $$24))))))) : Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(0),
-                    ( $$23 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Prelude__$3C$$$3E_(Lib_Types_$$Prelude_Functor$20Lib_Types_M,
-                    (eta1) => Lib_Eval_tweakFC($$8.h1, eta1), Lib_Eval_quote($$6, $$21)),
-                    ( $$24 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$25 ) => ((("quoted " + Lib_Types_$$Prelude_Show$20Lib_Types_Tm$2Cshow($$24)) + ""))),
-                    ( $$25 ) => (Lib_Eval_zonk($$5, $$6, $$7, $$24)))))))
+                    $$24 ? Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Prelude_fatalError((((("MM2 " + Prelude_showInt($$6)) + " /= ") + Prelude_showInt(Prelude_length$27($$7))) + "")),
+                    ( $$24 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Prelude__$3C$$$3E_(Lib_Types_$$Prelude_Functor$20Lib_Types_M,
+                    (eta1) => Lib_Eval_tweakFC($$8.h1, eta1), Lib_Eval_quote($$6, $$22)),
+                    ( $$25 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$26 ) => ((("quoted " + Lib_Types_$$Prelude_Show$20Lib_Types_Tm$2Cshow($$25)) + ""))),
+                    ( $$26 ) => (Lib_Eval_zonk($$5, $$6, $$7,
+                    $$25))))))) : Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(0),
+                    ( $$24 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Prelude__$3C$$$3E_(Lib_Types_$$Prelude_Functor$20Lib_Types_M,
+                    (eta1) => Lib_Eval_tweakFC($$8.h1, eta1), Lib_Eval_quote($$6, $$22)),
+                    ( $$25 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_debug(( $$26 ) => ((("quoted " + Lib_Types_$$Prelude_Show$20Lib_Types_Tm$2Cshow($$25)) + ""))),
+                    ( $$26 ) => (Lib_Eval_zonk($$5, $$6, $$7, $$25)))))))
                   );
                 })))))))))));
               default:
@@ -11645,7 +11727,7 @@ let Lib_Eval_tweakFC = ( $$0, $$1 ) => {
       case 1:
         return Lib_Types_Ref($$0, $$1.h2);
       case 2:
-        return Lib_Types_Meta($$0, $$1.h2);
+        return Lib_Types_Meta($$0, $$1.h2, $$1.h3);
       case 3:
         return Lib_Types_Lam($$0, $$1.h2, $$1.h3);
       case 4:
@@ -13041,7 +13123,7 @@ let Lib_TopContext_addHint =
         $$12.h4, $$12.h5, $$12.h6, $$12.h7, $$12.h8)));
       } else {
         return Lib_Types_error($$2.h1.h1,
-        (("can't find tcon name for " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$0)) + ""));
+        (((("can't find tcon name for " + Lib_Common_$$Prelude_Show$20Lib_Common_QName$2Cshow($$0)) + " type ") + Lib_Types_$$Prelude_Show$20Lib_Types_Tm$2Cshow($$2.h1.h4)) + ""));
       }
     } else { return Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(0); }
   }));
@@ -13767,8 +13849,8 @@ let Lib_ProcessDecl_populateConInfo_isSucc = ( $$0, $$1 ) => {
                 switch ($$15.h1.h2.tag) {
                   case 0:
                   {
-                    let $$21 = Prelude__$2C_(Lib_Util_splitApp($$15.h1.h1),
-                      Lib_Util_splitApp($$15.h2));
+                    let $$21 = Prelude__$2C_(Lib_Util_splitAppExplicit($$15.h1.h1),
+                      Lib_Util_splitAppExplicit($$15.h2));
                     switch ($$21.h1.h1.tag) {
                       case 1:
                         switch ($$21.h2.h1.tag) {
@@ -13801,8 +13883,9 @@ let Lib_ProcessDecl_populateConInfo_isSucc = ( $$0, $$1 ) => {
         return false;
     }
   };
-let Lib_Util_splitApp = ( $$0 ) => (Lib_Util_splitApp_go($$0, $$0, Prelude_Lin));
-let Lib_Util_splitApp_go = ( $$0, $$1, $$2 ) => {
+let Lib_Util_splitAppExplicit = ( $$0 ) => (Lib_Util_splitAppExplicit_go($$0, $$0,
+  Prelude_Lin));
+let Lib_Util_splitAppExplicit_go = ( $$0, $$1, $$2 ) => {
     for (;;) {
       let $$3 = $$0;
       let $$4 = $$1;
@@ -13931,7 +14014,7 @@ let Lib_Derive_expandDerive = ( $$0,
 let Lib_Derive_deriveOrd = ( $$0, $$1,
   $$2 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_getTop,
   ( $$11 ) => {
-    let $$12 = Lib_Util_splitApp($$2);
+    let $$12 = Lib_Util_splitAppExplicit($$2);
     switch ($$12.h1.tag) {
       case 1:
       {
@@ -14179,7 +14262,7 @@ let Lib_Derive_deriveOrd_getTarget = ( $$0, $$1, $$2, $$3 ) => {
 let Lib_Derive_deriveShow = ( $$0, $$1,
   $$2 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_getTop,
   ( $$10 ) => {
-    let $$11 = Lib_Util_splitApp($$2);
+    let $$11 = Lib_Util_splitAppExplicit($$2);
     switch ($$11.h1.tag) {
       case 1:
       {
@@ -14268,7 +14351,7 @@ let Lib_Derive_deriveShow_makeList = ( $$0, $$1, $$2, $$3 ) => ((
   ));
 let Lib_Derive_deriveEq = ( $$0, $$1,
   $$2 ) => (Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Lib_Types_getTop, ( $$8 ) => {
-    let $$9 = Lib_Util_splitApp($$2);
+    let $$9 = Lib_Util_splitAppExplicit($$2);
     switch ($$9.h1.tag) {
       case 1:
       {
@@ -15096,16 +15179,24 @@ let Lib_Parser_pratt_projectHead = ( $$0, $$1, $$2, $$3, $$4, $$5, $$6 ) => {
   };
 let Lib_Parser_parenTypeExp$27_comma = ( $$0, $$1 ) => {
     if (($$1.tag == 0)) { return $$0; } else {
-      let $$4 = Lib_Syntax_$$Lib_Common_HasFC$20Lib_Syntax_Raw$2CgetFC($$1.h1);
-      return Lib_Syntax_RApp($$4, Lib_Syntax_RApp($$4, Lib_Syntax_RVar($$4, "_,_"), $$0,
-      1), Lib_Parser_parenTypeExp$27_comma($$1.h1, $$1.h2), 1);
+      let $$6 = Lib_Parser_parenTypeExp$27_comma($$1.h1.h2, $$1.h2);
+      let $$8 =
+        Lib_Common_$$Prelude_Add$20Lib_Common_FC$2C_$2B_(Lib_Syntax_$$Lib_Common_HasFC$20Lib_Syntax_Raw$2CgetFC($$0),
+        Lib_Syntax_$$Lib_Common_HasFC$20Lib_Syntax_Raw$2CgetFC($$6));
+      let $$10 =
+        Lib_Common_$$Prelude_Add$20Lib_Common_FC$2C_$2B_(Lib_Syntax_$$Lib_Common_HasFC$20Lib_Syntax_Raw$2CgetFC($$0),
+        $$1.h1.h1);
+      return Lib_Syntax_RApp($$8, Lib_Syntax_RApp($$10, Lib_Syntax_RVar($$1.h1.h1,
+      "_,_"), $$0, 1), Lib_Parser_parenTypeExp$27_comma($$1.h1.h2, $$1.h2), 1);
     }
   };
-let Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Creturn =
-  (eta0) => Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(eta0);
-let Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser =
-  Prelude_MkMonad((eta0) => (eta1) => Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(eta0,
-  eta1), Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Creturn);
+let Lib_Parser_Impl_getPos =
+  ( $$0 ) => (( $$1 ) => (( $$2 ) => (( $$3 ) => (( $$4 ) => ((
+    ($$1.tag == 0) ? Lib_Parser_Impl_OK({ tag: 0, h1: $$4.h1,  h2: $$0 }, $$0, $$1, $$2,
+    $$3) : Lib_Parser_Impl_OK({ tag: 0, h1: $$4.h1,  h2: $$1.h1.h2 }, $$0, $$1, $$2, $$3)
+  ))))));
+let Prelude__$3C$2A_ = ( $$0, $$1,
+  $$2 ) => ($$0.h2($$0.h2($$0.h1(( $$9 ) => (( $$10 ) => ($$9))))($$1))($$2));
 let Lib_Parser_Impl_many =
   ( $$0 ) => (Lib_Parser_Impl_$$Prelude_Alternative$20Lib_Parser_Impl_Parser$2C_$3C$7C$3E_(Lib_Parser_Impl_some($$0),
   ( $$1 ) => (Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(Prelude_Nil))));
@@ -15117,18 +15208,13 @@ let Lib_Parser_Impl_some =
 let Lib_Parser_parenTypeExp$27 =
   Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(0),
   ( $$1 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_typeExpr,
-  ( $$2 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_many(Prelude__$3E$3E_(Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser,
-  Lib_Parser_Impl_keyword(","), Lib_Parser_typeExpr)),
+  ( $$2 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_many(Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2C_$3C$2A$3E_(Prelude__$3C$2A_(Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser,
+  Prelude__$3C$$$3E_(Lib_Parser_Impl_$$Prelude_Functor$20Lib_Parser_Impl_Parser,
+  (eta0) => (eta1) => Prelude__$2C_(eta0, eta1), Lib_Parser_Impl_getPos),
+  Lib_Parser_Impl_keyword(",")), Lib_Parser_typeExpr)),
   ( $$3 ) => (Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(Lib_Parser_parenTypeExp$27_comma($$2,
   $$3))))))));
-let Prelude__$3C$2A_ = ( $$0, $$1,
-  $$2 ) => ($$0.h2($$0.h2($$0.h1(( $$9 ) => (( $$10 ) => ($$9))))($$1))($$2));
 let Lib_Syntax_RImpossible = ( $$0 ) => ({ tag: 4, h1: $$0 });
-let Lib_Parser_Impl_getPos =
-  ( $$0 ) => (( $$1 ) => (( $$2 ) => (( $$3 ) => (( $$4 ) => ((
-    ($$1.tag == 0) ? Lib_Parser_Impl_OK({ tag: 0, h1: $$4.h1,  h2: $$0 }, $$0, $$1, $$2,
-    $$3) : Lib_Parser_Impl_OK({ tag: 0, h1: $$4.h1,  h2: $$1.h1.h2 }, $$0, $$1, $$2, $$3)
-  ))))));
 let Lib_Parser_parenTypeExp =
   Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_getPos,
   ( $$0 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_keyword("("),
@@ -15294,6 +15380,11 @@ let Lib_Parser_parseIfThen =
   ( $$5 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_term,
   ( $$6 ) => (Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(Lib_Syntax_RIf($$0,
   $$2, $$4, $$6))))))))))))))));
+let Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Creturn =
+  (eta0) => Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(eta0);
+let Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser =
+  Prelude_MkMonad((eta0) => (eta1) => Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(eta0,
+  eta1), Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Creturn);
 let Lib_Parser_caseAlt =
   Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(0),
   ( $$0 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_term,
@@ -15357,6 +15448,70 @@ let Lib_Parser_doLet =
   ( $$3 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_term,
   ( $$4 ) => (Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(Lib_Syntax_DoLet($$1,
   $$2, $$4))))))))))));
+let Lib_Syntax_$$Lib_Common_SetFC$20Lib_Syntax_Raw$2CsetFC = ( $$0, $$1 ) => {
+    switch ($$0.tag) {
+      case 0:
+        return Lib_Syntax_RVar($$0.h1, $$0.h2);
+      case 1:
+        return Lib_Syntax_RLam($$0.h1, $$0.h2, $$0.h3);
+      case 2:
+        return Lib_Syntax_RApp($$0.h1, $$0.h2, $$0.h3, $$0.h4);
+      case 3:
+        return Lib_Syntax_RU($$0.h1);
+      case 4:
+        return Lib_Syntax_RImpossible($$0.h1);
+      case 5:
+        return Lib_Syntax_RPi($$0.h1, $$0.h2, $$0.h3);
+      case 6:
+        return Lib_Syntax_RLet($$0.h1, $$0.h2, $$0.h3, $$0.h4, $$0.h5);
+      case 7:
+        return Lib_Syntax_RLit($$0.h1, $$0.h2);
+      case 8:
+        return Lib_Syntax_RCase($$0.h1, $$0.h2, $$0.h3, $$0.h4);
+      case 9:
+        return Lib_Syntax_RImplicit($$0.h1);
+      case 10:
+        return Lib_Syntax_RHole($$0.h1);
+      case 11:
+        return Lib_Syntax_RDo($$0.h1, $$0.h2);
+      case 12:
+        return Lib_Syntax_RIf($$0.h1, $$0.h2, $$0.h3, $$0.h4);
+      case 13:
+        return Lib_Syntax_RWhere($$0.h1, $$0.h2, $$0.h3);
+      case 14:
+        return Lib_Syntax_RAs($$0.h1, $$0.h2, $$0.h3);
+      case 15:
+        return Lib_Syntax_RUpdateRec($$0.h1, $$0.h2, $$0.h3);
+    }
+  };
+let Lib_Syntax_$$Lib_Common_SetFC$20Lib_Syntax_Raw =
+  (eta0) => (eta1) => Lib_Syntax_$$Lib_Common_SetFC$20Lib_Syntax_Raw$2CsetFC(eta0, eta1);
+let Lib_Parser_Impl_addFC = ( $$0,
+  $$1 ) => (( $$2 ) => (( $$3 ) => (( $$4 ) => (( $$5 ) => (( $$6 ) => {
+    let $$7 = Lib_Parser_Impl_runP($$1)($$2)($$3)($$4)($$5)($$6);
+    return (
+      ($$7.tag == 0) ? Lib_Parser_Impl_OK($$0($$7.h1)({ tag: 0, h1: $$6.h1, 
+        h2: Lib_Common_$$Prelude_Add$20Lib_Common_Bounds$2C_$2B_(Lib_Parser_Impl_tokStart($$3),
+        $$7.h2) }), $$7.h2, $$7.h3, $$7.h4, $$7.h5) : Lib_Parser_Impl_Fail($$7.h1,
+      $$7.h2, $$7.h3, $$7.h4, $$7.h5)
+    );
+  })))));
+let Lib_Parser_doIfThen =
+  Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_addFC(Lib_Syntax_$$Lib_Common_SetFC$20Lib_Syntax_Raw,
+  Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_keyword("if"),
+  ( $$0 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_term,
+  ( $$1 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_keyword("then"),
+  ( $$2 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_term,
+  ( $$3 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_getPos,
+  ( $$4 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_$$Prelude_Alternative$20Lib_Parser_Impl_Parser$2C_$3C$7C$3E_(Prelude__$2A$3E_(Lib_Parser_Impl_$$Prelude_Functor$20Lib_Parser_Impl_Parser,
+  Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser,
+  Lib_Parser_Impl_keyword("else"), Lib_Parser_term),
+  ( $$5 ) => (Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(Lib_Syntax_RApp($$4,
+  Lib_Syntax_RVar($$4, "return"), Lib_Syntax_RVar($$4, "MkUnit"), 1)))),
+  ( $$5 ) => (Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(Lib_Syntax_RIf(Lib_Common_emptyFC,
+  $$1, $$3, $$5))))))))))))))),
+  ( $$0 ) => (Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(Lib_Syntax_DoExpr(Lib_Syntax_$$Lib_Common_HasFC$20Lib_Syntax_Raw$2CgetFC($$0),
+  $$0))));
 let Lib_Parser_Impl_someSame =
   ( $$0 ) => (Lib_Parser_Impl_some(Lib_Parser_Impl_sameLevel($$0)));
 let Lib_Parser_doCaseLet =
@@ -15379,8 +15534,9 @@ let Lib_Parser_doCaseLet =
   h2: Prelude_Just($$8) }, $$6))))))))))))))))))))));
 let Lib_Parser_doStmt =
   Lib_Parser_Impl_$$Prelude_Alternative$20Lib_Parser_Impl_Parser$2C_$3C$7C$3E_(Lib_Parser_doCaseLet,
-  ( $$0 ) => (Lib_Parser_Impl_$$Prelude_Alternative$20Lib_Parser_Impl_Parser$2C_$3C$7C$3E_(Lib_Parser_doLet,
-  ( $$1 ) => (Lib_Parser_doArrow))));
+  ( $$0 ) => (Lib_Parser_Impl_$$Prelude_Alternative$20Lib_Parser_Impl_Parser$2C_$3C$7C$3E_(Lib_Parser_doIfThen,
+  ( $$1 ) => (Lib_Parser_Impl_$$Prelude_Alternative$20Lib_Parser_Impl_Parser$2C_$3C$7C$3E_(Lib_Parser_doLet,
+  ( $$2 ) => (Lib_Parser_doArrow))))));
 let Lib_Parser_doExpr =
   Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2C_$3C$2A$3E_(Prelude__$3C$2A_(Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser,
   Prelude__$3C$$$3E_(Lib_Parser_Impl_$$Prelude_Functor$20Lib_Parser_Impl_Parser,
@@ -15664,7 +15820,61 @@ let Lib_Parser_typeExpr =
     Lib_Common_BI($$2, "_", 1, true, $$3),
     $$4.h1)) : Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure($$3)
   )))))))))));
+let Lib_Syntax_$$Lib_Common_SetFC$20Lib_Syntax_Decl$2CsetFC = ( $$0, $$1 ) => {
+    switch ($$0.tag) {
+      case 0:
+        return Lib_Syntax_TypeSig($$1, $$0.h2, $$0.h3, $$0.h4);
+      case 1:
+        return Lib_Syntax_FunDef($$1, $$0.h2, $$0.h3);
+      case 2:
+        return Lib_Syntax_DCheck($$1, $$0.h2, $$0.h3);
+      case 3:
+        return Lib_Syntax_DDerive($$1, $$0.h2);
+      case 4:
+        return Lib_Syntax_DAlias($$1, $$0.h2, $$0.h3, $$0.h4);
+      case 5:
+        return Lib_Syntax_Data($$1, $$0.h2, $$0.h3, $$0.h4);
+      case 6:
+        return Lib_Syntax_ShortData($$1, $$0.h2, $$0.h3);
+      case 7:
+        return Lib_Syntax_PType($$1, $$0.h2, $$0.h3);
+      case 8:
+        return Lib_Syntax_PFunc($$1, $$0.h2, $$0.h3, $$0.h4, $$0.h5);
+      case 9:
+        return Lib_Syntax_PMixFix($$1, $$0.h2, $$0.h3, $$0.h4);
+      case 10:
+        return Lib_Syntax_Class($$1, $$0.h2, $$0.h3, $$0.h4);
+      case 11:
+        return Lib_Syntax_Instance($$1, $$0.h2, $$0.h3);
+      case 12:
+        return Lib_Syntax_Record($$1, $$0.h2, $$0.h3, $$0.h4, $$0.h5);
+      case 13:
+        return Lib_Syntax_Exports($$1, $$0.h2);
+      case 14:
+        return Lib_Syntax_DLog($$1, $$0.h2);
+    }
+  };
+let Lib_Syntax_$$Lib_Common_SetFC$20Lib_Syntax_Decl =
+  (eta0) => (eta1) => Lib_Syntax_$$Lib_Common_SetFC$20Lib_Syntax_Decl$2CsetFC(eta0,
+  eta1);
+let Lib_Syntax_DLog = ( $$0, $$1 ) => ({ tag: 14, h1: $$0,  h2: $$1 });
+let Lib_Syntax_Exports = ( $$0, $$1 ) => ({ tag: 13, h1: $$0,  h2: $$1 });
+let Lib_Syntax_Record = ( $$0, $$1, $$2, $$3, $$4 ) => ({ tag: 12, h1: $$0,  h2: $$1, 
+  h3: $$2,  h4: $$3,  h5: $$4 });
+let Lib_Syntax_Class = ( $$0, $$1, $$2, $$3 ) => ({ tag: 10, h1: $$0,  h2: $$1, 
+  h3: $$2,  h4: $$3 });
+let Lib_Syntax_PMixFix = ( $$0, $$1, $$2, $$3 ) => ({ tag: 9, h1: $$0,  h2: $$1, 
+  h3: $$2,  h4: $$3 });
+let Lib_Syntax_PFunc = ( $$0, $$1, $$2, $$3, $$4 ) => ({ tag: 8, h1: $$0,  h2: $$1, 
+  h3: $$2,  h4: $$3,  h5: $$4 });
+let Lib_Syntax_ShortData = ( $$0, $$1, $$2 ) => ({ tag: 6, h1: $$0,  h2: $$1, 
+  h3: $$2 });
+let Lib_Syntax_DAlias = ( $$0, $$1, $$2, $$3 ) => ({ tag: 4, h1: $$0,  h2: $$1, 
+  h3: $$2,  h4: $$3 });
+let Lib_Syntax_DDerive = ( $$0, $$1 ) => ({ tag: 3, h1: $$0,  h2: $$1 });
+let Lib_Syntax_DCheck = ( $$0, $$1, $$2 ) => ({ tag: 2, h1: $$0,  h2: $$1,  h3: $$2 });
 let Lib_Parser_parseSig =
+  Lib_Parser_Impl_addFC(Lib_Syntax_$$Lib_Common_SetFC$20Lib_Syntax_Decl,
   Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2C_$3C$2A$3E_(Lib_Parser_Impl_try(Prelude__$3C$2A_(Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser,
   Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2C_$3C$2A$3E_(Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2C_$3C$2A$3E_(Prelude__$3C$$$3E_(Lib_Parser_Impl_$$Prelude_Functor$20Lib_Parser_Impl_Parser,
   (eta0) => (eta1) => (eta2) => (eta3) => Lib_Syntax_TypeSig(eta0, eta1, eta2, eta3),
@@ -15672,7 +15882,7 @@ let Lib_Parser_parseSig =
   Lib_Parser_Impl_some(Lib_Parser_addPos(Lib_Parser_Impl_$$Prelude_Alternative$20Lib_Parser_Impl_Parser$2C_$3C$7C$3E_(Lib_Parser_ident,
   ( $$0 ) => (Lib_Parser_Impl_$$Prelude_Alternative$20Lib_Parser_Impl_Parser$2C_$3C$7C$3E_(Lib_Parser_uident,
   ( $$1 ) => (Lib_Parser_Impl_token(10)))))))), Lib_Parser_Impl_keyword(":"))),
-  Lib_Parser_typeExpr);
+  Lib_Parser_typeExpr));
 let Lib_Parser_getName = ( $$0 ) => {
     for (;;) {
       let $$1 = $$0;
@@ -15706,7 +15916,6 @@ let Lib_Parser_parseDef =
     }))) : Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(Lib_Syntax_FunDef($$0,
     $$2, Prelude__$3A$3A_(Prelude__$2C_($$1, Prelude_Nothing), Prelude_Nil)))
   )))))))));
-let Lib_Syntax_DLog = ( $$0, $$1 ) => ({ tag: 14, h1: $$0,  h2: $$1 });
 let Lib_Parser_Impl_lastPos =
   ( $$0 ) => (( $$1 ) => (( $$2 ) => (( $$3 ) => (( $$4 ) => (Lib_Parser_Impl_OK({ tag: 0, h1: $$4.h1, 
   h2: $$0 }, $$0, $$1, $$2, $$3))))));
@@ -15720,8 +15929,6 @@ let Lib_Parser_parseLog =
     ( $$5 ) => (Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(Lib_Syntax_DLog(Lib_Common_$$Prelude_Add$20Lib_Common_FC$2C_$2B_($$0,
     $$5), $$3))));
   })))));
-let Lib_Syntax_DAlias = ( $$0, $$1, $$2, $$3 ) => ({ tag: 4, h1: $$0,  h2: $$1, 
-  h3: $$2,  h4: $$3 });
 let Lib_Parser_parseAlias_ident =
   Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_getPos,
   ( $$0 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_token(0),
@@ -15737,7 +15944,6 @@ let Lib_Parser_parseAlias =
   ( $$5 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_typeExpr,
   ( $$6 ) => (Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(Lib_Syntax_DAlias($$1,
   $$3, Prelude_join(Prelude_$$Prelude_Monad$20Prelude_List, $$4), $$6))))))))))))));
-let Lib_Syntax_DDerive = ( $$0, $$1 ) => ({ tag: 3, h1: $$0,  h2: $$1 });
 let Lib_Parser_parseDerive =
   Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_getPos,
   ( $$0 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_withFC(Prelude__$2A$3E_(Lib_Parser_Impl_$$Prelude_Functor$20Lib_Parser_Impl_Parser,
@@ -15745,15 +15951,12 @@ let Lib_Parser_parseDerive =
   Lib_Parser_Impl_keyword("derive"), Lib_Parser_typeExpr)),
   ( $$1 ) => (Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(Lib_Syntax_DDerive($$1.h1,
   $$1.h2))))));
-let Lib_Syntax_Exports = ( $$0, $$1 ) => ({ tag: 13, h1: $$0,  h2: $$1 });
 let Lib_Parser_parseExport =
   Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_getPos,
   ( $$0 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_keyword("#export"),
   ( $$1 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_many(Lib_Parser_Impl_withFC(Lib_Parser_ident)),
   ( $$2 ) => (Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(Lib_Syntax_Exports($$0,
   $$2))))))));
-let Lib_Syntax_Record = ( $$0, $$1, $$2, $$3, $$4 ) => ({ tag: 12, h1: $$0,  h2: $$1, 
-  h3: $$2,  h4: $$3,  h5: $$4 });
 let Lib_Parser_nakedBind_makeBind = ( $$0 ) => (Lib_Common_BI($$0.h1, $$0.h2, 1, true,
   Lib_Syntax_RImplicit($$0.h1)));
 let Lib_Parser_nakedBind =
@@ -15792,8 +15995,6 @@ let Lib_Parser_parseInstance =
         $$2, Prelude_Nothing));
     }
   })))))));
-let Lib_Syntax_Class = ( $$0, $$1, $$2, $$3 ) => ({ tag: 10, h1: $$0,  h2: $$1, 
-  h3: $$2,  h4: $$3 });
 let Lib_Parser_parseClass =
   Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_getPos,
   ( $$0 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_keyword("class"),
@@ -15804,8 +16005,6 @@ let Lib_Parser_parseClass =
   ( $$4 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_startBlock(Lib_Parser_Impl_manySame(Lib_Parser_parseSig)),
   ( $$5 ) => (Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(Lib_Syntax_Class($$0,
   $$2, Prelude_join(Prelude_$$Prelude_Monad$20Prelude_List, $$3), $$5))))))))))))));
-let Lib_Syntax_ShortData = ( $$0, $$1, $$2 ) => ({ tag: 6, h1: $$0,  h2: $$1, 
-  h3: $$2 });
 let Lib_Parser_parseShortData =
   Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_getPos,
   ( $$0 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_keyword("data"),
@@ -15836,7 +16035,6 @@ let Lib_Parser_parseData =
         $$1, $$2, Prelude_Nothing));
     }
   })))))));
-let Lib_Syntax_DCheck = ( $$0, $$1, $$2 ) => ({ tag: 2, h1: $$0,  h2: $$1,  h3: $$2 });
 let Lib_Parser_parseNorm =
   Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2C_$3C$2A$3E_(Prelude__$3C$2A_(Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser,
   Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2C_$3C$2A$3E_(Prelude__$3C$2A_(Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser,
@@ -15844,8 +16042,6 @@ let Lib_Parser_parseNorm =
   (eta0) => (eta1) => (eta2) => Lib_Syntax_DCheck(eta0, eta1, eta2),
   Lib_Parser_Impl_getPos), Lib_Parser_Impl_keyword("#check")), Lib_Parser_typeExpr),
   Lib_Parser_Impl_keyword(":")), Lib_Parser_typeExpr);
-let Lib_Syntax_PFunc = ( $$0, $$1, $$2, $$3, $$4 ) => ({ tag: 8, h1: $$0,  h2: $$1, 
-  h3: $$2,  h4: $$3,  h5: $$4 });
 let Lib_Parser_parsePFunc =
   Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_getPos,
   ( $$0 ) => (Lib_Parser_Impl_$$Prelude_Monad$20Lib_Parser_Impl_Parser$2Cbind(Lib_Parser_Impl_keyword("pfunc"),
@@ -15869,8 +16065,6 @@ let Lib_Parser_parsePType =
   ( $$4 ) => (Lib_Parser_typeExpr))),
   ( $$4 ) => (Lib_Parser_Impl_$$Prelude_Applicative$20Lib_Parser_Impl_Parser$2Cpure(Lib_Syntax_PType($$0,
   $$2, $$4))))))))));
-let Lib_Syntax_PMixFix = ( $$0, $$1, $$2, $$3 ) => ({ tag: 9, h1: $$0,  h2: $$1, 
-  h3: $$2,  h4: $$3 });
 let Lib_Parser_Impl_addOp = ( $$0, $$1,
   $$2 ) => (( $$3 ) => (( $$4 ) => (( $$5 ) => (( $$6 ) => (( $$7 ) => {
     let $$8 = Prelude_splitBy($$0, "_");
@@ -17652,7 +17846,7 @@ let Main_runRepl =
     ($$1.tag == 0) ? Lib_Types_$$Prelude_Applicative$20Lib_Types_M$2Cpure(0) : Lib_Types_$$Prelude_Monad$20Lib_Types_M$2Cbind(Main_runString($$1.h1),
     ( $$4 ) => (Main_runRepl))
   )))));
-let Revision_gitRevision = "d50428f";
+let Revision_gitRevision = "da14369";
 let Main_replHeader = Prelude_putStrLn(Lib_Types_$$Prelude_HasIO$20Lib_Types_M,
   (("Newt REPL (" + Revision_gitRevision) + ")\n"));
 let Main_writeScheme =
