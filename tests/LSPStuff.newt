@@ -34,3 +34,7 @@ vfoo : ∀ n a.  Vect n a → Nat
 -- The first _ ends up with a stray case split if the `when` is not there
 vfoo (_:-_ _ _) = Z
 vfoo (VNil) = Z
+
+rename : ∀ a. List a → List a
+rename xs = xs
+

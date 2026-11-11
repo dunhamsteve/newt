@@ -1829,6 +1829,8 @@ infer ctx (RPi fc info@(BI nmfc nm icit quant ty) ty2) = do
   checkMarker fc ctx.marker Zero
   ty' <- checkIn ctx Zero ty (VU fc)
   vty' <- eval ctx.env ty'
+  -- don't register nameless args
+  if nm /= "_" then addTypeInfo nmfc nm ctx.env vty' nmfc
   ty2' <- checkIn (extend ctx (const vty' <$> info)) Zero ty2 (VU fc)
   pure (Pi fc (const ty' <$> info) ty2', (VU fc))
 infer ctx (RLet fc nm ty v sc) = do

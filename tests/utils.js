@@ -21,11 +21,15 @@ export function rename(fn, row, col, name) {
   const urn = `file://${process.cwd()}/tests/${fn}`
   clog(`*** rename ${fn} ${row} ${col} ${name}`)
   let edit = LSP_lspRename(urn, row, col, name)
+  if (edit) {
   for (let fn in edit.changes) {
     for (let change of edit.changes[fn]) {
       let base = fn.split('/').at(-1)
       clog(`- ${base} ${showRange(change.range)} ${jstr(change.newText)}`)
     }
+  }
+  } else {
+    clog('no edits')
   }
   clog()
 }

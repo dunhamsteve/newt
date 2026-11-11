@@ -57,3 +57,11 @@ INFO 5:11--5:12 "  n : Prelude.Nat\n  m : Prelude.Nat\n--------\nPrelude.Nat"
 
 *** Actions LSPStuff.newt 34 12
 
+*** rename LSPStuff.newt 37 19 woot
+- LSPStuff.newt 37:28--37:29 "woot"
+- LSPStuff.newt 37:19--37:20 "woot"
+- LSPStuff.newt 37:11--37:12 "woot"
+
+*** rename LSPStuff.newt 37 14 woot
+no edits
+

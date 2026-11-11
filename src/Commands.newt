@@ -309,18 +309,18 @@ getCaseSplit row col fc@(MkFC uri (MkBounds sr sc er ec)) ctx nm scty = do
 derive Show TypeInfo
 
 -- Return a list of all FC that are the same name (in scope)
--- The first entry shoudl be at row/col
+-- The first entry should be at row/col
 getRenameInfo : ModContext → Int → Int → M (List FC)
 getRenameInfo ctx row col = do
   let (Just $ MkTypeInfo fc nm _ _ root) = checkMod row col ctx.modTypes
     | _ => pure []
-  -- let ranges = filter (\case MkTypeInfo _ _ _ _ root' => root' == root) ctx.modTypes
   let infos = filter ((root ==) ∘ sourceFC) ctx.modTypes
-  case any (mismatch nm) infos of
-    True => do
-      putStrLn "MISMATCH! \{show infos}"
-      pure []
-    False => pure $ fc :: map getFC infos
+  let (False) = any (mismatch nm) infos
+    | _ => putStrLn {M} "MISMATCH! \{show infos}" >> pure []
+  let fcs = map getFC infos
+  if elem root fcs
+    then pure $ fc :: fcs
+    else putStrLn "Can't find root \{show root}" >> pure []
 
   where
     getFC : TypeInfo → FC
