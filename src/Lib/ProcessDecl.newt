@@ -170,7 +170,6 @@ processDef ns fc nm clauses = do
     then do
       debug "inline flag \{name}"
       setFlag (QN ns nm) fc Inline
-    else pure MkUnit
 
 processCheck :  String → FC → Raw → Raw → M Unit
 processCheck ns fc tm ty = do

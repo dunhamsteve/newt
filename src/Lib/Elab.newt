@@ -239,7 +239,7 @@ solveAutos = do
   let autos = filter isAuto $ mapMaybe (flip lookupMap' mc.metas) mc.autos
   res <- run autos
   -- If anything is solved, we try again from the top
-  if res then solveAutos else pure MkUnit
+  if res then solveAutos
   where
     isAuto : MetaEntry -> Bool
     isAuto (Unsolved fc k ctx x AutoSolve) = True
@@ -268,9 +268,7 @@ checkAutos ix Nil = pure MkUnit
 checkAutos ix (cand :: rest) = do
   entry@(Unsolved fc k ctx ty AutoSolve) <- lookupMeta cand | _ => checkAutos ix rest
   case ty of
-    VRef _ nm sp => if checkMeta sp
-        then trySolveAuto entry >> checkAutos ix rest
-        else pure MkUnit
+    VRef _ nm sp => when (checkMeta sp) $ trySolveAuto entry >> checkAutos ix rest
     _ => pure MkUnit
   checkAutos ix rest
   where
@@ -534,7 +532,8 @@ unify env mode t u = do
         then unifySpine env spineMode sp sp'
         else do
           let (CheckAll) = top.currentMod.modMetaCtx.mcmode | _ => error fc "vref mismatch \{show k} \{show k'}"
-          when (isConstr (lookup k top) && isConstr (lookup k' top)) $ error fc "vref mismatch \{show k} \{show k'}"
+          if isConstr (lookup k top) && isConstr (lookup k' top)
+            then error fc "vref mismatch \{show k} \{show k'}"
           -- We only really need to know if it has a meta at the moment
           case join (map (getMetas ∘ fst) $ sp <>> Nil) ++ join (map (getMetas ∘ fst) $ sp' <>> Nil) : List QName of
             Nil => error fc "vref mismatch \{show t'} =?= \{show u'}"
@@ -683,7 +682,6 @@ freshMeta ctx fc ty kind = do
           success <- trySolveAuto newmeta
           debug "auto: instant \{show success} \{show newmeta}"
       _ => return MkUnit
-    else pure MkUnit
 
   let size = length $ filter (\x => x == Bound) ctx.bds
   -- I tried checking Auto immediately if CheckAll, but there isn't enough information yet.
@@ -1054,7 +1052,7 @@ forcedCase ctx prob@(MkProb clauses ty) ((ix , (VRef _ dcName sp)) :: scons) = d
   vty <- eval Nil ty
   (ctx', ty', vars, sc) <- extendPi ctx (vty) Lin Lin
 
-  when (length vars /= snoclen sp) $ error emptyFC "\{show $ length vars} vars /= \{show $ snoclen sp}"
+  if length vars /= snoclen sp then error emptyFC "\{show $ length vars} vars /= \{show $ snoclen sp}"
 
   -- constrain arguments to spine of dotted value
   let lvl = ctx'.lvl - length' vars
@@ -1067,7 +1065,8 @@ forcedCase ctx prob@(MkProb clauses ty) ((ix , (VRef _ dcName sp)) :: scons) = d
   clauses <- mapMaybe id <$> traverse (rewriteClause ix tcon dcName vars) prob.clauses
   debug "and now:"
   for clauses $ (\x => debug "    \{show x}")
-  when (length' clauses == 0) $ error ctx.ctxFC "Missing case for \{show dcName} splitting \{show ix}"
+  if length' clauses == 0
+    then error ctx.ctxFC "Missing case for \{show dcName} splitting \{show ix}"
   tm <- forcedCase ctx' (MkProb clauses prob.ty) $ scons ++ scons'
 
   pure $ Case ctx.ctxFC (Bnd ctx.ctxFC (lvl2ix ctx.lvl ix)) [CaseCons dcName (length vars) tm]

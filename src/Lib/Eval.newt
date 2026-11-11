@@ -370,7 +370,6 @@ zonkApp top l env t@(Meta fc k sz) sp = do
       debug $  "-> result is \{show foo}"
       if length' env /= l
         then fatalError "MM2 \{show l} /= \{show $ length' env}"
-        else pure MkUnit
       res <- tweakFC fc <$> quote l foo
       debug "quoted \{show res}"
       zonk top l env res
