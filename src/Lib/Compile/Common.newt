@@ -114,7 +114,7 @@ getNames (App x t u Many) acc = getNames u $ getNames t acc
 getNames (App x t u Zero) acc = getNames t acc
 getNames (Pi x info u) acc = getNames u $ getNames info.biTy $ QN primNS "PiType" :: acc
 getNames (Let x str t u) acc = getNames u $ getNames t acc
-getNames (LetRec x str _ t u) acc = getNames u $  getNames t acc
+getNames (LetRec x q str _ t u) acc = getNames u $  getNames t acc
 getNames (Case x t alts) acc = getNames t $ foldl getAltNames acc alts
   where
     getAltNames : List QName -> CaseAlt -> List QName

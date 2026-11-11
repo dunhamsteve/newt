@@ -1,0 +1,60 @@
+module With
+-- https://idris2.readthedocs.io/en/latest/tutorial/views.html
+
+import Prelude
+import Data.Vect
+
+append : ∀ n m a. Vect n a → Vect m a → Vect (n + m) a
+append {Z} VNil ys = ys
+append {S k} (x :- xs) ys = x :- append xs ys
+
+filter : ∀ a n. (a → Bool) → Vect n a → Sg Nat (\l => Vect l a)
+filter p VNil = (_ ** VNil)
+filter p (x :- xs) = case filter p xs of
+  _ ** xs' => if p x then (_ ** x :- xs') else _ ** xs'
+
+data Parity : Nat → U where
+  Even : {n : _} → Parity (n + n)
+  Odd : {n : _} → Parity (S (n + n))
+
+plusSuccRightSucc : (j k : Nat) →  S (j + k) ≡ j + S k
+
+-- this is a replace and theorem
+helpEven : (j : Nat) → Parity (S j + S j) -> Parity (S (S (j + j)))
+helpEven j p = replace (\z => Parity (S z)) (sym $ plusSuccRightSucc j j) p
+
+helpOdd : (j : Nat) → Parity (S (S (j + S j))) -> Parity (S (S (S (j + j))))
+helpOdd j p = replace (\z => Parity (S (S z))) (sym $ plusSuccRightSucc j j) p
+
+parity : (n : Nat) → Parity n
+parity Z = Even {Z}
+parity (S Z) = Odd {Z}
+parity (S (S k)) = case parity k of
+  -- Idris rewrite goes the other way
+  Even {j} => replace (\z => Parity (S z)) (sym $ plusSuccRightSucc j j) (Even {S j})
+  Odd {j}  => replace (\z => Parity (S (S z))) (sym $ plusSuccRightSucc j j) (Odd {S j})
+
+natToBin : Nat → List Bool
+natToBin Z = Nil
+natToBin k = case parity k of
+  Even {j} => False :: natToBin j
+  Odd {j} => True :: natToBin j
+
+-- I'm not really getting a need for `with` yet, but it does want rewrite
+
+-- https://idris2.readthedocs.io/en/latest/tutorial/theorems.html
+
+0 disjointTy : Nat → U
+disjointTy Z = Unit
+disjointTy (S k) = Void
+
+#log 2
+disjoint : (n : Nat) → Z ≡ S n → Void
+-- ERROR TODO with MkUnit removed, we should have a better error
+disjoint n prf = replace disjointTy prf MkUnit
+  -- eval doesn't see letrec definitions
+  -- where
+  --   0 disjointTy : Nat → U
+  --   disjointTy Z = Unit
+  --   disjointTy (S k) = Void
+

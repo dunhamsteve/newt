@@ -76,7 +76,7 @@ tryEval env (VRef fc k sp) = do
             case val of
               VCase _ _ _ _ => pure Nothing
               VLam _ _ _ => pure Nothing
-              VLetRec _ _ _ _ _ => pure Nothing
+              VLetRec _ _ _ _ _ _ => pure Nothing
               v => pure $ Just v)
             (const $ pure Nothing)
       Just (MkEntry _ q (QN "Prelude" "unpack") ty (PrimFn _ _ _) _) =>
@@ -193,10 +193,19 @@ eval env (Let fc nm t u) = do
 -- LetRec is used for `where` clauses
 -- we need to handle this for inlining/zonking.
 -- TODO It probably needs a different approach for NormalEval (see Let)
-eval env (LetRec fc nm ty t u) = do
+eval env (LetRec fc q nm ty t u) = do
+  top <- getTop
   ty' <- eval env ty
-  pure $ VLetRec fc nm ty' (MkClosure env t) (MkClosure env u)
+
+  case top.elabMode of
+    NormalEval => do
+      let env' = VVar emptyFC "_" (length' env) Lin :: env
+      t' <- eval env' t
+      eval (t' :: env) u
+    InlineEval => do
+      pure $ VLetRec fc q nm ty' (MkClosure env t) (MkClosure env u)
 -- Here, we assume env has everything. We push levels onto it during type checking.
+
 -- I think we could pass in an l and assume everything outside env is free and
 -- translate to a level
 eval env (Bnd fc i) = case getAt' i env of
@@ -262,13 +271,13 @@ quote l (VLet fc nm t u) = do
   u <- u $$ VVar fc nm l Lin
   u' <- quote (1 + l) u
   pure $ Let fc nm t' u'
-quote l (VLetRec fc nm ty t u) = do
+quote l (VLetRec fc q nm ty t u) = do
   ty' <- quote l ty
   t  <- t $$ VVar fc nm l Lin
   t' <- quote (1 + l) t
   u <- u $$ VVar fc nm l Lin
   u' <- quote (1 + l) u
-  pure $ LetRec fc nm ty' t' u'
+  pure $ LetRec fc q nm ty' t' u'
 quote l (VU fc) = pure (UU fc)
 quote l (VRef fc n sp) = quoteSp l (Ref fc n) sp
 quote l (VCase fc sc env alts) = do
@@ -323,25 +332,6 @@ eval' env (t,q) = do
   v <- eval env t
   pure (v,q)
 
--- REVIEW When metas are subst in, the fc point elsewhere
--- We might want to update when it is solved and update recursively?
--- For errors, I think we want to pretend the code has been typed in place
--- TODO we want this in general for HasFC, probably will use it in the parser
-tweakFC : FC -> Tm -> Tm
-tweakFC fc (Bnd fc1 k) = Bnd fc k
-tweakFC fc (Force _ t) = Force fc t
-tweakFC fc (Delay _ t) = Delay fc t
-tweakFC fc (Ref fc1 nm) = Ref fc nm
-tweakFC fc (UU fc1) = UU fc
-tweakFC fc (Meta fc1 k sz) = Meta fc k sz
-tweakFC fc (Lam fc1 info t) = Lam fc info t
-tweakFC fc (App fc1 t u q) = App fc t u q
-tweakFC fc (Pi fc1 info u) = Pi fc info u
-tweakFC fc (Case fc1 t xs) = Case fc t xs
-tweakFC fc (Let fc1 nm t u) = Let fc nm t u
-tweakFC fc (LetRec fc1 nm ty t u) = LetRec fc nm ty t u
-tweakFC fc (Lit fc1 lit) = Lit fc lit
-tweakFC fc (Erased fc1) = Erased fc
 
 withLets : ∀ a. M a → M a
 withLets task = do
@@ -370,7 +360,9 @@ zonkApp top l env t@(Meta fc k sz) sp = do
       debug $  "-> result is \{show foo}"
       if length' env /= l
         then fatalError "MM2 \{show l} /= \{show $ length' env}"
-      res <- tweakFC fc <$> quote l foo
+      res <- quote l foo
+      -- REVIEW When metas are subst in, the fc point elsewhere
+      let res = setFC res fc
       debug "quoted \{show res}"
       zonk top l env res
     _ => zonkSpine l env t sp
@@ -435,9 +427,9 @@ zonk top l env t =
   (Let fc nm t u) =>
     let env' = VVar emptyFC "_" l Lin :: env in
     Let fc nm <$> zonk top l env t <*> zonkBind top (l + 1) env' u
-  (LetRec fc nm ty t u) =>
+  (LetRec fc q nm ty t u) =>
     let env' = VVar emptyFC "_" l Lin :: env in
-    LetRec fc nm <$> zonk top l env ty <*> zonkBind top (l + 1) env' t <*> zonkBind top (l + 1) env' u
+    LetRec fc q nm <$> zonk top l env ty <*> zonkBind top (l + 1) env' t <*> zonkBind top (l + 1) env' u
   (Case fc sc alts) => do
       sc' <- zonk top l env sc
       alts' <- traverse (zonkAlt top l env) alts
@@ -448,3 +440,4 @@ zonk top l env t =
   Bnd fc ix => pure $ Bnd fc ix
   Ref fc ix => pure $ Ref fc ix
   Erased fc => pure $ Erased fc
+

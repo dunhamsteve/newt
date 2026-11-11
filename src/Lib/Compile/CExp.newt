@@ -294,8 +294,8 @@ compileTerm env (Let _ nm t u) = do
   t' <- compileTerm env t
   u' <- compileTerm (push env Many) u
   pure $ CLet nm t' u'
-compileTerm env (LetRec _ nm _ t u) = do
-  let env' = push env Many
+compileTerm env (LetRec _ q nm _ t u) = do
+  let env' = push env q
   t' <- compileTerm env' t
   u' <- compileTerm env' u
   pure $ CLetRec nm t' u'

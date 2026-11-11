@@ -44,8 +44,8 @@ data Tm : U where
   Case : FC -> Tm -> List CaseAlt -> Tm
   -- need type? use bindinfo?
   Let : FC -> Name -> Tm -> Tm -> Tm
-  -- for desugaring where
-  LetRec : FC -> Name -> (ty : Tm) -> (t : Tm) -> (u : Tm) -> Tm
+  -- for desugaring where - do we want BindInfo?
+  LetRec : FC -> Quant ->  Name -> (ty : Tm) -> (t : Tm) -> (u : Tm) -> Tm
   Lit : FC -> Literal -> Tm
   -- An erased value
   Erased : FC -> Tm
@@ -65,8 +65,24 @@ instance HasFC Tm where
   getFC (Case fc t xs) = fc
   getFC (Lit fc _) = fc
   getFC (Let fc _ _ _) = fc
-  getFC (LetRec fc _ _ _ _) = fc
+  getFC (LetRec fc _ _ _ _ _) = fc
   getFC (Erased fc) = fc
+
+instance SetFC Tm where
+  setFC (Bnd fc1 k) fc = Bnd fc k
+  setFC (Force _ t) fc = Force fc t
+  setFC (Delay _ t) fc = Delay fc t
+  setFC (Ref fc1 nm) fc = Ref fc nm
+  setFC (UU fc1) fc = UU fc
+  setFC (Meta fc1 k sz) fc = Meta fc k sz
+  setFC (Lam fc1 info t) fc = Lam fc info t
+  setFC (App fc1 t u q) fc = App fc t u q
+  setFC (Pi fc1 info u) fc = Pi fc info u
+  setFC (Case fc1 t xs) fc = Case fc t xs
+  setFC (Let fc1 nm t u) fc = Let fc nm t u
+  setFC (LetRec fc1 q nm ty t u) fc = LetRec fc q nm ty t u
+  setFC (Lit fc1 lit) fc = Lit fc lit
+  setFC (Erased fc1) fc = Erased fc
 
 showCaseAlt : CaseAlt → String
 
@@ -85,7 +101,7 @@ instance Show Tm where
   show (Pi _ (BI _ str Auto rig t) u) = "(Pi {{\{show rig}\{str} : \{show t}}} => \{show u})"
   show (Case _ sc alts) = "(Case \{show sc} \{show $ map showCaseAlt   alts})"
   show (Let _ nm t u) = "(Let \{nm} \{show t} \{show u})"
-  show (LetRec _ nm ty t u) = "(LetRec \{nm} : \{show ty} \{show t} \{show u})"
+  show (LetRec _ q nm ty t u) = "(LetRec \{show q}\{nm} : \{show ty} \{show t} \{show u})"
   show (Erased _) = "ERASED"
 
 
@@ -112,6 +128,8 @@ parens : Int -> Int -> Doc -> Doc
 parens a b doc = if a < b
   then text "(" ++ doc ++ text ")"
   else doc
+
+-- Pretty printer for Tm.
 
 pprint' p names (Bnd _ k) = case getAt (cast k) names of
   -- Either a bug or we're printing without names
@@ -142,10 +160,10 @@ pprint' p names (Pi _ (BI _ nm Explicit rig t) u) = parens 0 p $
 pprint' p names (Case _ sc alts) = parens 0 p $ text "case" <+> pprint' 0 names sc <+> text "of" ++ (nest 2 (line ++ stack (map (pprintAlt 0 names) alts)))
 pprint' p names (Lit _ lit) = text (show lit)
 pprint' p names (Let _ nm t u) = parens 0 p $ text "let" <+> text nm <+> text ":=" <+> pprint' 0 names t <+> text "in" </> (nest 2 $ pprint' 0 (nm :: names) u)
-pprint' p names (LetRec _ nm ty t u) = parens 0 p $ text "letrec" <+> text nm <+> text ":" <+> pprint' 0 names ty <+> text ":=" <+> pprint' 0 names t <+> text "in" </> (nest 2 $ pprint' 0 (nm :: names) u)
+-- FIXME - should be a where clause
+pprint' p names (LetRec _ q nm ty t u) = parens 0 p $ text "letrec" <+> text (show q) ++ text nm <+> text ":" <+> pprint' 0 names ty <+> text ":=" <+> pprint' 0 names t <+> text "in" </> (nest 2 $ pprint' 0 (nm :: names) u)
 pprint' p names (Erased _) = text "ERASED"
 
--- Pretty printer for Tm.
 
 pprint : List String -> Tm -> Doc
 pprint names tm = pprint' 0 names tm
@@ -178,7 +196,7 @@ data Val : U where
   VPi : FC → BindInfo Val → (b : Closure) → Val
   -- not substing let, like idris
   VLet : FC -> Name -> Val -> Closure -> Val
-  VLetRec : FC -> Name -> Val -> Closure -> Closure -> Val
+  VLetRec : FC -> Quant -> Name -> Val -> Closure -> Closure -> Val
   VU : FC -> Val
   VErased : FC -> Val
   VLit : FC -> Literal -> Val
@@ -203,7 +221,7 @@ getValFC (VU fc) = fc
 getValFC (VErased fc) = fc
 getValFC (VLit fc _) = fc
 getValFC (VLet fc _ _ _) = fc
-getValFC (VLetRec fc _ _ _ _) = fc
+getValFC (VLetRec fc _ _ _ _ _) = fc
 
 instance HasFC Val where getFC = getValFC
 
@@ -231,7 +249,7 @@ instance Show Val where
   show (VU _) = "U"
   show (VLit _ lit) = show lit
   show (VLet _ nm a (MkClosure env b)) = "(%let \{show nm} = \{show a} in \{show b}"
-  show (VLetRec _ nm ty (MkClosure _ a) (MkClosure _ b)) = "(%letrec \{show nm} : \{show ty} = \{show a} in \{show b}"
+  show (VLetRec _ q nm ty (MkClosure _ a) (MkClosure _ b)) = "(%letrec \{show q}\{show nm} : \{show ty} = \{show a} in \{show b}"
   show (VErased _) = "ERASED"
 
 

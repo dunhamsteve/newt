@@ -46,8 +46,12 @@ single : String → Json → Json
 single k v = JsonObj $ (k,v) :: Nil
 
 record LSPState where
+    -- caches processed module data
     topContext : TopContext
+    -- the base directory for the module tree
     baseDir : String
+    -- module name to (LSP) filename,content
+    -- only for file content from the client
     files : SortedMap String (String × String)
 
 state : IORef LSPState

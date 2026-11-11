@@ -63,7 +63,7 @@ getTMetas (Case _ t alts) = join $ getTMetas t :: map getAltMetas alts
     getAltMetas (CaseCons name args t) = getTMetas t
     getAltMetas (CaseLit _ t) = getTMetas t
 getTMetas (Let _ _ t u) = getTMetas t ++ getTMetas u
-getTMetas (LetRec _ _ ty t u) = getTMetas ty ++ getTMetas t ++ getTMetas u
+getTMetas (LetRec _ _ _ ty t u) = getTMetas ty ++ getTMetas t ++ getTMetas u
 getTMetas (Delay _ t) = getTMetas t
 getTMetas (Force _ t) = getTMetas t
 getTMetas _ = Nil
@@ -84,7 +84,7 @@ getMetas (VCase _ sc _ alts) = join $ getMetas sc :: map getAltMetas alts
     getAltMetas (CaseDefault t) = getTMetas t
     getAltMetas (CaseCons name args t) = getTMetas t
     getAltMetas (CaseLit _ t) = getTMetas t
-getMetas (VLetRec _ _ ty (MkClosure _ t) (MkClosure _ u)) = getMetas ty ++ getTMetas t ++ getTMetas u
+getMetas (VLetRec _ _ _ ty (MkClosure _ t) (MkClosure _ u)) = getMetas ty ++ getTMetas t ++ getTMetas u
 getMetas _ = []
 
 -- Variable assignments needed by unification, currently only used for pattern matching
@@ -724,17 +724,17 @@ insert ctx tm ty = do
 
 -- REVIEW the lvl is kind of implicit, do we need to store it here?
 -- this was name before
-data Bind = MkBind Int Icit Val
+data Bind = MkBind Quant Int Icit Val
 
 instance Show Bind where
-  show (MkBind str icit x) = "\{show str} \{show icit}"
+  show (MkBind q str icit x) = "\{show str} \{show icit}"
 
 ---------------- Case builder
 
 -- These are "constraint" in the paper, but we've got other things called constraints
-data PMatch = PC Int Pattern
+data PMatch = PC Quant Int Pattern
 instance Show PMatch where
-  show (PC nm pat) = show (nm,pat)
+  show (PC q nm pat) = show (q,nm,pat)
 
 record Clause where
   constructor MkClause
@@ -761,15 +761,15 @@ fresh {{ctx}} base = base ++ "$" ++ show ctx.lvl
 buildTree : Context -> Problem -> M Tm
 
 -- Updates a clause for INTRO - turning a pattern into a constraint
-introClause : Int -> Icit -> Val -> Clause -> M Clause
-introClause nm icit ty (MkClause fc cons (pat :: pats) expr) =
-  if icit == getIcit pat then pure $ MkClause fc (cons ++ [PC nm pat]) pats expr
+introClause : Quant -> Int -> Icit -> Val -> Clause -> M Clause
+introClause q nm icit ty (MkClause fc cons (pat :: pats) expr) =
+  if icit == getIcit pat then pure $ MkClause fc (cons ++ [PC q nm pat]) pats expr
   else if icit == Implicit then pure $ MkClause fc cons (pat :: pats) expr
   else if icit == Auto then pure $ MkClause fc cons (pat :: pats) expr
   else error fc "Explicit arg and \{show $ getIcit pat} pattern \{show nm}  \{show pat}"
-introClause nm Implicit ty (MkClause fc cons Nil expr) = pure $ MkClause fc (PC nm (PatWild fc Implicit) :: cons) Nil expr
-introClause nm Auto ty (MkClause fc cons Nil expr) = pure $ MkClause fc (PC nm (PatWild fc Auto) :: cons) Nil expr
-introClause nm icit ty (MkClause fc cons Nil expr) = error fc "Clause size doesn't match"
+introClause q nm Implicit ty (MkClause fc cons Nil expr) = pure $ MkClause fc (PC q nm (PatWild fc Implicit) :: cons) Nil expr
+introClause q nm Auto ty (MkClause fc cons Nil expr) = pure $ MkClause fc (PC q nm (PatWild fc Auto) :: cons) Nil expr
+introClause q nm icit ty (MkClause fc cons Nil expr) = error fc "Clause size doesn't match"
 
 -- Find the next constraint to split on
 -- We go in order at the moment, which happens to be right to left
@@ -777,10 +777,11 @@ introClause nm icit ty (MkClause fc cons Nil expr) = error fc "Clause size doesn
 -- solving the others.
 -- TODO If the type is a meta and we're looking at a DCon, we _could_ give the TCon some
 -- args and try to solve the meta, but I'm not sure if that's a good idea.
+-- we will try skipping erased args
 findSplit : List PMatch -> Maybe PMatch
 findSplit Nil = Nothing
-findSplit (x@(PC nm (PatCon _ _ _ _ _)) :: xs) = Just x
-findSplit (x@(PC nm (PatLit _ val)) :: xs) = Just x
+findSplit (x@(PC Many nm (PatCon _ _ _ _ _)) :: xs) = Just x
+findSplit (x@(PC Many nm (PatLit _ val)) :: xs) = Just x
 findSplit (x :: xs) = findSplit xs
 
 lookupDCon : QName -> M (QName × Int × Tm)
@@ -825,7 +826,7 @@ extendPi ctx (VPi x info@(BI _ str icit rig a) b) nms sc = do
     let ctx' = extend ctx (BI x nm icit rig a)
     let v = VVar emptyFC str ctx.lvl Lin
     tyb <- b $$ v
-    extendPi ctx' tyb (nms :< MkBind ctx.lvl icit a) (sc :< (VVar x str ctx.lvl Lin, rig))
+    extendPi ctx' tyb (nms :< MkBind rig ctx.lvl icit a) (sc :< (VVar x str ctx.lvl Lin, rig))
 extendPi ctx ty nms sc = pure (ctx, ty, nms <>> Nil, sc)
 
 -- Still not right, we have S _ /= Z (good)
@@ -929,27 +930,27 @@ makeConstr : FC -> List Bind -> List Pattern -> M (List PMatch)
 makeConstr fc Nil Nil = pure $ Nil
 makeConstr fc Nil (pat :: pats) = error (getFC pat) "too many patterns"
 
-makeConstr fc ((MkBind nm Implicit ty) :: xs) Nil  = makeConstr fc xs Nil
-makeConstr fc ((MkBind nm Auto ty) :: xs) Nil = makeConstr fc xs Nil
-makeConstr fc ((MkBind nm Explicit ty) :: xs) Nil = error fc "not enough patterns"
-makeConstr fc ((MkBind nm Explicit ty) :: xs) (pat :: pats) =
+makeConstr fc ((MkBind q nm Implicit ty) :: xs) Nil  = makeConstr fc xs Nil
+makeConstr fc ((MkBind q nm Auto ty) :: xs) Nil = makeConstr fc xs Nil
+makeConstr fc ((MkBind q nm Explicit ty) :: xs) Nil = error fc "not enough patterns"
+makeConstr fc ((MkBind q nm Explicit ty) :: xs) (pat :: pats) =
   if getIcit pat == Explicit
     then do
       rest <- makeConstr fc xs pats
-      pure $ PC nm pat :: rest
+      pure $ PC q nm pat :: rest
     else error fc "mismatch between Explicit and \{show $ getIcit pat}"
-makeConstr fc ((MkBind nm icit ty) :: xs) (pat :: pats) =
+makeConstr fc ((MkBind q nm icit ty) :: xs) (pat :: pats) =
   if getIcit pat /= icit -- Implicit/Explicit Implicit/Auto, etc
     then makeConstr fc xs (pat :: pats)
     else do
       rest <- makeConstr fc xs pats
-      pure $ PC nm pat :: rest
+      pure $ PC q nm pat :: rest
 
 -- constraints on scnm with constraints on parameters, or nothing if non-matching clause
 -- TODO update types that reference the scrutinee?
 rewriteConstraint : Int → QName -> QName ->  List Bind -> List PMatch -> List PMatch -> M (Maybe (List PMatch))
 rewriteConstraint k tcname dcname vars Nil acc = pure $ Just acc
-rewriteConstraint k tcname dcname vars (c@(PC nm y) :: xs) acc =
+rewriteConstraint k tcname dcname vars (c@(PC q nm y) :: xs) acc =
   if nm == k
     then case y of
       PatVar _ _ s => pure $ Just $ c :: (xs ++ acc)
@@ -964,7 +965,7 @@ rewriteConstraint k tcname dcname vars (c@(PC nm y) :: xs) acc =
           -- putting this in constraints causes it to be renamed k -> nm' when we check body.
           Just (fc',nm') => do
             rest <- makeConstr fc vars ys
-            pure $ Just $ (PC k (PatVar fc' icit nm')) :: rest ++ xs ++ acc
+            pure $ Just $ (PC q k (PatVar fc' icit nm')) :: rest ++ xs ++ acc
         else do
           -- TODO can we check this when we make the PatCon?
           top <- getTop
@@ -992,16 +993,16 @@ isSplit ix ((MkClause clauseFC cons pats expr) :: xs) =
   if any (match) cons then True else isSplit ix xs
   where
     match : PMatch → Bool
-    match (PC k _) = k == ix
+    match (PC _ k _) = k == ix
 
 matchName : Int → PMatch → Bool
-matchName nm (PC n _) = nm == n
+matchName nm (PC q n _) = nm == n
 
 -- collect constructors that are matched on
 matchedConstructors : Int → List Clause → List (FC × QName)
 matchedConstructors nm Nil = Nil
 matchedConstructors nm ((MkClause fc cons pats expr) :: cs) = case find (matchName nm) cons of
-  Just (PC _ (PatCon fc _ dcon _ _)) => (fc, dcon) :: matchedConstructors nm cs
+  Just (PC _ _ (PatCon fc _ dcon _ _)) => (fc, dcon) :: matchedConstructors nm cs
   _ => matchedConstructors nm cs
 
 getQuantity : Context → (lvl : Int) → Quant
@@ -1027,7 +1028,7 @@ forcedCase ctx prob@(MkProb clauses ty) ((ix, (VVar _ nm k sp)) :: scons) = do
   forcedCase ctx (MkProb (clauses) prob.ty) scons
   where
     substIx : Int → Int → PMatch → PMatch
-    substIx ix k pm@(PC i pat) = if i == ix then PC k pat else pm
+    substIx ix k pm@(PC q i pat) = if i == ix then PC q k pat else pm
 
     updateClause : Int → Int → Clause → M Clause
     updateClause ix k (MkClause clauseFC cons pats expr) = do
@@ -1221,12 +1222,12 @@ checkDone fc ctx Nil (Just body) ty = do
 
   debug "DONE<- got \{rpprint (names ctx) got}"
   pure got
-checkDone fc ctx (PC x (PatWild pvfc icit) :: xs) body ty = do
+checkDone fc ctx (PC q x (PatWild pvfc icit) :: xs) body ty = do
   scty <- levelType ctx x
   addInfo $ CaseSplit pvfc ctx x scty
   addTypeInfo pvfc "_" ctx.env scty pvfc
   checkDone fc ctx xs body ty
-checkDone fc ctx (PC nm (PatVar pvfc _ nm') :: xs) body ty = do
+checkDone fc ctx (PC q nm (PatVar pvfc _ nm') :: xs) body ty = do
   scty <- levelType ctx nm
   addInfo $ CaseSplit pvfc ctx nm scty
   addTypeInfo pvfc nm' ctx.env scty pvfc
@@ -1243,7 +1244,7 @@ checkDone fc ctx (PC nm (PatVar pvfc _ nm') :: xs) body ty = do
 -- I'm running this at the end to ensure everything relevant has been split
 -- if we have `foo Z ()`, we want to be sure `Z` was matched before we check
 -- there are no possible constructors for the second place.
-checkDone fc ctx (PC nm (PatImpossible fc') :: xs) body ty = do
+checkDone fc ctx (PC q nm (PatImpossible fc') :: xs) body ty = do
   scty <- levelType ctx nm
   tmp <- quote ctx.lvl scty
   scty <- eval ctx.env tmp
@@ -1252,14 +1253,26 @@ checkDone fc ctx (PC nm (PatImpossible fc') :: xs) body ty = do
     | xs => error fc' "possible constructors: \{show $ map fst xs}"
   pure $ Erased fc
 
-checkDone fc ctx (PC x pat :: xs) body ty = error (getFC pat) "stray constraint \{show x} /? \{show pat}"
+checkDone fc ctx (PC Zero nm pat :: xs) body ty = do
+  scty <- levelType ctx nm
+  tmp <- quote ctx.lvl scty
+  scty <- eval ctx.env tmp
+  let fc' = getFC pat
+  cons <- getConstructors ctx fc scty
+  -- FIXME we cant do this here, need to deal with
+  -- vars on the pattern
+  [x] <- filterM (checkCase ctx nm scty) cons
+    | xs => error (getFC pat) "matching erased value"
+  checkDone fc ctx xs body ty
+
+checkDone fc ctx (PC q x pat :: xs) body ty = error (getFC pat) "stray constraint \{show x} /? \{show pat}"
 
 -- need to run constructors, then run default
 
 isDefaultCase : Int -> Clause -> Bool
 isDefaultCase scnm cl = case find (matchName scnm) cl.cons of
-  Just (PC _ (PatVar _ _ _)) => True
-  Just (PC _ (PatWild _ _)) => True
+  Just (PC q _ (PatVar _ _ _)) => True
+  Just (PC q _ (PatWild _ _)) => True
   Nothing => True
   _ => False
 
@@ -1268,8 +1281,8 @@ isDefaultCase scnm cl = case find (matchName scnm) cl.cons of
 getLits : Val -> Int -> List Clause -> M (List Literal)
 getLits ty nm Nil = pure Nil
 getLits ty nm ((MkClause fc cons pats expr) :: cs) = case find (matchName nm) cons of
-  Just (PC _ (PatLit _ lit)) => _::_ lit <$> getLits ty nm cs
-  Just (PC _ (PatCon fc _ _ _ _)) => error fc "expected \{show ty}"
+  Just (PC q _ (PatLit _ lit)) => _::_ lit <$> getLits ty nm cs
+  Just (PC q _ (PatCon fc _ _ _ _)) => error fc "expected \{show ty}"
   _ => getLits ty nm cs
 
 
@@ -1293,7 +1306,7 @@ buildLitCase ctx prob fc scnm scty lit = do
     -- replace constraint with constraints on parameters, or nothing if non-matching clause
     rewriteConstraint : List PMatch -> List PMatch -> Maybe (List PMatch)
     rewriteConstraint Nil acc = Just acc
-    rewriteConstraint (c@(PC nm y) :: xs) acc =
+    rewriteConstraint (c@(PC q nm y) :: xs) acc =
       if nm == scnm
         then case y of
           PatVar _ _ s => Just $ c :: (xs ++ acc)
@@ -1357,22 +1370,22 @@ checkDups fc ms = go Nil ms
     -- tests/TestCase5.newt has z / z
     getNames : Int → List PMatch → List String
     getNames k Nil = Nil
-    getNames k Nil = ?
-    getNames k (PC i (PatVar _ _ nm) :: ms) = if i == k then nm :: getNames k ms else getNames k ms
+    getNames k (PC q i (PatVar _ _ nm) :: ms) = if i == k then nm :: getNames k ms else getNames k ms
     getNames k (_ :: ms)  = getNames k ms
 
     go : List Int → List PMatch → M Unit
     go seen Nil = pure MkUnit
-    go seen (PC k (PatVar _ _ nm) :: cons) =
+    go seen (PC q k (PatVar _ _ nm) :: cons) =
       if elem k seen
         then do
           let names = nub $ getNames k ms
           when (length' names > 1) $ error fc "Var \{show k} has multiple names: \{show $ getNames k ms}"
           go (k :: seen) cons
         else go (k :: seen) cons
-    go seen (PC k (PatWild _ _) :: cons) = go seen cons
-    go seen (PC k (PatImpossible _) :: cons) = go seen cons
-    go seen (pm :: cons) = fatalError "Weird \{show pm}"
+    go seen (PC q k (PatWild _ _) :: cons) = go seen cons
+    go seen (PC q k (PatImpossible _) :: cons) = go seen cons
+    -- erased match
+    go seen (PC q k (_) :: cons) = go seen cons
 
 -- This process is similar to extendPi, but we need to stop
 -- if one clause is short on patterns.
@@ -1382,7 +1395,7 @@ buildTree ctx prob@(MkProb ((MkClause fc cons (x :: xs) expr) :: cs) (VPi _ info
   let nm = fresh info.biName
   let ctx' = extend ctx $ BI fc' nm icit q a
   -- type of the rest
-  clauses <- traverse (introClause l icit a) prob.clauses
+  clauses <- traverse (introClause q l icit a) prob.clauses
   -- REVIEW fc from a pat?
   vb <- b $$ VVar fc nm l Lin
   Lam fc (BI fc' nm icit q MkUnit) <$> buildTree ctx' (MkProb clauses vb)
@@ -1398,7 +1411,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
   debug "buildTree \{show constraints} \{show expr}"
   -- reverse constraints if we want to try left to right
   -- probably need to skip quant 0 (dotted) at least, though
-  let (Just (PC scnm pat)) = findSplit constraints
+  let (Just (PC q scnm pat)) = findSplit constraints
     | _ => do
       debug "checkDone \{show constraints}"
       checkDups fc constraints
@@ -1529,14 +1542,12 @@ checkWhere ctx decls body ty = do
   let (TypeSig sigFC q ((nfc,name) :: Nil) rawtype :: decls) = decls
     | x :: _ => error (getFC x) "expected type signature"
     | _ => check ctx body ty
-  let (Many) = q | _ => error sigFC "Zero quantity not supported in where clauses"
   funTy <- checkIn ctx Zero rawtype (VU sigFC)
   debug "where clause \{name} : \{rpprint (names ctx) funTy}"
   let (FunDef defFC name' clauses :: decls') = decls
     | x :: _ => error (getFC x) "expected function definition"
     | _ => error sigFC "expected function definition after this signature"
   unless (name == name') $ error defFC "Expected def for \{name}"
-  -- REVIEW is this right, cribbed from my top level code
   top <- getTop
   clauses' <- traverse makeClause clauses
   vty <- eval ctx.env funTy
@@ -1544,11 +1555,12 @@ checkWhere ctx decls body ty = do
   addTypeInfo nfc name ctx.env vty nfc
   debug "\{name} vty is \{show vty}"
   let ctx' = extend ctx (BI nfc name Explicit Many vty)
-
-  tm <- buildTree (withPos ctx' defFC) (MkProb clauses' vty)
-  vtm <- eval ctx'.env tm
+  tm <- buildTree (enterMarker' q $ withPos ctx' defFC) (MkProb clauses' vty)
+  -- letrec is a Var in ctx', if we define it, we blow up the stack
+  -- vtm <- eval ctx'.env tm
+  -- let ctx' = define ctx (BI nfc name Explicit Many vty) vtm
   ty' <- checkWhere ctx' decls' body ty
-  pure $ LetRec sigFC name funTy tm ty'
+  pure $ LetRec sigFC q name funTy tm ty'
 
 
 -- REVIEW should `arg` be assigned to a variable with `RLet`?
@@ -1654,7 +1666,7 @@ check ctx tm ty = do
       clauses <- for alts $ \case
         (MkAlt pat rawRHS) => do
           pat' <- mkPat (pat, Explicit)
-          pure $ MkClause (getFC pat) ((PC ctx.lvl pat') :: Nil) Nil rawRHS
+          pure $ MkClause (getFC pat) ((PC Many ctx.lvl pat') :: Nil) Nil rawRHS
 
       -- scrutinee was checked at Many above
       let ctx' = withPos (extend ctx (BI fc scnm Explicit Many scty)) (getFC tm)
