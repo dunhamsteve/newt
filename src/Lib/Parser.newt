@@ -395,21 +395,19 @@ caseLet = do
   body <- term
   pure $ RCase fc sc Nothing (MkAlt pat (Just body) :: alts)
 
--- TODO Desugaring here because there is not corresponding DoStmt
 doCaseLet : Parser DoStmt
 doCaseLet = do
   -- look ahead so we can fall back to normal let
   -- Maybe make it work like arrow?
   fc <- getPos
   try (keyword "let" >> symbol "(")
-  pat <- parenTypeExp'
+  left <- parenTypeExp'
   symbol ")"
   keyword "="
-  sc <- typeExpr
+  right <- typeExpr
   alts <- startBlock $ manySame $ symbol "|" *> caseAlt
   bodyFC <- getPos
-  body <- RDo <$> getPos <*> someSame doStmt
-  pure $ DoExpr fc (RCase fc sc Nothing (MkAlt pat (Just body) :: alts))
+  pure $ DoCaseLet fc left right alts
 
 doArrow : Parser DoStmt
 doArrow = do

@@ -1509,9 +1509,15 @@ undo ((DoArrow fc left@(RVar fc' nm) right Nil) :: xs) = do
 undo ((DoArrow fc left right alts) :: xs) = do
   let nm = "$sc"
   xs' <- undo xs
-  rest <- pure $ RCase fc (RVar fc nm) Nothing (MkAlt left (Just xs') :: alts)
+  let rest = RCase fc (RVar fc nm) Nothing (MkAlt left (Just xs') :: alts)
   pure $ RApp fc (RApp fc (RVar fc "_>>=_") right Explicit)
     (RLam fc (BI fc nm Explicit Many Nothing) rest) Explicit
+undo ((DoCaseLet fc left right alts) :: xs) = do
+  let nm = "$sc"
+  -- TODO nmfc
+  xs' <- undo xs
+  pure $ RLet fc nm (RImplicit fc) right
+       $ RCase fc (RVar fc nm) Nothing (MkAlt left (Just xs') :: alts)
 
 -- we'll want both check and infer, we're augmenting a context
 -- so probably a continuation:

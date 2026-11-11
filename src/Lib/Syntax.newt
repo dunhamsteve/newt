@@ -5,7 +5,9 @@ import Lib.Common
 import Data.String
 import Data.List
 import Lib.Prettier
--- import Lib.Types
+
+-- Lib.Syntax describes the surface syntax of newt
+
 
 data Raw : U
 
@@ -19,11 +21,19 @@ data DoStmt : U where
   DoExpr : (fc : FC) -> Raw -> DoStmt
   DoLet : (fc : FC) -> String -> Raw -> DoStmt
   DoArrow : (fc : FC) -> (lhs : Raw) -> (rhs : Raw) -> (alts : List RCaseAlt) -> DoStmt
+  DoCaseLet : (fc : FC) -> (lhs : Raw) -> (rhs : Raw) -> (alts : List RCaseAlt) -> DoStmt
 
 instance HasFC DoStmt where
   getFC (DoExpr fc _) = fc
+  getFC (DoCaseLet fc lhs rhs alts) = fc
   getFC (DoArrow fc _ _ _) = fc
   getFC (DoLet fc _ _) = fc
+
+instance SetFC DoStmt where
+  setFC (DoExpr _ a) fc = DoExpr fc a
+  setFC (DoLet _ a b) fc = DoLet fc a b
+  setFC (DoArrow _ lhs rhs alts) fc = DoArrow fc lhs rhs alts
+  setFC (DoCaseLet _ lhs rhs alts) fc = DoCaseLet fc lhs rhs alts
 
 data Decl : U
 
@@ -226,15 +236,16 @@ instance Pretty Raw where
     asDoc p (RHole _) = text "?"
     asDoc p (RDo _ stmts) = text "do" ++ nest 2 (line ++ stack (map prettyDoStmt stmts))
       where
+        prettyAlts : List RCaseAlt → Doc → Doc
+        prettyAlts Nil acc = acc
+        prettyAlts ((MkAlt lhs (Just rhs)) :: alts) acc = prettyAlts alts $ acc ++ nest 2 (line ++ text "|" <+> asDoc 0 lhs <+> text "=>" <+> nest 2 (asDoc 0 rhs))
+        prettyAlts ((MkAlt lhs Nothing) :: alts) acc = prettyAlts alts $ acc ++ nest 2 (line ++ text "|" <+> asDoc 0 lhs)
+
         prettyDoStmt : DoStmt → Doc
         prettyDoStmt (DoExpr fc t) = asDoc 0 t
         prettyDoStmt (DoLet fc n t) = text "let" <+> text n <+> text "=" <+/> nest 2 (asDoc 0 t)
-        prettyDoStmt (DoArrow fc lhs rhs alts) = go alts $ asDoc 0 lhs <+> text "<-" <+/> nest 2 (asDoc 0 rhs)
-          where
-            go : List RCaseAlt → Doc → Doc
-            go Nil acc = acc
-            go ((MkAlt lhs (Just rhs)) :: alts) acc = go alts $ acc ++ nest 2 (line ++ text "|" <+> asDoc 0 lhs <+> text "=>" <+> nest 2 (asDoc 0 rhs))
-            go ((MkAlt lhs Nothing) :: alts) acc = go alts $ acc ++ nest 2 (line ++ text "|" <+> asDoc 0 lhs)
+        prettyDoStmt (DoArrow fc lhs rhs alts) = prettyAlts alts $ asDoc 0 lhs <+> text "<-" <+/> nest 2 (asDoc 0 rhs)
+        prettyDoStmt (DoCaseLet fc lhs rhs alts) = prettyAlts alts $ text "let" <+> text "(" ++ asDoc 0 lhs ++ text ")" <+> text "=" <+/> nest 2 (asDoc 0 rhs) <+/> text "in"
 
     asDoc p (RIf _ x y z) = paren p 0 $ text "if" <+> asDoc 0 x <+/> text "then" <+> asDoc 0 y <+/> text "else" <+> asDoc 0 z
     asDoc p (RWhere _ dd b) = asDoc 0 b ++ nest 2 (line ++ text "where" <+> (nest 2 (line ++ stack (map pretty dd))))
@@ -336,6 +347,8 @@ substRaw ss t = case t of
       substStmts ss (DoArrow fc pat sc alts :: rest) =
         DoArrow fc (substRaw ss pat) (substRaw ss sc) (map (substAlt) alts) :: substStmts (filter (lhsNames pat) ss) rest
       substStmts ss (DoLet fc nm t :: rest) = DoLet fc nm (substRaw ss t) :: substStmts (filter (nm :: Nil) ss) rest
+      substStmts ss (DoCaseLet fc pat sc alts :: rest) =
+        DoCaseLet fc (substRaw ss pat) (substRaw ss sc) (map (substAlt) alts) :: substStmts (filter (lhsNames pat) ss) rest
 
 instance Pretty Module where
   pretty (MkModule name imports decls) =
