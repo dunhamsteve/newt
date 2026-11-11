@@ -48,7 +48,7 @@ single k v = JsonObj $ (k,v) :: Nil
 record LSPState where
     topContext : TopContext
     baseDir : String
-    files : SortedMap String String
+    files : SortedMap String (String × String)
 
 state : IORef LSPState
 state = unsafePerformIO $ newIORef $ MkLSPState emptyTop "" emptyMap
@@ -78,7 +78,7 @@ lspFileSource = do
     let ext = snd $ splitFileName fn
     let key = modName ++ "." ++ ext
     let (Nothing) = lookupMap' key st.files
-        | Just src => pure (fn,src)
+        | Just (fn,src) => pure (fn,src)
     let fn' = case split fn "file://" of
           x :: fn :: _ => fn
           _ => fn
@@ -113,7 +113,7 @@ updateFile fn src = unsafePerformIO $ do
     let key = modName ++ "." ++ ext
     putStrLn "update File \{fn} \{modName}"
     putStrLn "data is \{show src}"
-    modifyIORef state { files $= updateMap key src }
+    modifyIORef state { files $= updateMap key (fn,src) }
     st <- readIORef state
     Right (ctx,_) <- (invalidateModule modName).runM st.topContext
         | _ => writeIORef state st

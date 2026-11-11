@@ -82,8 +82,6 @@ getReferences row col = do
       isMatch : FC → TypeInfo → Bool
       isMatch fc (MkTypeInfo _ _ _ _ fc') = fc == fc'
 
--- The cheap version of type at point, find the token, lookup in global context
--- Later we will either get good FC for entries or scan them all and build a cache.
 getHoverInfo : FileSource → String → Int → Int → M HoverInfo
 getHoverInfo repo modns row col = do
     Just mod <- switchModule repo modns | _ => pure NeedCheck
@@ -98,13 +96,15 @@ getHoverInfo repo modns row col = do
     -- Find the token at the point
     let lines = split mod.modSource "\n"
     let line = fromMaybe "" (getAt' row lines)
-    let (Right toks) = tokenise "" line | Left _ => pure NoHoverInfo
+    let (Right toks) = tokenise "" line | _ => pure NoHoverInfo
     let (Just name) = getTok toks       | _ => pure NoHoverInfo
 
     let (Left _) = partialParse "" parseImport emptyMap toks
       | Right ((MkImport _ (fc, nm)), _, _) => do
-        -- FIXME - doesn't work with stuff in NEWT_LIB
-        let fc = MkFC ("\{repo.baseDir}/\{joinBy "/" (split nm ".")}.newt") (MkBounds 0 0 0 0)
+        -- HACK find anything in the module and pull the filename off of it
+        let (Just target) = lookupMap' nm top.modules | _ => pure NoHoverInfo
+        let ((MkTypeInfo fc _ _ _ _) :: _) = target.modTypes | _ => pure NoHoverInfo
+        let fc = MkFC fc.file (MkBounds 0 0 0 0)
         pure $ HasHover fc "module \{nm}"
     putStrLn "Hover name is \{show name}"
     -- Lookup the name
