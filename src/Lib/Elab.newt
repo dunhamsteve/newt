@@ -771,6 +771,12 @@ introClause q nm Implicit ty (MkClause fc cons Nil expr) = pure $ MkClause fc (P
 introClause q nm Auto ty (MkClause fc cons Nil expr) = pure $ MkClause fc (PC q nm (PatWild fc Auto) :: cons) Nil expr
 introClause q nm icit ty (MkClause fc cons Nil expr) = error fc "Clause size doesn't match"
 
+markerCompat : Marker → Quant → Bool
+markerCompat Present _ = True
+markerCompat Absent Zero = False
+markerCompat Absent Many = True
+
+
 -- Find the next constraint to split on
 -- We go in order at the moment, which happens to be right to left
 -- FIXME we should skip ones with non-TCon types, hoping we'll have more information after
@@ -778,11 +784,14 @@ introClause q nm icit ty (MkClause fc cons Nil expr) = error fc "Clause size doe
 -- TODO If the type is a meta and we're looking at a DCon, we _could_ give the TCon some
 -- args and try to solve the meta, but I'm not sure if that's a good idea.
 -- we will try skipping erased args
-findSplit : List PMatch -> Maybe PMatch
-findSplit Nil = Nothing
-findSplit (x@(PC Many nm (PatCon _ _ _ _ _)) :: xs) = Just x
-findSplit (x@(PC Many nm (PatLit _ val)) :: xs) = Just x
-findSplit (x :: xs) = findSplit xs
+findSplit : Marker -> List PMatch -> Maybe PMatch
+findSplit mq Nil = Nothing
+-- We should split on erased values if there is only one constructor
+-- We can do the work at the end, but what we learn from the constructor
+-- might be useful.
+findSplit m (x@(PC q nm (PatCon _ _ _ _ _)) :: xs) = if markerCompat m q then Just x else findSplit m xs
+findSplit m (x@(PC q nm (PatLit _ val)) :: xs) = if markerCompat m q then Just x else findSplit m xs
+findSplit m (x :: xs) = findSplit m xs
 
 lookupDCon : QName -> M (QName × Int × Tm)
 lookupDCon nm = do
@@ -871,7 +880,6 @@ updateContext ctx ((k, val) :: cs) =
     (Just val') => do
       -- var k is both val' and val
       -- We need a more appropriate unify for pattern matching
-      -- val <- forceType ctx.env val
       MkResult Nil <- unify ctx.env UPattern val val'
         | res => do
           debug "TODO: updateContext yielded constraints \{show res.constraints} - var \{show k} is \{show val'} and update says \{show val}"
@@ -1411,7 +1419,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
   debug "buildTree \{show constraints} \{show expr}"
   -- reverse constraints if we want to try left to right
   -- probably need to skip quant 0 (dotted) at least, though
-  let (Just (PC q scnm pat)) = findSplit constraints
+  let (Just (PC q scnm pat)) = findSplit ctx.marker constraints
     | _ => do
       debug "checkDone \{show constraints}"
       checkDups fc constraints

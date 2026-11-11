@@ -22,7 +22,7 @@ isLTE (S n) (S m) = case isLTE n m of
   Yes prf => (Yes (LTESucc prf))
   No contra => No (contra ∘ fromLTESucc)
 
-notLTEimpliesGT : ∀ n m. ¬ (LTE n m) → GT n m
+0 notLTEimpliesGT : ∀ n m. ¬ (LTE n m) → GT n m
 notLTEimpliesGT {Z} {m} q = absurd $ q LTEZero
 notLTEimpliesGT {S _} {Z} q = LTESucc LTEZero
 notLTEimpliesGT {S n} {(S m)} q = LTESucc $ notLTEimpliesGT (q ∘ LTESucc)

@@ -5,6 +5,8 @@ module Jigger
 
 -- I think I got the link from: https://github.com/effectfully/Cubes
 
+-- edge cases for quantity in here
+
 data Nat : U where
     Z : Nat
     S : Nat → Nat
@@ -19,7 +21,7 @@ data Fin : Nat → U where
     FZ : ∀ n. Fin (S n)
     FS : ∀ n. Fin n → Fin (S n)
 
-max : ∀ n. Fin (S n)
+max : {n : Nat} → Fin (S n)
 max {Z} = FZ
 max {S n} = FS (max {n})
 
@@ -27,7 +29,7 @@ embed : ∀ n. Fin n → Fin (S n)
 embed FZ = FZ
 embed (FS n) = FS (embed n)
 
-var : (m : Nat) {0 n : Nat} → Fin (S (m + n))
+var : (m : Nat) {n : Nat} → Fin (S (m + n))
 var Z = max
 var (S m) = embed (var m)
 

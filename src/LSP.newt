@@ -116,7 +116,6 @@ updateFile fn src = unsafePerformIO $ do
     let ext = snd $ splitFileName fn
     let key = modName ++ "." ++ ext
     putStrLn "update File \{fn} \{modName}"
-    putStrLn "data is \{show src}"
     modifyIORef state { files $= updateMap key (fn,src) }
     st <- readIORef state
     Right (ctx,_) <- (invalidateModule modName).runM st.topContext
