@@ -53,8 +53,10 @@ record LSPState where
 state : IORef LSPState
 state = unsafePerformIO $ newIORef $ MkLSPState emptyTop "" emptyMap
 
-resetState : String → IO Unit
-resetState base = do
+checkBase : String → IO Unit
+checkBase base = do
+    st <- readIORef state
+    let (False) = st.baseDir == base | _ => putStrLn "Same base \{base}"
     False <- checkLib | _ => putStrLn "Don't reset base to \{base}"
     putStrLn "Reset base to \{base}"
     writeIORef state $ MkLSPState emptyTop base emptyMap
@@ -90,8 +92,7 @@ lspFileSource = do
 wrapper : String → M Json → (Error → IO JSObject) → JSObject
 wrapper fn op onError = unsafePerformIO $ do
   let (base, modName) = decomposeName fn
-  st <- readIORef {IO} state
-  when (st.baseDir /= base) $ resetState base
+  checkBase base
   st <- readIORef {IO} state
   repo <- lspFileSource
   Right (top,json) <- (do
@@ -132,10 +133,7 @@ hoverInfo : String → Int → Int → JSObject
 hoverInfo uri line col = unsafePerformIO $ do
     let (base,modns) = decomposeName uri
     putStrLn "Hover \{uri} base \{base} mod \{modns}"
-    st <- readIORef state
-    if (st.baseDir /= base)
-        then resetState base
-        else pure MkUnit
+    checkBase base
     st <- readIORef state
     repo <- lspFileSource
     -- There is a hack here where we tell the caller to schedule a check
@@ -161,8 +159,7 @@ codeActionInfo : String → Int → Int → JSObject
 codeActionInfo uri line col = unsafePerformIO $ do
   let (base,modns) = decomposeName uri
   putStrLn "Action \{uri} base \{base} mod \{modns}"
-  st <- readIORef state
-  if (st.baseDir /= base) then resetState base else pure MkUnit
+  checkBase base
   st <- readIORef state
   repo <- lspFileSource
   Right (top, actions) <- (do
