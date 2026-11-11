@@ -1,9 +1,9 @@
 *** Process tests/Duplicate.newt
 module Duplicate
-ERROR at tests/Duplicate.newt:5:1--5:5: Duplicate.Left is already defined at tests/Duplicate.newt:5:1--5:5
-  -- duplicate name should fail
-  -- FIXME FC is wrong here
+ERROR at tests/Duplicate.newt:7:3--7:7: Duplicate.Left is already defined at tests/Duplicate.newt:6:3--6:7
   data Either : U -> U -> U where
-  ^^^^
+    Left : {a b : U} -> a -> Either a b
+    Left : {a b : U} -> b -> Either a b
+    ^^^^
 
 Stop on error

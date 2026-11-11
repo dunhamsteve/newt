@@ -64,7 +64,7 @@ logMetas (Unsolved fc k ctx ty kind :: rest) = do
 getSigs : List Decl -> List (BindInfo Raw)
 getSigs Nil = Nil
 getSigs ((TypeSig _ q Nil _) :: xs) = getSigs xs
-getSigs ((TypeSig fc q ((_,nm) :: nms) ty) :: xs) = (BI fc nm Explicit q ty) :: getSigs (TypeSig fc q nms ty :: xs)
+getSigs ((TypeSig fc q ((nmfc,nm) :: nms) ty) :: xs) = (BI nmfc nm Explicit q ty) :: getSigs (TypeSig fc q nms ty :: xs)
 getSigs (_ :: xs) = getSigs xs
 
 teleToPi : Telescope -> Raw -> Raw
@@ -359,7 +359,7 @@ processInstance ns instfc rawty decls = do
 -- desugars to Data and processes it
 processShortData :  String → FC → Raw → List Raw → M Unit
 processShortData ns fc lhs sigs = do
-  (nameFC, nm,args) <- getArgs lhs Nil
+  (nameFC,nm,args) <- getArgs lhs Nil
   let ty = foldr mkPi (RU fc) args
   cons <- traverse (mkDecl args Nil) sigs
   let dataDecl = Data fc (nameFC, nm) ty (Just cons)
@@ -373,7 +373,7 @@ processShortData ns fc lhs sigs = do
     getArgs : Raw -> List (FC × String) -> M (FC × String × List (FC × String))
     getArgs (RVar fc1 nm) acc = pure (fc1, nm, acc)
     getArgs (RApp _ t (RVar fc' nm) _) acc = getArgs t ((fc', nm) :: acc)
-    getArgs tm _ = error (getFC tm) "Expected contructor application, got: \{show tm}"
+    getArgs tm _ = error (getFC tm) "Expected constructor application, got: \{show tm}"
 
     mkDecl : List (FC × Name) -> List Raw -> Raw -> M Decl
     mkDecl args acc (RVar fc' name) = do
@@ -385,7 +385,7 @@ processShortData ns fc lhs sigs = do
         mkPi (fc,nm) acc = RPi fc (BI fc nm Implicit Zero (RU fc)) acc
 
     mkDecl args acc (RApp fc' t u icit) = mkDecl args (u :: acc) t
-    mkDecl args acc tm = error (getFC tm) "Expected contructor application, got: \{show tm}"
+    mkDecl args acc tm = error (getFC tm) "Expected constructor application, got: \{show tm}"
 
 -- Identify Nat-like, enum-like, etc
 populateConInfo : List TopEntry → List TopEntry
@@ -489,7 +489,7 @@ processData ns fc (nameFC, nm) ty cons = do
             | (tm, _) => error (getFC tm) "expected \{nm} got \{render 90 $ pprint tnames tm}"
           when (hn /= QN ns nm) $
             error (getFC codomain) "Constructor codomain is \{render 90 $ pprint tnames codomain} rather than \{nm}"
-          pure $ (_,_ dty) <$> map snd names
+          pure $ (_,_ dty) <$> names
       decl => throwError $ E (getFC decl) "expected constructor declaration")
   -- type level autos like _++_
   solveAutos
@@ -502,8 +502,8 @@ processData ns fc (nameFC, nm) ty cons = do
   let arity = piArity tyty
   updateDef (QN ns nm) fc tyty (TCon arity cnames)
   where
-    makeConEntry : (Nat × Tm × String) → TopEntry
-    makeConEntry (ix, dty, nm') = MkEntry fc Many (QN ns nm') dty (DCon ix NormalCon (getArity dty) (QN ns nm)) Nil
+    makeConEntry : (Nat × Tm × FC × String) → TopEntry
+    makeConEntry (ix, dty, nmfc, nm') = MkEntry nmfc Many (QN ns nm') dty (DCon ix NormalCon (getArity dty) (QN ns nm)) Nil
 
     checkDeclType : Tm -> M Unit
     checkDeclType (UU _) = pure MkUnit
