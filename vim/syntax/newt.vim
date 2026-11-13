@@ -5,7 +5,7 @@ if exists("b:current_syntax") && !exists("main_syntax")
   finish
 endif
 syn keyword newtInfix infix infixl infixr
-syn keyword newtKW data where let in case of derive module import if then else alias class instance record constructor pfunc ptype uses do
+syn keyword newtKW data where let in case of derive module import if then else alias class instance record constructor pfunc ptype uses do rewrite
 syn match newtType "\<[A-Z][a-zA-Z0-9]*\>"
 syn region newtBlockComment start="/-" end="-/"
 syn match newtLineComment "--.*$" contains=@Spell

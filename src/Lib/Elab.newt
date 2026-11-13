@@ -13,6 +13,7 @@ import Lib.Util
 import Lib.TopContext
 import Lib.Syntax
 import Lib.Types
+import Lib.TermUtil
 
 vprint : Context -> Val -> M String
 vprint ctx v = do
@@ -37,11 +38,18 @@ showCtx : Context -> M String
 showCtx ctx =
   unlines ∘ reverse <$> go (names ctx) 0 (reverse $ zip ctx.env ctx.types) Nil
   where
+    isBind : Val → Int → Bool
+    isBind (VVar _ _ ix Lin) k = k == ix
+    isBind _ _ = False
+
     go : List String -> Int -> List (Val × (BindInfo Val)) -> List String -> M (List String)
     go _ _ Nil acc = pure acc
     go names k ((v, BI _ n _ q ty) :: xs) acc = do
         tty <- quote ctx.lvl ty
-        go names (1 + k) xs ("  \{show q}\{n} : \{rpprint names tty}" :: acc)
+        if isBind v k
+          then go names (1 + k) xs ("  \{show q}\{n} : \{rpprint names tty}" :: acc)
+          else go names (1 + k) xs ("  \{show q}\{n} = \{show v}" :: acc)
+          -- else go names (1 + k) xs ("  \{show q}\{n} : \{rpprint names tty} = \{show v}" :: acc)
 
 lookupDef : Context -> String -> Maybe Val
 lookupDef ctx name = go 0 ctx.types ctx.env
@@ -1645,10 +1653,41 @@ maybeType nmfc ctx mty = do
 
 infer : Context -> Raw  -> M (Tm × Val)
 
+-- Ideally I'd generate the `p` function and call `replace`
+-- but that requires desugaring a term back to raw
+-- This is not as strong as the Idris version -
+-- maybe because -- we don't expand functions when normalizing
+-- see papers/VFilter.newt and papers/OTComp.newt
+-- but check if VFilter works in idris
+checkRewrite : FC → Context → Raw → Raw → Val → M Tm
+checkRewrite fc ctx pf body ty = do
+  (pftm, pfty) <- infer ctx pf
+  -- hopefully the metas are solved, or we need to delay
+  pfty' <- quote ctx.lvl pfty
+  pfty <- eval ctx.env pfty'
+  -- check pf is equality
+  (a,b) <- getEq pfty $ funArgs pfty'
+  -- a <- nf ctx.env a
+  -- b <- nf ctx.env b
+  -- putStrLn "\{show a} ≡ \{show b}"
+  tty <- quote ctx.lvl ty
+  -- tty <- nf ctx.env tty
+  debug "rewrite: replace \{rpprint (names ctx) a} \n   with \{rpprint (names ctx) b} \n     in \{rpprint (names ctx) tty}"
+  newty <- rwSubst 0 a b tty
+  vty <- eval ctx.env newty
+  debug "rewrite: got \{rpprint (names ctx) newty}"
+  check ctx body vty
+  where
+    getEq : Val → Tm × List (Tm × Quant) → M (Tm × Tm)
+    getEq ty ((Ref _ (QN qns "_≡_")) , [_, a, b]) = pure (fst a, fst b)
+    getEq ty _ = error fc "expected an ≡ type, got \{show ty}"
+
+
 check ctx tm ty = do
   ty' <- forceType ctx.env ty
   case (tm, ty') of
     (RUpdateRec fc clauses arg, ty) => updateRec ctx fc clauses arg ty
+    (RRewrite fc pf body, ty) => checkRewrite fc ctx pf body ty
     (RWhere fc decls body, ty) => checkWhere ctx (collectDecl decls) body ty
     (RIf fc a b c, ty) =>
       -- REVIEW maybe stuff Bool in here?
@@ -1892,4 +1931,3 @@ infer ctx (RLit fc (LInt i)) = pure (Lit fc (LInt i), VRef fc intType Lin)
 infer ctx (RLit fc (LChar c)) = pure (Lit fc (LChar c), VRef fc charType Lin)
 infer ctx (RAs fc _ _) = error fc "@ can only be used in patterns"
 infer ctx tm = error (getFC tm) "Implement infer \{show tm}"
-

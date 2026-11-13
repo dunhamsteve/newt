@@ -23,16 +23,24 @@ termEq off (Case _ _ _) u = ?
 termEq off (Let _ _ _ _) u = ?
 termEq off (LetRec _ _ _ ty t u) u = ?
 
+-- the M is to throw unsupported
 weakenTm : Int → Tm → M Tm
 weakenTm off (Bnd fc i) = pure $ Bnd fc (i + off)
-weakenTm off (Lam _ _ _) = ?
-weakenTm off (App _ _ _ _) = ?
-weakenTm off (Delay _ _) = ?
-weakenTm off (Force _ _) = ?
-weakenTm off (Pi fc _ _) = ?
-weakenTm off (Case _ _ _) = ?
-weakenTm off (Let _ _ _ _) = ?
-weakenTm off (LetRec _ _ _ ty t u) = ?
+weakenTm off (Lam fc bi t) = Lam fc bi <$> weakenTm (off + 1) t
+weakenTm off (App fc t u q) = do
+  t <- weakenTm off t
+  u <- weakenTm off u
+  pure $ App fc t u q
+weakenTm off (Delay fc t) = Delay fc <$> weakenTm off t
+weakenTm off (Force fc t) = Force fc <$> weakenTm off t
+weakenTm off (Pi fc bi t) = do
+  bi <- traverse (weakenTm off) bi
+  t <- weakenTm (off + 1) t
+  pure $ Pi fc bi t
+weakenTm off (Case fc sc alts) = error fc "support weakenTm Case"
+weakenTm off (Let fc nm a b) = error fc "support weakenTm Case"
+weakenTm off (LetRec fc q nm ty t u) = error fc "support weakenTm LetRec"
+weakenTm off t = pure t
 weakenTm off (Lit _ _) = ?
 weakenTm off (UU _) = ?
 weakenTm off (Erased _) = ?
@@ -46,19 +54,19 @@ weakenTm off (Meta _ _ _) = ?
 rwSubst : Int → Tm → Tm → Tm → M Tm
 rwSubst off a b src = if termEq off a src then weakenTm off b else case src of
   -- TODO bind info type
-  (Lam fc bi sc) => Lam fc bi <$> rwSubst off a b sc
+  (Lam fc bi sc) => Lam fc bi <$> rwSubst (off + 1) a b sc
   (App fc t u q) => do
     t <- rwSubst off a b t
     u <- rwSubst off a b u
     pure $ App fc t u q
   (Delay fc t) => Delay fc <$> rwSubst off a b t
   (Force fc t) => Force fc <$> rwSubst off a b t
-  _ => pure src
   -- TODO
-  (Pi fc _ _) => ?
-  (Case _ _ _) => ?
-  (Let _ _ _ _) => ?
-  (LetRec _ _ _ ty t u) => ?
+  (Pi fc _ _) => error fc "rwSubst Pi"
+  (Case fc _ _) => error fc "rwSubst Case"
+  (Let fc _ _ _) => error fc "rwSubst Let"
+  (LetRec fc _ _ ty t u) => error fc "rwSubst LetRec"
+  _ => pure src
   -- no recursion needed
   (UU _) => ?
   (Erased _) => ?

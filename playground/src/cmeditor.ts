@@ -50,6 +50,7 @@ const keywords = [
   "of",
   "data",
   "derive",
+  "rewrite",
   "alias",
   "U",
   "do",

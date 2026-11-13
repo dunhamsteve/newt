@@ -293,6 +293,14 @@ parseOp = do
     | (res, xs) => fail "extra stuff \{show xs}"
   pure res
 
+rewriteExpr : Parser Raw
+rewriteExpr = addFC $ do
+  keyword "rewrite"
+  pf <- typeExpr
+  keyword' "in"
+  body <- typeExpr
+  pure $ RRewrite emptyFC pf body
+
 letExpr : Parser Raw
 letExpr = do
   keyword "let"
@@ -467,6 +475,7 @@ term' : Parser Raw
 term' =  caseExpr
     <|> caseLet
     <|> letExpr
+    <|> rewriteExpr
     <|> caseLamExpr
     <|> lamExpr
     <|> doExpr

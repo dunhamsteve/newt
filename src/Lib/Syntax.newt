@@ -48,6 +48,7 @@ data Raw : U where
   RLit : (fc : FC) -> Literal -> Raw
   RCase : (fc : FC) -> (scrut : Raw) -> (mty : Maybe Raw) -> (alts : List RCaseAlt) -> Raw
   RImplicit : (fc : FC) -> Raw
+  RRewrite : (fc : FC) → (pf : Raw) → (body : Raw) → Raw
   RHole : (fc : FC) -> Raw
   RDo : (fc : FC) -> List DoStmt -> Raw
   RIf : (fc : FC) -> Raw -> Raw -> Raw -> Raw
@@ -59,6 +60,7 @@ data Raw : U where
 
 instance HasFC Raw where
   getFC (RVar fc nm) = fc
+  getFC (RRewrite fc pf body) = fc
   getFC (RLam fc _ ty) = fc
   getFC (RApp fc t u icit) = fc
   getFC (RU fc) = fc
@@ -77,6 +79,7 @@ instance HasFC Raw where
 
 instance SetFC Raw where
   setFC (RVar fc nm) fc = RVar fc nm
+  setFC (RRewrite _ pf body) fc = RRewrite fc pf body
   setFC (RLam fc a sc) fc = RLam fc a sc
   setFC (RApp fc t u icit) fc = RApp fc t u icit
   setFC (RU fc) fc = RU fc
@@ -209,6 +212,7 @@ instance Pretty Raw where
 
     asDoc : Int -> Raw -> Doc
     asDoc p (RVar _ str) = text str
+    asDoc p (RRewrite fc pf body) = paren p 0 $ text "rewrite" <+> asDoc 0 pf <+> text "in" <+> asDoc 0 body
     -- TODO print mty
     asDoc p (RLam _ (BI _ nm icit q mty) x) = paren p 0 $ text "\\" ++ wrap icit (text nm) <+> text "=>" <+> asDoc 0 x
     -- This needs precedence and operators...
@@ -298,6 +302,7 @@ lhsNames tm = case tm of
 substRaw : List (String × Raw) → Raw → Raw
 substRaw ss t = case t of
   RVar fc n => fromMaybe t (lookup n ss)
+  (RRewrite fc pf body) => RRewrite fc (substRaw ss pf) (substRaw ss body)
   (RUpdateRec fc uc target) => RUpdateRec fc (map substUC uc) (map (substRaw ss) target)
   -- LHS only
   (RAs fc nm t) => RAs fc nm (substRaw ss t)

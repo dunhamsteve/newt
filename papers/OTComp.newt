@@ -63,7 +63,6 @@ correct e@(Add x y) s =
   -- replace the changing bit with z
 correct e@(If b x y) s =
   replace (\ z => exec (IF (compile x) (compile y)) z ≡ eval e |> s) (sym $ correct b s) $
-  -- thought the (|> s) was an issue, desugars to flip _|> s, but that's not it
   replace (\ z => exec (IF (compile x) (compile y)) (eval b |> s) ≡ z) (sym $ distributeIf (|> s) (eval b) (eval x) (eval y)) $
   -- other way from Idris. It was easier to keep working on that side
   replace (\ z => exec (IF (compile x) (compile y)) (eval b |> s) ≡ ite (eval b) (z) (eval y |> s)) (correct x s) $

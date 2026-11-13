@@ -8,15 +8,15 @@ INFO at tests/ConstraintErr.newt:9:15--9:16: User Hole
   -----------
   Prelude.Nat
 INFO at tests/ConstraintErr.newt:9:15--9:16: User Hole
-  l : Prelude.Nat
+  l = Prelude.Z
   n : Prelude.Nat
   m : Prelude.Nat
   -----------
   Prelude.Nat
 INFO at tests/ConstraintErr.newt:8:14--8:15: User Hole
-  _$0 : Prelude.Nat
+  _$0 = Prelude.Z
   n : Prelude.Nat
-  _$2 : Prelude.Nat
+  _$2 = Prelude.Z
   -----------
   Prelude.Nat
 ERROR at tests/ConstraintErr.newt:14:17--14:21: Unsolved meta ConstraintErr.$m9 Normal type U -> U

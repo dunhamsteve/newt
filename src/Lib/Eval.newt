@@ -79,6 +79,7 @@ tryEval env (VRef fc k sp) = do
               VLetRec _ _ _ _ _ _ => pure Nothing
               v => pure $ Just v)
             (const $ pure Nothing)
+      -- Prim functions for type-level evel
       Just (MkEntry _ q (QN "Prelude" "unpack") ty (PrimFn _ _ _) _) =>
         case sp of
           (Lin :< ((VLit fc (LString s)) , _)) => return $ Just $ quoteChars fc $ unpack s
