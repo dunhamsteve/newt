@@ -1,0 +1,68 @@
+module Lib.TermUtil
+
+import Prelude
+import Lib.Types
+import Lib.Common
+
+
+termEq : Int → Tm → Tm → Bool
+termEq off (Bnd _ a) (Bnd _ b) = a + off == b
+termEq off (Ref _ a) (Ref _ b) = a == b
+termEq off (Meta _ a n) (Meta _ b m) = a == b && n == m
+termEq off (App _ a b _) (App _ c d _) = if termEq off a c then termEq off b d else False
+termEq off (UU _) (UU _) = True
+termEq off (Lit _ a) (Lit _ b) = a == b
+termEq off (Erased _) (Erased _) = True
+termEq off (Delay _ a) (Delay _ b) = termEq off a b
+termEq off (Force _ a) (Force _ b) = termEq off a b
+termEq off _ _ = False
+-- TODO if it's not handled, we assume no match
+termEq off (Lam _ _ _) u = ?
+termEq off (Pi fc _ _) u = ?
+termEq off (Case _ _ _) u = ?
+termEq off (Let _ _ _ _) u = ?
+termEq off (LetRec _ _ _ ty t u) u = ?
+
+weakenTm : Int → Tm → M Tm
+weakenTm off (Bnd fc i) = pure $ Bnd fc (i + off)
+weakenTm off (Lam _ _ _) = ?
+weakenTm off (App _ _ _ _) = ?
+weakenTm off (Delay _ _) = ?
+weakenTm off (Force _ _) = ?
+weakenTm off (Pi fc _ _) = ?
+weakenTm off (Case _ _ _) = ?
+weakenTm off (Let _ _ _ _) = ?
+weakenTm off (LetRec _ _ _ ty t u) = ?
+weakenTm off (Lit _ _) = ?
+weakenTm off (UU _) = ?
+weakenTm off (Erased _) = ?
+weakenTm off (Ref _ _) = ?
+weakenTm off (Meta _ _ _) = ?
+
+-- If we find a match for a, weaken b and return, else continue
+-- Alternative is to build the function (weaken each Bnd by 1, insert for match)
+-- and do the app
+-- there we could use replace, and would hope to desugar the Tm
+rwSubst : Int → Tm → Tm → Tm → M Tm
+rwSubst off a b src = if termEq off a src then weakenTm off b else case src of
+  -- TODO bind info type
+  (Lam fc bi sc) => Lam fc bi <$> rwSubst off a b sc
+  (App fc t u q) => do
+    t <- rwSubst off a b t
+    u <- rwSubst off a b u
+    pure $ App fc t u q
+  (Delay fc t) => Delay fc <$> rwSubst off a b t
+  (Force fc t) => Force fc <$> rwSubst off a b t
+  _ => pure src
+  -- TODO
+  (Pi fc _ _) => ?
+  (Case _ _ _) => ?
+  (Let _ _ _ _) => ?
+  (LetRec _ _ _ ty t u) => ?
+  -- no recursion needed
+  (UU _) => ?
+  (Erased _) => ?
+  (Lit _ _) => ?
+  (Bnd _ _) => ?
+  (Ref _ _) => ?
+  (Meta _ _ _) => ?

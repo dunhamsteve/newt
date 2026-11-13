@@ -1259,7 +1259,9 @@ checkDone fc ctx (PC q nm (PatImpossible fc') :: xs) body ty = do
   cons <- getConstructors ctx fc scty
   Nil <- filterM (checkCase ctx nm scty) cons
     | xs => error fc' "possible constructors: \{show $ map fst xs}"
-  pure $ Erased fc
+  case body of
+    Just t => error (getFC t) "impossible clauses should not have a RHS"
+    Nothing => pure $ Erased fc
 
 checkDone fc ctx (PC Zero nm pat :: xs) body ty = do
   scty <- levelType ctx nm
