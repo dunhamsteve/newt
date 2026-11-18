@@ -32,6 +32,8 @@ inoremap <buffer> \cuR ⌉
 inoremap <buffer> \< ⟨
 inoremap <buffer> \> ⟩
 inoremap <buffer> \iff ⇔
+inoremap <buffer> \oplus ⊕
+inoremap <buffer> \otimes ⊗
 
 " Sets and Types
 inoremap <buffer> \bN  ℕ
@@ -48,5 +50,5 @@ inoremap <buffer> \Gt  τ
 inoremap <buffer> \Ga  α
 inoremap <buffer> \Gd  δ
 inoremap <buffer> \Ge  ε
-
+inoremap <buffer> \Gm  µ
 

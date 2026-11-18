@@ -1,0 +1,169 @@
+module Holes
+
+import Prelude
+
+-- "Why walk when you can take the tube"
+-- Lucas Dixon, Peter Hancock, Conor Titania McBride
+-- https://personal.cis.strath.ac.uk/conor.mcbride/pub/Holes/Holes.pdf
+
+-- The short data definitions below solve, but only because of later usage.
+
+-- data Mu f = In (f (Mu f))
+data Mu : (U → U) → U where
+  In : {0 f : U → U} → (_ : f (Mu f)) → Mu f
+
+data Id x = MkId x
+data C c x = MkC c
+
+infixl 5 _⊗_
+
+-- data (Sum p q) x = InL (p x) | InR (q x)
+data Sum : (U → U) → (U → U) → U → U where
+  InL : {0 p q : U → U} → {0 x : U} → (_ : p x) → Sum p q x
+  InR : {0 p q : U → U} → {0 x : U} → (_ : q x) → Sum p q x
+
+data Prod : (U → U) → (U → U) → U →  U where
+  _⊗_ : {0 p q : U → U} → {0 x : U} → (_ : p x) → (_ : q x) → Prod p q x
+
+data Expr = Num Nat | Add Expr Expr
+
+-- If this is eta'd out, the auto doesn't solve (no hint for ExprF)
+0 ExprF : U → U
+ExprF = Sum (C Nat) (Prod Id Id)
+
+mnum : Nat → Mu ExprF
+mnum i = In (InL (MkC i))
+
+madd : Mu ExprF → Mu ExprF → Mu ExprF
+madd e1 e2 = In (InR (MkId e1 ⊗ MkId e2))
+
+cata : ∀ f t. {{Functor f}} → (f t → t) → Mu f → t
+cata phi (In fm) = phi (map (cata phi) fm)
+
+instance Functor Id where
+  map f (MkId x) = MkId (f x)
+
+instance ∀ c. Functor (C c) where
+  map f (MkC c) = (MkC c)
+
+instance ∀ p q. {{Functor p}} {{Functor q}} → Functor (Sum p q) where
+  map f (InL px) = InL (map f px)
+  map f (InR qx) = InR (map f qx)
+
+instance ∀ p q. {{Functor p}} {{Functor q}} → Functor (Prod p q) where
+  map f (px ⊗ qx) = map f px ⊗ map f qx
+
+eval : Mu ExprF → Nat
+eval = cata phi
+  where
+    phi : ExprF Nat → Nat
+    phi (InL (MkC i)) = i
+    phi (InR (MkId v₁ ⊗ MkId v₂)) = v₁ + v₂
+
+instance Traversable Id where
+  traverse f (MkId x) = pure MkId <*> f x
+
+instance ∀ c. Traversable (C c) where
+  traverse f (MkC c) = pure (MkC c)
+
+instance ∀ p q. {{Traversable p}} {{Traversable q}} → Traversable (Sum p q) where
+  traverse f (InL px) = pure InL <*> traverse f px
+  traverse f (InR qx) = pure InR <*> traverse f qx
+
+instance ∀ p q. {{Traversable p}} {{Traversable q}} → Traversable (Prod p q) where
+  traverse f (px ⊗ qx) = pure _⊗_ <*> traverse f px <*> traverse f qx
+
+--  2.1
+
+
+-- data Dot p q x = Comp (p (q x))
+data Dot : (p : U → U)  (q : U → U)  (x : U) → U where
+  Comp : ∀ p q x. p (q x) → Dot p q x
+
+instance ∀ p q. {{Traversable p}} {{Traversable q}} → Traversable (Dot p q) where
+  traverse f (Comp xqp) = pure Comp <*> traverse (traverse f) xqp
+
+-- 3 Free Monads
+
+-- data Term p x = Con (p (Term p x)) | Var x
+data Term : (p : U → U) (x : U) → U where
+  Var : ∀ p x. x → Term p x
+  Con : ∀ p x. p (Term p x) → Term p x
+
+instance ∀ p. {{Functor p}} → Monad (Term p) where
+  return x = Var x
+  bind (Var x) f = f x
+  bind (Con tp) f = Con (map (\ a => bind a f) tp)
+
+instance ∀ p. {{Traversable p}} → Traversable (Term p) where
+  -- TODO LSP When right of <*> is ?, might be nice to intro f because it returns f b
+  traverse f (Var x) = pure Var <*> f x
+  -- TODO needs a little help with this implicit
+  traverse {p} f (Con tp) = pure Con <*> traverse {p} (traverse f) tp
+
+-- alias Sig x = Sum (C Nat) (Prod Id Id) x
+0 Sig : U → U
+Sig = Sum (C Nat) (Prod Id Id)
+
+val : ∀ x. Nat → Term Sig x
+val i = Con (InL (MkC i))
+
+add : ∀ x. Term Sig x → Term Sig x → Term Sig x
+add x y = Con (InR (MkId x ⊗ MkId y))
+
+-- 4 Zero type
+
+-- ∅ in the paper
+data Empty : U where
+
+naughtE : ∀ a. Empty → a
+naughtE ()
+
+inflate : ∀ f a. {{Functor f}} → f Empty → f a
+inflate x = map naughtE x
+
+fcata : ∀ p v. {{Functor p}} → (p v → v) → Term p Empty → v
+fcata operate (Var nonsense) = naughtE nonsense
+fcata operate (Con expression) = operate (map (fcata operate) expression)
+
+sigOps : Sig Nat → Nat
+sigOps (InL (MkC i)) = i
+sigOps (InR ((MkId x) ⊗ (MkId y))) = x + y
+
+two : Nat
+two = S (S Z)
+
+four : Nat
+four = S (S (S (S Z)))
+
+-- paper has cata, which is an error
+test : fcata sigOps (add (val two) (val two)) ≡ four
+test = Refl
+
+-- ∂_↦_ in the paper, (Diff in haskell), but that's not a UIdent
+
+-- FIXME we need dependencies on type classes.
+-- class ∀ p p'. {{Traversable p}} {{Traversable p'}} → ∂ p ↦ p' where
+
+infixl 4 _⋖_
+
+class Diff p p' where
+  _⋖_ : ∀ x. p' x → x → p x
+  down : ∀ x. p x → p (p' x × x)
+
+-- axioms:
+--
+-- fmap snd (down xf) ≡ xf
+-- fmap (uncurry _<._) (down xf) ≡ fmap (const xf) xf
+
+instance Diff Id (C Unit) where
+  -- If I put C here it says not in scope, but the issue is that it's typecon
+  MkC MkUnit ⋖ x = MkId x
+  -- no the arg to MkId - can't split not a vref
+  down (MkId _) = ?
+
+main : IO Unit
+main = printLn $ fcata sigOps (add (val two) (val two))
+
+
+

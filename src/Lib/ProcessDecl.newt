@@ -368,7 +368,8 @@ processShortData ns fc lhs sigs = do
   processDecl ns dataDecl
   where
     mkPi : FC × Name → Raw → Raw
-    mkPi (fc,n) a = RPi fc (BI fc n Explicit Zero (RU fc)) a
+    mkPi (fc,n) a = RPi fc (BI fc n Explicit Zero (RImplicit fc)) a
+    -- mkPi (fc,n) a = RPi fc (BI fc n Explicit Zero (RU fc)) a
 
     getArgs : Raw -> List (FC × String) -> M (FC × String × List (FC × String))
     getArgs (RVar fc1 nm) acc = pure (fc1, nm, acc)
@@ -382,7 +383,8 @@ processShortData ns fc lhs sigs = do
       pure $ TypeSig fc' Many ((fc',name) :: Nil) ty
       where
         mkPi : FC × String → Raw → Raw
-        mkPi (fc,nm) acc = RPi fc (BI fc nm Implicit Zero (RU fc)) acc
+        mkPi (fc,nm) acc = RPi fc (BI fc nm Implicit Zero (RImplicit fc)) acc
+        -- mkPi (fc,nm) acc = RPi fc (BI fc nm Implicit Zero (RU fc)) acc
 
     mkDecl args acc (RApp fc' t u icit) = mkDecl args (u :: acc) t
     mkDecl args acc tm = error (getFC tm) "Expected constructor application, got: \{show tm}"

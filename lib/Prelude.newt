@@ -160,7 +160,7 @@ class DecEq t where
 -- Functor
 
 class Functor (m : U → U) where
-  map : ∀ a b. (a → b) → m a → m b
+  map : ∀ a b. (f : a → b) → m a → m b
 
 infixr 4 _<$>_ _<$_
 _<$>_ : ∀ f. {{Functor f}} {0 a b : _} → (a → b) → f a → f b

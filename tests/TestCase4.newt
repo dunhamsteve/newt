@@ -50,7 +50,7 @@ zipWith f (x :: xs) (y :: ys) = f x y :: zipWith f xs ys
 transpose : {0 a : U} {m n : Nat} -> Vect m (Vect n a) -> Vect n (Vect m a)
 transpose {a} {Z} {n} Nil = vec n Nil
 -- FIXME CaseTree - erased k is chosen over z
-transpose {a} {S z} {n} (_::_ {a'} {j} x xs) = zipWith (_::_) x (transpose {_} {z} {_}  xs)
+transpose {a} {S z} {n} (_::_ {a'} {z} x xs) = zipWith (_::_) x (transpose {_} {z} {_}  xs)
 
 
 
@@ -58,10 +58,8 @@ myArr : Vect (S (S (S Z))) (Vect (S (S Z)) Int)
 myArr = (1 :: 2 :: Nil) :: (3 :: 4 :: Nil) :: (5 :: 6 :: Nil) :: Nil
 
 
-/-
+-- I'm not sure where I got this. It was commented out because it wasn't working, but is fine now.
 
--- this possibly needs dynamic pattern unification
--- It's complaining about a meta in a pattern
 data Ix : U where
 
 infixr 2 _:-:_
@@ -69,8 +67,8 @@ data Path : (Sig : Ix -> Ix -> U) (i j : Ix) -> U where
   Stop : {Sig : Ix -> Ix -> U} {i : Ix} -> Path Sig i i
   _:-:_ : {Sig : Ix -> Ix -> U} {i j k : Ix} -> Sig i j -> Path Sig j k -> Path Sig i k
 
-
 pmap : {s t : Ix -> Ix -> U} -> (f : {i j : Ix} -> s i j -> t i j) -> {i j : Ix} -> Path s i j -> Path t i j
 pmap f Stop = Stop
 pmap f (s :-: ss) = f s :-: pmap f ss
--/
+
+
