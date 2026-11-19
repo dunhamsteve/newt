@@ -21,10 +21,10 @@ vprint ctx v = do
   pure $ render 90 $ pprint (names ctx) tm
 
 -- Check that target is Many or we are in an erased context
-checkMarker : FC → Marker → Quant → M Unit
-checkMarker fc _ Many = pure MkUnit
-checkMarker fc Present Zero = pure MkUnit
-checkMarker fc Absent Zero = throwError $ E fc "Erased value used in unerased context"
+checkMarker : FC → Marker → Quant → Lazy Error → M Unit
+checkMarker fc _ Many err = pure MkUnit
+checkMarker fc Present Zero err = pure MkUnit
+checkMarker fc Absent Zero err = throwError err -- $ E fc "Erased value used in unerased context"
 
 -- collectDecl collects multiple Def for one function into one
 collectDecl : List Decl -> List Decl
@@ -335,14 +335,14 @@ rename meta mark ren lvl v@(VVar fc nm k sp) = go 0 ren
     go x Nil = error fc "scope/skolem thinger VVar \{show k} ren \{show ren}"
     go x ((k',q) :: rest) = if k' == k
       then do
-        checkMarker fc mark q
+        checkMarker fc mark q $ E fc "Erased value (lvl \{show k'}) used in unerased context"
         renameSpine meta mark ren lvl (Bnd fc x) sp
       else go (x + 1) rest
 rename meta Absent ren lvl v@(VRef fc nm sp) = do
   top <- getTop
   case lookup nm top of
     Just (MkEntry fc q name type def eflags) => do
-      checkMarker fc Absent q
+      checkMarker fc Absent q $ E fc "Erased value \{show nm} used in unerased context"
       renameSpine meta Absent ren lvl (Ref fc nm) sp
 
     _ => renameSpine meta Absent ren lvl (Ref fc nm) sp
@@ -371,13 +371,13 @@ rename meta mark ren lvl (VLam fc info t) = do
   scope <- rename meta mark ((lvl, info.biQuant) :: ren) (1 + lvl) tapp
   pure (Lam fc info scope)
 rename meta mark ren lvl v@(VPi fc info tm) = do
-  checkMarker fc mark Zero
+  checkMarker fc mark Zero $ E fc "Type used in unerased context"
   info' <- traverse (rename meta mark ren lvl) info
   tmapp <- tm $$ VVar emptyFC info.biName lvl Lin
   scope' <- rename meta mark ((lvl,info.biQuant) :: ren) (1 + lvl) tmapp
   pure (Pi fc info' scope')
 rename meta mark ren lvl v@(VU fc) = do
-  checkMarker fc mark Zero
+  checkMarker fc mark Zero $ E fc "Type used in unerased context"
   pure (UU fc)
 rename meta mark ren lvl (VErased fc) = pure (Erased fc)
 rename meta mark ren lvl (VLit fc lit) = pure (Lit fc lit)
@@ -523,7 +523,7 @@ unify env mode t u = do
 
     unifyRef : Val -> Val -> M UnifyResult
     unifyRef t'@(VRef fc k sp)  u'@(VRef fc' k' sp') = do
-      -- unifySpine is a problem for cmp (S x) (S y) =?= cmp x y
+      -- for cases like cmp (S x) (S y) =?= cmp x y
       Nothing <- tryEval env t'
         | Just v => do
             debug "tryEval \{show t'} to \{show v}"
@@ -534,6 +534,7 @@ unify env mode t u = do
             unify env mode t' v
 
       top <- getTop
+      -- If the head is a constructor we allow solving when matching the spine
       let spineMode = spineMode $ lookup k top
       -- we need to postpone if there are metas in the spines
       if k == k'
@@ -557,7 +558,9 @@ unify env mode t u = do
         spineMode (Just (MkEntry _ q name ty (DCon _ _ _ _) _) ) = mode
         spineMode (Just (MkEntry _ q name ty (PrimTCon _) _) ) = mode
         spineMode (Just (MkEntry _ q name ty (TCon _ _) _) ) = mode
-        spineMode _ = if mode == UNormal then USpine else mode
+        -- do we need something special on LHS
+        spineMode _ = USpine
+        -- spineMode _ = if mode == UNormal then USpine else mode
 
     unifyRef t         u@(VRef fc' k' sp') = do
       debug "expand \{show t} =?= %ref \{show k'}"
@@ -1112,6 +1115,9 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   -- We get unification constraints from matching the data constructor's
   -- codomain with the scrutinee type
   debug "unify dcon cod with scrut\n  \{show ty'}\n  \{show scty}"
+
+  -- FIXME There is no occurs check here (and the results don't see each other)
+  -- c.f. Zippy.newt - impossible cases with circular defs
   Just res <- catchError(Just <$> unify ctx'.env UPattern ty' scty)
               (\err => do
                   -- REVIEW we may need to distinguish between NO and FAIL here
@@ -1126,7 +1132,8 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
     Just (VVar _ nm k sp) => do
         -- future me: This case is in SortedMap. I thought to point the context
         -- updates in the other direction to match forcedCase, but then we get skolem issues
-        -- when (k /= scnm) $ error ctx.ctxFC "Splitting forced value"
+        -- Seems to be ok now...
+        when (k /= scnm) $ error ctx.ctxFC "Splitting forced value"
 
         -- Constrain the scrutinee's variable to be dcon applied to args
         let scon = (scnm, VRef ctx.ctxFC dcName sc) -- (DCon arity dcName)
@@ -1831,7 +1838,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
       case lookupRaw nm top of
         Just (MkEntry vfc q name ty def _) => do
           debug "lookup \{show name} as \{show def}"
-          checkMarker fc ctx.marker q
+          checkMarker fc ctx.marker q $ E fc "Erased name \{show nm} used in unerased context"
           vty <- eval Nil ty
           addTypeInfo fc nm ctx.env vty vfc
           pure (Ref fc name, vty)
@@ -1849,7 +1856,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
     go i ((BI vfc x icit q ty) :: xs) =
       if x == nm
       then do
-        checkMarker fc ctx.marker q
+        checkMarker fc ctx.marker q $ E fc "Erased value '\{show x}' used in unerased context"
         addTypeInfo fc nm ctx.env ty vfc
         pure (Bnd fc i, ty)
       else go (i + 1) xs
@@ -1889,10 +1896,10 @@ infer ctx (RApp fc t u icit) = do
     else pure (App fc t u q, bappu)
 
 infer ctx (RU fc) = do
-  checkMarker fc ctx.marker Zero
+  checkMarker fc ctx.marker Zero $ E fc "U used in unerased context"
   pure (UU fc, VU fc) -- YOLO
 infer ctx (RPi fc info@(BI nmfc nm icit quant ty) ty2) = do
-  checkMarker fc ctx.marker Zero
+  checkMarker fc ctx.marker Zero $ E fc "Type used in unerased context"
   ty' <- checkIn ctx Zero ty (VU fc)
   vty' <- eval ctx.env ty'
   -- don't register nameless args

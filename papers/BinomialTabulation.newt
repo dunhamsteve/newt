@@ -1,0 +1,61 @@
+module BinomialTabulation
+
+-- "Binomial Tabulation: A Short Story"
+-- Just section 2.1 at the moment
+
+import Prelude
+import Data.Nat
+import Data.Vect
+
+data B : Nat → Nat → U → U where
+  TipZ : ∀ a. {n : Nat} → a → B n Z a
+  TipS : ∀ a. {k : Nat} → a → B (S k) (S k) a
+  Bin : ∀ a. {n k : Nat} → B n (S k) a → B n k a → B (S n) (S k) a
+
+-- we don't have LT
+<-irrefl : ∀ x. ¬ (LTE (S x) x)
+<-irrefl (LTESucc pf) = <-irrefl pf
+
+lteRefl : {x : _} →  LTE x x
+-- TODO it offers LTESucc, but that shouldn't be possible...
+-- check if we're using getConstructors
+lteRefl {Z} = LTEZero
+lteRefl {S _} = LTESucc lteRefl
+
+bounded : ∀ a n k. B n k a → LTE k n
+bounded (TipZ _) = LTEZero
+bounded (TipS t) = lteRefl
+bounded (Bin _ u) = LTESucc (bounded u)
+
+#log 2
+unbounded : ∀ k a. B k (S k) a → Void
+unbounded (Bin t u) = unbounded u
+-- should be impossible because cyclic type
+unbounded (TipS _) = ?
+#log 1
+
+mapB : ∀ a b n k. (a → b) → B n k a → B n k b
+mapB f (TipZ x) = TipZ (f x)
+mapB f (TipS x) = TipS (f x)
+mapB f (Bin t u) = Bin (mapB f t) (mapB f u)
+
+unTipB : ∀ n a. B n n a → a
+unTipB (TipZ x) = x
+unTipB (TipS x) = x
+unTipB (Bin t _) = absurd (unbounded t)
+
+zipBWith : ∀ a b c n k. (a → b → c) → B n k a → B n k b → B n k c
+
+-- cd : ∀ k n a. LTE (S Z) k → LT k n → B n k a → B n (S k) (Vect (S k) a)
+cd : ∀ k n a. LTE (S Z) k → LTE (S k) n → B n k a → B n (S k) (Vect (S k) a)
+cd () _ (TipZ _)
+cd _ pf (TipS _) = absurd (<-irrefl pf)
+cd _ _ (Bin (TipS y) (TipZ z)) = TipS (y :- z :- VNil)
+cd _ _ (Bin (TipS y) u@(Bin _ _)) = TipS (y :- unTipB (cd (LTESucc LTEZero) lteRefl u))
+cd _ _ (Bin t@(Bin t' _) (TipZ z)) = Bin (cd lteRefl (LTESucc (bounded t')) t) (mapB (:- (z :- VNil)) t)
+cd _ pf (Bin (Bin _ _) (TipS _)) = absurd (<-irrefl pf)
+cd _ (LTESucc pf) (Bin t@(Bin t' _) u@(Bin _ _)) = Bin (cd (LTESucc LTEZero) (LTESucc (bounded t')) t) (zipBWith _:-_ t (cd (LTESucc LTEZero) pf u))
+-- FIXME The second TipS is impossible because of a cycle k ≟ S k
+cd pf pf' (Bin (TipS y) (TipS _)) = ?
+
+

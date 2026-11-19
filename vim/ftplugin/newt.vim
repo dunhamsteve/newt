@@ -27,6 +27,7 @@ inoremap <buffer> \neg  ¬
 inoremap <buffer> \[[  ⟦
 inoremap <buffer> \]]  ⟧
 inoremap <buffer> \circ ∘
+inoremap <buffer> \<. ⋖
 inoremap <buffer> \cuL ⌈
 inoremap <buffer> \cuR ⌉
 inoremap <buffer> \< ⟨
@@ -34,6 +35,9 @@ inoremap <buffer> \> ⟩
 inoremap <buffer> \iff ⇔
 inoremap <buffer> \oplus ⊕
 inoremap <buffer> \otimes ⊗
+inoremap <buffer> \partial ∂
+inoremap <buffer> \mapsto ↦
+inoremap <buffer> \empty ∅
 
 " Sets and Types
 inoremap <buffer> \bN  ℕ

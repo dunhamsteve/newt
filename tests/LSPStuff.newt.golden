@@ -18,12 +18,12 @@ INFO 5:11--5:12 "  n : Prelude.Nat\n  m : Prelude.Nat\n--------\nPrelude.Nat"
 - LSPStuff.newt 5:11--5:12 "Z"
 * Intro (S ?)
 - LSPStuff.newt 5:11--5:12 "(S ?)"
-* Intro case
-- LSPStuff.newt 5:11--5:12 "case _ of\n  _ => ?"
 * Intro m
 - LSPStuff.newt 5:11--5:12 "m"
 * Intro n
 - LSPStuff.newt 5:11--5:12 "n"
+* Intro case
+- LSPStuff.newt 5:11--5:12 "case _ of\n  _ => ?"
 
 *** Actions LSPStuff.newt 9 0
 * Add show
@@ -34,10 +34,10 @@ INFO 5:11--5:12 "  n : Prelude.Nat\n  m : Prelude.Nat\n--------\nPrelude.Nat"
 - LSPStuff.newt 13:0--13:0 "blah B = ?\n"
 
 *** Actions LSPStuff.newt 16 12
-* Intro case
-- LSPStuff.newt 16:12--16:13 "case _ of\n  _ => ?"
 * Intro b
 - LSPStuff.newt 16:12--16:13 "b"
+* Intro case
+- LSPStuff.newt 16:12--16:13 "case _ of\n  _ => ?"
 
 *** rename LSPStuff.newt 20 17 woot
 - LSPStuff.newt 20:0--20:3 "woot"

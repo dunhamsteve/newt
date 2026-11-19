@@ -71,6 +71,7 @@ setDef name fc q ty def flags = do
 
   modifyTop {currentMod $= { modDefs $= (updateMap name (MkEntry fc q name ty def flags))} }
 
+-- FC is a name FC at the moment and only used for errors
 updateDef : QName -> FC -> Tm -> Def -> M Unit
 updateDef name fc ty def = do
   top <- getTop

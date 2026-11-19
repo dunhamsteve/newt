@@ -1,6 +1,6 @@
 *** Process tests/QTcon.newt
 module QTcon
-ERROR at tests/QTcon.newt:7:7--7:11: Erased value used in unerased context
+ERROR at tests/QTcon.newt:7:7--7:11: Erased name Unit used in unerased context
   -- expect quantity error
   foo : U
   foo = Unit

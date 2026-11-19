@@ -4,6 +4,7 @@ build/
 *.swp
 *.log
 *.bak
+*.agdai
 input.txt
 node_modules
 mkday.py

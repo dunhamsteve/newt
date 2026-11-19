@@ -353,7 +353,7 @@ introActions (Just $ Unsolved fc qn ctx vty User) =
     let introCase = Intro "case" $ MkEdit fc "case _ of\n\{pack $ replicate (cast $ 2 + indent) ' '}_ => ?"
 
     locals <- mapMaybe id <$> traverse checkEntry ctx.types
-    let actions = introCase :: locals
+    let actions = locals ++ [introCase]
 
     putStrLn "intros for \{show vty}"
     case vty of
@@ -361,8 +361,10 @@ introActions (Just $ Unsolved fc qn ctx vty User) =
         let str = "(\\ \{nm} => ?)"
         pure $ Intro str (MkEdit fc str) :: actions
       _ => catchError (do
+            -- FIXME this returns LTESucc for LTE Z Z
             cons <- getConstructors ctx fc vty
-            putStrLn "constructors \{show cons}"
+            cons <- filterM (checkCase ctx vty) cons
+            putStrLn "constructors \{show cons} for \{show vty}"
             pure $ map makeEdit cons ++ actions
           ) $ \ _ => pure actions
   ) $ \ err => do
@@ -370,12 +372,27 @@ introActions (Just $ Unsolved fc qn ctx vty User) =
       putStrLn $ show err
       pure Nil
   where
+    checkCase : Context → Val → (QName × Int × Tm) → M Bool
+    checkCase ctx scty (dcName, arity, ty) = do
+      vty <- eval Nil ty
+      (ctx', ty', vars, sc) <- extendPi ctx (vty) Lin Lin
+      (Right res) <- tryError (unify ctx'.env UPattern ty' scty)
+              | Left err => do
+                putStrLn "SKIP \{show dcName} because unify error \{errorMsg err}"
+                pure False
+      pure True
+
     checkEntry : BindInfo Val → M (Maybe CodeAction)
     checkEntry (BI _ "_" _ q ty) = pure Nothing
     checkEntry (BI _ nm _ q ty) = do
-      Right _ <- tryError (unify ctx.env UNormal vty ty)
+      -- look at the tail of functions, we probably should still
+      -- try the raw function too
+      -- The idea is to pick up `f ?`
+      (ctx, ty', binds, sp)  <- extendPi ctx ty Lin Lin
+      Right _ <- tryError (unify ctx.env UNormal vty ty')
          | _ => pure Nothing
-      pure $ Just $ Intro nm $ MkEdit fc nm
+      let edit = if length binds /= Z then "(" ++ (unwords $ [nm] ++ map (const "?") binds) ++ ")" else nm
+      pure $ Just $ Intro nm $ MkEdit fc edit
 
     introDCon : QName × Int × Tm → List String
     introDCon (QN _ nm, _, tm) = go (Lin :< nm) tm
