@@ -240,7 +240,7 @@ instance Show Val where
   show (VRef _ nm Lin) = show nm
   show (VRef _ nm sp) = "(\{show nm} \{showVSpine sp})"
   show (VMeta _ ix arity Lin) = show ix
-  show (VMeta _ ix arity sp) = "(\{show ix} \{unwords $ map show $ map fst $ drop arity (sp <>> Nil)})"
+  show (VMeta _ ix arity sp) = "(\{show ix}[\{show arity}] \{unwords $ map show $ map fst $ drop arity (sp <>> Nil)})"
   show (VLam fc (BI _ str icit quant _) x) = "(%lam \{show quant}\{str} \{showClosure x})"
   show (VPi fc (BI fc str Implicit rig x) y) = "(%pi {\{show rig} \{str} : \{show  x}}. \{showClosure  y})"
   show (VPi fc (BI fc str Explicit rig x) y) = "(%pi (\{show rig} \{str} : \{show  x}). \{showClosure  y})"

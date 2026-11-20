@@ -11,6 +11,7 @@ A poorly maintained list of todo items, as ideas for what to work on next.
   - need a bunch of fresh nams, since we're generating raw code
   - or just skip the implicits...
 - [ ] playground - case split doesn't work on last line of file
+- [ ] not detecting circular references in impossible constructors (`papers/BinomialTabulation.newt`)
 - [x] support derive with args:
   - `derive ∀ a. {{Show a}} → Show (BindInfo a)`
   - `instance (∀ a. {{Show a}} → Show (BindInfo a))`
@@ -56,7 +57,7 @@ A poorly maintained list of todo items, as ideas for what to work on next.
   - [x] FC for duplicate `data`, `record`, `class` name is wrong (points to `data`)
   - [x] FC on bad import should point to the name
   - [x] Current module overrides imports
-  - [ ] Duplicate data constructor errors point to `data`
+  - [x] Duplicate data constructor errors point to `data`
   - [ ] Allow Qualified names in surface syntax
   - Don't disambiguate on type for now
 - [x] Suppress code actions in `derive` statements

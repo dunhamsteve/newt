@@ -9,6 +9,7 @@
 (define $GT 2)
 (define (Prelude.addString a b) (string-append a b))
 (define (Prelude.addInt a b) (+ a b))
+(define (Prelude.mulInt a b) (* a b))
 (define (Prelude.ltInt a b) (< a b))
 (define (Prelude.eqInt a b) (= a b))
 (define (Prelude.ltChar a b) (char<? a b))

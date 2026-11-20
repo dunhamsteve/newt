@@ -28,10 +28,19 @@ view-diag (S m) ()
 succEqIsEq : ∀ n m. S n ≡ S m → n ≡ m
 succEqIsEq Refl = Refl
 
-
 _≟_ : (m n : Nat) → Dec (m ≡ n)
 m ≟ n = case withProof (view m n) of
     Just Zero ** _ => Yes Refl
     Just (Suc m n) ** _ => mapEquiv (cong S) succEqIsEq (m ≟ n)
     Nothing ** pf => No (\z => case z : m ≡ n of Refl => view-diag m pf)
 
+-- This version was failing before I mad fixes to pattern unification
+inspect' : ∀ a . {0 b : a → U} (f : (x : a) → b x) → (x : a) → Sg (b x) (\ nn => f x ≡ nn)
+inspect' f x = (f x ** Refl)
+
+infixl 5 _≟'_
+_≟'_ : (m n : Nat) → Dec (m ≡ n)
+m ≟' n = case inspect' (view m) n of
+    Just Zero ** _ => Yes Refl
+    Just (Suc m n) ** _ => mapEquiv (cong S) succEqIsEq (m ≟' n)
+    Nothing ** pf => No (\z => case z : m ≡ n of Refl => view-diag m pf)

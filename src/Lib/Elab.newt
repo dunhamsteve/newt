@@ -303,7 +303,8 @@ addConstraint env fc tm' tm = do
       Just (Solved fc qn val) => expand mc acc (getMetas val ++ ns)
       _ => expand mc ns acc
 
--- return renaming, the position is the new VVar
+-- return renaming, list position is the new debruijn index
+-- TODO return snoclist
 invert : Int -> SnocList (Val × Quant) -> M (List (Int × Quant))
 invert lvl sp = go sp Nil
   where
@@ -328,7 +329,6 @@ renameSpine meta mark ren lvl tm (xs :< (x, q)) = do
   xs' <- renameSpine meta mark ren lvl tm xs
   pure $ App emptyFC xs' xtm q
 
--- I think we need to check quantity here.
 rename meta mark ren lvl v@(VVar fc nm k sp) = go 0 ren
   where
     go : Int → List (Int × Quant) → M Tm
@@ -351,7 +351,6 @@ rename meta mark ren lvl (VRef fc nm sp) = do
   -- FIXME lookup quantity of VRef (if mark absent) - we should keep this on the VRef..
   renameSpine meta mark ren lvl (Ref fc nm) sp
 rename meta mark ren lvl (VMeta fc ix size sp) = do
-  -- So sometimes we have an unsolved meta in here which reference vars out of scope.
   debug "rename Meta \{show ix} spine \{show sp}"
   if ix == meta
   -- REVIEW is this the right fc?
@@ -381,15 +380,14 @@ rename meta mark ren lvl v@(VU fc) = do
   pure (UU fc)
 rename meta mark ren lvl (VErased fc) = pure (Erased fc)
 rename meta mark ren lvl (VLit fc lit) = pure (Lit fc lit)
--- for now, we don't do solutions with case, let, letrec in them
+-- for now, we don't support solutions with case, let, letrec in them
 -- If we we need this, follow the model of VLam
 rename meta mark ren lvl tm = error (getFC tm) "Unhandled term in `rename`: \{show tm}"
 
-lams : Nat -> List (BindInfo Val) -> Tm -> Tm
-lams Z _ tm = tm
-lams (S k) Nil tm = fatalError "Fatal: too many args in lams"
--- REVIEW forgetting type?
-lams (S k) (info :: xs) tm = Lam emptyFC (map (const MkUnit) info) (lams k xs tm)
+lams : VSpine -> List (BindInfo Val) -> Tm -> Tm
+lams Lin _ tm = tm
+lams (xs :< (_ , q)) Nil tm = Lam emptyFC (BI emptyFC "_" Explicit q MkUnit) (lams xs Nil tm)
+lams (xs :< x) (info :: infos) tm = Lam emptyFC (map (const MkUnit) info) (lams xs infos tm)
 
 unify : Env -> UnifyMode -> Val -> Val  -> M UnifyResult
 
@@ -415,25 +413,20 @@ solve env m sp t = do
   debug "SOLVE \{show m} \{show kind} lvl \{show $ length' env} sp \{show sp} is \{show t} mark \{show ctx.marker}"
   let size = length $ filter (\x => x == Bound) ctx.bds
   debug "\{show m} size is \{show size} sps \{show $ snoclen sp}"
-  let (True) = snoclen sp == size
-    | _ => do
-      let l = length' env
-      let meta = VMeta (getFC t) m size sp
-      debug "meta \{show m} (\{show ix}) applied to \{show $ snoclen sp} args instead of \{show size}"
-      debug "CONSTRAINT \{show meta} =?= \{show t}"
-      -- FC might depend on which direction the solution occurred in?
-      addConstraint env metaFC meta t
-  let l = length' env
   debug "meta \{show meta}"
 
   -- tests/UnifyPi.newt - Solution is non-linear, but is solved later
+  let l = length' env
   Right ren <- tryError $ invert l sp
     | Left err => do
         debug "postpone constraint \{show err}"
-        addConstraint env (getFC t) (VMeta (getFC t) m size sp) t
+        addConstraint env metaFC (VMeta metaFC m size sp) t
   catchError (do
+    -- lvl is used for the eval of Lam, it ensures the eval'd Tm point at the
+    -- right spot in ctx, the var is then translated by finding its location in ren
     tm <- rename m ctx.marker ren l t
-    let tm = lams (snoclen sp) (reverse ctx.boundNames) tm
+    -- names are for debugging
+    let tm = lams sp (reverse ctx.boundNames) tm
     top <- getTop
     soln <- eval Nil tm
 
@@ -635,9 +628,10 @@ unify env mode t u = do
 
     unifyMeta : Val -> Val -> M UnifyResult
     -- flex/flex
-    unifyMeta t@(VMeta fc k _ sp) t'@(VMeta fc' k' _ sp') =
-      if k == k' then unifySpine env mode sp sp'
-      -- TODO, might want to try the other way, too.
+    unifyMeta t@(VMeta fc k size sp) t'@(VMeta fc' k' size' sp') =
+      -- If the spines don't convert, we need to postpone in case an arg is ignored.
+      -- we could catchError, but it appears to be slower
+      if k == k' then throwError $ Postpone fc "flex spine"
       else if snoclen sp < snoclen sp'
         then solve' env k' sp' t >> pure neutral
         else solve' env k sp t' >> pure neutral
@@ -667,7 +661,7 @@ unifyCatch fc ctx ty' ty = do
         pure neutral
 
       err => do
-        debug "fail \{show ty'} \{show ty}"
+        debug "fail \{show ty'} ≟ \{show ty}"
         -- Need to quote here to catch any transient meta solutions
         a <- quote ctx.lvl ty'
         b <- quote ctx.lvl ty
@@ -1118,6 +1112,8 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
 
   -- FIXME There is no occurs check here (and the results don't see each other)
   -- c.f. Zippy.newt - impossible cases with circular defs
+  -- simply post-processing `res` can get dicey because we may have further
+  -- unification to do (say v1 -> S v2, v1 -> v3, and v3 -> S v4)
   Just res <- catchError(Just <$> unify ctx'.env UPattern ty' scty)
               (\err => do
                   -- REVIEW we may need to distinguish between NO and FAIL here
@@ -1180,6 +1176,8 @@ mkPat (tm, icit) = do
   top <- getTop
   case splitArgs tm Nil of
     ((RVar fc nm), b) => case lookupRaw nm top of
+                (Just (MkEntry _ _ name type (TCon _ _) _)) =>
+                  error (getFC tm) "\{nm} is a type constructor"
                 (Just (MkEntry _ _ name type (DCon _ _ k str) _)) => do
                   -- TODO check arity, also figure out why we need reverse
                   bpat <- traverse (mkPat) b
@@ -1448,6 +1446,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
   tmp <- quote ctx.lvl scty
   scty' <- eval ctx.env tmp
   scty' <- forceType ctx.env scty'
+  -- This calls solveAutos if it's still unsolved, TODO check if we still need this
   scty' <- case scty' of
     (VMeta fc1 ix _ sp) => do
       meta <- lookupMeta ix

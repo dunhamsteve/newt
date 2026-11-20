@@ -17,8 +17,6 @@ data B : Nat → Nat → U → U where
 <-irrefl (LTESucc pf) = <-irrefl pf
 
 lteRefl : {x : _} →  LTE x x
--- TODO it offers LTESucc, but that shouldn't be possible...
--- check if we're using getConstructors
 lteRefl {Z} = LTEZero
 lteRefl {S _} = LTESucc lteRefl
 
@@ -32,7 +30,7 @@ unbounded : ∀ k a. B k (S k) a → Void
 unbounded (Bin t u) = unbounded u
 -- should be impossible because cyclic type
 unbounded (TipS _) = ?
-#log 1
+#log 0
 
 mapB : ∀ a b n k. (a → b) → B n k a → B n k b
 mapB f (TipZ x) = TipZ (f x)
@@ -46,7 +44,6 @@ unTipB (Bin t _) = absurd (unbounded t)
 
 zipBWith : ∀ a b c n k. (a → b → c) → B n k a → B n k b → B n k c
 
--- cd : ∀ k n a. LTE (S Z) k → LT k n → B n k a → B n (S k) (Vect (S k) a)
 cd : ∀ k n a. LTE (S Z) k → LTE (S k) n → B n k a → B n (S k) (Vect (S k) a)
 cd () _ (TipZ _)
 cd _ pf (TipS _) = absurd (<-irrefl pf)
