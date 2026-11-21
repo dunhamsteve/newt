@@ -933,7 +933,8 @@ pfunc isSuffixOf uses (True False): String → String → Bool := `(pfx, s) => s
 pfunc strIndex : String → Int → Char := `(s, ix) => s[ix] ?? ''`
 
 instance ∀ a. {{Show a}} → Show (SnocList a) where
-  show xs = show (xs <>> Nil)
+  -- We don't have his surface syntax, but I want to know it's a snoclist
+  show xs = "[<" ++ (joinBy ", " $ map show $ xs <>> Nil) ++ "]"
 
 getAt' : ∀ a. Int → List a → Maybe a
 getAt' i xs = getAt (cast i) xs
