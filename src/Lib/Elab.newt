@@ -97,15 +97,12 @@ getMetas _ = []
 
 -- Variable assignments needed by unification, currently only used for pattern matching
 record UnifyResult where
-  constructor MkResult
+  constructor MkUResult
   -- these correspond to v₁ ≡ val from indicies
   constraints : List (Int × Val)
 
-instance Semigroup UnifyResult where
-  (MkResult cs) <+> (MkResult cs') = MkResult (cs ++ cs')
-
-instance Monoid UnifyResult where
-  neutral = MkResult Nil
+emptyResult : UnifyResult
+emptyResult = MkUResult Nil
 
 data UnifyMode = UNormal | UPattern | USpine
 derive Show UnifyMode
@@ -389,7 +386,7 @@ lams Lin _ tm = tm
 lams (xs :< (_ , q)) Nil tm = Lam emptyFC (BI emptyFC "_" Explicit q MkUnit) (lams xs Nil tm)
 lams (xs :< x) (info :: infos) tm = Lam emptyFC (map (const MkUnit) info) (lams xs infos tm)
 
-unify : Env -> UnifyMode -> Val -> Val  -> M UnifyResult
+unify : Env -> UnifyMode → UnifyResult -> Val -> Val  -> M UnifyResult
 
 .boundNames : Context -> List (BindInfo Val)
 ctx.boundNames = map snd $ filter (\x => fst x == Bound) $ zip ctx.bds ctx.types
@@ -443,10 +440,10 @@ solve env m sp t = do
       for_ rel $ \case
         MkMc fc _ env lhs rhs => do
           debug "discharge l=\{show $ length' env} \{(show lhs)} =?= \{(show rhs)}"
-          catchError (unify env UNormal lhs rhs) $ \case
+          catchError (unify env UNormal emptyResult lhs rhs) $ \case
             Postpone fc _ => do
               addConstraint env fc lhs rhs
-              pure neutral
+              pure emptyResult
             err => throwError err
           pure MkUnit
       -- check any autos
@@ -472,13 +469,18 @@ checkPostpone : FC → Val → M Unit
 checkPostpone fc (VCase _ (VMeta _ qn _ sp) _ _) = throwError $ Postpone fc "postponed stuck meta \{show qn}"
 checkPostpone fc _ = return MkUnit
 
-unifySpine : Env -> UnifyMode -> SnocList (Val × Quant) -> SnocList (Val × Quant) -> M UnifyResult
-unifySpine env mode Lin Lin = pure (MkResult Nil)
-unifySpine env mode (xs :< (x, q)) (ys :< (y, q')) =
-  _<+>_ <$> unify env mode x y <*> unifySpine env mode xs ys
-unifySpine env mode _ _ = error emptyFC "meta spine length mismatch"
+-- TODO occurs check
+addResult : UnifyResult → Int → Val → M UnifyResult
+addResult (MkUResult constraints) k v = pure $ MkUResult ((k,v) :: constraints)
 
-unify env mode t u = do
+unifySpine : Env -> UnifyMode → UnifyResult -> SnocList (Val × Quant) -> SnocList (Val × Quant) -> M UnifyResult
+unifySpine env mode res Lin Lin = pure res
+unifySpine env mode res (xs :< (x, q)) (ys :< (y, q')) = do
+  res <- unify env mode res x y
+  res <- unifySpine env mode res xs ys
+  pure res
+unifySpine env mode res _ _ = error emptyFC "meta spine length mismatch"
+unify env mode res' t u = do
   debug "Unify lvl \{show $ length env}"
   debug "  \{show t}"
   debug "  =?= \{show u}"
@@ -493,45 +495,47 @@ unify env mode t u = do
   -- We want this to happen before VRefs are expanded, and mixing mode
   -- into the case tree explodes it further.
   case mode of
-    UPattern => unifyPattern t' u'
-    _ => unifyMeta t' u'
+    UPattern => unifyPattern res' t' u'
+    _ => unifyMeta res' t' u'
   where
     -- The case tree in Idris was huge, so I split it into stages
-    unifyRest : Val -> Val -> M UnifyResult
-    unifyRest (VPi fc (BI _ nm _ _ a) b) (VPi fc' (BI _ _ _ _ a') b') = do
+    unifyRest : UnifyResult -> Val -> Val -> M UnifyResult
+    unifyRest res (VPi fc (BI _ nm _ _ a) b) (VPi fc' (BI _ _ _ _ a') b') = do
       let fresh = VVar fc nm (length' env) Lin
       xb <- b $$ fresh
       xb' <- b' $$ fresh
-      _<+>_ <$> unify env mode a a' <*> unify (fresh :: env) mode xb xb'
+      res <- unify env mode res a a'
+      res <- unify (fresh :: env) mode res xb xb'
+      pure res
 
     -- TODO adds about 2kb, maybe add one more func for unifyPi?
     -- or rearrange to split on first arg and then case on second (might be a good experiment)
-    unifyRest (VLit fc l) (VLit _ k) = if l == k
-      then pure neutral
+    unifyRest res (VLit fc l) (VLit _ k) = if l == k
+      then pure res
       else error fc "unify failed \{show l} =?= \{show k}"
 
-    unifyRest (VU _) (VU _) = pure neutral
+    unifyRest res (VU _) (VU _) = pure res
     -- REVIEW I'd like to quote this back, but we have l that aren't in the environment.
-    unifyRest t' u' = error (getFC t') "unify failed \{show t'} =?= \{show u'} \n  env is \{show env}"
+    unifyRest res t' u' = error (getFC t') "unify failed \{show t'} =?= \{show u'} \n  env is \{show env}"
 
-    unifyRef : Val -> Val -> M UnifyResult
-    unifyRef t'@(VRef fc k sp)  u'@(VRef fc' k' sp') = do
+    unifyRef : UnifyResult ->  Val -> Val -> M UnifyResult
+    unifyRef res t'@(VRef fc k sp)  u'@(VRef fc' k' sp') = do
       -- for cases like cmp (S x) (S y) =?= cmp x y
       Nothing <- tryEval env t'
         | Just v => do
             debug "tryEval \{show t'} to \{show v}"
-            unify env mode v u'
+            unify env mode res v u'
       Nothing <- tryEval env u'
         | Just v => do
             debug "tryEval \{show u'} to \{show v}"
-            unify env mode t' v
+            unify env mode res t' v
 
       top <- getTop
       -- If the head is a constructor we allow solving when matching the spine
       let spineMode = spineMode $ lookup k top
       -- we need to postpone if there are metas in the spines
       if k == k'
-        then unifySpine env spineMode sp sp'
+        then unifySpine env spineMode res sp sp'
         else do
           let (CheckAll) = top.currentMod.modMetaCtx.mcmode | _ => error fc "vref mismatch \{show k} \{show k'}"
           if isConstr (lookup k top) && isConstr (lookup k' top)
@@ -555,7 +559,7 @@ unify env mode t u = do
         spineMode _ = USpine
         -- spineMode _ = if mode == UNormal then USpine else mode
 
-    unifyRef t         u@(VRef fc' k' sp') = do
+    unifyRef res t         u@(VRef fc' k' sp') = do
       debug "expand \{show t} =?= %ref \{show k'}"
       top <- getTop
       case lookup k' top of
@@ -563,102 +567,102 @@ unify env mode t u = do
           vtm <- eval Nil tm
           appvtm <- vappSpine vtm sp'
           checkPostpone fc' appvtm
-          unify env mode t appvtm
+          unify env mode res t appvtm
         _ => error fc' "unify failed \{show t} =?= \{show u} [no Fn]"
 
-    unifyRef t@(VRef fc k sp) u = do
+    unifyRef res t@(VRef fc k sp) u = do
       debug "expand %ref \{show k} \{show sp} =?= \{show u}"
       top <- getTop
       case lookup k top of
         Just (MkEntry _ q name ty (Fn tm) _) => do
           vtm <- eval Nil tm
           tmsp <- vappSpine vtm sp
-          unify env mode tmsp u
+          unify env mode res tmsp u
         _ => error fc "unify failed \{show t} [no Fn] =?= \{show u}"
-    unifyRef t u = unifyRest t u
+    unifyRef res t u = unifyRest res t u
 
-    unifyVar : Val -> Val -> M UnifyResult
-    unifyVar t'@(VVar fc n₁ k sp)  u'@(VVar fc' n₂ k' sp')  =
-      if k == k' then unifySpine env mode sp sp'
+    unifyVar : UnifyResult -> Val -> Val -> M UnifyResult
+    unifyVar res t'@(VVar fc n₁ k sp)  u'@(VVar fc' n₂ k' sp')  =
+      if k == k' then unifySpine env mode res sp sp'
       else error fc "Failed to unify \{show t'} and \{show u'}"
 
-    unifyVar t'@(VVar fc nm k Lin) u = do
+    unifyVar res t'@(VVar fc nm k Lin) u = do
       vu <- tryEval env u
       case vu of
-        Just v => unify env mode t' v
+        Just v => unify env mode res t' v
         Nothing => error fc "Failed to unify \{show t'} and \{show u}"
 
-    unifyVar t u'@(VVar fc nm k Lin) = do
+    unifyVar res t u'@(VVar fc nm k Lin) = do
       vt <- tryEval env t
       case vt of
-        Just v => unify env mode v u'
+        Just v => unify env mode res v u'
         Nothing => error fc "Failed to unify \{show t} and \{show u'}"
-    unifyVar t u = unifyRef t u
+    unifyVar res t u = unifyRef res t u
 
-    unifyLam : Val -> Val -> M UnifyResult
-    unifyLam (VLam fc info t)  (VLam _ _ t') = do
+    unifyLam : UnifyResult -> Val -> Val -> M UnifyResult
+    unifyLam res (VLam fc info t)  (VLam _ _ t') = do
       let fresh = VVar fc info.biName (length' env) Lin
       vappt <- t $$ fresh
       vappt' <- t' $$ fresh
-      unify (fresh :: env) mode vappt vappt'
-    unifyLam t         (VLam fc' (BI _ nm _ q _) t') = do
+      unify (fresh :: env) mode res vappt vappt'
+    unifyLam res t         (VLam fc' (BI _ nm _ q _) t') = do
       debug "ETA \{show t}"
       let fresh = VVar fc' nm (length' env) Lin
       vappt <- vapp t fresh q
       vappt' <- t' $$ fresh
-      unify (fresh :: env) mode vappt vappt'
-    unifyLam (VLam fc (BI _ n _ q _) t)  t' = do
+      unify (fresh :: env) mode res vappt vappt'
+    unifyLam res (VLam fc (BI _ n _ q _) t)  t' = do
       debug "ETA' \{show t'}"
       let fresh = VVar fc n (length' env) Lin
       appt <- t $$ fresh
       vappt' <- vapp t' fresh q
-      unify (fresh :: env) mode appt vappt'
-    unifyLam t u = unifyVar t u
+      unify (fresh :: env) mode res appt vappt'
+    unifyLam res t u = unifyVar res t u
 
-    solve' : Env -> QName -> SnocList (Val × Quant)-> Val -> M UnifyResult
+    solve' : Env -> QName -> SnocList (Val × Quant)-> Val -> M Unit
     solve' env nm sp sol = do
       case mode of
         UPattern => do
           debug "pattern solve \{show nm} \{show sp} =?= \{show sol}"
-          pure neutral
         USpine => do
           debug "spine match \{show nm}"
           throwError $ Postpone (getFC sol) "spine match"
-        _ => solve env nm sp sol >> pure neutral
+        _ => solve env nm sp sol
 
-    unifyMeta : Val -> Val -> M UnifyResult
+    unifyMeta : UnifyResult → Val -> Val -> M UnifyResult
     -- flex/flex
-    unifyMeta t@(VMeta fc k size sp) t'@(VMeta fc' k' size' sp') =
+    unifyMeta res t@(VMeta fc k size sp) t'@(VMeta fc' k' size' sp') =
       -- If the spines don't convert, we need to postpone in case an arg is ignored.
       -- we could catchError, but it appears to be slower
       if k == k' then throwError $ Postpone fc "flex spine"
       else if snoclen sp < snoclen sp'
-        then solve' env k' sp' t >> pure neutral
-        else solve' env k sp t' >> pure neutral
-    unifyMeta t (VMeta fc' i' _ sp') = solve env i' sp' t >> pure neutral
-    unifyMeta (VMeta fc i _ sp) t' = solve env i sp t' >> pure neutral
-    unifyMeta t v = unifyLam t v
+        then solve' env k' sp' t >> pure res
+        else solve' env k sp t' >> pure res
+    unifyMeta res t (VMeta fc' i' _ sp') = solve env i' sp' t >> pure res
+    unifyMeta res (VMeta fc i _ sp) t' = solve env i sp t' >> pure res
+    unifyMeta res t v = unifyLam res t v
 
-    unifyPattern : Val -> Val -> M UnifyResult
-    unifyPattern t'@(VVar fc n₁ k sp)  u'@(VVar fc' n₂ k' sp')  =
-      if k == k' then unifySpine env mode sp sp'
+    unifyPattern : UnifyResult -> Val -> Val -> M UnifyResult
+    unifyPattern res t'@(VVar fc n₁ k sp)  u'@(VVar fc' n₂ k' sp')  =
+      if k == k' then unifySpine env mode res sp sp'
       else case (sp, sp') of
         (Lin,Lin) => if k < k'
-          then pure $ MkResult ((k, u') :: Nil)
-          else pure $ MkResult ((k', t') :: Nil)
-        (Lin,_) => pure $ MkResult ((k, u') :: Nil)
-        (_,Lin) => pure $ MkResult ((k', t') :: Nil)
+          then addResult res k u'
+          else addResult res k' t'
+        (Lin,_) => addResult res k u'
+        (_,Lin) => addResult res k' t'
         _ => error fc "Failed to unify \{show t'} and \{show u'} at \{show mode}"
 
-    unifyPattern (VVar fc nm k Lin) u = pure $ MkResult ((k, u) :: Nil)
-    unifyPattern t (VVar fc nm k Lin) = pure $ MkResult ((k, t) :: Nil)
-    unifyPattern t u = unifyMeta t u
+    unifyPattern res (VVar fc nm k Lin) u = addResult res k u
+    unifyPattern res t (VVar fc nm k Lin) = addResult res k t
+    unifyPattern res t u = unifyMeta res t u
 
 unifyCatch fc ctx ty' ty = do
-    ignore $ catchError (unify ctx.env UNormal ty' ty) $ \case
+    ignore $ catchError (unify ctx.env UNormal emptyResult ty' ty) $ \case
       Postpone _ _ => do
         addConstraint ctx.env fc ty' ty
-        pure neutral
+        -- FIXME - we should tell the caller to return a meta placeholder
+        pure emptyResult
 
       err => do
         debug "fail \{show ty'} ≟ \{show ty}"
@@ -672,8 +676,6 @@ freshMeta ctx fc ty kind = do
   top <- getTop
   let mc = top.currentMod.modMetaCtx
   debug "fresh meta \{show mc.next} : \{show ty} (\{show kind}, \{show ctx.marker})"
-  -- need the ns here
-  -- we were fudging this for v1
   let qn = QN top.currentMod.modName "$m\{show mc.next}"
   let newmeta = Unsolved fc qn ctx ty kind
   let autos = case kind of
@@ -851,13 +853,35 @@ extendPi ctx ty nms sc = pure (ctx, ty, nms <>> Nil, sc)
 checkConflicts : List (Int × Val) → M Unit
 checkConflicts Nil = pure MkUnit
 checkConflicts ((l, v) :: xs) = do
-  traverse_ go xs
+  -- This shouldn't happen anymore
+  -- traverse_ go xs
+  debug "occurs \{show l} \{show v}"
+  -- FIXME - move this to addResult
+  occursCheck v
   checkConflicts xs
   where
+    occursCheck : Val → M Unit
+    occursCheck (VVar fc nm k sp) = if k == l then error fc "occurs" else pure MkUnit
+    occursCheck (VMeta _ _ _ sp) = traverse_ occursCheck $ map fst sp
+    occursCheck (VRef _ nm sp) = traverse_ occursCheck $ map fst sp
+    occursCheck (VDelay _ t) = occursCheck t
+    occursCheck (VForce _ t) = occursCheck t
+    -- TODO rest (but really, we need proper unification
+    occursCheck _ = pure MkUnit
+    occursCheck (VCase _ sc _ _) = ?
+    occursCheck (VLam _ _ b) = ?
+    occursCheck (VPi _ _ b) = ?
+    occursCheck (VLet _ _ _ _) = ?
+    occursCheck (VLetRec _ _ _ _ _ _) = ?
+    occursCheck (VU _) = ?
+    occursCheck (VErased _) = ?
+    occursCheck (VLit _ _) = ?
+
     go : (Int × Val) → M Unit
     go (k,w) = if k /= l then pure MkUnit
       else case (v,w) of
         (VRef fc qn _, VRef fc' qn' _) =>
+          -- FIXME this is more of a maybe situation...
           if qn == qn' then pure MkUnit else error fc "need to unify \{show v} and \{show w}"
         _ => pure MkUnit
 
@@ -885,7 +909,7 @@ updateContext ctx ((k, val) :: cs) =
     (Just val') => do
       -- var k is both val' and val
       -- We need a more appropriate unify for pattern matching
-      MkResult Nil <- unify ctx.env UPattern val val'
+      MkUResult Nil <- unify ctx.env UPattern emptyResult  val val'
         | res => do
           debug "TODO: updateContext yielded constraints \{show res.constraints} - var \{show k} is \{show val'} and update says \{show val}"
           -- Not quite right? We're _forcing_ a value and I'm getting missing case
@@ -912,15 +936,19 @@ updateContext ctx ((k, val) :: cs) =
     setAt' (S k) x (y :: xs) = y :: setAt' k x xs
 
 -- check if a constructor is possible. Used to check impossible and missing cases.
+-- True is a Yes or a Maybe, False is definite no
 checkCase : Context → Int → Val → (QName × Int × Tm) → M Bool
 checkCase ctx scnm scty (dcName, arity, ty) = do
   vty <- eval Nil ty
   (ctx', ty', vars, sc) <- extendPi ctx (vty) Lin Lin
-  (Right res) <- tryError (unify ctx'.env UPattern ty' scty)
+  (Right res) <- tryError (unify ctx'.env UPattern emptyResult ty' scty)
+          | Left (Postpone _ msg) => do
+            debug "Maybe \{show dcName} because unify postpone \{msg}"
+            pure True
           | Left err => do
             debug "SKIP \{show dcName} because unify error \{errorMsg err}"
             pure False
-  -- TODO make a better unify for pattern matching
+  -- TODO make a better unify for pattern matching that catches this
   Right _ <- tryError $ checkConflicts res.constraints
     | Left err => pure False
   case getAt' (lvl2ix ctx.lvl scnm) ctx.env of
@@ -1114,7 +1142,7 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   -- c.f. Zippy.newt - impossible cases with circular defs
   -- simply post-processing `res` can get dicey because we may have further
   -- unification to do (say v1 -> S v2, v1 -> v3, and v3 -> S v4)
-  Just res <- catchError(Just <$> unify ctx'.env UPattern ty' scty)
+  Just res <- catchError(Just <$> unify ctx'.env UPattern emptyResult ty' scty)
               (\err => do
                   -- REVIEW we may need to distinguish between NO and FAIL here
                   debug "SKIP \{show dcName} because unify error \{errorMsg err}"
