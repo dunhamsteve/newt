@@ -6,6 +6,9 @@ import Prelude
 foo : Z ≡ S Z → Nat
 foo Refl = Z
 
+foo2 : Z ≡ S Z → Nat
+foo2 ()
+
 -- This one should be ok
 test2 : Z ≡ Z → Nat
 test2 Refl = Z

@@ -45,7 +45,6 @@ data Env : ∀ n. Vect n Ty → U where
 
 lookup : ∀ n t. {0 ctxt : Vect n Ty} {0 i : Fin n} → HasType i ctxt t → Env ctxt → interpTy t
 lookup Stop (x ::: xs) = x
-lookup () Empty
 lookup (Pop k) (x ::: xs) = lookup k xs
 
 interp : ∀ n t. {0 ctxt : Vect n Ty} → Env ctxt → Expr ctxt t → interpTy t

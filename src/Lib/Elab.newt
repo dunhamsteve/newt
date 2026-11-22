@@ -104,6 +104,9 @@ record UnifyResult where
 emptyResult : UnifyResult
 emptyResult = MkUResult Nil
 
+-- UNormal runs the higher ordered pattern unification for elaboration
+-- UPattern is a first order, filling in the UnifyResult, for pattern matching
+-- USpine is a conversion checking, for spines of stuck functions
 data UnifyMode = UNormal | UPattern | USpine
 derive Show UnifyMode
 derive Eq UnifyMode
@@ -473,6 +476,9 @@ checkPostpone fc _ = return MkUnit
 addResult : UnifyResult → Int → Val → M UnifyResult
 addResult (MkUResult constraints) k v = pure $ MkUResult ((k,v) :: constraints)
 
+findResult : UnifyResult → Int → Maybe Val
+findResult (MkUResult constraints) k = assoc constraints k
+
 unifySpine : Env -> UnifyMode → UnifyResult -> SnocList (Val × Quant) -> SnocList (Val × Quant) -> M UnifyResult
 unifySpine env mode res Lin Lin = pure res
 unifySpine env mode res (xs :< (x, q)) (ys :< (y, q')) = do
@@ -535,7 +541,9 @@ unify env mode res' t u = do
       let spineMode = spineMode $ lookup k top
       -- we need to postpone if there are metas in the spines
       if k == k'
-        then unifySpine env spineMode res sp sp'
+        then do
+          debug "spine \{show sp} ≟ \{show sp'}"
+          unifySpine env spineMode res sp sp'
         else do
           let (CheckAll) = top.currentMod.modMetaCtx.mcmode | _ => error fc "vref mismatch \{show k} \{show k'}"
           if isConstr (lookup k top) && isConstr (lookup k' top)
@@ -644,6 +652,8 @@ unify env mode res' t u = do
 
     unifyPattern : UnifyResult -> Val -> Val -> M UnifyResult
     unifyPattern res t'@(VVar fc n₁ k sp)  u'@(VVar fc' n₂ k' sp')  =
+      let (Nothing) = findResult res k | Just t => unifyPattern res t u' in
+      let (Nothing) = findResult res k' | Just u => unifyPattern res t' u in
       if k == k' then unifySpine env mode res sp sp'
       else case (sp, sp') of
         (Lin,Lin) => if k < k'
@@ -653,8 +663,14 @@ unify env mode res' t u = do
         (_,Lin) => addResult res k' t'
         _ => error fc "Failed to unify \{show t'} and \{show u'} at \{show mode}"
 
-    unifyPattern res (VVar fc nm k Lin) u = addResult res k u
-    unifyPattern res t (VVar fc nm k Lin) = addResult res k t
+    unifyPattern res (VVar fc nm k Lin) u =
+      case findResult res k of
+        Just t => unifyPattern res t u
+        Nothing => addResult res k u
+    unifyPattern res t (VVar fc nm k Lin) =
+      case findResult res k of
+        Just u => unifyPattern res t u
+        Nothing => addResult res k t
     unifyPattern res t u = unifyMeta res t u
 
 unifyCatch fc ctx ty' ty = do
@@ -950,7 +966,9 @@ checkCase ctx scnm scty (dcName, arity, ty) = do
             pure False
   -- TODO make a better unify for pattern matching that catches this
   Right _ <- tryError $ checkConflicts res.constraints
-    | Left err => pure False
+    | Left err => do
+        debug "SKIP \{show dcName} because conflicts \{errorMsg err}"
+        pure False
   case getAt' (lvl2ix ctx.lvl scnm) ctx.env of
     Just val@(VRef fc nm sp) => pure $ nm == dcName
     _ => pure True
@@ -1497,18 +1515,18 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
       -- expand vars that may be solved, eval top level functions
       debug "EXP \{show scty} -> \{show scty'}"
       cons <- getConstructors ctx (getFC pat) scty'
+      cons <- filterM (checkCase ctx scnm scty') cons
+      when (isNil cons) $ error fc "Impossible case"
       let matched = matchedConstructors scnm prob.clauses
       let matched' = map snd matched
       let (hit,miss) = partition (flip elem matched' ∘ fst) cons
-      -- need to check miss is possible
-      miss' <- filterM (checkCase ctx scnm scty') miss
       for matched $ \case
        (fc, qn) => do
           if elem qn (map fst cons)
             then pure MkUnit
             else error fc "\{show qn} not a constructor for \{show scty'}"
 
-      debug "CONS \{show $ map fst cons} matched \{show matched} miss \{show miss} miss' \{show miss'}"
+      debug "CONS \{show $ map fst cons} matched \{show matched} miss \{show miss}"
 
       -- process constructors with matches
       alts <- traverse (buildCase ctx prob scnm scty') hit
@@ -1516,7 +1534,7 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
       let alts' = mapMaybe id alts
       when (length' alts' == 0) $ error (fc) "no alts for \{show scty'}"
       -- build a default case for missed constructors
-      case miss' of
+      case miss of
         Nil => pure $ Case fc sctm (mapMaybe id alts)
         missed => do
         -- ctx prob fc scnm

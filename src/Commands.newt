@@ -376,7 +376,7 @@ introActions (Just $ Unsolved fc qn ctx vty User) =
     checkCase ctx scty (dcName, arity, ty) = do
       vty <- eval Nil ty
       (ctx', ty', vars, sc) <- extendPi ctx (vty) Lin Lin
-      (Right res) <- tryError (unify ctx'.env UPattern ty' scty)
+      (Right res) <- tryError (unify ctx'.env UPattern emptyResult ty' scty)
               | Left err => do
                 putStrLn "SKIP \{show dcName} because unify error \{errorMsg err}"
                 pure False
@@ -389,7 +389,7 @@ introActions (Just $ Unsolved fc qn ctx vty User) =
       -- try the raw function too
       -- The idea is to pick up `f ?`
       (ctx, ty', binds, sp)  <- extendPi ctx ty Lin Lin
-      Right _ <- tryError (unify ctx.env UNormal vty ty')
+      Right _ <- tryError (unify ctx.env UNormal emptyResult vty ty')
          | _ => pure Nothing
       let edit = if length binds /= Z then "(" ++ (unwords $ [nm] ++ map (const "?") binds) ++ ")" else nm
       pure $ Just $ Intro nm $ MkEdit fc edit

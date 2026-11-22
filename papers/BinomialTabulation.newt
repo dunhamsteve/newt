@@ -12,7 +12,7 @@ data B : Nat → Nat → U → U where
   TipS : ∀ a. {k : Nat} → a → B (S k) (S k) a
   Bin : ∀ a. {n k : Nat} → B n (S k) a → B n k a → B (S n) (S k) a
 
--- we don't have LT
+-- The name LT is already taken by an Ordering dcon
 <-irrefl : ∀ x. ¬ (LTE (S x) x)
 <-irrefl (LTESucc pf) = <-irrefl pf
 
@@ -25,12 +25,8 @@ bounded (TipZ _) = LTEZero
 bounded (TipS t) = lteRefl
 bounded (Bin _ u) = LTESucc (bounded u)
 
-#log 2
 unbounded : ∀ k a. B k (S k) a → Void
 unbounded (Bin t u) = unbounded u
--- should be impossible because cyclic type
-unbounded (TipS _) = ?
-#log 0
 
 mapB : ∀ a b n k. (a → b) → B n k a → B n k b
 mapB f (TipZ x) = TipZ (f x)
@@ -52,7 +48,4 @@ cd _ _ (Bin (TipS y) u@(Bin _ _)) = TipS (y :- unTipB (cd (LTESucc LTEZero) lteR
 cd _ _ (Bin t@(Bin t' _) (TipZ z)) = Bin (cd lteRefl (LTESucc (bounded t')) t) (mapB (:- (z :- VNil)) t)
 cd _ pf (Bin (Bin _ _) (TipS _)) = absurd (<-irrefl pf)
 cd _ (LTESucc pf) (Bin t@(Bin t' _) u@(Bin _ _)) = Bin (cd (LTESucc LTEZero) (LTESucc (bounded t')) t) (zipBWith _:-_ t (cd (LTESucc LTEZero) pf u))
--- FIXME The second TipS is impossible because of a cycle k ≟ S k
-cd pf pf' (Bin (TipS y) (TipS _)) = ?
-
 
