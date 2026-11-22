@@ -13,7 +13,7 @@ pretty: build/newt2.js
 
 newt3: build/newt3.js
 
-test: build/newt.js lsp
+test: build/newt.js build/lsp.js
 	scripts/test
 	scripts/test-playground
 

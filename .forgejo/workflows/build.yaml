@@ -17,10 +17,11 @@ jobs:
       - name: install dependencies
         run: |
           apt-get update
-          apt-get install -y zip esbuild time
+          apt-get install -y time
+          # apt-get install -y zip esbuild 
           # npm install -g --allow-scripts=esbuild
           # npm install -g esbuild vite
-          (cd newt-vscode-lsp && npm install)
+          # (cd newt-vscode-lsp && npm install)
       - name: build
         run: |
           make newt3
