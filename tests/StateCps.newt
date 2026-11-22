@@ -1,0 +1,13 @@
+module StateCps
+
+import Prelude
+
+0 StateCpsT : (σ : U) (m : U → U) (α : U) → U
+StateCpsT σ m α = (δ : U) → σ → (α → σ → m δ) → m δ
+
+-- fails with unsolved meta, constrained with $m4 δ =?= m δ
+-- the Idris thing would help
+instance ∀ σ . {0 m : U → U} → Monad (StateCpsT σ m) where
+  return a = \ δ s k => k a s
+  bind {m} x f = \ δ s k => x δ s (\ a s => f a δ s k)
+
