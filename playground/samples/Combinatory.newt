@@ -41,7 +41,6 @@ data Env : Ctx -> U where
 
 lookup : {σ : Type} {Γ : Ctx} → Ref σ Γ → Env Γ → Val σ
 lookup Here (x ::: y) = x
-lookup () ENil
 lookup (There i) (x ::: env) = lookup i env
 
 infixl 1 ⟦_⟧

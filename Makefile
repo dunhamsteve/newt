@@ -15,6 +15,7 @@ newt3: build/newt3.js
 
 test: build/newt.js lsp
 	scripts/test
+	scripts/test-playground
 
 cheztest: build/newt.so lsp
 	make test NEWT='chez --program build/newt.so' RUNOUT="chez --script" OUTFILE=tmp/out.ss
