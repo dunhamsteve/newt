@@ -46,9 +46,10 @@ showCtx ctx =
     go _ _ Nil acc = pure acc
     go names k ((v, BI _ n _ q ty) :: xs) acc = do
         tty <- quote ctx.lvl ty
+        vtm <- quote ctx.lvl v
         if isBind v k
           then go names (1 + k) xs ("  \{show q}\{n} : \{rpprint names tty}" :: acc)
-          else go names (1 + k) xs ("  \{show q}\{n} = \{show v}" :: acc)
+          else go names (1 + k) xs ("  \{show q}\{n} = \{rpprint names vtm}" :: acc)
           -- else go names (1 + k) xs ("  \{show q}\{n} : \{rpprint names tty} = \{show v}" :: acc)
 
 lookupDef : Context -> String -> Maybe Val
@@ -472,9 +473,28 @@ checkPostpone : FC → Val → M Unit
 checkPostpone fc (VCase _ (VMeta _ qn _ sp) _ _) = throwError $ Postpone fc "postponed stuck meta \{show qn}"
 checkPostpone fc _ = return MkUnit
 
--- TODO occurs check
+occursCheck : Int → Val → M Unit
+occursCheck l (VVar fc nm k sp) = if k == l then error fc "occurs" else pure MkUnit
+occursCheck l (VMeta _ _ _ sp) = traverse_ (occursCheck l) $ map fst sp
+occursCheck l (VRef _ nm sp) = traverse_ (occursCheck l) $ map fst sp
+occursCheck l (VDelay _ t) = occursCheck l t
+occursCheck l (VForce _ t) = occursCheck l t
+-- TODO rest
+occursCheck l _ = pure MkUnit
+-- these three would be a pain
+occursCheck l (VCase _ sc _ _) = ?
+occursCheck l (VLam _ _ b) = ?
+occursCheck l (VPi _ _ b) = ?
+occursCheck l (VLet _ _ _ _) = ?
+occursCheck l (VLetRec _ _ _ _ _ _) = ?
+occursCheck l (VU _) = ?
+occursCheck l (VErased _) = ?
+occursCheck l (VLit _ _) = ?
+
 addResult : UnifyResult → Int → Val → M UnifyResult
-addResult (MkUResult constraints) k v = pure $ MkUResult ((k,v) :: constraints)
+addResult (MkUResult constraints) k v = do
+  occursCheck k v
+  pure $ MkUResult ((k,v) :: constraints)
 
 findResult : UnifyResult → Int → Maybe Val
 findResult (MkUResult constraints) k = assoc constraints k
@@ -545,13 +565,15 @@ unify env mode res' t u = do
           debug "spine \{show sp} ≟ \{show sp'}"
           unifySpine env spineMode res sp sp'
         else do
-          let (CheckAll) = top.currentMod.modMetaCtx.mcmode | _ => error fc "vref mismatch \{show k} \{show k'}"
+          let (CheckAll) = top.currentMod.modMetaCtx.mcmode | _ => error fc "auto search vref mismatch \{show k} \{show k'}"
           if isConstr (lookup k top) && isConstr (lookup k' top)
             then error fc "vref mismatch \{show k} \{show k'}"
           -- We only really need to know if it has a meta at the moment
           case join (map (getMetas ∘ fst) $ sp <>> Nil) ++ join (map (getMetas ∘ fst) $ sp' <>> Nil) : List QName of
-            Nil => error fc "vref mismatch \{show t'} =?= \{show u'}"
-            _ =>  throwError $ Postpone fc "postponed"
+            Nil => case mode of
+              UPattern => throwError $ Postpone fc "postpone vref mismatch \{show t'} =?= \{show u'}"
+              _ => error fc "vref mismatch \{show t'} =?= \{show u'}"
+            _ => throwError $ Postpone fc "postponed ref/ref"
       where
         isConstr : Maybe TopEntry → Bool
         isConstr (Just (MkEntry fc quant name type (DCon _ _ _ _) eflags)) = True
@@ -871,28 +893,11 @@ checkConflicts Nil = pure MkUnit
 checkConflicts ((l, v) :: xs) = do
   -- This shouldn't happen anymore
   -- traverse_ go xs
-  debug "occurs \{show l} \{show v}"
+  -- debug "occurs \{show l} \{show v}"
   -- FIXME - move this to addResult
-  occursCheck v
+  -- occursCheck l v
   checkConflicts xs
   where
-    occursCheck : Val → M Unit
-    occursCheck (VVar fc nm k sp) = if k == l then error fc "occurs" else pure MkUnit
-    occursCheck (VMeta _ _ _ sp) = traverse_ occursCheck $ map fst sp
-    occursCheck (VRef _ nm sp) = traverse_ occursCheck $ map fst sp
-    occursCheck (VDelay _ t) = occursCheck t
-    occursCheck (VForce _ t) = occursCheck t
-    -- TODO rest (but really, we need proper unification
-    occursCheck _ = pure MkUnit
-    occursCheck (VCase _ sc _ _) = ?
-    occursCheck (VLam _ _ b) = ?
-    occursCheck (VPi _ _ b) = ?
-    occursCheck (VLet _ _ _ _) = ?
-    occursCheck (VLetRec _ _ _ _ _ _) = ?
-    occursCheck (VU _) = ?
-    occursCheck (VErased _) = ?
-    occursCheck (VLit _ _) = ?
-
     go : (Int × Val) → M Unit
     go (k,w) = if k /= l then pure MkUnit
       else case (v,w) of
@@ -959,10 +964,10 @@ checkCase ctx scnm scty (dcName, arity, ty) = do
   (ctx', ty', vars, sc) <- extendPi ctx (vty) Lin Lin
   (Right res) <- tryError (unify ctx'.env UPattern emptyResult ty' scty)
           | Left (Postpone _ msg) => do
-            debug "Maybe \{show dcName} because unify postpone \{msg}"
+            debug "MAYBE \{show dcName} because postpone \{msg}"
             pure True
           | Left err => do
-            debug "SKIP \{show dcName} because unify error \{errorMsg err}"
+            debug "SKIP \{show dcName} because unify error \{show err}"
             pure False
   -- TODO make a better unify for pattern matching that catches this
   Right _ <- tryError $ checkConflicts res.constraints
@@ -970,7 +975,7 @@ checkCase ctx scnm scty (dcName, arity, ty) = do
         debug "SKIP \{show dcName} because conflicts \{errorMsg err}"
         pure False
   case getAt' (lvl2ix ctx.lvl scnm) ctx.env of
-    Just val@(VRef fc nm sp) => pure $ nm == dcName
+    Just val@(VRef fc nm sp) => trace "FORCE" $ pure $ nm == dcName
     _ => pure True
 
 -- the code will probably get bigger unless we check whether the vars are actually used
@@ -1156,16 +1161,12 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
   -- codomain with the scrutinee type
   debug "unify dcon cod with scrut\n  \{show ty'}\n  \{show scty}"
 
-  -- FIXME There is no occurs check here (and the results don't see each other)
-  -- c.f. Zippy.newt - impossible cases with circular defs
-  -- simply post-processing `res` can get dicey because we may have further
-  -- unification to do (say v1 -> S v2, v1 -> v3, and v3 -> S v4)
-  Just res <- catchError(Just <$> unify ctx'.env UPattern emptyResult ty' scty)
-              (\err => do
-                  -- REVIEW we may need to distinguish between NO and FAIL here
-                  debug "SKIP \{show dcName} because unify error \{errorMsg err}"
-                  pure Nothing)
-    | _ => pure Nothing
+  Right res <- tryError (unify ctx'.env UPattern emptyResult ty' scty)
+    | Left err => do
+        let fc = errorFC $ join {List} $ map (.cons) prob.clauses
+        addError $ setFC err fc
+        tm <- freshMeta ctx' fc scty ErrorHole
+        pure $ Just $ CaseCons dcName (length vars) tm
 
   let (VRef _ sctynm _) = scty | _ => error (getFC scty) "case split on non-inductive \{show scty}"
   case getAt' (lvl2ix ctx.lvl scnm) ctx.env of
@@ -1205,7 +1206,12 @@ buildCase ctx prob scnm scty (dcName, arity, ty) = do
         pure $ Just $ CaseCons dcName (length vars) tm
     Just v => fatalError "Weird thing \{show v} in buildCase"
     Nothing => fatalError "Bad index in buildCase"
-
+  where
+    errorFC : List PMatch → FC
+    errorFC Nil = strace "sad" ctx.ctxFC
+    errorFC ((PC q ix (PatCon fc _ qn _ _)) :: xs) =
+      if ix == scnm && qn == dcName then strace "woo" fc else errorFC xs
+    errorFC ((PC q ix (_)) :: xs) = errorFC xs
 
 splitArgs : Raw -> List (Raw × Icit) -> (Raw × List (Raw × Icit))
 splitArgs (RApp fc t u icit) args = splitArgs t ((u, icit) :: args)
@@ -1250,9 +1256,9 @@ makeClause (lhs, rhs) = do
   pats <- traverse mkPat args
   pure $ MkClause (getFC lhs) Nil pats rhs
 
-registerClause : FC → Env → Val → Raw → M Unit
-registerClause rfc env ty (RVar fc nm) = addTypeInfo fc nm env ty rfc
-registerClause rfc env ty (RApp fc t u icit) = registerClause rfc env ty t
+registerClause : FC → Context → Val → Raw → M Unit
+registerClause rfc ctx ty (RVar fc nm) = addTypeInfo fc nm ctx ty rfc
+registerClause rfc ctx ty (RApp fc t u icit) = registerClause rfc ctx ty t
 registerClause rfc _ _ _ = pure MkUnit
 
 levelType : Context → Int → M Val
@@ -1292,12 +1298,12 @@ checkDone fc ctx Nil (Just body) ty = do
 checkDone fc ctx (PC q x (PatWild pvfc icit) :: xs) body ty = do
   scty <- levelType ctx x
   addInfo $ CaseSplit pvfc ctx x scty
-  addTypeInfo pvfc "_" ctx.env scty pvfc
+  addTypeInfo pvfc "_" ctx scty pvfc
   checkDone fc ctx xs body ty
 checkDone fc ctx (PC q nm (PatVar pvfc _ nm') :: xs) body ty = do
   scty <- levelType ctx nm
   addInfo $ CaseSplit pvfc ctx nm scty
-  addTypeInfo pvfc nm' ctx.env scty pvfc
+  addTypeInfo pvfc nm' ctx scty pvfc
 
   let ctx = the Context { types $= rename (lvl2ix ctx.lvl nm) } ctx
   checkDone fc ctx xs body ty
@@ -1532,10 +1538,11 @@ buildTree ctx prob@(MkProb ((MkClause fc constraints Nil expr) :: cs) ty) = do
       alts <- traverse (buildCase ctx prob scnm scty') hit
       debug "GOTALTS \{show alts}"
       let alts' = mapMaybe id alts
-      when (length' alts' == 0) $ error (fc) "no alts for \{show scty'}"
+      when (isNil alts') $ error fc "no alts for \{show scty'}"
+
       -- build a default case for missed constructors
       case miss of
-        Nil => pure $ Case fc sctm (mapMaybe id alts)
+        Nil => pure $ Case fc sctm alts'
         missed => do
         -- ctx prob fc scnm
           default <- buildDefault ctx prob fc scnm (map fst missed)
@@ -1621,8 +1628,8 @@ checkWhere ctx decls body ty = do
   top <- getTop
   clauses' <- traverse makeClause clauses
   vty <- eval ctx.env funTy
-  traverse_ (registerClause nfc ctx.env vty) $ map fst clauses
-  addTypeInfo nfc name ctx.env vty nfc
+  traverse_ (registerClause nfc ctx vty) $ map fst clauses
+  addTypeInfo nfc name ctx vty nfc
   debug "\{name} vty is \{show vty}"
   let ctx' = extend ctx (BI nfc name Explicit Many vty)
   tm <- buildTree (enterMarker' q $ withPos ctx' defFC) (MkProb clauses' vty)
@@ -1788,7 +1795,7 @@ check ctx tm ty = do
                 -- we don't have surface syntax to put quantity on the lambda
                 -- For now, pull it off of the type
                 let var = VVar fc nm ctx.lvl Lin
-                addTypeInfo nmfc nm ctx.env a nmfc
+                addTypeInfo nmfc nm ctx a nmfc
                 -- if the user provided a type, do a conversion check
                 case mty of
                   Just a' => do
@@ -1814,7 +1821,7 @@ check ctx tm ty = do
         let ctx' = extend ctx (BI fc nm icit quant a)
         b <- MkClosure ctx.env <$> freshMeta (enterMarker ctx') fc (VU emptyFC) Normal
         unifyCatch fc ctx tty (VPi fc (BI nmFC "_" icit quant a) b)
-        addTypeInfo nmFC nm ctx.env a nmFC
+        addTypeInfo nmFC nm ctx a nmFC
         let var = VVar fc nm ctx.lvl Lin
         ty' <- b $$ var
         tm' <- check ctx' tm ty'
@@ -1829,7 +1836,7 @@ check ctx tm ty = do
       vty <- eval ctx.env ty'
       v' <- check ctx v vty
       vv <- eval ctx.env v'
-      addTypeInfo fc nm ctx.env vty fc
+      addTypeInfo fc nm ctx vty fc
       -- TODO allow rig on Let (here and check -> checkIn above)
       let ctx' = define ctx (BI fc nm Explicit Many vty) vv
       sc' <- check ctx' sc rty
@@ -1885,13 +1892,13 @@ infer ctx (RVar fc nm) = go 0 ctx.types
           debug "lookup \{show name} as \{show def}"
           checkMarker fc ctx.marker q $ E fc "Erased name \{show nm} used in unerased context"
           vty <- eval Nil ty
-          addTypeInfo fc nm ctx.env vty vfc
+          addTypeInfo fc nm ctx vty vfc
           pure (Ref fc name, vty)
         -- Can we soften this without introducing a meta for the type
         -- a meta might be additional errors, but also could lead to narrowing of possible names...
         -- especially when we hit this for .foo
         Nothing => do
-          ty <- freshMeta (enterMarker ctx) fc (VU emptyFC) Normal
+          ty <- freshMeta (enterMarker ctx) fc (VU emptyFC) ErrorHole
           vty <- eval ctx.env ty
           let err = ENotInScope fc nm ctx vty
           addError err
@@ -1902,7 +1909,7 @@ infer ctx (RVar fc nm) = go 0 ctx.types
       if x == nm
       then do
         checkMarker fc ctx.marker q $ E fc "Erased value '\{show x}' used in unerased context"
-        addTypeInfo fc nm ctx.env ty vfc
+        addTypeInfo fc nm ctx ty vfc
         pure (Bnd fc i, ty)
       else go (i + 1) xs
 
@@ -1948,13 +1955,13 @@ infer ctx (RPi fc info@(BI nmfc nm icit quant ty) ty2) = do
   ty' <- checkIn ctx Zero ty (VU fc)
   vty' <- eval ctx.env ty'
   -- don't register nameless args
-  if nm /= "_" then addTypeInfo nmfc nm ctx.env vty' nmfc
+  if nm /= "_" then addTypeInfo nmfc nm ctx vty' nmfc
   ty2' <- checkIn (extend ctx (const vty' <$> info)) Zero ty2 (VU fc)
   pure (Pi fc (const ty' <$> info) ty2', (VU fc))
 infer ctx (RLet fc nm ty v sc) = do
   ty' <- checkIn ctx Zero ty (VU emptyFC)
   vty <- eval ctx.env ty'
-  addTypeInfo fc nm ctx.env vty fc
+  addTypeInfo fc nm ctx vty fc
   v' <- check ctx v vty
   vv <- eval ctx.env v'
   -- TODO allow rig on let (what use case?)
@@ -1964,7 +1971,7 @@ infer ctx (RLet fc nm ty v sc) = do
 
 infer ctx (RLam fc (BI nmfc nm icit quant mty) tm) = do
   a <- maybeType nmfc ctx mty
-  addTypeInfo nmfc nm ctx.env a nmfc
+  addTypeInfo nmfc nm ctx a nmfc
   let info = (BI nmfc nm icit quant a)
   let ctx' = extend ctx info
   (tm', b) <- infer ctx' tm

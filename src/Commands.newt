@@ -28,6 +28,11 @@ getIndent : Int → List Char → Int
 getIndent acc (' ' :: rest) = getIndent (1 + acc) rest
 getIndent acc _ = acc
 
+errorsAtPos : Int → Int → M (List Error)
+errorsAtPos row col = do
+  top <- getTop
+  pure $ filter (posInFC row col ∘ getFC) top.currentMod.modErrors
+
 internalName : String → Bool
 internalName nm = isPrefixOf "$" nm
 
@@ -87,11 +92,14 @@ getHoverInfo repo modns row col = do
     Just mod <- switchModule repo modns | _ => pure NeedCheck
     top <- getTop
 
+    Nothing <- getUserInfo $ listValues mod.modMetaCtx.metas | Just info => pure info
+
     -- check type at point info in module
     let (Nothing) = checkMod row col mod.modTypes
-      | Just (MkTypeInfo fc nm env vty fc') => do
-        ty <- quote (length' env) vty
-        pure $ HasHover fc' "\{nm} : \{rpprint Nil ty}"
+      | Just (MkTypeInfo fc nm ctx vty fc') => do
+        ty <- quote (length' ctx.env) vty
+        ty <- nf ctx.env ty
+        pure $ HasHover fc' "\{nm} : \{rpprint ctx.names ty}"
 
     -- Find the token at the point
     let lines = split mod.modSource "\n"
@@ -113,6 +121,18 @@ getHoverInfo repo modns row col = do
     pure $ HasHover e.fc ("\{show e.name} : \{rpprint Nil ty}")
 
     where
+        getUserInfo : List MetaEntry → M (Maybe HoverInfo)
+        getUserInfo Nil = pure Nothing
+        getUserInfo ((Unsolved fc k ctx ty User) :: xs) =
+          if posInFC row col fc then do
+            ty' <- quote ctx.lvl ty
+            let dispType = render 90 $ pprint ctx.names ty'
+            dispEnv <- showCtx ctx
+            let msg = "\{dispEnv}\n--------\n\{dispType}"
+            pure $ Just $ HasHover fc msg
+          else getUserInfo xs
+        getUserInfo (_ :: xs) = getUserInfo xs
+
         -- We don't want to pick up the paren token when on the border
         isIdent : BTok → Bool
         isIdent (MkBounded (Tok Ident _) _) = True
@@ -520,6 +540,7 @@ addClause row col = do
 
 getActions : FileSource → String → Int → Int → M (List CodeAction)
 getActions repo modns row col = do
+  -- TODO maybe offer to auto solve User implicits _ (and/or replace with the found solution)
   Just mod <- switchModule repo modns | _ => pure Nil
   top <- getTop
   let infos = filter (posInFC row col ∘ getFC) top.currentMod.modInfos

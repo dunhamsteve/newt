@@ -99,7 +99,7 @@ processTypeSig ns fc q fcnames tm = do
   for_ fcnames $ \case
     (fc,nm) => do
       setDef (QN ns nm) fc q ty Axiom Nil
-      addTypeInfo fc nm [] vty fc
+      addTypeInfo fc nm (mkCtx fc Zero)  vty fc
 
 processPrimType : String → FC → Name → Maybe Raw → M Unit
 processPrimType ns fc nm ty = do
@@ -161,7 +161,7 @@ processDef ns fc nm clauses = do
   debug "Add def \{nm} \{render 90 $ pprint Nil tm} : \{render 90 $ pprint Nil ty}"
   updateDef (QN ns nm) fc ty (Fn tm)
   vty <- eval [] ty
-  traverse_ (registerClause fc [] vty) $ map fst clauses
+  traverse_ (registerClause fc (mkCtx fc q) vty) $ map fst clauses
   let name = show $ QN ns nm
   if shouldInline tm
      || name == "Prelude.Prelude.Monad Prelude.IO,bind"

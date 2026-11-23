@@ -44,3 +44,21 @@ m ≟' n = case inspect' (view m) n of
     Just Zero ** _ => Yes Refl
     Just (Suc m n) ** _ => mapEquiv (cong S) succEqIsEq (m ≟' n)
     Nothing ** pf => No (\z => case z : m ≡ n of Refl => view-diag m pf)
+
+
+≟-diag : (m : Nat) → m ≟ m ≡ Yes Refl
+≟-diag m = case inspect' (view m) m of
+  (Just Zero ** eq) => Refl
+  -- one of these `m` is dotted
+  (Just (Suc m m) ** eq) =>
+    replace (\z => mapEquiv (cong S) succEqIsEq z ≡ Yes Refl) (sym $ ≟-diag m) Refl
+    -- TODO case for future rewrite improvement
+    -- rewrite diag-≟ m in Refl
+  (Nothing ** eq) => absurd (view-diag _ eq)
+
+
+≟-diag' : (m : Nat) → m ≟ m ≡ Yes Refl
+≟-diag' m = case withProof (view m m) of
+  (Just Zero ** pf) => Refl
+  (Just (Suc m m) ** pf) => replace (\z => mapEquiv (cong S) succEqIsEq z ≡ Yes Refl) (sym $ ≟-diag' m) Refl
+  (Nothing ** pf) => absurd (view-diag _ pf)

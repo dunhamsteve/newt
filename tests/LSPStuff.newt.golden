@@ -1,12 +1,12 @@
 *** Check LSPStuff.newt
 ERROR 12:5--12:6 "missing cases: [LSPStuff.B]"
-ERROR 9:0--9:8 "no definition for show : LSPStuff.Foo -> Prim.String"
+ERROR 9:0--9:8 "no definition for show : Foo -> String"
 WARN 5:5--5:6 "Unused name n"
 WARN 5:7--5:8 "Unused name m"
 WARN 16:5--16:6 "Unused name a"
 WARN 16:7--16:8 "Unused name b"
-INFO 16:12--16:13 "  _$0 = (Prelude._,_ Prim.Int Prim.String _$3:3 _$4:4)\n  0 a$1 = Prim.Int\n  0 b$2 = Prim.String\n  a : Prim.Int\n  b : Prim.String\n--------\nPrim.String"
-INFO 5:11--5:12 "  n : Prelude.Nat\n  m : Prelude.Nat\n--------\nPrelude.Nat"
+INFO 16:12--16:13 "  _$0 = _,_ Int String a:1 b:0\n  0 a$1 = Int\n  0 b$2 = String\n  a : Int\n  b : String\n--------\nString"
+INFO 5:11--5:12 "  n : Nat\n  m : Nat\n--------\nNat"
 
 *** Actions LSPStuff.newt 5 6
 * Case split
@@ -53,7 +53,7 @@ INFO 5:11--5:12 "  n : Prelude.Nat\n  m : Prelude.Nat\n--------\nPrelude.Nat"
 - LSPStuff.newt 26:4--26:6 "woot"
 
 *** info LSPStuff.newt 30 7
-823:0--823:3 nub : {0  a : U } -> {{ _ : Prelude.Eq a:0 }} -> (Prelude.List a:1) -> Prelude.List a:2
+823:0--823:3 nub : {0  a : U } -> {{ _ : Eq a:0 }} -> (List a:1) -> List a:2
 
 *** Actions LSPStuff.newt 34 12
 

@@ -2,8 +2,8 @@
 module Prelude
 module TypeLam
 ERROR at tests/TypeLam.newt:7:33--7:34: unification failure: vref mismatch Prim.Int Prelude.Nat
-  failed to unify Prim.Int
-             with Prelude.Nat
+  failed to unify Int
+             with Nat
   
   -- this should be an error
   foo : List Int → List Int
