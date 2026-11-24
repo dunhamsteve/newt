@@ -1,0 +1,9 @@
+when:
+  - event: [push, pull_request, manual]
+steps:
+  - name: build-and-test
+    image: alpine:latest
+    commands:
+      - apk add --no-cache nodejs make bash git
+      - make newt2
+      - make test

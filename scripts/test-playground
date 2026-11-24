@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 SAMPLES=$(find playground/samples -name "*.newt")
 # NEWT ="bun run build/newt.js"
 NEWT=${NEWT:="node build/newt.js"}
